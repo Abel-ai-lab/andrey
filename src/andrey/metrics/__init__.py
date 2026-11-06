@@ -3,7 +3,7 @@
 Standalone and method-agnostic: every metric is a pure function of an estimated structure and a true
 one, so what a metric computes depends on what the structure carries (its kind, whether it is
 temporal, whether it holds an ordering / weights / latent flags), never on which algorithm produced
-it. Depends only on :mod:`andrey.core` and numpy.
+it. Depends only on :mod:`andrey.core` and NumPy.
 
 Two layers:
 

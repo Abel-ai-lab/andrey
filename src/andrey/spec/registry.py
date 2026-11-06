@@ -954,12 +954,7 @@ _add(
                 default=True,
                 doc="false makes every pair a candidate edge.",
             ),
-            ParamSpec(
-                name="standardize",
-                type="bool",
-                default=False,
-                doc="Scale each column to unit variance first.",
-            ),
+            concept_param("standardize"),
             concept_param(
                 "w_threshold",
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
@@ -1147,6 +1142,7 @@ _add(
                 "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Zheng, Aragam, Ravikumar & Xing 2018",
@@ -1211,6 +1207,7 @@ _add(
                 exclusive_minimum=True,
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Bello, Aragam & Ravikumar 2022",
@@ -2322,6 +2319,7 @@ _add(
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
                 "this value, above 1, the weight the fit starts from.",
             ),
+            concept_param("standardize"),
         ),
         references=(
             "Pamfil et al. 2020",

@@ -474,6 +474,22 @@ _CONCEPTS = (
         others_exempt="No weighted continuous fit to threshold.",
     ),
     Concept(
+        key="standardize",
+        summary="Scale each column to unit variance before a continuous fit whose penalty and "
+        "weight thresholds read the data's units; its weights are then those of the scaled "
+        "columns.",
+        param=_template(
+            "standardize",
+            "bool",
+            False,
+            "Scale each column to unit variance first, so the fit does not read the columns' "
+            "units; the weights are then those of the scaled columns.",
+        ),
+        fragment="unit variance",
+        suitable=(*_CONTINUOUS, "calm", "dynotears"),
+        others_exempt="Not a continuous-optimization fit.",
+    ),
+    Concept(
         key="fdr_method",
         summary="The correction of the lagged links' p-values for the number of links tested: "
         "fdr_bh, the default, replaces them with their Benjamini-Hochberg "

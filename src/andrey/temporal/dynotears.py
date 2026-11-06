@@ -27,9 +27,11 @@ from andrey.core.ties import tie_ranks
 from andrey.search.continuous import (
     Canonical,
     augmented_lagrangian,
+    center,
     threshold_dag,
     trace_exponential,
 )
+from andrey.temporal.pcmci import lagged_design
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -52,18 +54,12 @@ class DynotearsResult:
     edges_removed: int
 
 
-def lagged_design(series: np.ndarray, tau_max: int) -> np.ndarray:
-    """``[X | X_1 | ... | X_p]`` for ``p = tau_max``: row ``s`` holds steps ``t, t-1, ..., t-p``.
-
-    ``t = p + s`` runs over the steps that have ``p`` steps before them, so the design has
-    ``len(series) - p`` rows and ``d * (p + 1)`` columns.
-    """
-    steps = series.shape[0]
-    return np.hstack([series[tau_max - k : steps - k] for k in range(tau_max + 1)])
-
-
 def lagged_covariance(series: np.ndarray, tau_max: int) -> np.ndarray:
-    """The covariance of :func:`lagged_design`'s columns, each centered on its own mean."""
+    """The covariance of the lagged design's columns over lags ``0`` to ``tau_max``.
+
+    The design is :func:`~andrey.temporal.pcmci.lagged_design`'s; each column is centered on its
+    own mean.
+    """
     design = lagged_design(series, tau_max)
     centered = design - design.mean(axis=0, keepdims=True)
     return centered.T @ centered / design.shape[0]
@@ -79,21 +75,24 @@ def dynotears(
     max_iter: int,
     h_tol: float,
     rho_max: float,
+    standardize: bool = False,
     constraints: LaggedConstraints | None = None,
 ) -> DynotearsResult:
     """Fit DYNOTEARS (Pamfil et al. 2020) to ``series``, one row per time step.
 
     The columns are fit in the order of their :func:`~andrey.core.ties.tie_ranks`, so the result
-    does not depend on the order they come in. ``constraints`` holds the knowledge over lags ``0``
-    to ``tau_max``: a forbidden link stays at zero, and a required one leaves the penalty and the
-    threshold and is never dropped by the cycle repair.
+    does not depend on the order they come in. ``standardize`` scales each column of the series to
+    unit variance first (:func:`~andrey.search.continuous.center`). ``constraints`` holds the
+    knowledge over lags ``0`` to ``tau_max``: a forbidden link stays at zero, and a required one
+    leaves the penalty and the threshold and is never dropped by the cycle repair.
     """
     samples = np.asarray(series, dtype=np.float64)
     d = samples.shape[1]
     lags = tau_max + 1
     order = np.argsort(tie_ranks(samples))
     back = np.argsort(order)
-    cov = lagged_covariance(samples[:, order], tau_max)
+    ordered = samples[:, order]
+    cov = lagged_covariance(center(ordered, standardize=True) if standardize else ordered, tau_max)
     if constraints is None:
         forbidden = required = np.zeros((lags, d, d), dtype=bool)
     else:

@@ -55,6 +55,7 @@ def notears(
     mcp_delta: float = 0.2,
     mcp_decay: float = 0.8,
     max_path: int = 50,
+    standardize: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with NOTEARS, a continuous-optimization structure learner.
@@ -95,6 +96,10 @@ def notears(
     max_path : int, default=50
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
+    standardize : bool, default=False
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns. Limitations gives the fit's errors on
+        standardized columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -259,6 +264,7 @@ def notears(
             mcp_delta=mcp_delta,
             mcp_decay=mcp_decay,
             max_path=max_path,
+            standardize=standardize,
             labels=labels,
             constraints=constraints,
         )
@@ -280,6 +286,7 @@ def dagma(
     mcp_delta: float = 0.2,
     mcp_decay: float = 0.8,
     max_path: int = 50,
+    standardize: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with DAGMA, a continuous-optimization structure learner.
@@ -324,6 +331,10 @@ def dagma(
     max_path : int, default=50
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
+    standardize : bool, default=False
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns. Limitations gives the fit's errors on
+        standardized columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -490,6 +501,7 @@ def dagma(
             mcp_delta=mcp_delta,
             mcp_decay=mcp_decay,
             max_path=max_path,
+            standardize=standardize,
             labels=labels,
             constraints=constraints,
         )

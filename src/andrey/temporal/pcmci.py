@@ -185,7 +185,7 @@ def design_test(
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
     """
-    design = lagged_design(data, tau_max)
+    design = lagged_design(data, 2 * tau_max)
     if indep_test not in PARTIAL_CORRELATION_TESTS:
         mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
         built = make_indep_test(indep_test, design, categorical=mask, seed=seed)
@@ -225,15 +225,15 @@ def design_column_name(n_vars: int, name: Callable[[int], str] = str) -> Callabl
     return column
 
 
-def lagged_design(data: np.ndarray, tau_max: int) -> np.ndarray:
-    """Return the ``(T - 2 * tau_max, n * (2 * tau_max + 1))`` lagged design of a ``(T, n)`` series.
+def lagged_design(series: np.ndarray, n_lags: int, *, first: int = 0) -> np.ndarray:
+    """Return the lagged design of a ``(T, n)`` series over lags ``first`` to ``n_lags``.
 
-    Column ``lag * n + i`` holds variable ``i`` at ``t - lag``, row by row for ``t = 2 * tau_max ..
-    T - 1``.
+    Column ``(lag - first) * n + i`` holds variable ``i`` at ``t - lag``, row by row for ``t =
+    n_lags .. T - 1``, so the design has ``T - n_lags`` rows and ``n * (n_lags - first + 1)``
+    columns.
     """
-    n_steps = data.shape[0]
-    window = 2 * tau_max
-    return np.hstack([data[window - lag : n_steps - lag] for lag in range(window + 1)])
+    n_steps = series.shape[0]
+    return np.hstack([series[n_lags - lag : n_steps - lag] for lag in range(first, n_lags + 1)])
 
 
 def _column(link: Link, n_vars: int) -> int:

@@ -60,6 +60,19 @@ The other former names are gone too:
 - `andrey.config` refuses `num_workers`, as an argument and as a setting: use `n_jobs`.
 - Andrey no longer reads `ANDREY_NUM_WORKERS`: set `ANDREY_N_JOBS`.
 
+### Ensembles of datasets
+
+`andrey.data.generate` and `andrey.data.Ensemble` still work in 0.15, with an
+`andrey.DeprecatedArgumentWarning`, and stop working in 0.16. A loop over `SCM.sample` draws the
+same datasets:
+
+```python
+# 0.14
+datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
+# 0.15
+datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
+```
+
 ## From 0.13 to 0.14
 
 Andrey 0.14.0 names each row's environment `env` in both `cdnod` and `gies`, and `gies` takes the
