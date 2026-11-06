@@ -113,14 +113,16 @@ SHARED = {
         "pairs allowed to be adjacent, and temporal tiers, all honored.",
         lambda m: takes(m, "knowledge") and REGISTRY[m].family != "temporal" and m != "gnies",
     ),
-    # cdnod reads env as a variable, coerced to numbers.
+    # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
         "Parameters",
         "env",
         "first",
         "The environment of each row: one label per row, strings or numbers, not both, or the name "
         "of a column of the DataFrame ``data`` that holds them.",
-        lambda m: any(i.name == "env" for i in REGISTRY[m].data.inputs) and m != "cdnod",
+        lambda m: (
+            any(i.name == "env" for i in REGISTRY[m].data.inputs) and m not in ("cdnod", "fci_jci")
+        ),
     ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
