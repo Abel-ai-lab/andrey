@@ -51,7 +51,7 @@ def _fit(
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap the graph ``structure`` names or the set."""
-    from andrey.search.hybrid import local_set, local_structure
+    from andrey.constraint.blanket import local_set, local_structure
     from andrey.spec.concepts import BLANKET_STRUCTURES
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)

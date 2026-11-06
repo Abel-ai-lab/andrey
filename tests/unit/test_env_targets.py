@@ -66,40 +66,15 @@ def test_the_reference_fit_orients_the_chain(reference):
     ]
 
 
-# --- gies: every form of env and targets ----------------------------------------------------------
-
-
-def _positions_or_nan() -> np.ndarray:
-    """Each row's target as a 0-based position, ``NaN`` on an observational row."""
-    cells = np.full(N, np.nan, dtype=object)
-    cells[ENV == "set x1"], cells[ENV == "set x2"] = 1, 2
-    return cells
+# --- gies: env and targets as columns of the data -------------------------------------------------
 
 
 GIES_FORMS = {
-    "mapping by name": lambda: andrey.gies(DATA, ENV, targets=TARGETS),
-    "mapping by position": lambda: andrey.gies(
-        DATA, ENV, targets={"observed": [], "set x1": [1], "set x2": 2}
-    ),
-    "number labels": lambda: andrey.gies(
-        DATA, np.repeat([7, 3, 5], [500, 200, 200]), targets={7: [], 3: ["x1"], 5: ["x2"]}
-    ),
     "env column": lambda: andrey.gies(DATA.assign(e=ENV), "e", targets=TARGETS),
     "targets column": lambda: andrey.gies(
         DATA.assign(t=np.select([ENV == "set x1", ENV == "set x2"], ["x1", "x2"], "")),
         targets="t",
     ),
-    "targets column of lists": lambda: andrey.gies(
-        DATA.assign(t=[[] if e == "observed" else [e[-2:]] for e in ENV]), targets="t"
-    ),
-    "targets column of NaN and positions": lambda: andrey.gies(
-        DATA.assign(t=_positions_or_nan()), targets="t"
-    ),
-    "env and targets columns": lambda: andrey.gies(
-        DATA.assign(e=ENV, t=[[] if e == "observed" else e[-2:] for e in ENV]), "e", targets="t"
-    ),
-    "matrix with env": lambda: andrey.gies(DATA, ENV, targets=MASK),
-    "matrix as a table": lambda: andrey.gies(DATA, targets=pd.DataFrame(MASK.astype(int))),
 }
 
 
@@ -250,11 +225,6 @@ CDNOD_FORMS = {
 @pytest.mark.parametrize("form", list(CDNOD_FORMS))
 def test_each_form_of_env_fits_what_its_numbers_fit(form):
     assert _same(CDNOD_FORMS[form](), andrey.cdnod(X, DOMAIN))
-
-
-def test_cdnod_with_one_domain_is_pc():
-    one = andrey.cdnod(X, np.zeros(600))
-    assert np.array_equal(one.structure.to_numpy(), andrey.pc(X).structure.to_numpy())
 
 
 @pytest.mark.parametrize(

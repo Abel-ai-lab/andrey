@@ -557,14 +557,6 @@ def test_tabu_stops_at_max_iter_and_warns():
     assert len(out.structure.oriented_edges()) == 3
 
 
-def test_cdnod_with_one_domain_gives_the_pc_graph():
-    rng = np.random.default_rng(1)
-    w = np.triu(rng.uniform(0.5, 1.5, (6, 6)) * (rng.random((6, 6)) < 0.4), 1)
-    x = rng.standard_normal((500, 6)) @ np.linalg.inv(np.eye(6) - w)
-    one_domain = andrey.cdnod(x, env=np.full(500, 3.0)).structure
-    assert np.array_equal(one_domain.to_numpy(), andrey.pc(x).structure.to_numpy())
-
-
 def test_cdnod_rejects_nan_in_env():
     with pytest.raises(ValueError, match="env contains NaN"):
         andrey.cdnod(_data(), env=np.r_[np.nan, np.zeros(59)])

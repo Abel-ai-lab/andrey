@@ -484,20 +484,18 @@ def test_pool_created_once_spans_passes(monkeypatch):
     assert sum(calls) == 1  # created lazily once, reused -> not re-spawned per pass
 
 
-# --- transitive parity (GIES / GFCI delegate to ges()) --------------------------------------------
+# --- transitive parity (GFCI delegates to ges()) --------------------------------------------------
 
 
-@pytest.mark.parametrize("facade_name", ["gies", "gfci"])
-def test_gies_gfci_transitive_parity(facade_name):
-    """Worker count does not change the GIES or GFCI output structure."""
+def test_gfci_transitive_parity():
+    """Worker count does not change the GFCI output structure."""
     import andrey
 
-    facade = getattr(andrey, facade_name)
     x = _gaussian_sem(0, 600, 10, 0.4)
-    serial = facade(x)
+    serial = andrey.gfci(x)
     with _force_pool(), backend.config(n_jobs=4):
-        parallel = facade(x)
-    assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy()), facade_name
+        parallel = andrey.gfci(x)
+    assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy())
     assert serial.structure.kind == parallel.structure.kind
 
 

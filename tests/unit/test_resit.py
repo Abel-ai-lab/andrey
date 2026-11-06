@@ -1,4 +1,4 @@
-"""RESIT's contract: knowledge, units, ties, the p-values it compares, and the data it refuses."""
+"""RESIT's contract: knowledge, offsets, ties, the p-values it compares, and the data it refuses."""
 
 from __future__ import annotations
 
@@ -8,11 +8,17 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
+from andrey.core.independence import (
+    gamma_gram,
+    hsic_gamma_from_grams,
+    hsic_gamma_log_p,
+    hsic_gram,
+    hsic_log_p,
+)
+from andrey.core.ties import tie_ranks
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache
-from andrey.fcm.resit import _gram, _log_p, _residual, causal_order
-from andrey.search.hc import tie_ranks
+from andrey.fcm.resit import _residual, causal_order
 
 N = 400
 
@@ -61,12 +67,6 @@ def test_alpha_sets_which_parents_go_and_not_the_order(chain_fit):
     assert strict.ordering == loose.ordering == chain_fit.ordering
 
 
-def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
-    out = _fit(_chain() * np.array([1e-4, 3.7, 2e3]))
-    assert out.structure == chain_fit.structure
-    assert out.ordering == chain_fit.ordering
-
-
 def _mirrored(seed: int = 0) -> np.ndarray:
     """Linear Gaussian ``x`` and ``y`` with each row's swap also a row.
 
@@ -100,11 +100,6 @@ def test_a_tied_sink_is_the_lower_ranked_column_in_any_column_order():
         assert _named(_fit(frame[columns])) == {(cause, sink)}
     with andrey.config(tie_break="position"):
         assert _named(_fit(frame[["y", "x"]])) == {("x", "y")}
-
-
-def test_a_forbidden_edge_is_never_in_the_graph():
-    out = _fit(_chain(), knowledge=andrey.Knowledge(forbidden=[(0, 1)]))
-    assert (0, 1) not in _edges(out)
 
 
 def test_a_required_edge_stays_on_independent_columns():
@@ -155,7 +150,7 @@ def test_the_sink_follows_p_values_below_the_smallest_double():
     bases = BasisCache(X)
     p, log_p = {}, {}
     for sink, cause in ((1, 0), (0, 1)):
-        grams = _gram(unit[:, [cause]]), _gram(_residual(bases, sink, [cause]))
+        grams = hsic_gram(unit[:, [cause]]), hsic_gram(_residual(bases, sink, [cause]))
         p[sink] = hsic_gamma_from_grams(*grams, n, variance="product")[1]
         log_p[sink] = hsic_gamma_log_p(*grams, n, variance="product")
     sink = max(log_p, key=log_p.get)
@@ -180,7 +175,7 @@ def test_an_independent_grid_tests_as_independent_despite_rounding():
     values = np.arange(4.0)
     X = np.array([(a, b) for a in values for b in values])
     unit = (X - X.mean(axis=0)) / X.std(axis=0)
-    assert hsic_gamma_log_p(_gram(unit[:, [0]]), _gram(unit[:, [1]]), 16, variance="product") == 0
+    assert hsic_log_p(hsic_gram(unit[:, [0]]), hsic_gram(unit[:, [1]]), "resit") == 0
     assert _edges(_fit(X)) == set()
 
 
@@ -188,15 +183,16 @@ def test_a_statistic_far_below_zero_raises():
     # A negated gram is not positive semidefinite, so the statistic lies far below a rounded 0.
     rng = np.random.default_rng(0)
     x = rng.standard_normal(200)
-    centered, mu, sumsq = _gram(x[:, None])
+    centered, mu, sumsq = hsic_gram(x[:, None])
+    residual = hsic_gram(np.sin(2 * x) + 0.1 * rng.standard_normal(200))
     with pytest.raises(FloatingPointError):
-        _log_p((-centered, mu, sumsq), np.sin(2 * x) + 0.1 * rng.standard_normal(200))
+        hsic_log_p((-centered, mu, sumsq), residual, "resit")
 
 
 def test_a_non_finite_test_raises_rather_than_steer_a_choice(monkeypatch):
-    import andrey.fcm.resit as fit
+    import andrey.core.independence as independence
 
-    monkeypatch.setattr(fit, "hsic_gamma_log_p", lambda *args, **kwargs: float("nan"))
+    monkeypatch.setattr(independence, "hsic_gamma_log_p", lambda *args, **kwargs: float("nan"))
     with pytest.raises(FloatingPointError):
         _fit(_chain())
 

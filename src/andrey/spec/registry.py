@@ -1418,6 +1418,98 @@ _add(
         references=("Lam, Andrews & Ramsey 2022",),
     )
 )
+#: The parent cap of the BOSS or GRaSP phase of boss_fci and grasp_fci.
+_PERMUTATION_FCI_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents in the BOSS or GRaSP phase, at least 0. The test phase only "
+    "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of the PAG. "
+    "null sets no cap.",
+)
+#: The seed of boss_fci and grasp_fci: the order search's and a randomized test's.
+_PERMUTATION_FCI_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
+    "gpdc.",
+)
+for _name, _summary, _own, _refs in (
+    (
+        "boss_fci",
+        "GFCI with BOSS in place of GES: BOSS adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI, with BOSS's search for "
+        "highly connected variables. Returns a PAG.",
+        (),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",
+            "Zhang 2008",
+        ),
+    ),
+    (
+        "grasp_fci",
+        "GFCI with GRaSP in place of GES: GRaSP adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI. Returns a PAG.",
+        (
+            ParamSpec(
+                name="grasp_depth",
+                minimum=1,
+                type="int",
+                default=3,
+                doc="Maximum number of tucks in one chain of moves of the GRaSP phase, at least 1; "
+                "larger depths search more chains and run longer.",
+            ),
+        ),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Lam, Andrews & Ramsey 2022",
+        ),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="permutation",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="pag",
+                doc="metadata['categorical'] lists the categorical columns a mixed-data setting "
+                "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
+                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position",
+            ),
+            determinism="stochastic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            order_note=(
+                '`tie_break="position"` fires the orientation rules one at a time in column order '
+                "and records the first separating subset found, and it or "
+                '`possible_dsep="fast"` visits the possible-d-separation step in column order.'
+            ),
+            seeded=True,
+            params=(
+                _SCORE_FUNC,
+                _PENALTY_DISCOUNT,
+                _EBIC_GAMMA_STANDARD,
+                _EQUIVALENT_SAMPLE_SIZE,
+                *_own,
+                _INDEP_TEST,
+                _ALPHA,
+                _COLLIDER_RULE,
+                _CATEGORICAL,
+                _POSSIBLE_DSEP,
+                _PERMUTATION_FCI_SEED,
+                _N_STARTS,
+                _PERMUTATION_FCI_MAX_PARENTS,
+            ),
+            references=_refs,
+        )
+    )
 _add(
     MethodSpec(
         name="igsp",
@@ -2587,6 +2679,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
     "and never removes a required pair. " + _PAG_MARKS,
+    "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
+    "BOSS found and never removes a required pair. " + _PAG_MARKS,
+    "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
+    "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,

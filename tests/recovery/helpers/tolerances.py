@@ -39,6 +39,8 @@ SPEC: dict[str, dict] = {
     "ExactSearch": GRAPH_ONLY,
     "FCI": GRAPH_ONLY,
     "GFCI": GRAPH_ONLY,
+    "BOSSFCI": GRAPH_ONLY,
+    "GRaSPFCI": GRAPH_ONLY,
     # CAM records no weights: its DAG and its causal order.
     "CAM": {
         "structural": ["graph", "causal_order"],

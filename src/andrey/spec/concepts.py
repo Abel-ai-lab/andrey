@@ -116,7 +116,7 @@ def _absent(fixed_in: Release, reason: str, *methods: str) -> tuple[Deviation, .
 
 # Method groups the rules below name.
 CI_SEARCHES = (
-    *("pc", "fci", "gfci", "cdnod", "fci_jci"),
+    *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
     *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
@@ -132,6 +132,8 @@ SCORE_SEARCHES = (
     "mmhc",
     "rsmax2",
     "gfci",
+    "boss_fci",
+    "grasp_fci",
 )
 _PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
 _CONTINUOUS = ("notears", "dagma")
@@ -144,13 +146,15 @@ _LINGAM = (
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
-_STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
+_STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
 _TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
     *("pc", "fci", "gfci", "cdnod", "fci_jci", "icp", "iamb", "inter_iamb", "mmpc"),
+    "boss_fci",
+    "grasp_fci",
     *_PURE_SCORE,
     "gnies",
     "calm",
@@ -406,6 +410,17 @@ _CONCEPTS = (
                 fixed_in=None,
                 reason="The standard BIC: the extended term lowered its errors only slightly and "
                 "raised them on some dense graphs; its docstring gives the measurements.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="ebic_gamma",
+                    default=0.0,
+                    fixed_in=None,
+                    reason="The standard BIC, as in gfci, the same pipeline with GES, and in the "
+                    "published method.",
+                )
+                for m in ("boss_fci", "grasp_fci")
             ),
         ),
     ),
@@ -742,9 +757,10 @@ _CONCEPTS = (
     Concept(
         key="n_starts",
         summary="The number of searches a fit runs, each later one from a start drawn from seed: "
-        "a random order (boss, grasp), a minimum-degree order with ties drawn from seed "
-        "(igsp, ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, "
-        "tabu); the best-scoring one is returned, and 1, the default, runs one search.",
+        "a random order (boss, grasp, boss_fci, grasp_fci), a minimum-degree order with ties "
+        "drawn from seed (igsp, ut_igsp), or the best DAG so far after n_perturbations random edge "
+        "changes (hc, tabu); the best-scoring one is returned, and 1, the default, runs one "
+        "search.",
         param=_template(
             "n_starts",
             "int",
@@ -983,7 +999,10 @@ _CONCEPTS = (
             "pnl",
         ),
         exempt=(
-            *_exempt("Its score phase reads every column.", "gfci", "mmhc", "rsmax2"),
+            *_exempt(
+                "Its score phase reads every column.",
+                *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
+            ),
             *_exempt(
                 "A score or a regression reads every column.",
                 *_PURE_SCORE,
@@ -1139,7 +1158,7 @@ _CONCEPTS = (
             choices=COLLIDER_RULES,
         ),
         fragment="collider",
-        suitable=("pc", "fci", "gfci", "cdnod", "fci_jci", "pcmciplus"),
+        suitable=("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci", "pcmciplus"),
         exempt=(
             *_exempt(
                 "Its collider phase follows LPCMCI's own orientation rules, not yet compared with "
@@ -1164,6 +1183,8 @@ _CONCEPTS = (
                         "pc",
                         "fci",
                         "gfci",
+                        "boss_fci",
+                        "grasp_fci",
                         "cdnod",
                         "fci_jci",
                         "pcmciplus",

@@ -135,6 +135,8 @@ ALGORITHMS = {
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
+    "BOSSFCI": (_facade("boss_fci"), "gauss_5v"),
+    "GRaSPFCI": (_facade("grasp_fci"), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
     "FCIJCI": (_run_fci_jci, "gauss_5v"),
     "ICP": (_run_icp, "gauss_5v"),

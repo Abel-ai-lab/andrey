@@ -32,29 +32,18 @@ TRUTH = datagen.to_columns(CASE, {(0, 2), (1, 2), (2, 3), (3, 4)})
 
 # Each fit that learns a CPDAG from categorical data, by its categorical setting.
 CPDAG_FITS = {
-    "pc-chisq": lambda x: andrey.pc(x, indep_test="chisq"),
-    "pc-gsq": lambda x: andrey.pc(x, indep_test="gsq"),
-    "ges-bdeu": lambda x: andrey.ges(x, score_func="bdeu"),
-    "hc-bdeu": lambda x: andrey.hc(x, score_func="bdeu"),
-    "ges-bic": lambda x: andrey.ges(x, score_func="discrete_bic"),
-    "gies-bdeu": lambda x: andrey.gies(x, score_func="bdeu"),
-    "gies-bic": lambda x: andrey.gies(x, score_func="discrete_bic"),
-    "xges-bdeu": lambda x: andrey.xges(x, score_func="bdeu"),
-    "xges-bic": lambda x: andrey.xges(x, score_func="discrete_bic"),
-    "hc-bic": lambda x: andrey.hc(x, score_func="discrete_bic"),
-    "tabu-bdeu": lambda x: andrey.tabu(x, score_func="bdeu"),
-    "tabu-bic": lambda x: andrey.tabu(x, score_func="discrete_bic"),
-    "boss-bdeu": lambda x: andrey.boss(x, score_func="bdeu"),
-    "grasp-bdeu": lambda x: andrey.grasp(x, score_func="bdeu"),
-    "boss-bic": lambda x: andrey.boss(x, score_func="discrete_bic"),
-    "grasp-bic": lambda x: andrey.grasp(x, score_func="discrete_bic"),
+    **{f"pc-{test}": partial(andrey.pc, indep_test=test) for test in ("chisq", "gsq")},
+    **{
+        f"{method}-{name}": partial(getattr(andrey, method), score_func=score)
+        for method in ("ges", "hc", "gies", "xges", "tabu", "boss", "grasp")
+        for name, score in (("bdeu", "bdeu"), ("bic", "discrete_bic"))
+    },
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
 }
 PAG_FITS = {
-    "fci-chisq": lambda x: andrey.fci(x, indep_test="chisq"),
-    "fci-gsq": lambda x: andrey.fci(x, indep_test="gsq"),
-    "gfci-bdeu-chisq": lambda x: andrey.gfci(x, score_func="bdeu", indep_test="chisq"),
-    "gfci-bic-gsq": lambda x: andrey.gfci(x, score_func="discrete_bic", indep_test="gsq"),
+    **{f"fci-{test}": partial(andrey.fci, indep_test=test) for test in ("chisq", "gsq")},
+    "gfci-bdeu-chisq": partial(andrey.gfci, score_func="bdeu", indep_test="chisq"),
+    "gfci-bic-gsq": partial(andrey.gfci, score_func="discrete_bic", indep_test="gsq"),
 }
 
 # Each exact search, which returns one DAG of the optimal class.

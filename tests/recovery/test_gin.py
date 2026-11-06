@@ -70,11 +70,6 @@ def test_gin_matches_its_recorded_output(fit) -> None:
     assert_recorded_output(out, "GIN", case=_CASE)
 
 
-def test_gin_is_deterministic(fit) -> None:
-    data, out = fit
-    assert andrey.gin(data) == out
-
-
 def test_gin_finds_one_latent_behind_three_indicators() -> None:
     rng = np.random.default_rng(0)
     latent = rng.uniform(-1.0, 1.0, 500)

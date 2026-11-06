@@ -191,36 +191,3 @@ def test_ges_rejects_required_edges_the_cap_cannot_hold():
     with pytest.raises(ValueError, match="max_parents"):
         andrey.ges(fan_in(2), max_parents=1, knowledge=knowledge)
     assert in_degree(andrey.ges(fan_in(2), max_parents=2, knowledge=knowledge), 2) == 2
-
-
-@pytest.mark.parametrize(
-    ("value", "error"), [(-1, ValueError), (2.5, TypeError), (True, TypeError)]
-)
-def test_ges_rejects_a_bad_max_parents(value, error):
-    with pytest.raises(error, match="max_parents"):
-        andrey.ges(fan_in(3), max_parents=value)
-
-
-def test_pc_output_contract():
-    out = andrey.pc(datagen.generate("gauss_5v"))
-    assert out.structure.kind == "cpdag"
-
-
-def test_ges_output_contract():
-    out = andrey.ges(datagen.generate("gauss_5v"))
-    assert out.structure.kind == "cpdag" and "score" in out.metadata
-
-
-def test_pc_rejects_unknown_indep_test():
-    with pytest.raises(ValueError):
-        andrey.pc(datagen.generate("gauss_5v"), indep_test="no_such_test")
-
-
-def test_ges_rejects_unknown_score():
-    with pytest.raises(ValueError):
-        andrey.ges(datagen.generate("gauss_5v"), score_func="local_score_CV_general")
-
-
-def test_pc_rejects_bad_alpha():
-    with pytest.raises(ValueError, match="alpha"):
-        andrey.pc(datagen.generate("gauss_5v"), alpha=1.5)

@@ -14,11 +14,11 @@ from threadpoolctl import threadpool_limits
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.core.ties import tie_ranks
 from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
 from andrey.search.ges import _parent_limits, _recompute_objective, _reform_cpdag
-from andrey.search.hc import tie_ranks
 
 
 def forward_inprocess(

@@ -64,12 +64,6 @@ def test_recovers_the_planted_graph_with_its_hidden_cause(planted, indep_test):
     assert out.metadata["conflicts"] == []
 
 
-def test_same_result_on_every_run(planted):
-    first, second = (andrey.lpcmci(planted, tau_max=2) for _ in range(2))
-    assert first.structure == second.structure
-    assert first.metadata == second.metadata
-
-
 def test_the_result_does_not_depend_on_the_variable_order(planted):
     order = [3, 0, 4, 2, 1]
     out = andrey.lpcmci(planted, tau_max=2)

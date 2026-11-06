@@ -24,7 +24,9 @@ _GRAPH = (
             "MMPC",
             "ExactSearch",
             "BOSS",
+            "BOSSFCI",
             "GRaSP",
+            "GRaSPFCI",
             "CALM",
         }
     )

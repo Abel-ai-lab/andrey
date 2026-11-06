@@ -23,7 +23,7 @@ Yang, Katcoff, and Uhler 2018; Squires, Wang, and Uhler 2020):
    first on a tie, so a later start replaces an earlier one only with a strictly lower objective.
 
 Every choice that goes by variable index follows the engine's variable order: the caller sorts the
-columns by :func:`~andrey.search.hc.tie_ranks` first. Start ``0`` breaks the minimum-degree ties by
+columns by :func:`~andrey.core.ties.tie_ranks` first. Start ``0`` breaks the minimum-degree ties by
 the lowest index and visits children in the order of their arrows ``(i, j)``; start ``s >= 1``
 draws both from :func:`~andrey.core.seeding.start_rng`.
 
@@ -59,14 +59,13 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, make_indep_test
+from andrey.core.ci import MIXED_INDEP_TESTS, make_indep_test
 from andrey.core.invariance import InvarianceTest, make_invariance_test
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import to_structure
 from andrey.core.seeding import start_rng
+from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search.gies import cut_pairs, replace_unprotected
-from andrey.search.hc import tie_ranks
 
 __all__ = [
     "DEPTH",
@@ -501,7 +500,7 @@ def _prepared(
     """
     d = X.shape[1]
     mixed = indep_test in MIXED_INDEP_TESTS
-    mask = column_mask(categorical, d) if mixed else np.full(d, indep_test in DISCRETE_INDEP_TESTS)
+    mask = tie_mask(indep_test, categorical, d)
     ranks = tie_ranks(X, mask)
     by_rank = np.argsort(ranks)
     sorted_x = np.ascontiguousarray(X[:, by_rank])
@@ -579,7 +578,7 @@ def igsp(
     nonempty set for a setting. The conditional-independence test ``indep_test`` at ``alpha``
     reads the observational rows; the invariance test ``invariance_test`` at ``invariance_alpha``
     compares each setting with them. ``categorical`` is the mixed-data tests' mask. The search runs
-    over the columns sorted by :func:`~andrey.search.hc.tie_ranks` (:func:`igsp_search`,
+    over the columns sorted by :func:`~andrey.core.ties.tie_ranks` (:func:`igsp_search`,
     :func:`igsp_rules`).
 
     Returns the ``cpdag`` interventional essential graph of the DAG found under the observational
@@ -631,7 +630,7 @@ def ut_igsp(
     ``indep_test`` at ``alpha`` reads the observational rows; the invariance test
     ``invariance_test`` at ``invariance_alpha`` compares each setting with them. ``categorical`` is
     the mixed-data tests' mask. The search runs over the columns sorted by
-    :func:`~andrey.search.hc.tie_ranks` (:func:`igsp_search`, :func:`ut_igsp_rules`).
+    :func:`~andrey.core.ties.tie_ranks` (:func:`igsp_search`, :func:`ut_igsp_rules`).
 
     Returns the ``cpdag`` interventional essential graph of the DAG found, under the
     observational setting and each setting's targets, the most oriented under ``constraints``;

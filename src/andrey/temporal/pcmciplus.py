@@ -56,7 +56,7 @@ from andrey.core import backend
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
 
 if TYPE_CHECKING:
@@ -509,7 +509,7 @@ def run_phases(
 ) -> PCMCIPlusResult:
     """Run the four phases with ``test`` over the columns of the lagged design.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`, which orders PC1's equal
+    ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`, which orders PC1's equal
     strengths. With ``constraints``, no phase tests a forbidden or a required link: phase 1 leaves
     out the forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links
     from the allowed pairs and removes no required link, and phase 3 directs the lag-0 links the
