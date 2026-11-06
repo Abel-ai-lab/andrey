@@ -1563,13 +1563,12 @@ def fci_jci(
         rules, and the discriminating-path rule.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and temporal tiers, all honored, as for :func:`~andrey.fci`. The
-        adjacency search starts from the allowed pairs and never removes a required pair; the tests
-        can remove any other allowed pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair
-        puts an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is
-        ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge ``a - b`` while its
-        required edges lead from ``a`` to ``b`` raises ``ValueError``. The environment index is
-        unconstrained.
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and
+        can leave a circle at ``b``, and a required one is ``a -> b``; knowledge that puts an
+        arrowhead at ``a`` on an edge ``a - b`` while its required edges lead from ``a`` to ``b``
+        raises ``ValueError``. The environment index is unconstrained.
 
     Returns
     -------
@@ -1587,6 +1586,8 @@ def fci_jci(
         or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
         ``x < y``, in ascending order; the index, in a triple through it, is numbered
         ``n_variables``. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1684,7 +1685,9 @@ def fci_jci(
     subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"``,
     ``"student_t"``, and ``"normal_scores"`` can miss a shift in a middle domain of three or more,
     as above. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
-    up to a fifth of the values missing completely at random.
+    up to a fifth of the values missing completely at random. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
