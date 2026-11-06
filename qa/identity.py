@@ -36,7 +36,6 @@ import argparse
 import dataclasses
 import functools
 import hashlib
-import importlib
 import json
 import os
 import platform
@@ -593,7 +592,6 @@ SCORE_QUERIES: dict[str, Callable[..., Iterable[Iterable[int]]]] = {
     ),
 }
 SCORE_CLASSES = (
-    importlib.import_module("andrey.search.exact")._GramBICScore,
     score.BICScore,
     score.BDeuScore,
     score.CategoricalBICScore,

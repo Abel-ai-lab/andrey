@@ -499,8 +499,37 @@ class BICScore:
         return self._score_key(int(node), key)
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the negative local BIC scores for many parent sets, in request order."""
-        return [self.score(node, parents) for parents in parent_sets]
+        """Return the negative local BIC scores for many parent sets, in request order.
+
+        The sets of each size share one stacked solve of their normal equations on the covariance,
+        or a solve each (:func:`_solve`) when one is singular, so a set's score is the one a call
+        with that set alone gives. It agrees with :meth:`score`, which takes closed forms for one
+        and two parents, up to rounding, and it is not memoized.
+        """
+        node = int(node)
+        variance = float(self._cov_diag[node])
+        values = [math.inf] * len(parent_sets)
+        for size in {len(parents) for parents in parent_sets}:
+            at = [k for k, parents in enumerate(parent_sets) if len(parents) == size]
+            if size > self.n - 2:
+                continue
+            penalty = self.log_n * size * self.penalty_discount
+            if self.ebic_gamma:
+                penalty += ebic_penalty(size, self.cov.shape[0], self.ebic_gamma)
+            if not size:
+                for k in at:
+                    values[k] = _from_residual(variance, variance, self.n, penalty)
+                continue
+            pa = np.array([parent_sets[k] for k in at], dtype=np.intp)
+            xx = self.cov[pa[:, :, None], pa[:, None, :]]
+            xy = self.cov[node, pa]
+            try:
+                betas = np.linalg.solve(xx, xy[..., None])[..., 0]
+            except np.linalg.LinAlgError:  # one singular set fails the whole stacked call
+                betas = [_solve(a, b) for a, b in zip(xx, xy, strict=True)]
+            for k, b, beta in zip(at, xy, betas, strict=True):
+                values[k] = _from_residual(variance - b @ beta, variance, self.n, penalty)
+        return values
 
 
 class _CountScore:

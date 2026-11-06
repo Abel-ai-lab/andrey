@@ -2,8 +2,8 @@
 
 The reference family score is ``n log R + penalty_discount k log n + 2 gamma log C(d - 1, k)``, with
 ``R`` the residual variance of the node on its parents from the sample covariance and the count
-from :func:`math.comb`. Each fast path (full scores, the scalar and batched Schur deltas, their
-full-score fallbacks, the Gram score of exact search) is compared with it directly, and each
+from :func:`math.comb`. Each fast path (full scores, their stacked batch, the scalar and batched
+Schur deltas, their full-score fallbacks) is compared with it directly, and each
 search is run twice, once on its fast engine and once on the reference score, which takes the
 two-full-score path, and must return the same graph.
 """
@@ -27,7 +27,6 @@ from andrey.core.score_delta import (
     remove_deltas,
     score_many_with_base,
 )
-from andrey.search.exact import _GramBICScore
 from andrey.search.gies import InterventionalScore
 from tests.recovery.helpers.project import found_dag
 
@@ -107,6 +106,7 @@ def test_every_fast_path_matches_the_formula(gamma, cond):
     d = _X.shape[1]
     for v, base in _CASES:
         assert score.score(v, base) == pytest.approx(ref.score(v, base), rel=1e-12)
+        assert score.score_many(v, [base]) == pytest.approx([ref.score(v, base)], rel=1e-12)
         adds = [u for u in range(d) if u != v and u not in base]
         moves = [("add", u) for u in adds] + [("remove", u) for u in base]
         want = [
@@ -134,21 +134,13 @@ def test_a_full_parent_set_has_no_add():
 
 
 @pytest.mark.parametrize("gamma", GAMMAS)
-def test_the_other_scores_carry_the_term(gamma):
-    """Exact search's Gram score and the GIES score with no interventions."""
-    n, d = _X.shape
-    gram = _GramBICScore(_X, gamma)
-    centered = _X - _X.mean(axis=0)
+def test_the_gies_score_carries_the_term(gamma):
+    """The GIES score with no interventions."""
     gies_score = InterventionalScore(_X, None, ebic_gamma=gamma)
     ref = _Reference(_X, ebic_gamma=gamma)
+    d = _X.shape[1]
     for v, base in _CASES:
         pa = list(base)
-        rss = float(np.sum(centered[:, v] ** 2))
-        if pa:
-            fit = np.linalg.lstsq(centered[:, pa], centered[:, v], rcond=None)[0]
-            rss = float(np.sum((centered[:, v] - centered[:, pa] @ fit) ** 2))
-        want = n * math.log(rss / n) + len(pa) * math.log(n) + 2 * gamma * _log_count(d, len(pa))
-        assert gram.score(v, pa) == pytest.approx(want, rel=1e-12)
         assert gies_score.score(v, pa) == pytest.approx(ref.score(v, pa), rel=1e-12)
         adds = [u for u in range(d) if u != v and u not in pa]
         assert gies_score.add_deltas(v, pa)[adds] == pytest.approx(
