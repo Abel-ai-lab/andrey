@@ -2,9 +2,9 @@
 
 Every accepted form of ``env`` and ``targets`` gives the same fit as the 0/1 intervention matrix
 it describes, each former form warns once and gives the same fit as its replacement, and every
-form that cannot say which variables an environment intervened on raises. Data given as each
-environment's rows apart fit, in every method that takes ``env``, what the table they stack into
-fits.
+form that cannot say which variables an environment intervened on raises. Every method that takes
+``env`` refuses a label that is not finite. Data given as each environment's rows apart fit, in
+every method that takes ``env``, what the table they stack into fits.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
 from andrey.resample import build_job
-from andrey.spec import get_spec
+from andrey.spec import REGISTRY, get_spec
 
 N = 900
 #: Each row's environment: observational rows, then rows that set x1, then rows that set x2.
@@ -258,6 +258,41 @@ def test_bootstrap_draws_cdnod_rows_within_domains_for_text():
     one_row = np.array(["a", "b", "c"])[DOMAIN.astype(int)]
     one_row[0] = "d"  # a domain of one row stays in every subsample
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
+
+
+# --- every method that takes env -----------------------------------------------------------------
+
+#: What each method that takes ``env`` needs besides ``DATA`` and ``env``, where ``set x2``'s rows
+#: carry the label ``bad``: its targets, keyed by the labels, or ICP's target.
+ENV_SETTINGS = {
+    "cdnod": lambda bad: {},
+    "fci_jci": lambda bad: {},
+    "icp": lambda bad: {"target": "x2"},
+    "gies": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "gnies": lambda bad: {},
+    "igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "ut_igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: None}},
+}
+
+
+def test_every_method_that_takes_env_has_settings():
+    takes = {m for m, spec in REGISTRY.items() if any(i.name == "env" for i in spec.data.inputs)}
+    assert set(ENV_SETTINGS) == takes
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["inf", "-inf in a column"])
+@pytest.mark.parametrize("method", list(ENV_SETTINGS))
+def test_every_method_refuses_an_env_label_that_is_not_finite(method, bad):
+    """The label ``inf`` or ``-inf`` raises one ``ValueError`` before the fit, naming the method
+    and the first row that holds it, whether ``env`` holds the labels or names their column."""
+    env = np.select([ENV == "observed", ENV == "set x1"], [0.0, 1.0], bad)
+    data, env = (DATA, env) if bad > 0 else (DATA.assign(site=env), "site")
+    with (
+        warnings.catch_warnings(),
+        pytest.raises(ValueError, match=rf"^{method}: env contains {bad} at row 700; "),
+    ):
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        getattr(andrey, method)(data, env, **ENV_SETTINGS[method](bad))
 
 
 # --- data as each environment's rows apart -------------------------------------------------------
