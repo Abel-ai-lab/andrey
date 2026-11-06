@@ -23,13 +23,14 @@ from ._adapt import (
     with_labels,
 )
 from ._irregular import (
-    _adapt_anm,
     _adapt_bottom_up_parce,
-    _adapt_pnl,
     _adapt_rcd,
+    _pairwise_output,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
@@ -61,6 +62,44 @@ def _complete_pairs(
             "hold the missing values"
         )
     return kept, rows_metadata({rows: 2})
+
+
+def fit_pair(
+    method: str,
+    data: npt.ArrayLike,
+    native: Callable[[np.ndarray, np.ndarray], tuple[float, float, float, float]],
+    alpha: float | None,
+    *,
+    standardize: bool = False,
+) -> StructureOutput:
+    """Run ``method``'s pairwise test ``native``, ANM's or PNL's, both ways on ``data``.
+
+    ``data`` must be a table of two columns; the tests read the rows where both are observed
+    (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
+    magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
+    mean and unit variance. ``native`` returns the forward and backward p-values and statistics,
+    and the result holds the edge they choose with ``alpha`` (:func:`_pairwise_output`).
+    """
+    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
+        raise ValueError(
+            f"{method} expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
+        )
+    X = data_matrix(data, method=method, missing=True)
+    labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, method)
+    if standardize:
+        X = X / np.abs(X).max(axis=0)
+        X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
+    pval_forward, pval_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
+    return _pairwise_output(
+        pval_forward,
+        pval_backward,
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
+        extra=rows,
+    )
 
 
 @method_spec("anm")
@@ -196,25 +235,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """
     from andrey.irregular.anm import anm as _native
 
-    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
-        raise ValueError(
-            f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
-        )
-    X = data_matrix(data, method="anm", missing=True)
-    labels = column_labels(data)
-    X, rows = _complete_pairs(X, labels, "anm")
-    X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
-    Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
-    pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
-    return _adapt_anm(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=rows,
-    )
+    return fit_pair("anm", data, _native, alpha, standardize=True)
 
 
 @method_spec("pnl")
@@ -365,23 +386,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """
     from andrey.irregular.pnl import pnl as _native
 
-    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
-        raise ValueError(
-            f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
-        )
-    X = data_matrix(data, method="pnl", missing=True)
-    labels = column_labels(data)
-    X, rows = _complete_pairs(X, labels, "pnl")
-    pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
-    return _adapt_pnl(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=rows,
-    )
+    return fit_pair("pnl", data, _native, alpha)
 
 
 @method_spec("rcd")

@@ -214,13 +214,8 @@ def estimate_adjacency(
         if forbidden is not None:
             predictors = [j for j in predictors if not forbidden[j, target]]
         forced = [] if required is None else [j for j in predictors if required[j, target]]
-        if forced:
-            free = [j for j in predictors if j not in forced]
-            B[target, forced], B[target, free] = adjacency.predict_with_required(
-                X, forced, free, target
-            )
-        elif predictors:
-            B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
+        free = [j for j in predictors if j not in forced]
+        B[target, forced], B[target, free] = adjacency.fit_target(X, forced, free, target)
 
     for block in order:
         if isinstance(block, list):

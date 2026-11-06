@@ -12,7 +12,7 @@ import numpy as np
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
-from andrey.core.knowledge import as_node, column_position
+from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
 from andrey.core.structure import column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
@@ -20,6 +20,7 @@ from andrey.core.warning_policy import DataTypeWarning, warn_once
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from andrey.core.knowledge import Constraints, Knowledge
     from andrey.core.output import JSONValue
 
 
@@ -241,6 +242,22 @@ def data_kind(name: str) -> str:
     return "continuous"
 
 
+def check_same_data(method: str, score_func: str, indep_test: str) -> None:
+    """Raise ``ValueError`` unless ``score_func`` and ``indep_test`` read the same kind of data.
+
+    A method that runs a score search and tests on the same data needs both to read it as
+    categories, as mixed data, or as continuous data (:func:`data_kind`).
+    """
+    if data_kind(score_func) != data_kind(indep_test):
+        raise ValueError(
+            f"{method}'s score and test must read the data alike: score_func='bdeu' or "
+            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
+            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
+            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
+            f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
+        )
+
+
 #: The most distinct whole numbers a column may hold for :func:`warn_category_codes` to name it as
 #: possible category codes.
 MAX_CATEGORIES = 10
@@ -269,7 +286,6 @@ def default_score(
     score_func: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the score of a score search on ``data`` and the ``categorical`` it reads.
 
@@ -277,12 +293,11 @@ def default_score(
     column types (:func:`declared_columns`): ``"bdeu"`` when every column is categorical,
     ``"cond_gauss"``, the conditional Gaussian BIC, when some are, returned with those columns by
     position so that :func:`checked_data` reads exactly them, else ``"bic"``, the linear-Gaussian
-    BIC. A search that takes only some scores passes them as ``choices``: a pick outside them gives
-    ``"bic"``.
+    BIC.
     """
     if score_func is not None:
         return score_func, categorical
-    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"), choices)
+    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"))
 
 
 def default_test(
@@ -290,42 +305,32 @@ def default_test(
     indep_test: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the conditional-independence test on ``data`` and the ``categorical`` it reads.
 
     A given ``indep_test`` returns as it is, with ``categorical``. ``None`` picks from the declared
     column types (:func:`declared_columns`): ``"gsq"``, the G-square test, when every column is
     categorical, ``"cond_gauss"``, the conditional Gaussian likelihood-ratio test, when some are,
-    returned with those columns by position, else ``"fisherz"``. A search that takes only some
-    tests passes them as ``choices``: a pick outside them gives ``"fisherz"``.
+    returned with those columns by position, else ``"fisherz"``.
     """
     if indep_test is not None:
         return indep_test, categorical
-    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"), choices)
+    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"))
 
 
 def _by_declared_types(
     data: npt.ArrayLike,
     categorical: Sequence[str | int] | None,
     names: tuple[str, str, str],
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
-    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types.
-
-    A pick that ``choices`` leaves out is the continuous setting.
-    """
+    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types."""
     continuous, every, some = names
     mask = declared_columns(data, categorical)
     if mask is None:
         return continuous, categorical
     if mask.all():
-        picked, columns = every, None
-    else:
-        picked, columns = some, np.flatnonzero(mask).tolist()
-    if choices is not None and picked not in choices:
-        return continuous, categorical
-    return picked, columns
+        return every, None
+    return some, np.flatnonzero(mask).tolist()
 
 
 def _listed_mask(data: npt.ArrayLike, categorical: object) -> np.ndarray:
@@ -412,6 +417,36 @@ def checked_data(
         f"type and leave {option} as None, which picks a categorical or mixed-data {what}",
     )
     return X, None
+
+
+def fit_inputs(
+    data: npt.ArrayLike,
+    option: str,
+    value: str,
+    categorical: object,
+    knowledge: Knowledge | None,
+    *,
+    method: str,
+    missing: bool = False,
+    index_categorical: bool = False,
+) -> tuple[np.ndarray, np.ndarray | None, tuple[str, ...] | None, Constraints | None]:
+    """Return a fit's data matrix, its categorical-column mask, its column labels, and knowledge.
+
+    The data are checked for the setting ``option=value`` (:func:`checked_data`, with
+    ``index_categorical``, ``method``, and ``missing``), and ``knowledge`` is resolved against
+    their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those raise, in that order.
+    """
+    X, mask = checked_data(
+        data,
+        categorical,
+        option,
+        value,
+        index_categorical=index_categorical,
+        method=method,
+        missing=missing,
+    )
+    labels = column_labels(data)
+    return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
 
 
 def categories_as_numbers(
@@ -635,6 +670,14 @@ def int_in_range(value: object, name: str, low: int, high: int | None = None) ->
         accepted = f"at least {low}" if high is None else f"from {low} to {high}"
         raise ValueError(f"{name} must be an int {accepted}, got {value}")
     return int(value)
+
+
+def tabu_cap(max_tabu: int | None, tabu_length: int) -> int:
+    """Return the non-improving moves a tabu search allows: ``max_tabu``, or else ``tabu_length``.
+
+    Raises as :func:`int_in_range` does unless the number is from 1 to ``tabu_length``.
+    """
+    return int_in_range(tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length)
 
 
 def flag(value: object, name: str) -> bool:
