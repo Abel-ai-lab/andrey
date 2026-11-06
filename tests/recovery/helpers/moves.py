@@ -144,7 +144,7 @@ def boss_gain(data: np.ndarray, score_func: str, seed: int = 0) -> tuple[float, 
     the CPDAG it returns."""
     data = np.asarray(data, dtype=np.float64)
     score, ranks, trees, _ = boss_search._search_state(
-        data, boss_search._GrowShrinkTree, score_func, 1.0, 1.0, 1.0, None, None, None
+        data, score_func, 1.0, 1.0, 1.0, None, None, None
     )
     order = list(range(data.shape[1]))
     parents = boss_search._search_from(order, start_rng(seed, 0), trees, None)
@@ -178,7 +178,7 @@ def grasp_gain(
     the CPDAG it returns."""
     data = np.asarray(data, dtype=np.float64)
     _, ranks, trees, _ = boss_search._search_state(
-        data, grasp_search._GST, score_func, 1.0, 1.0, 1.0, None, None, None
+        data, score_func, 1.0, 1.0, 1.0, None, None, None
     )
     order = grasp_search._search_from(data.shape[1], start_rng(seed, 0), trees, depth, None)
     gain = -math.inf

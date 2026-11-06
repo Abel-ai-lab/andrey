@@ -1,275 +1,40 @@
 """GRaSP: greedy relaxation of the sparsest permutation over a BIC, BDeu, or mixed-data score.
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
-come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated local scores, so the
-search maximizes. The search runs on the columns sorted by tie rank
-(:func:`~andrey.search.boss.ranked_score`), so a variable's index is its tie rank. The algorithm and
-its reference are described on :func:`andrey.grasp`.
+come from its persistent grow-shrink tree, BOSS's :class:`~andrey.search.boss._GrowShrinkTree`.
+Scores are negated local scores, so the search maximizes. The search runs on the columns sorted by
+tie rank (:func:`~andrey.search.boss.ranked_score`), so a variable's index is its tie rank. The
+algorithm and its reference are described on :func:`andrey.grasp`.
 """
 
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
 
 import numpy as np
 
 from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints
-from andrey.core.score import LocalScore
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.search.boss import _EPS, _SCORE_EPS, _tightened, permutation_search, precedence_sort
+from andrey.search.boss import (
+    _SCORE_EPS,
+    _GrowShrinkTree,
+    permutation_search,
+    precedence_sort,
+)
 
-# DFS accepts a tuck when the total negated BIC increases by more than ``_SCORE_EPS``; changes in
-# (-_SCORE_EPS, _SCORE_EPS] are explored as ties. Grow recomputes full BIC scores when a
-# candidate's score is this close to the score of the current parent set or another candidate, so
-# batch rounding does not change strict improvement decisions or branch order.
+# DFS accepts a tuck when the total negated score increases by more than ``_SCORE_EPS``; changes
+# in (-_SCORE_EPS, _SCORE_EPS] are explored as ties.
 
 
-def _open_gap(a: float, a_bound: float, b: float, b_bound: float) -> float:
-    """The largest gap between ``a`` and ``b`` whose sign their error bounds could flip, or -1.
+def _settled(tree: _GrowShrinkTree, prefix: set[int], parents: list[int]) -> float:
+    """Trace ``tree`` from ``prefix`` into ``parents``; return the traced set's full negated score.
 
-    ``a`` and ``b`` are within ``a_bound`` and ``b_bound`` of their full scores; a few units in the
-    last place cover the difference the comparison computes. With both bounds 0 the values are full
-    scores and no gap is open.
+    The leaf is scored in full (:meth:`~andrey.search.boss._Leaf.settle`), so the DFS compares full
+    local scores.
     """
-    bound = a_bound + b_bound
-    if bound == 0.0:
-        return -1.0
-    return bound + 8 * _EPS * (abs(a) + abs(b))
-
-
-class _GSTNode:
-    """One node of a grow-shrink tree: a grow step and its cached higher-is-better local score.
-
-    ``grow`` expands the node into the improving single-variable additions (children, best-scoring
-    first); ``shrink`` records the removals that improve the score once no addition helps.
-    Both are computed lazily on first visit and cached, so a later trace reaching this node reuses
-    them. ``score`` is the local score after this node's grow step, in the search's higher-is-better
-    convention, and ``bound`` bounds its distance from the full local score (0 for a full score).
-    """
-
-    __slots__ = ("tree", "add", "grow_score", "grow_bound", "shrink_score", "branches", "remove")
-
-    def __init__(
-        self, tree: _GST, add: int | None = None, score: float | None = None, bound: float = 0.0
-    ) -> None:
-        if score is None:
-            score = tree.empty_score
-        self.tree = tree
-        self.add = add
-        self.grow_score = score
-        self.grow_bound = bound
-        self.shrink_score = score
-        self.branches: list[_GSTNode] | None = None
-        self.remove: list[int] | None = None
-
-    def __lt__(self, other: _GSTNode) -> bool:
-        return self.grow_score < other.grow_score
-
-    def grow(self, available: list[int], parents: list[int]) -> None:
-        """Populate ``branches`` with the additions that improve this node's score (sorted).
-
-        Scores the single-variable additions in one batch against the shared ``parents`` base.
-        Rechecks near-tied candidates and the base with full BIC scores before the strict
-        improvement comparison, and rechecks near-tied siblings before ordering them. A candidate
-        or a pair of siblings whose comparison the batch's error bounds leave open gets tighter
-        bounds and, if those leave it open too, is rechecked, so the branches and their order are
-        the ones full scores give. ``parents`` is left unchanged.
-        """
-        self.branches = []
-        tree = self.tree
-        vertex = tree.vertex
-        deltas = [("add", add) for add in available]
-        bounds: list[float] = []
-        values = tree.delta.score_many_with_base(vertex, parents, deltas, bounds=bounds)
-        base_rechecked = base_tightened = False
-        for add, value, bound in zip(available, values, bounds):
-            candidate_score = -value
-            gap = abs(candidate_score - self.grow_score)
-            if (
-                _SCORE_EPS
-                < gap
-                <= _open_gap(candidate_score, bound, self.grow_score, self.grow_bound)
-            ):
-                # Tighten the bounds before scoring in full: the candidate's, and the node's own,
-                # from the move of its parent's batch.
-                bound = _tightened(tree, parents, "add", add, bound)
-                if not base_tightened:
-                    own_base = [p for p in parents if p != self.add]
-                    self.grow_bound = _tightened(tree, own_base, "add", self.add, self.grow_bound)
-                    base_tightened = True
-            if gap <= _SCORE_EPS or gap <= _open_gap(
-                candidate_score, bound, self.grow_score, self.grow_bound
-            ):
-                if not base_rechecked:
-                    self.grow_score = -tree.score.score(vertex, parents)
-                    self.grow_bound = 0.0
-                    # Grow precedes shrink, so both cached base scores must agree.
-                    self.shrink_score = self.grow_score
-                    base_rechecked = True
-                candidate_score = -tree.score.score(vertex, [*parents, add])
-                bound = 0.0
-            if candidate_score > self.grow_score:
-                self.branches.append(_GSTNode(tree, add, candidate_score, bound))
-        ranked = sorted(self.branches, reverse=True)
-        recheck = {
-            branch
-            for left, right in zip(ranked, ranked[1:])
-            if left.grow_score - right.grow_score <= _SCORE_EPS
-            for branch in (left, right)
-        }
-        tightened: set[_GSTNode] = set()
-        while True:
-            for branch in recheck:
-                assert branch.add is not None
-                branch.grow_score = -tree.score.score(vertex, [*parents, branch.add])
-                branch.grow_bound = 0.0
-                branch.shrink_score = branch.grow_score
-            # A pair whose order the bounds leave open gets tighter bounds, then full scores.
-            ranked = sorted(self.branches, reverse=True)
-            unsure = {
-                branch
-                for left, right in zip(ranked, ranked[1:])
-                if left.grow_score - right.grow_score
-                <= _open_gap(left.grow_score, left.grow_bound, right.grow_score, right.grow_bound)
-                for branch in (left, right)
-                if branch.grow_bound > 0.0
-            }
-            if not unsure:
-                break
-            recheck = set()
-            if unsure <= tightened:
-                recheck = unsure
-            for branch in unsure - tightened:
-                branch.grow_bound = _tightened(tree, parents, "add", branch.add, branch.grow_bound)
-            tightened |= unsure
-        # `trace` takes the first branch allowed by the prefix, so branch order determines the
-        # search path. Sort the original candidate order so exact ties retain that order.
-        self.branches.sort(reverse=True)
-
-    def shrink(self, parents: list[int], required: Sequence[int] = ()) -> None:
-        """Record in ``remove`` the parents whose deletion improves the score, greedily.
-
-        Repeatedly removes the single parent that most improves ``shrink_score`` until none does,
-        mutating ``parents`` to the shrunk set and appending each removed parent to ``remove``.
-        A ``required`` parent is never removed.
-        """
-        self.remove = []
-        vertex = self.tree.vertex
-        score_fn = self.tree.score
-        # The cached grow score may be approximate even when there are no grow candidates left.
-        self.shrink_score = -score_fn.score(vertex, parents)
-        while True:
-            best: int | None = None
-            removable = [u for u in parents if u not in required] if required else list(parents)
-            for candidate in removable:
-                parents.remove(candidate)
-                candidate_score = -score_fn.score(vertex, parents)
-                parents.append(candidate)
-                if candidate_score > self.shrink_score:
-                    self.shrink_score = candidate_score
-                    best = candidate
-            if best is None:
-                break
-            self.remove.append(best)
-            parents.remove(best)
-
-    def trace(
-        self,
-        excluded: set[int],
-        parents: list[int],
-        prefix_set: set[int],
-    ) -> float:
-        """Walk the grow-shrink tree along ``prefix_set``, returning the settled local score.
-
-        Descends into the first improving addition whose variable is an allowed predecessor (in
-        ``prefix_set``), appending it to ``parents``; variables passed over are added to
-        ``excluded``, and a node grows from the tree's ``available`` variables outside it, unless
-        its parent set holds the tree's ``max_parents`` members. When no further addition is
-        allowed, applies the shrink step and returns the higher-is-better local score of the
-        settled parent set.
-        """
-        if self.branches is None:
-            cap = self.tree.max_parents
-            if cap is not None and len(parents) >= cap:
-                self.branches = []
-            else:
-                self.grow([u for u in self.tree.available if u not in excluded], parents)
-        branches = self.branches
-        assert branches is not None  # grow() above always assigns a list
-        for branch in branches:
-            add = branch.add
-            assert add is not None  # only the root has add=None, and it is never a branch
-            excluded.add(add)
-            if add in prefix_set:
-                parents.append(add)
-                return branch.trace(excluded, parents, prefix_set)
-        if self.remove is None:
-            self.shrink(parents, self.tree.required)
-            return self.shrink_score
-        for removed in self.remove:
-            parents.remove(removed)
-        return self.shrink_score
-
-
-class _GST:
-    """Persistent grow-shrink tree for one target variable over a fixed score.
-
-    Holds the root node and the empty-parent-set score, both reused across every permutation the
-    search visits. :meth:`trace` grows/shrinks the target's parents from the variables that precede
-    it (``prefix``), reusing any cached path the tree already holds.
-
-    ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
-    ``required`` parents are in every parent set: the root scores them, grow adds to them, and
-    shrink never removes them. The caller keeps each required parent in ``prefix``.
-    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
-    many members grows no branches (``None``: no cap).
-    """
-
-    __slots__ = (
-        "vertex",
-        "score",
-        "delta",
-        "empty_score",
-        "root",
-        "available",
-        "required",
-        "max_parents",
-    )
-
-    def __init__(
-        self,
-        vertex: int,
-        score: LocalScore,
-        delta: DeltaBICScore | FullScoreDelta,
-        n_features: int,
-        *,
-        candidates: list[int] | None = None,
-        required: list[int] | None = None,
-        max_parents: int | None = None,
-    ) -> None:
-        self.vertex = vertex
-        self.score = score
-        self.delta = delta
-        self.available = tuple(
-            [i for i in range(n_features) if i != vertex] if candidates is None else candidates
-        )
-        self.required = [] if required is None else required
-        self.max_parents = max_parents
-        self.empty_score = -score.score(vertex, self.required)
-        self.root = _GSTNode(self)
-
-    def trace(self, prefix: set[int], parents: list[int]) -> float:
-        """Grow-shrink the target's parents from the allowed predecessors ``prefix``.
-
-        ``prefix`` is the set of allowed predecessors; the trace only reads it. ``parents`` (mutated
-        in place) receives the chosen parent set, required parents included; the return is its
-        higher-is-better local score. ``available`` is every variable except the target, or the
-        ``candidates``.
-        """
-        parents.extend(self.required)
-        return self.root.trace(set(), parents, prefix)
+    leaf = tree.trace(prefix, parents)
+    leaf.settle()
+    return leaf.score
 
 
 class _Order:
@@ -288,7 +53,7 @@ class _Order:
         self,
         n_features: int,
         rng: random.Random,
-        gsts: list[_GST],
+        gsts: list[_GrowShrinkTree],
         before: np.ndarray | None = None,
     ) -> None:
         self.order = list(range(n_features))
@@ -368,7 +133,7 @@ def _tuck(i: int, j: int, order: _Order) -> None:
             shift += 1
 
 
-def _update(i: int, j: int, order: _Order, gsts: list[_GST]) -> tuple[int, float]:
+def _update(i: int, j: int, order: _Order, gsts: list[_GrowShrinkTree]) -> tuple[int, float]:
     """Re-score the span ``[j, i]`` after a tuck; return the edge-count and total-score deltas."""
     edge_bump = 0
     old_score = 0.0
@@ -380,7 +145,7 @@ def _update(i: int, j: int, order: _Order, gsts: list[_GST]) -> tuple[int, float
         edge_bump -= len(z_parents)
         old_score += order.get_local_score(z)
         z_parents.clear()
-        local_score = gsts[z].trace(prefix, z_parents)
+        local_score = _settled(gsts[z], prefix, z_parents)
         order.set_local_score(z, local_score)
         edge_bump += len(z_parents)
         new_score += local_score
@@ -428,7 +193,7 @@ def _dfs(
     depth: int,
     chain: set[frozenset[tuple[int, int]]],
     order: _Order,
-    gsts: list[_GST],
+    gsts: list[_GrowShrinkTree],
     rng: random.Random,
     before: np.ndarray | None = None,
 ) -> bool:
@@ -478,7 +243,7 @@ def _dfs(
 def _search_from(
     n_features: int,
     rng: random.Random,
-    gsts: list[_GST],
+    gsts: list[_GrowShrinkTree],
     depth: int,
     before: np.ndarray | None,
 ) -> _Order:
@@ -488,7 +253,7 @@ def _search_from(
     for i in range(n_features):
         y = order.get(i)
         y_parents = order.get_parents(y)
-        local_score = gsts[y].trace(prefix, y_parents)
+        local_score = _settled(gsts[y], prefix, y_parents)
         order.set_local_score(y, local_score)
         order.bump_edges(len(y_parents))
         prefix.add(y)
@@ -569,13 +334,12 @@ def grasp(
     """
 
     def run_start(
-        start: int, rng: random.Random, trees: list[_GST], before: np.ndarray | None
+        start: int, rng: random.Random, trees: list[_GrowShrinkTree], before: np.ndarray | None
     ) -> dict[int, list[int]]:
         return _search_from(len(trees), rng, trees, depth, before).parents
 
     return permutation_search(
         data,
-        _GST,
         run_start,
         score_func=score_func,
         penalty_discount=penalty_discount,

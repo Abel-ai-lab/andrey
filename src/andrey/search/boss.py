@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -27,15 +26,9 @@ from andrey.core.structure import endpoint_marks
 from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search.operators import check_parent_cap
 
-if TYPE_CHECKING:
-    from andrey.search.grasp import _GST
-
 # Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
 _EPS = float(np.finfo(np.float64).eps)
-
-#: A permutation search's grow-shrink tree class.
-TreeT = TypeVar("TreeT")
 
 
 def ranked_score(
@@ -236,7 +229,7 @@ def _settle_kept(
 
 
 def _tightened(
-    tree: _GrowShrinkTree | _GST, base: Sequence[int], op: str, u: int | None, bound: float
+    tree: _GrowShrinkTree, base: Sequence[int], op: str, u: int | None, bound: float
 ) -> float:
     """``bound``, or the componentwise bound of the batched move ``(base, op, u)`` that gave the
     score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
@@ -784,7 +777,6 @@ def _better_mutation(
 
 def _search_state(
     X: np.ndarray,
-    make_tree: Callable[..., TreeT],
     score_func: str,
     penalty_discount: float,
     ebic_gamma: float,
@@ -792,11 +784,10 @@ def _search_state(
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     max_parents: int | None,
-) -> tuple[LocalScore, np.ndarray, list[TreeT], np.ndarray | None]:
+) -> tuple[LocalScore, np.ndarray, list[_GrowShrinkTree], np.ndarray | None]:
     """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
 
-    ``make_tree`` builds each variable's tree. The precedence (``before[a, b]``: ``a`` precedes
-    ``b``) is ``None`` without ``constraints``.
+    The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
     """
     score, ranks = ranked_score(
         X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
@@ -804,14 +795,14 @@ def _search_state(
     delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        trees = [make_tree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        trees = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
         return score, ranks, trees, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
     trees = []
     for v in range(p):
         candidates, required = parent_knowledge(ranked, v)
         trees.append(
-            make_tree(
+            _GrowShrinkTree(
                 v,
                 score,
                 delta,
@@ -826,8 +817,9 @@ def _search_state(
 
 def permutation_search(
     data: np.ndarray,
-    make_tree: Callable[..., TreeT],
-    run_start: Callable[[int, random.Random, list[TreeT], np.ndarray | None], dict[int, list[int]]],
+    run_start: Callable[
+        [int, random.Random, list[_GrowShrinkTree], np.ndarray | None], dict[int, list[int]]
+    ],
     *,
     score_func: str,
     penalty_discount: float,
@@ -863,7 +855,6 @@ def permutation_search(
         # one start's state at a time.
         score, ranks, trees, before = _search_state(
             X,
-            make_tree,
             score_func,
             penalty_discount,
             ebic_gamma,
@@ -1005,7 +996,6 @@ def boss(
 
     return permutation_search(
         data,
-        _GrowShrinkTree,
         run_start,
         score_func=score_func,
         penalty_discount=penalty_discount,

@@ -1,8 +1,9 @@
 """Check grow-shrink branch priority, BOSS's tolerance for score ties, and column-order invariance.
 
 ``_GSTNode.trace`` takes the first branch allowed by the prefix. Branch order therefore determines
-the search path. BOSS's grow and shrink steps break score ties by variable index; its order move
-takes the leftmost tied position. Each step requires an improvement larger than ``_SCORE_EPS``.
+the search path. The grow and shrink steps of the tree BOSS and GRaSP share break score ties by
+variable index; BOSS's order move takes the leftmost tied position. Each step requires an
+improvement larger than ``_SCORE_EPS``.
 BOSS and GRaSP search the columns sorted by tie rank, so a variable's index, the seeded starting
 order, and the visiting order follow the columns' data, and reordering the columns relabels the
 graph.
@@ -21,7 +22,6 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.data import sample_discrete, sample_mixed
 from andrey.search import boss as boss_mod
-from andrey.search import grasp as grasp_mod
 from andrey.search.boss import boss, ranked_score
 from andrey.search.grasp import grasp
 
@@ -127,18 +127,22 @@ def test_boss_mutation_prefers_the_leftmost_improving_tied_position(left, right,
     assert positions == {v: i for i, v in enumerate(expected)}
 
 
-def test_grasp_grows_best_scoring_branch_first() -> None:
-    """GRaSP's tree orders a node's improving additions best-first."""
-    x = _sample()
-    score = BICScore(x, penalty_discount=1.0)
-    tree = grasp_mod._GST(0, score, DeltaBICScore(score), D_NODES)
+def _pair_gaining(gain: float) -> tuple[np.ndarray, float]:
+    """Two dependent columns and the penalty under which an edge between them gains ``gain``."""
+    x = np.random.default_rng(3).standard_normal((200, 2))
+    x[:, 1] += 0.5 * x[:, 0]
+    raw = BICScore(x, penalty_discount=0.0)
+    return x, (raw.score(1, []) - raw.score(1, [0]) - gain) / raw.log_n
 
-    node = tree.root
-    node.grow([v for v in range(D_NODES) if v != 0], [])
 
-    # Require two branches so `_descending` cannot pass vacuously.
-    assert len(node.branches) >= 2, "fixture yields too few improving additions to order"
-    assert _descending([b.grow_score for b in node.branches])
+@pytest.mark.parametrize("search", [boss, grasp])
+@pytest.mark.parametrize("gain", [0.5 * boss_mod._SCORE_EPS, 2 * boss_mod._SCORE_EPS])
+def test_an_edge_must_gain_more_than_the_tolerance(search, gain) -> None:
+    """BOSS and GRaSP grow the same trees: a parent joins only when it gains more than
+    ``_SCORE_EPS``."""
+    x, penalty = _pair_gaining(gain)
+    graph, _ = search(x, penalty_discount=penalty, ebic_gamma=0.0)
+    assert (graph.to_numpy() != 0).any() == (gain > boss_mod._SCORE_EPS)
 
 
 def _linear(seed: int, n: int = 400, d: int = 10) -> np.ndarray:
