@@ -498,7 +498,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss", "tabu"):
+    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
