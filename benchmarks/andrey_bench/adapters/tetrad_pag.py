@@ -14,18 +14,26 @@ Tetrad (causal-cmd)                  Andrey
 ``alpha``                            ``alpha``
 ``sem-bic-score``                    ``score_func="local_score_BIC"``
 ``penaltyDiscount``                  ``lambda_value``
+``depth``                            ``depth``, Andrey's ``max_depth``
 ``--knowledge`` tier 1               ``context_vars``, the context variables' columns
 ===================================  ============================================================
 
 Every search runs the complete rule set R1-R10 and the discriminating-path rule with no cap on
-conditioning sets or path lengths (``completeRuleSetUsed``, ``doDiscriminatingPathRule``, ``depth
--1``, ``maxPathLength -1``). FCI and GRaSP-FCI run the possible-d-separation step
-(``possibleMsepDone``); causal-cmd's ``bfci`` has no setting for it. The two score searches use
-the BIC with no structure prior and the standard penalty rule (``semBicStructurePrior 0``,
-``semBicRule 1``), one start (``numStarts 1``), and the covariance matrix read once
-(``precomputeCovariances``); BOSS-FCI runs without BES, and GRaSP-FCI from the data's column order,
-with ``depth -1`` as GRaSP's tuck depth too. A boolean setting that is off is left out: causal-cmd turns a boolean on
-whenever it is named, and each is off by default.
+discriminating paths, and with no cap on conditioning sets unless ``params`` give ``depth``
+(``completeRuleSetUsed``, ``doDiscriminatingPathRule``, ``maxPathLength -1``, ``depth -1``). FCI
+runs the possible-d-separation step (``possibleMsepDone``). causal-cmd 1.12.0's ``bfci`` and
+``grasp-fci`` (tetrad-lib 7.6.3's ``BFci`` and ``GraspFci``) take their FCI steps from GFCI's, one
+pass of greedy separating sets over the score search's adjacencies, and have no
+possible-d-separation step. The two score searches run at Tetrad's documented defaults: the BIC
+with no structure prior and the standard penalty rule (``semBicStructurePrior 0``, ``semBicRule
+1``), one start (``numStarts 1``), the covariance matrix read once (``precomputeCovariances``), and
+no seed (``seed -1``). BOSS-FCI runs without BES; GRaSP-FCI runs from the data's column order
+(``useDataOrder``), its stages in order (``graspOrderedAlg``), scored (``graspUseScore``, which
+causal-cmd does not expose and leaves at its default), with singular and nonsingular tuck depths of
+1, and ``depth`` as GRaSP's tuck depth too: causal-cmd sets ``graspDepth`` and then ``depth``.
+causal-cmd sets a boolean it is not given to false, not to its documented default, so each one on
+by default is named; a boolean that is off is left out, since causal-cmd turns a boolean on
+whenever it is named.
 
 FCI-JCI is FCI with the context variables in Tetrad's first knowledge tier, so no system variable
 causes a context variable: JCI assumption 1 only. Tetrad's FCI in causal-cmd 1.12.0 has no setting
@@ -39,15 +47,13 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.bic_penalty import SEARCH_SEED
 from andrey_bench.adapters.tetrad_cmd import _TetradCmd
 from andrey_bench.adapters.tetrad_gfci import read_pag
 
 _DEFAULT_ALPHA = 0.05
 _DEFAULT_LAMBDA = 1.0
-#: The FCI steps every search runs, by causal-cmd's names.
+#: The FCI steps every search runs, by causal-cmd's names; ``params`` may cap ``depth``.
 _FCI_STEPS = {
-    "depth": -1,
     "maxPathLength": -1,
     "completeRuleSetUsed": True,
     "doDiscriminatingPathRule": True,
@@ -58,6 +64,7 @@ _SCORE = {
     "semBicRule": 1,
     "numStarts": 1,
     "precomputeCovariances": True,
+    "seed": -1,
 }
 
 
@@ -95,7 +102,9 @@ class _TetradPAG(_TetradCmd):
         """Tetrad's settings, by causal-cmd's names, for Andrey's ``params``."""
         alpha = {"alpha": float(params.get("alpha", _DEFAULT_ALPHA))}
         penalty = {"penaltyDiscount": float(params.get("lambda_value", _DEFAULT_LAMBDA))}
-        return {**alpha, **(penalty | _SCORE if self.scored else {}), **_FCI_STEPS, **self.extra}
+        depth = {"depth": int(params.get("depth", -1))}
+        steps = _FCI_STEPS | depth
+        return {**alpha, **(penalty | _SCORE if self.scored else {}), **steps, **self.extra}
 
     def _arguments(self, params: Mapping[str, Any]) -> list[str]:
         command = ["--algorithm", self.command, "--test", "fisher-z-test"]
@@ -143,7 +152,7 @@ class TetradBFCI(_TetradPAG):
     command = "bfci"
     experimental = True
     scored = True
-    extra = {"useBes": False, "seed": SEARCH_SEED}
+    extra = {"useBes": False}
 
 
 class TetradCmdGraspFCI(_TetradPAG):
@@ -158,9 +167,9 @@ class TetradCmdGraspFCI(_TetradPAG):
     command = "grasp-fci"
     scored = True
     extra = {
-        "possibleMsepDone": True,
         "graspSingularDepth": 1,
         "graspNonSingularDepth": 1,
+        "graspOrderedAlg": True,
+        "graspUseRaskuttiUhler": False,
         "useDataOrder": True,
-        "seed": SEARCH_SEED,
     }
