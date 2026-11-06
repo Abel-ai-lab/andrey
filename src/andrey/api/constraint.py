@@ -1628,14 +1628,13 @@ def fci_jci(
     because no data variable causes the index (JCI Assumption 1). With ``confounded_index=False``,
     the edge also gets a tail at the index, because no hidden variable causes both (JCI Assumption
     2), so the edge is ``index -> variable`` and the index is never a collider; otherwise the end at
-    the index stays a circle until a rule orients it. The marks go on before the collider pass, as
-    in the authors' reference implementation [1]_. JCI assumes no selection bias, so Zhang's rules
-    R1-R4 and R8-R10 [3]_ orient the rest, without R5-R7; they change only circles, so the index's
-    marks stay. An index edge then orients edges between data variables: from ``index *-> x o-o y``
-    with ``y`` not adjacent to the index, rule R1 gives ``x -> y``. Mooij et al. prove the procedure
-    sound under Assumption 1, and sound and complete under Assumptions 1 and 2 with one context
-    variable, where their Assumption 3, on how several context variables relate, does not apply
-    [1]_.
+    the index stays a circle until a rule orients it. JCI assumes no selection bias, so Zhang's
+    rules R1-R4 and R8-R10 [3]_ orient the rest, without R5-R7; they change only circles, so the
+    index's marks stay. An index edge then orients edges between data variables: from
+    ``index *-> x o-o y`` with ``y`` not adjacent to the index, rule R1 gives ``x -> y``. Mooij et
+    al. prove the procedure sound under Assumption 1, and sound and complete under Assumptions 1
+    and 2 with one context variable, where their Assumption 3, on how several context variables
+    relate, does not apply [1]_.
 
     A variable keeps an edge to the index when its distribution changes across the domains and no
     other variable explains the change: the domains change its causal module, the distribution given
@@ -1669,10 +1668,10 @@ def fci_jci(
     7,466 cells from nine conditions, with ``"cond_gauss"``. It takes one environment variable: the
     several context variables of the authors' designs, one per intervention, are not implemented, so
     domains that change different variables share one index. Its possible-d-separation step tests
-    subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"`` and
-    ``"student_t"`` can miss a shift in a middle domain of three or more, as above. Missing values
-    are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of the
-    values missing completely at random.
+    subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"``,
+    ``"student_t"``, and ``"normal_scores"`` can miss a shift in a middle domain of three or more,
+    as above. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random.
 
     References
     ----------

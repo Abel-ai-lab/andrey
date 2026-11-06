@@ -451,10 +451,11 @@ Each test and score reads the columns as one kind of data:
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
 `pc`, `fci`, `gfci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`,
-`ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the tests; `ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score; `gies` scores each variable
-on the rows without an intervention on it. `gfci`, `mmhc`, and `rsmax2` take a score and a test that
-read the same kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
+`ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the tests; `ges`, `gies`, `xges`, `gfci`, `hc`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score; `gies` scores each
+variable on the rows without an intervention on it. `gfci`, `mmhc`, and `rsmax2` take a score and a
+test that read the same kind of data, such as
+`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.

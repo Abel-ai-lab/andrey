@@ -7,11 +7,10 @@ Inference (Mooij, Magliacane, and Claassen 2020). FCI's steps run over the augme
 rule implementations, tests, and mark convention of :mod:`andrey.constraint.fci`. Before each
 collider pass, every edge the index keeps gets an arrowhead at its data variable, since no data
 variable causes the index (JCI Assumption 1); with ``confounded_index=False`` the edge also gets a
-tail at the index, since no hidden variable causes both (Assumption 2). The marks go on before the
-collider pass, as in the authors' reference implementation. The orientation rules change only
-circles, so these marks persist. JCI assumes no selection bias, so the rules are R1-R4 and R8-R10,
-without R5-R7. The index node is dropped from the returned PAG, and its edges are returned beside
-it.
+tail at the index, since no hidden variable causes both (Assumption 2). The orientation rules
+change only circles, so these marks persist. JCI assumes no selection bias, so the rules are R1-R4
+and R8-R10, without R5-R7. The index node is dropped from the returned PAG, and its edges are
+returned beside it.
 """
 
 from __future__ import annotations

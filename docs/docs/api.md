@@ -134,9 +134,9 @@ read. A column with no observed value, or a constant one over its observed value
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`,
-`ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`,
-and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
-`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`,
+`"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical
+data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
 `"cmiknn"`, and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 `None`, the default, picks from the declared column types, `"fisherz"` for continuous data. `pcmci`,
 `pcmciplus`, and `lpcmci` run each test on the lagged values of the series, and order the candidate
@@ -171,6 +171,13 @@ step, by an approximation of the pairwise likelihood ratios of Hyvarinen and Smi
 `"tanh"` uses a correlation of the standardized pair through `tanh`, which suits sparse noise such
 as Laplace, and `"skew"` one through the square after a sign correction, which suits skewed noise;
 they cost less, and `direct_lingam`'s Notes and Limitations give where each fails.
+
+% concept: confounded_index
+`fci_jci` takes `confounded_index`, whether a hidden variable may cause both the environment index
+and a data variable. `True`, the default (Mooij, Magliacane, and Claassen 2020's FCI-JCI1), leaves
+the index end of an edge a circle until a rule orients it. `False` assumes the environment is set
+from outside, as in a randomized experiment (FCI-JCI123), so every edge the index keeps points out
+of it.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the

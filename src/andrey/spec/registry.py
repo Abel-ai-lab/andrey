@@ -376,6 +376,7 @@ _add(
         ),
         references=(
             "Mooij, Magliacane & Claassen 2020",
+            "Spirtes, Glymour & Scheines 2000",
             "Zhang 2008",
             "Colombo & Maathuis 2014",
             "Ramsey, Zhang & Spirtes 2006",
