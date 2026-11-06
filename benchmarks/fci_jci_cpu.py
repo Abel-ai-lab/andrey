@@ -86,8 +86,8 @@ CAP_MEM_MB = 16000.0
 BOOTSTRAP = 10_000
 MIN_PAIRS = 10
 
-#: The largest cell whose fits take a warm-up fit before the timed one; above it the warm-up would
-#: double a fit that may run to the cap.
+#: The largest cell whose pcalg fits take a warm-up fit before the timed one; above it the warm-up
+#: would double a fit that may run to the cap. Every other arm always takes one.
 WARMUP_MAX_P = 10
 
 
@@ -617,7 +617,7 @@ def fit_arm(arm: str, data: Dataset, alpha: float, true: dict, args) -> dict[str
     """Fit `arm` on `data` at `alpha` in a fresh interpreter; return its record."""
     x, params = inputs(arm, data, alpha)
     solution = adapter(arm)
-    warmup = 1 if data.cell.p <= WARMUP_MAX_P else 0
+    warmup = 1 if data.cell.p <= WARMUP_MAX_P or ARMS[arm].role != "reference" else 0
     params = {**solution.params(), **params}
     result = run_task(
         solution,
