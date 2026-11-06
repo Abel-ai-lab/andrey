@@ -45,7 +45,21 @@ def _clusters(g: GraphStructure) -> dict[int, object]:
 
 
 def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
-    """Adjusted Rand index between two label vectors (chance-corrected; 1.0 is identical).
+    """Return the adjusted Rand index between two clusterings of the same items.
+
+    Parameters
+    ----------
+    labels_a : array-like of shape (n,)
+        Each item's cluster label.
+    labels_b : array-like of shape (n,)
+        Each item's cluster label in the other clustering.
+
+    Returns
+    -------
+    float
+        The chance-corrected agreement: 1.0 for the same partition, about 0.0 for chance. Fewer
+        than two items score 1.0, and so do two partitions that both put every item together or
+        both put every item apart.
 
     Examples
     --------
@@ -79,11 +93,23 @@ def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
 
 
 def latent_cluster_ari(estimated: object, true: object) -> float:
-    """Adjusted Rand index of the latent clustering of the observed variables.
+    """Return the adjusted Rand index of the latent clustering of the observed variables.
 
-    Clusters each observed node by its latent parent, then scores the two partitions. The two graphs
-    must describe the same observed variables (same indices and labels), though their latent counts
-    may differ; a mismatch raises. Returns 1.0 when there are no observed nodes.
+    Clusters each observed node by its latent parents, then scores the two partitions. The two
+    graphs must describe the same observed variables, at the same indices with the same labels,
+    though their latent counts may differ; a mismatch raises.
+
+    Parameters
+    ----------
+    estimated : StructureOutput or GraphStructure
+        The estimated graph, whose ``node_types`` flag its latent nodes.
+    true : StructureOutput or GraphStructure
+        The true graph, whose ``node_types`` flag its latent nodes.
+
+    Returns
+    -------
+    float
+        The adjusted Rand index of the two clusterings, or 1.0 when there is no observed node.
 
     Examples
     --------
@@ -123,7 +149,17 @@ def _int_labels(clusters: dict[int, object], nodes: list[int]) -> list[int]:
 
 
 def number_of_latents(graph: object) -> int:
-    """Count of nodes flagged ``LATENT`` (0 when ``node_types`` is unset).
+    """Return the number of nodes a graph flags ``LATENT``.
+
+    Parameters
+    ----------
+    graph : StructureOutput or GraphStructure
+        The graph, whose ``node_types`` flag its latent nodes.
+
+    Returns
+    -------
+    int
+        The number of latent nodes, 0 when ``node_types`` is unset.
 
     Examples
     --------

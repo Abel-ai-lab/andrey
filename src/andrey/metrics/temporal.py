@@ -44,16 +44,30 @@ def _edge_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
 
 
 def temporal_scores(estimated: object, true: object) -> dict[str, object]:
-    """Per-lag and summary scores for a temporal structure.
-
-    Returns ``per_lag`` (each lag's precision/recall/f1/shd), a ``contemporaneous`` block when
-    the estimate carries lag-0, an aggregate ``lagged`` block over lags >= 1, a ``summary`` graph
-    collapsing every scored lag (self-loops excluded so diagonals do not inflate it),
-    and ``coefficient_mae_per_lag`` when both structures carry lag weights.
+    """Return the per-lag and summary scores of an estimated temporal structure.
 
     Raises ``NotImplementedError`` for a time-carrying structure (``n_times > 0``): the ``(time,
     lag)`` axis has no metric yet, and scoring only the final-occasion projection would silently
     miss per-occasion differences.
+
+    Parameters
+    ----------
+    estimated : StructureOutput or TemporalStructure
+        The estimated structure, one graph per lag.
+    true : StructureOutput or TemporalStructure
+        The true structure, over the same variables in the same order.
+
+    Returns
+    -------
+    dict
+        ``"per_lag"`` maps each scored lag to its ``"precision"``, ``"recall"``, ``"f1"``, and
+        ``"shd"``, the Hamming distance of the directed edges, where a reversal costs 2. Lag 0 is
+        scored when the estimate carries it, and its scores are also ``"contemporaneous"``.
+        ``"lagged"``, present when either structure has a lag from 1, scores the edges of every
+        such lag together, and ``"summary"`` gives the precision, recall, and F1 of the graph that
+        merges every scored lag, self-loops left out.
+        ``"coefficient_mae_per_lag"`` maps each scored lag that both structures carry to its
+        weight error, when both carry lag weights.
 
     Examples
     --------

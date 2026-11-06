@@ -377,7 +377,7 @@ Released October 15, 2026
 :::{div} release-body
 <h3>Score-based search</h3>
 
-XGES, compared with xges, and Tabu search and hill climbing, compared with bnlearn, on
+XGES, compared with xges, and tabu search and hill climbing, compared with bnlearn, on
 linear-Gaussian data.
 
 - **3** methods
