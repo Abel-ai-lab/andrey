@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, backend
+from andrey.core import GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
 from andrey.core.score import Score, make_score
+from andrey.core.structure import endpoint_marks
 from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search import operators as ops
 
@@ -26,10 +27,7 @@ def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
 def required_dag(constraints: Constraints) -> np.ndarray:
     """The DAG made of the required edges, as a mark matrix: where a search under knowledge starts,
     once taken to its equivalence class."""
-    dag = np.zeros(constraints.required.shape, dtype=np.int8)
-    dag[constraints.required] = TAIL
-    dag[constraints.required.T] = ARROW
-    return dag
+    return endpoint_marks(constraints.required)
 
 
 def _reachable(adj: np.ndarray):

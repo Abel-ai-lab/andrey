@@ -28,7 +28,8 @@ from scipy.special import betaincc
 from scipy.stats import pearsonr, shapiro
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
-from andrey.core.knowledge import KnowledgeError, _has_cycle
+from andrey.core.knowledge import KnowledgeError
+from andrey.core.structure import has_cycle
 from andrey.core.units import least_squares
 
 if TYPE_CHECKING:
@@ -351,7 +352,7 @@ def apply_knowledge(P: list[set[int]], constraints: Constraints) -> list[set[int
     for i, parents in enumerate(P):
         found[list(parents), i] = True
     edges = (found & ~constraints.forbidden) | constraints.required
-    if _has_cycle(edges) and not _has_cycle(found):
+    if has_cycle(edges) and not has_cycle(found):
         raise KnowledgeError(
             "the required edges close a directed cycle with the parents RCD found; change the "
             "required edges, or forbid an edge on the cycle"

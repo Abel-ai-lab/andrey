@@ -604,13 +604,13 @@ def _backward_task(
 # counts the targets the in-process scan would enumerate again: those touched since the graph it
 # kept, which is every target on the first pass and after the workers ran the passes in between. A
 # backward pass counts every target. It is checked per pass, and the worker set is created lazily
-# on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK`` below;
+# on the first pass that crosses. The default is the fixed ``MIN_POOL_GES_WORK`` below;
 # ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a fit with
 # workers warns once on the default when a pass nears it.
 
 # Estimated candidate evaluations below which a pass runs in-process. The default is a starting
 # point, not tuned for any machine; `andrey calibrate` measures the value for this one.
-_DEFAULT_MIN_WORK = 10_000
+MIN_POOL_GES_WORK = 10_000
 
 # The largest estimated work of a pass in the last fit with more than one worker; `andrey calibrate`
 # reads it to state a measured crossover in the gate's units.
@@ -623,7 +623,7 @@ _DEGREE_CAP = (
 
 def _min_work() -> int:
     """The crossover gate in estimated candidate evals (env override, fixed default)."""
-    return par.min_work(env.GES_PARALLEL_MIN_WORK, _DEFAULT_MIN_WORK)
+    return par.min_work(env.GES_PARALLEL_MIN_WORK, MIN_POOL_GES_WORK)
 
 
 def forward_work_per_target(

@@ -80,12 +80,13 @@ def configurations(
     return index, size
 
 
-# A table with at most this many cells per row, or _DENSE_MIN cells, is counted over every possible
+# A table with at most this many cells per row, or DENSE_MIN cells, is counted over every possible
 # configuration with one bincount and no renumbering; its empty configurations are dropped after.
-_DENSE_ROWS = 4
-_DENSE_MIN = 1 << 16
-# The most row indices, and table cells, one batched bincount holds.
-_BATCH_CELLS = 1 << 22
+# The chi-square test's batched path takes a table under the same bound.
+DENSE_ROWS = 4
+DENSE_MIN = 1 << 16
+# The most row indices, table cells, or Gram-matrix entries one batched count holds.
+BATCH_CELLS = 1 << 22
 
 
 def table_counts(
@@ -121,7 +122,7 @@ def table_counts(
     target = codes[:, node]
     out: list[np.ndarray] = [np.empty((0, r), dtype=np.int64)] * len(parent_sets)
     dense: list[tuple[int, int]] = []
-    limit = max(_DENSE_ROWS * n, _DENSE_MIN)
+    limit = max(DENSE_ROWS * n, DENSE_MIN)
     for i, parents in enumerate(parent_sets):
         q = 1
         for p in parents:
@@ -134,8 +135,8 @@ def table_counts(
     start = 0
     while start < len(dense):
         stop, cells = start, 0
-        while stop < len(dense) and (stop == start or (stop - start + 1) * n <= _BATCH_CELLS):
-            if stop > start and cells + dense[stop][1] * r > _BATCH_CELLS:
+        while stop < len(dense) and (stop == start or (stop - start + 1) * n <= BATCH_CELLS):
+            if stop > start and cells + dense[stop][1] * r > BATCH_CELLS:
                 break
             cells += dense[stop][1] * r
             stop += 1

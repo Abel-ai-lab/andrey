@@ -14,12 +14,13 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
 from andrey.core.seeding import start_rng
+from andrey.core.structure import endpoint_marks
 from andrey.search.boss import parent_knowledge, precedence_sort, ranked_score
 from andrey.search.operators import check_parent_cap
 
@@ -657,13 +658,11 @@ def grasp(
     assert best is not None  # n_starts >= 1
     order, total_bic = best
 
-    adj = np.zeros((n_features, n_features), dtype=np.int8)
+    dag = np.zeros((n_features, n_features), dtype=bool)
     for y in range(n_features):
-        for x in order.get_parents(y):
-            adj[x, y] = TAIL
-            adj[y, x] = ARROW
+        dag[order.get_parents(y), y] = True
 
-    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
+    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total_bic)

@@ -11,12 +11,13 @@ from collections import deque
 
 import numpy as np
 
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core import GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import MIXED_SCORES, LocalScore, make_score
 from andrey.core.score_delta import make_delta
 from andrey.core.seeding import start_rng
+from andrey.core.structure import endpoint_marks
 from andrey.core.ties import EPS_IMPROVE, tie_mask, tie_ranks
 from andrey.core.warning_policy import warn_search_limit
 from andrey.search.hc import (
@@ -241,13 +242,11 @@ def tabu(
     assert best is not None  # n_starts >= 1
     _, parents, total = best
 
-    # The best DAG as unsigned endpoint marks (u -> v: TAIL at u, ARROW at v), reduced to its CPDAG.
-    dag = np.full((d, d), NULL, dtype=np.int8)
+    # The best DAG, reduced to its CPDAG.
+    dag = np.zeros((d, d), dtype=bool)
     for v in range(d):
-        for p in parents[v]:
-            dag[p, v] = TAIL
-            dag[v, p] = ARROW
-    cpdag = dag2cpdag(dag)
+        dag[parents[v], v] = True
+    cpdag = dag2cpdag(endpoint_marks(dag))
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), total

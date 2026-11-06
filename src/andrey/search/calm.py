@@ -29,13 +29,10 @@ from andrey.core import GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.structure import endpoint_marks
 from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search.continuous import (
-    break_cycles,
-    endpoint_marks,
-    residual_variances,
-)
+from andrey.search.continuous import break_cycles, residual_variances
 
 
 def _require_torch():
