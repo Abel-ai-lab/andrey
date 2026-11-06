@@ -80,8 +80,9 @@ The implementations differ in parts each adapter names and the lane measures rat
 | GRaSP's tuck depth | 3, independent of `max_depth` | `depth`, -1 (none) by default, the FCI cap too |
 
 Context arms at the paper's settings measure each part: Andrey's hybrids with the
-possible-d-separation step's removals skipped (`no_possible_dsep`), Andrey's GRaSP-FCI at a tuck
-depth of 7 on P20, P100, and O1, and GFCI and FCI from both packages on P20. A tuck depth of `d`,
+possible-d-separation step's removals skipped (`no_possible_dsep`) on P20, P100, O1, and O2,
+Andrey's GRaSP-FCI at a tuck depth of 7 on P20, P100, and O1, and GFCI and FCI from both packages
+on P20. A tuck depth of `d`,
 nearer Tetrad's, runs past minutes at 200 rows, where many scores tie, so the lane stops at 7.
 
 ## Scores

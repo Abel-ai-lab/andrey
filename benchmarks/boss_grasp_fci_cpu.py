@@ -24,10 +24,11 @@ against the gated reference, causal-cmd 1.12.0's ``bfci`` and ``grasp-fci`` (tet
 Tetrad's documented defaults (:mod:`~andrey_bench.adapters.tetrad_pag`), run :data:`DRAWS` times
 per dataset with no seed. At the paper's settings, P20 adds context arms: tetrad-lib 7.6.10's
 ``BossFci`` and ``GraspFci``, the paper's code, once (also on P100); causal-cmd's GFCI and FCI and
-Andrey's ``gfci`` and ``fci``; and Andrey's hybrids with the possible-d-separation step's removals
-skipped (``no_possible_dsep``, the step neither Tetrad hybrid has). P20, P100, and O1 at the
-paper's settings add ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a
-tuck depth of ``d`` runs past minutes at 200 rows, where ties between scores are many.
+Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, O1, and O2 add Andrey's hybrids
+with the possible-d-separation step's removals skipped (``no_possible_dsep``, the step neither
+Tetrad hybrid has), and P20, P100, and O1 ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP,
+which has no cap; a tuck depth of ``d`` runs past minutes at 200 rows, where ties between scores
+are many.
 
 The truth is the PAG of the measured variables (``andrey.data.latent.marginal``); ``check-truth``
 compares it with pcalg's ``dag2pag`` on the DAG numbered in a topological order. Every estimate is
@@ -354,13 +355,13 @@ def andrey_fits(cell: Cell) -> list[dict]:
         }
 
     fits = [fit("boss_fci"), fit("grasp_fci")]
-    if cell.block == "P20" and cell.setting == "paper":
+    if cell.setting == "paper" and cell.block in ("P20", "P100", "O1", "O2"):
         fits += [
             fit("boss_fci", "paper-no-possible-dsep", "no_possible_dsep"),
             fit("grasp_fci", "paper-no-possible-dsep", "no_possible_dsep"),
-            fit("gfci"),
-            fit("fci"),
         ]
+    if cell.block == "P20" and cell.setting == "paper":
+        fits += [fit("gfci"), fit("fci")]
     if cell.block in ("P20", "P100", "O1") and cell.setting == "paper":
         fits.append(fit("grasp_fci", "paper-grasp-depth-7", grasp_depth=7))
     return fits
