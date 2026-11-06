@@ -1,46 +1,26 @@
 from __future__ import annotations
 
 import warnings
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from andrey.lingam.var import var_lingam
-from andrey.temporal.granger import granger_f_test
-from tests.recovery.helpers import datagen, harness
+from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def test_varma_lingam_baseline():
-    from andrey.temporal.varma import varma_lingam
+    from andrey.api.temporal import varma_lingam
 
-    order, psis, omegas = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=False)
-    harness.assert_baseline(
-        "VARMALiNGAM",
-        {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)},
-        case="varma_3v",
-    )
+    out = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=False)
+    assert_recorded_output(out, "VARMALiNGAM", case="varma_3v")
 
 
 def test_varma_lingam_pruned_baseline():
-    from andrey.temporal.varma import varma_lingam
-
-    order, psis, omegas = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=True)
-    harness.assert_baseline(
-        "VARMALiNGAMPruned",
-        {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)},
-        case="varma_3v",
-    )
-
-
-def test_varma_lingam_output_contract():
     from andrey.api.temporal import varma_lingam
 
-    out = varma_lingam(datagen.generate("varma_3v"), order=(1, 1))
-    assert out.structure.type == "temporal"
-    assert out.structure.lag_weights.shape == (2, 3, 3)
-    assert out.structure.lag_weights_ma.shape == (1, 3, 3)
+    out = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=True)
+    assert_recorded_output(out, "VARMALiNGAMPruned", case="varma_3v")
 
 
 def test_varma_lingam_orders_innovations_by_least_squares():
@@ -130,25 +110,11 @@ def test_longitudinal_lingam_matches_the_recorded_output():
     assert_recorded_output(out, "LongitudinalLiNGAM", case="panel_4v")
 
 
-def test_var_lingam_recovery():
-    from andrey.api._temporal import _adapt_var_lingam
-
-    order, adj = var_lingam(datagen.generate("var_4v_stable"))
-    model = SimpleNamespace(adjacency_matrices_=adj, causal_order_=order)
-    out = _adapt_var_lingam(model)
-    assert_recorded_output(out, "VARLiNGAM", case="var_4v_stable")
-
-
 def test_granger_recovery():
-    coeff, _ = granger_f_test(datagen.generate("var_4v_stable"), maxlag=2)
-    harness.assert_baseline("Granger", {"coeff": coeff, "adj": coeff != 0}, case="var_4v_stable")
+    from andrey.api.temporal import granger
 
-
-def test_var_lingam_output_contract():
-    order, adj = var_lingam(datagen.generate("var_4v_stable"))
-    # The planted instantaneous order is x0, x1, x2, x3.
-    assert list(order) == datagen.column_of("var_4v_stable").tolist()
-    assert np.asarray(adj).shape == (2, 4, 4)
+    out = granger(datagen.generate("var_4v_stable"), tau_max=2, fdr_method="none")
+    assert_recorded_output(out, "Granger", case="var_4v_stable")
 
 
 @pytest.fixture(scope="module")

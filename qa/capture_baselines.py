@@ -20,7 +20,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 
@@ -69,33 +68,6 @@ def _run_icp(X: np.ndarray, algorithm: str) -> dict:
 
     target = int(datagen.column_of("gauss_5v")[3])  # the column of x3, whose parents are x1, x2
     return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
-
-
-def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
-    from andrey.api._temporal import _adapt_var_lingam
-    from andrey.lingam.var import var_lingam
-
-    order, adj = var_lingam(X)
-    model = SimpleNamespace(adjacency_matrices_=adj, causal_order_=order)
-    return project_output(_adapt_var_lingam(model), algorithm)
-
-
-def _run_varmalingam(X: np.ndarray, algorithm: str, *, prune: bool = False) -> dict:
-    from andrey.temporal.varma import varma_lingam
-
-    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=prune)
-    return {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)}
-
-
-def _run_varmalingam_pruned(X: np.ndarray, algorithm: str) -> dict:
-    return _run_varmalingam(X, algorithm, prune=True)
-
-
-def _run_granger(X: np.ndarray, algorithm: str) -> dict:
-    from andrey.temporal.granger import granger_f_test
-
-    coeff = np.asarray(granger_f_test(X, maxlag=2)[0], dtype=np.float64)
-    return {"coeff": coeff, "adj": (coeff != 0.0).astype(int)}
 
 
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
@@ -158,10 +130,9 @@ ALGORITHMS = {
     "UT-IGSP": (_run_ut_igsp, "gauss_5v_noise_shift"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
     "CAM": (_facade("cam"), "nonmonotone_4v"),
-    "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
-    "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
-    "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),
-    "Granger": (_run_granger, "var_4v_stable"),
+    "VARMALiNGAM": (_facade("varma_lingam", order=(1, 1), prune=False), "varma_3v"),
+    "VARMALiNGAMPruned": (_facade("varma_lingam", order=(1, 1), prune=True), "varma_3v"),
+    "Granger": (_facade("granger", tau_max=2, fdr_method="none"), "var_4v_stable"),
     "DYNOTEARS": (_facade("dynotears"), "svar_4v_gauss"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),

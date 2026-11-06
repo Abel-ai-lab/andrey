@@ -9,7 +9,6 @@ lives in the private ``_temporal`` adapters.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -268,9 +267,8 @@ def varma_lingam(
         constraints=constraints,
         name=column_namer(labels),
     )
-    model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     required = None if constraints is None else constraints.required
-    return with_labels(_adapt_varma_lingam(model, required), labels)
+    return with_labels(_adapt_varma_lingam(causal_order, psis, omegas, required), labels)
 
 
 @method_spec("longitudinal_lingam")
@@ -428,7 +426,8 @@ def longitudinal_lingam(
     )
     model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
     required = None if constraints is None else constraints.required
-    return with_labels(_adapt_longitudinal_lingam(model, required), labels)
+    out = _adapt_longitudinal_lingam(model.adjacency_matrices_, model.causal_orders_, required)
+    return with_labels(out, labels)
 
 
 @method_spec("pcmci")
@@ -1560,7 +1559,7 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required, p_values), labels)
+    return with_labels(_adapt_granger(coeff, tau_max, required, p_values), labels)
 
 
 @method_spec("dynotears")

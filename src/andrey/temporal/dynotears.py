@@ -30,6 +30,7 @@ from andrey.search.continuous import (
     threshold_dag,
     trace_exponential,
 )
+from andrey.temporal.pcmci import lagged_design
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -52,18 +53,12 @@ class DynotearsResult:
     edges_removed: int
 
 
-def lagged_design(series: np.ndarray, tau_max: int) -> np.ndarray:
-    """``[X | X_1 | ... | X_p]`` for ``p = tau_max``: row ``s`` holds steps ``t, t-1, ..., t-p``.
-
-    ``t = p + s`` runs over the steps that have ``p`` steps before them, so the design has
-    ``len(series) - p`` rows and ``d * (p + 1)`` columns.
-    """
-    steps = series.shape[0]
-    return np.hstack([series[tau_max - k : steps - k] for k in range(tau_max + 1)])
-
-
 def lagged_covariance(series: np.ndarray, tau_max: int) -> np.ndarray:
-    """The covariance of :func:`lagged_design`'s columns, each centered on its own mean."""
+    """The covariance of the lagged design's columns over lags ``0`` to ``tau_max``.
+
+    The design is :func:`~andrey.temporal.pcmci.lagged_design`'s; each column is centered on its
+    own mean.
+    """
     design = lagged_design(series, tau_max)
     centered = design - design.mean(axis=0, keepdims=True)
     return centered.T @ centered / design.shape[0]

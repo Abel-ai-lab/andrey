@@ -788,7 +788,7 @@ def camuv(
         )
     # B[i, j] != 0 is the edge j -> i, and a NaN pair is o-o.
     B = np.where(pairs, np.nan, edges.T.astype(np.float64))
-    marks = marks_from_signed(B, nan_mark="circle")
+    marks = marks_from_signed(B, nan_mark=CIRCLE)
     if constraints is not None:
         # On a marked pair, a forbidden i -> j whose reverse is not forbidden: an arrowhead at i.
         one_way = constraints.forbidden & ~constraints.forbidden.T
