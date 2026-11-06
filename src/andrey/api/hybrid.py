@@ -11,14 +11,15 @@ from typing import TYPE_CHECKING
 from andrey.api._adapt import (
     categorical_metadata,
     check_same_data,
+    checked_data,
+    column_labels,
     copies_named,
-    fit_inputs,
     json_safe,
     structure_output,
     tabu_cap,
 )
 from andrey.api._method import method_spec
-from andrey.core.knowledge import Knowledge
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -55,10 +56,10 @@ def _fit(
     assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
     check_same_data(name, score_func, indep_test)
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
     max_tabu = tabu_cap(max_tabu, tabu_length)
-    X, mask, labels, constraints = fit_inputs(
-        data, "indep_test", indep_test, categorical, knowledge, method=name
-    )
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method=name)
     with copies_named(labels):
         cpdag, score, _ = _rsmax2(
             X,

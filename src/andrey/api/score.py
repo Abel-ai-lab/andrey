@@ -20,6 +20,7 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
+    checked_data,
     column_labels,
     column_namer,
     copies_named,
@@ -1729,11 +1730,11 @@ def tabu(
     """
     from andrey.search.tabu import tabu as _tabu
 
-    max_tabu = tabu_cap(max_tabu, tabu_length)
     assert score_func is not None  # method_spec picks it from the column types
-    X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="tabu"
-    )
+    X, mask = checked_data(data, categorical, "score_func", score_func, method="tabu")
+    max_tabu = tabu_cap(max_tabu, tabu_length)
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
     changes = X.shape[1] if n_perturbations is None else n_perturbations
     with copies_named(labels):
         cpdag, score = _tabu(
