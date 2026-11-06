@@ -137,17 +137,31 @@ class Canonical:
     required: np.ndarray
 
 
-def canonicalize(data: np.ndarray, constraints: Constraints | None = None) -> Canonical:
-    """Order the columns of ``data`` by their ranks, center them, and form their covariance.
+def center(samples: np.ndarray, *, standardize: bool = False) -> np.ndarray:
+    """``samples`` with each column centered on its mean; with ``standardize``, each column is also
+    divided by its standard deviation, to unit variance, and a constant column keeps its scale.
+    """
+    centered = samples - samples.mean(axis=0, keepdims=True)
+    if standardize:
+        scale = centered.std(axis=0, keepdims=True)
+        scale[scale == 0.0] = 1.0
+        centered = centered / scale
+    return centered
+
+
+def canonicalize(
+    data: np.ndarray, constraints: Constraints | None = None, *, standardize: bool = False
+) -> Canonical:
+    """Order the columns of ``data`` by their ranks, :func:`center` them, and form their covariance.
 
     ``constraints`` (background knowledge in the data's column order) is carried into the fit's
-    column order; ``None`` forbids and requires nothing.
+    column order; ``None`` forbids and requires nothing. ``standardize`` scales each column to unit
+    variance first.
     """
     samples = np.asarray(data, dtype=np.float64)
     d = samples.shape[1]
     order = np.argsort(tie_ranks(samples))
-    samples = samples[:, order]
-    centered = samples - samples.mean(axis=0, keepdims=True)
+    centered = center(samples[:, order], standardize=standardize)
     if constraints is None:
         forbidden = required = np.zeros((d, d), dtype=bool)
     else:
@@ -426,25 +440,32 @@ def likelihood_path(
     canonical: Canonical,
     start: np.ndarray,
     solve: Callable[[np.ndarray, Penalty], np.ndarray],
-    prune: Callable[[np.ndarray], np.ndarray],
     *,
+    w_threshold: float,
     lam: float,
     delta: float,
     decay: float,
     max_steps: int,
+    method: str,
 ) -> tuple[np.ndarray, int]:
     """Refit ``start`` under the likelihood and a shrinking quasi-MCP; return the weights and steps.
 
-    Each step calls ``solve(weights, penalty)`` from the last accepted weights with the quasi-MCP of
-    the current ``lam`` and ``delta`` and ``prune``s its result to an acyclic, thresholded graph,
-    the weights the step returns. The step is accepted when the likelihood of those weights,
-    :func:`gaussian_likelihood`, is lower than that of the last accepted weights by more than a
-    ``_PATH_TOL`` fraction (the likelihood of ``start`` counts as infinite); ``lam`` and ``delta``
-    are then multiplied by ``decay``. The path ends at the first step that does not lower the
-    likelihood, or after ``max_steps`` accepted steps, and returns the last accepted weights, or
-    ``start`` when none was accepted (Deng et al. 2024).
+    The path starts from ``start`` pruned to its acyclic, thresholded graph
+    (:func:`threshold_dag` at ``w_threshold``). Each step calls ``solve(weights, penalty)`` from
+    the last accepted weights with the quasi-MCP of the current ``lam`` and ``delta`` and prunes
+    its result the same way, the weights the step returns. The step is accepted when the likelihood
+    of those weights, :func:`gaussian_likelihood`, is lower than that of the last accepted weights
+    by more than a ``_PATH_TOL`` fraction (the likelihood of ``start`` counts as infinite); ``lam``
+    and ``delta`` are then multiplied by ``decay``. The path ends at the first step that does not
+    lower the likelihood, or after ``max_steps`` accepted steps, which warns with ``method``'s
+    name, and returns the last accepted weights, or the pruned ``start`` when none was accepted
+    (Deng et al. 2024).
     """
-    best, best_value, steps = start, np.inf, 0
+
+    def prune(raw: np.ndarray) -> np.ndarray:
+        return raw * threshold_dag(raw, canonical, w_threshold)[0]
+
+    best, best_value, steps = prune(start), np.inf, 0
     while steps < max_steps:
         candidate = prune(solve(best, quasi_mcp(lam, delta)))
         value, _ = gaussian_likelihood(canonical.cov, candidate)
@@ -452,6 +473,8 @@ def likelihood_path(
             break
         best, best_value, steps = candidate, value, steps + 1
         lam, delta = lam * decay, delta * decay
+    if steps == max_steps:
+        warn_search_limit(method, "max_path", max_steps, "path steps")
     return best, steps
 
 
@@ -555,17 +578,18 @@ def notears(
     mcp_delta: float,
     mcp_decay: float,
     max_path: int,
+    standardize: bool = False,
     labels: tuple[str, ...] | None = None,
     constraints: Constraints | None = None,
 ) -> ContinuousResult:
     """NOTEARS (Zheng et al. 2018), and with ``robust`` the likelihood path of Deng et al. (2024).
 
-    The first fit is the least-squares loss with an ``l1`` penalty by :func:`augmented_lagrangian`.
-    With ``robust`` its thresholded, acyclic weights start :func:`likelihood_path`, whose steps
-    (each thresholded again) solve :func:`adam_augmented_lagrangian` with
-    :func:`gaussian_likelihood` and the quasi-MCP.
+    ``standardize`` scales each column to unit variance first (:func:`canonicalize`). The first fit
+    is the least-squares loss with an ``l1`` penalty by :func:`augmented_lagrangian`. With
+    ``robust`` its weights start :func:`likelihood_path`, whose steps solve
+    :func:`adam_augmented_lagrangian` with :func:`gaussian_likelihood` and the quasi-MCP.
     """
-    canonical = canonicalize(data, constraints)
+    canonical = canonicalize(data, constraints, standardize=standardize)
     weights = augmented_lagrangian(
         canonical.cov,
         canonical.forbidden,
@@ -577,9 +601,6 @@ def notears(
     )
     steps = 0
     if robust:
-
-        def prune(raw: np.ndarray) -> np.ndarray:
-            return raw * threshold_dag(raw, canonical, w_threshold)[0]
 
         def solve(initial: np.ndarray, penalty: Penalty) -> np.ndarray:
             return adam_augmented_lagrangian(
@@ -596,16 +617,15 @@ def notears(
 
         weights, steps = likelihood_path(
             canonical,
-            prune(weights),
+            weights,
             solve,
-            prune,
+            w_threshold=w_threshold,
             lam=mcp_lambda,
             delta=mcp_delta,
             decay=mcp_decay,
             max_steps=max_path,
+            method="notears",
         )
-        if steps == max_path:
-            warn_search_limit("notears", "max_path", max_path, "path steps")
     h_final, _ = trace_exponential(weights)
     return finish(
         weights, canonical, threshold=w_threshold, labels=labels, h_final=h_final, path_steps=steps
@@ -626,16 +646,18 @@ def dagma(
     mcp_delta: float,
     mcp_decay: float,
     max_path: int,
+    standardize: bool = False,
     labels: tuple[str, ...] | None = None,
     constraints: Constraints | None = None,
 ) -> ContinuousResult:
     """DAGMA (Bello et al. 2022), and with ``robust`` the likelihood path of Deng et al. (2024).
 
-    The first fit is the least-squares loss with an ``l1`` penalty along :func:`central_path`. With
-    ``robust`` its thresholded, acyclic weights start :func:`likelihood_path`, whose steps run the
-    central path again with :func:`gaussian_likelihood` and the quasi-MCP.
+    ``standardize`` scales each column to unit variance first (:func:`canonicalize`). The first fit
+    is the least-squares loss with an ``l1`` penalty along :func:`central_path`. With ``robust``
+    its weights start :func:`likelihood_path`, whose steps run the central path again with
+    :func:`gaussian_likelihood` and the quasi-MCP.
     """
-    canonical = canonicalize(data, constraints)
+    canonical = canonicalize(data, constraints, standardize=standardize)
 
     def solve(initial: np.ndarray, loss: Loss, penalty: Penalty) -> np.ndarray:
         return central_path(
@@ -652,22 +674,17 @@ def dagma(
     weights = solve(np.zeros_like(canonical.cov), least_squares, l1_penalty(lambda1))
     steps = 0
     if robust:
-
-        def prune(raw: np.ndarray) -> np.ndarray:
-            return raw * threshold_dag(raw, canonical, w_threshold)[0]
-
         weights, steps = likelihood_path(
             canonical,
-            prune(weights),
+            weights,
             lambda initial, penalty: solve(initial, gaussian_likelihood, penalty),
-            prune,
+            w_threshold=w_threshold,
             lam=mcp_lambda,
             delta=mcp_delta,
             decay=mcp_decay,
             max_steps=max_path,
+            method="dagma",
         )
-        if steps == max_path:
-            warn_search_limit("dagma", "max_path", max_path, "path steps")
     return finish(
         weights,
         canonical,

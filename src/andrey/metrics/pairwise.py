@@ -15,12 +15,27 @@ def _signs(labels: object) -> np.ndarray:
 
 
 def direction_accuracy(pred: object, truth: object, *, weights: object | None = None) -> float:
-    """Fraction of decided pairs whose predicted cause -> effect direction matches the truth.
+    """Return the fraction of decided pairs whose predicted direction matches the true one.
 
-    ``pred`` and ``truth`` are per-pair signed labels (``+1`` = ``X -> Y``, ``-1`` = ``Y -> X``);
-    a ``pred`` of 0 is an abstention, dropped before scoring. ``weights`` gives optional per-pair
-    weights (the Tuebingen-pairs standard). Returns 0.0 when nothing is decided; pair it with
-    :func:`decision_rate` so a high accuracy from few decisions is visible.
+    An abstention is dropped before scoring, so report :func:`decision_rate` with it: a high
+    accuracy from few decisions then shows.
+
+    Parameters
+    ----------
+    pred : array-like of shape (n_pairs,)
+        Each pair's predicted direction: positive for ``X -> Y``, negative for ``Y -> X``, and 0
+        for an abstention.
+    truth : array-like of shape (n_pairs,)
+        Each pair's true direction, signed the same way.
+    weights : array-like of shape (n_pairs,) or None, default=None
+        Each pair's weight, such as the weights of a benchmark of cause-effect pairs; ``None``
+        weighs every pair 1.
+
+    Returns
+    -------
+    float
+        The weighted share of the decided pairs whose direction matches, or 0.0 when no pair is
+        decided or the decided pairs' weights sum to 0.
 
     Examples
     --------
@@ -39,7 +54,22 @@ def direction_accuracy(pred: object, truth: object, *, weights: object | None = 
 
 
 def decision_rate(pred: object, *, weights: object | None = None) -> float:
-    """Fraction of pairs the method commits to (``pred != 0``); 1.0 when it decides every pair.
+    """Return the fraction of pairs the method decides, those with ``pred != 0``.
+
+    Parameters
+    ----------
+    pred : array-like of shape (n_pairs,)
+        Each pair's predicted direction: positive for ``X -> Y``, negative for ``Y -> X``, and 0
+        for an abstention.
+    weights : array-like of shape (n_pairs,) or None, default=None
+        Each pair's weight, such as the weights of a benchmark of cause-effect pairs; ``None``
+        weighs every pair 1.
+
+    Returns
+    -------
+    float
+        The weighted share of all pairs that are decided: 1.0 when every pair is decided, and 0.0
+        when the weights sum to 0.
 
     Examples
     --------

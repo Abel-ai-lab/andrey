@@ -31,7 +31,7 @@ whose cells give each row's variables, from whose distinct values `env` follows 
 out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
 `ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
 environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
-the mapping leaves out or gives `None` as a setting whose targets it learns, and still needs an
+the mapping leaves out or gives `None` as one whose targets it learns, and still needs an
 observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
 `targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
@@ -90,35 +90,34 @@ such as a least-squares rank cutoff, the linear combination that `gin` tests, or
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
 units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
 least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as their pages describe.
-The categorical
-settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
-boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
-distinct value of a column one category. Every method that takes `indep_test` or `score_func`
-defaults it to `None`, which picks from the column types you declare, with `categorical` or a
-DataFrame's `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is
-categorical, `"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC,
-`"bic"`; the result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the
-score the fit used. Values never decide: a column of a few whole numbers reads as numbers, with a
-`DataTypeWarning` that it may hold category codes, from every method that reads columns as numbers,
-as [Data types](guides/getting-started.md#data-types) describes. The mixed-data settings,
-`indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
-the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
-columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
-test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a `ValueError` on a column
-declared categorical, by `categorical` or by its type. Methods that score with BIC also reject a
-column that repeats another up to scale and shift or, given more rows than columns, is a linear
-function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
-every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
-group and read its edges as the group's; no option drops or merges the copies for you. Every method
-that takes `indep_test`, with a partial-correlation test, `"fisherz"` or `"student_t"`, rejects
-copies the same way before any test runs, and so do `icp` and `dynotears`. `pcmci`, `pcmciplus`, and
-`lpcmci` with those tests also reject a series that repeats another up to `2 * tau_max` steps back
-and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject
-copies the same way, and a column of fewer than 3 distinct values, such as a binary one, on which no
-smooth term can be fit; `resit` and `camuv` also need at least twice as many rows as columns, and
-`camuv` rejects a column that is a linear function of other columns, such as a total, as the BIC
-methods do. Other data raises a `ValueError` that names the argument and, for a bad cell, its row
-and column. A single column gives a one-node graph.
+The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or
+`"discrete_bic"`, read text, boolean, and `category` columns as categories and need whole numbers in
+a column of numbers, each distinct value of a column one category. Every method that takes
+`indep_test` or `score_func` defaults it to `None`, which picks from the column types you declare,
+with `categorical` or a DataFrame's `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when
+every column is categorical, `"cond_gauss"` when some are, and otherwise `"fisherz"` and the
+linear-Gaussian BIC, `"bic"`; the result's `metadata["indep_test"]` and `metadata["score_func"]`
+name the test and the score the fit used. Values never decide: a column of a few whole numbers reads
+as numbers, with a `DataTypeWarning` that it may hold category codes, from every method that reads
+columns as numbers, as [Data types](guides/getting-started.md#data-types) describes. The mixed-data
+settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or
+`"cond_gauss"`, read the categorical columns that `categorical` lists, or a DataFrame's `category`,
+`bool`, and text columns, and never a column by its values; a categorical column of numbers needs
+whole numbers. A test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a
+`ValueError` on a column declared categorical, by `categorical` or by its type. Methods that score
+with BIC also reject a column that repeats another up to scale and shift or, given more rows than
+columns, is a linear function of other columns. Copies of one variable cannot be told apart, so one
+`ValueError` names every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep
+one column per group and read its edges as the group's; no option drops or merges the copies for
+you. Every method that takes `indep_test`, with a partial-correlation test, `"fisherz"` or
+`"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
+`pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
+`2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
+`resit`, and `camuv` reject copies the same way, and a column of fewer than 3 distinct values, such
+as a binary one, on which no smooth term can be fit; `resit` and `camuv` also need at least twice as
+many rows as columns, and `camuv` rejects a column that is a linear function of other columns, such
+as a total, as the BIC methods do. Other data raises a `ValueError` that names the argument and, for
+a bad cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
@@ -320,14 +319,11 @@ with another score, named or picked by `None`, raises a `ValueError`;
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [0.1.0](benchmarks/0.1.0.md#large-graphs),
-[0.2.0](benchmarks/0.2.0.md#known-limits), [0.3.0](benchmarks/0.3.0.md#known-limits),
-[0.5.0](benchmarks/0.5.0.md#known-limits), and [0.7.0](benchmarks/0.7.0.md#limits) release
-cards show where a method scores worse than the empty graph, or about as well, as ICA-LiNGAM does
-at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
-and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
-does from 20 series at 1,000 time steps, and GES does at 200 variables with ten rows per variable.
-The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
+workload: the limits on every [release card](benchmarks.md), and each method's **Limitations.**
+paragraph, show where a method scores worse than the empty graph or about as well. On the cards
+before 0.11.0, which score with the standard BIC (`ebic_gamma=0.0`), hill climbing and tabu search
+do so from 50 variables with ten rows per variable, and GES at 200 variables with ten rows per
+variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -406,16 +402,15 @@ RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMP
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
 
-FCI, GFCI, BOSS-FCI, and GRaSP-FCI use uncovered paths for their R5, R9, and R10 tail
+FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
 orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
-path, up to a fixed search bound. R8 checks each pair of endpoints in both orders, so it does not
-depend on the node labels. The rules run in rounds, each setting together the marks every rule
-implies on the graph as it stands and leaving a circle where two of them disagree, so they do not
-depend on the node labels.
-The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
-with `possible_dsep="order_free"`, the default, their result does not depend on the column order
-unless two columns are identical; `"fast"` visits them in column order and is the default under
+path, up to a fixed search bound. R8 checks each pair of endpoints in both orders, and the rules run
+in rounds, each setting together the marks every rule implies on the graph as it stands and leaving
+a circle where two of them disagree, so neither depends on the node labels. The same rules determine
+the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`. Their possible-d-separation
+step visits the pairs and nodes by a rank computed from the data, so with
+`possible_dsep="order_free"`, the default, their result does not depend on the column order unless
+two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
@@ -431,18 +426,18 @@ one in all for the others. Known targets in `targets` stay in the set; with ever
 targets known, one search runs. The [0.14.0](benchmarks/0.14.0.md#gnies) release card measures it
 against gnies, the authors' package.
 
-IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
-and settings whose intervention targets are all known, as GIES does: it searches variable orders
-for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
-over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
-authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
-as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
-and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
-in 17, with interval ends that are floating-point residue of 0 read as 0. It returns the
-interventional essential graph and the level used in `metadata["alpha"]`. The
-[0.14.0](benchmarks/0.14.0.md#igsp) release card measures it against graphical-model-learning, the
-authors' library.
+IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment and
+interventional settings whose intervention targets are all known, as GIES does, where a setting is
+the rows of one environment of `env`: it searches variable orders for the DAG with the fewest edges,
+then the fewest I-contradicting edges, the edges whose direction the settings' invariance tests
+contradict. Its default level for both tests, `alpha=None`, is one over the number of observational
+rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its authors swept, from `1e-4` to `0.05`,
+`1e-3` had the fewest errors on one set of datasets simulated as in its papers; on fresh datasets,
+against the authors' reference implementation at `1e-3`, it and one over the observational rows were
+each worse in none of 114 comparisons and had fewer errors in 17, with interval ends that are
+floating-point residue of 0 read as 0. It returns the interventional essential graph and the level
+used in `metadata["alpha"]`. The [0.14.0](benchmarks/0.14.0.md#igsp) release card measures it
+against graphical-model-learning, the authors' library.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings whose
 intervention targets are known in part or not at all: it searches variable orders for the DAG with
@@ -534,8 +529,7 @@ A method becomes supported once it has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, IGSP, UT-IGSP,
-PCMCI, PCMCI+, and LPCMCI take their conditional-independence test as `indep_test`:
+{{ indep_test_methods }} take their conditional-independence test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|
@@ -609,7 +603,7 @@ query.
 
 ## Graph structures
 
-`GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`, and
+`GraphStructure` reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`, and
 writes Graphviz DOT text with `to_dot`, which needs no other package. It converts between graph
 kinds: `to_dag` returns a DAG of a CPDAG's equivalence class, and when the class holds more than
 one DAG, it asks you to choose how to pick one, with `tie_break="label"` or `seed`; `to_mag`
@@ -645,17 +639,17 @@ draws as many rows as `data` has, with replacement, instead. The generator depen
 resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run begins
 with the shorter run's fits. A method that takes a row-aligned input (`env`, or `targets` as a 0/1
 matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
-rows. When `env` holds text labels, or for the methods that take `targets` (`gies`, `gnies`, `igsp`,
-`ut_igsp`, and `icp`), each resample takes the same share of every environment's rows, at least one,
-so no resample drops an environment; the numeric index of `cdnod` and `fci_jci`, such as a time
-step, resamples the rows as a whole. For the methods that take `targets` and return a CPDAG (`gies`,
-`gnies`, `igsp`, and `ut_igsp`), the averaged graph is made a CPDAG without the targets, so an edge
-that only the interventions orient is undirected there; the edge frequencies keep its direction.
-`multi_group_direct_lingam` resamples each dataset on its own and returns one result per dataset;
-`longitudinal_lingam` resamples the units, the same rows of every dataset. A time-series method on
-one series subsamples one stretch of consecutive rows; with `resampling="bootstrap"` it resamples
-blocks of `block_length` consecutive rows, by default at least ten times its `tau_max`. `gin` is the
-one method it does not take, since its number of latent nodes differs from fit to fit.
+rows. When `env` holds text labels, or for the methods that take `targets` ({{ targets_names }}),
+each resample takes the same share of every environment's rows, at least one, so no resample drops
+an environment; the numeric index of `cdnod` and `fci_jci`, such as a time step, resamples the rows
+as a whole. For the methods that take `targets` and return a CPDAG ({{ cpdag_targets_names }}), the
+averaged graph is made a CPDAG without the targets, so an edge that only the interventions orient is
+undirected there; the edge frequencies keep its direction. `multi_group_direct_lingam` resamples
+each dataset on its own and returns one result per dataset; `longitudinal_lingam` resamples the
+units, the same rows of every dataset. A time-series method on one series subsamples one stretch of
+consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length` consecutive
+rows, by default at least ten times its `tau_max`. `gin` is the one method it does not take, since
+its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
@@ -671,12 +665,11 @@ points by the columns' `tie_break` ranks, so the graph relabels with the columns
 graph exists, the averaged graph is the resample graph nearest the others among the resamples that
 are valid graphs of the kind, with a warning, and `metadata["averaged_graph"]` says
 `"nearest_resample"` instead of `"vote"`; when no resample is valid either, it says
-`"nearest_resample_invalid"`. `strict=True` raises instead of both. A bootstrap resample
-repeats rows, so a conditional-independence test sees
-more evidence than the resample holds; a subsample does not, which is why we make it the default
-(the `bootstrap` docstring gives the measurements). Either way, read a frequency as a ranking of
-the edges, not as a probability. `andrey bootstrap` runs the same from the shell
-([Command-line interface](#command-line-interface)).
+`"nearest_resample_invalid"`. `strict=True` raises instead of both. A bootstrap resample repeats
+rows, so a conditional-independence test sees more evidence than the resample holds; a subsample
+does not, which is why we make it the default (the `bootstrap` docstring gives the measurements).
+Either way, read a frequency as a ranking of the edges, not as a probability. `andrey bootstrap`
+runs the same from the shell ([Command-line interface](#command-line-interface)).
 
 ```{eval-rst}
 .. autosummary::
@@ -762,7 +755,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
-| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
+| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function or class, which also works for one more release. |
 | {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
@@ -944,10 +937,10 @@ returns, after the column shuffle, and give values and shifts in the units of th
 the `scale`. The sample under `do` draws the noise the sample without interventions draws, so every
 column the interventions do not reach is the same in the two.
 
-`envs=` on `SCM.sample` and `sample_discrete` draws several environments into one dataset: one
-mapping of interventions per environment, `{}` for none. Each environment draws its own noise, and
-the rows come pooled, environment 0 first, with `env`, each row's environment, and `targets`, each
-environment's intervened columns:
+`envs=` on `SCM.sample`, `sample_discrete`, and `sample_mixed` draws several environments into one
+dataset: one mapping of interventions per environment, `{}` for none. Each environment draws its own
+noise, and the rows come pooled, environment 0 first, with `env`, each row's environment, and
+`targets`, each environment's intervened columns:
 
 ```python
 import andrey.data as data
@@ -963,15 +956,16 @@ ds.targets  # {0: [], 1: [3], 2: [5, 8]}
 
 `"standardize"` and `"rescale"` take their means, standard deviations, and divisors from the model
 without interventions on the same noise and apply them to every environment, so a shift in one
-environment stays a shift in the data. On discrete data, `hard(category)` or `hard(probs=...)`
-gives a variable one distribution whatever its parents, and `soft()` draws its table anew. The true
-graph is the graph without interventions.
+environment stays a shift in the data. On discrete data, and on the categorical columns of mixed
+data, `hard(category)` or `hard(probs=...)` gives a variable one distribution whatever its parents,
+and `soft()` draws its table anew. The true graph is the graph without interventions.
 
-`model_seed=` on `SCM.sample` and `sample_discrete` keeps one model across datasets. The model
-comes from `model_seed`: the graph, the weights or tables, the noise scales, the column order, and
-the weights or tables a `soft` intervention draws anew. Each environment draws its own, and `params`
-holds those of the model without interventions. `seed` draws only the rows, so samples with one
-`model_seed` and different seeds are datasets of one model, with the same true graph and `params`:
+`model_seed=` on `SCM.sample`, `sample_discrete`, and `sample_mixed` keeps one model across
+datasets. The model comes from `model_seed`: the graph, the weights or tables, the noise scales, the
+column order, and the weights or tables a `soft` intervention draws anew. Each environment draws its
+own, and `params` holds those of the model without interventions. `seed` draws only the rows, so
+samples with one `model_seed` and different seeds are datasets of one model, with the same true
+graph and `params`:
 
 ```python
 datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(weights="redraw")}])
@@ -1096,7 +1090,7 @@ each method gives it. `andrey run` rejects a value out of range before the fit.
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs
-HC. Configuration reports list detected backends, not the backend an operation will use.
+hill climbing. Configuration reports list detected backends, not the backend an operation will use.
 
 `andrey bootstrap <method>` takes the inputs, parameters, and options of `andrey run`, and
 `--n-resamples`, `--seed`, `--threshold`, `--strict`, `--resampling`, `--sample-fraction`, and

@@ -10,7 +10,7 @@ apply the constraints to an equivalence class.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
@@ -406,6 +406,54 @@ def _check_parts(knowledge: Knowledge, method: str, honors: Sequence[KnowledgePa
         )
 
 
+def _columns(
+    d: int, labels: Sequence[str] | None
+) -> tuple[Callable[[Node, str], int], Callable[[int], str]]:
+    """The column lookup of a knowledge part over ``d`` columns named ``labels``.
+
+    ``position`` gives the column a knowledge part names and raises :class:`KnowledgeError` when it
+    is missing; ``label`` gives the name a message uses for column ``i``.
+    """
+    names = list(labels) if labels is not None else None
+
+    def position(node: Node, what: str) -> int:
+        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
+
+    def label(i: int) -> str:
+        return repr(names[i]) if names is not None else str(i)
+
+    return position, label
+
+
+def _tiers_and_allowed(
+    knowledge: Knowledge,
+    d: int,
+    position: Callable[[Node, str], int],
+    label: Callable[[int], str],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Each column's tier, ``-1`` for none, and the links the tiers and ``allowed`` forbid.
+
+    The links form a ``(d, d)`` mask: the tiers forbid a link from a later tier into an earlier
+    one, and ``allowed`` forbids both directions of every pair of distinct columns it leaves out.
+    """
+    tier = np.full(d, -1, dtype=np.intp)
+    for k, nodes in enumerate(knowledge.tiers):
+        for v in nodes:
+            i = position(v, "tiers")
+            if tier[i] >= 0:
+                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
+            tier[i] = k
+    tiered = tier >= 0
+    forbidden = tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
+    if knowledge.allowed is not None:
+        allowed = np.eye(d, dtype=bool)
+        for a, b in knowledge.allowed:
+            i, j = position(a, "allowed"), position(b, "allowed")
+            allowed[i, j] = allowed[j, i] = True
+        forbidden |= ~allowed
+    return tier, forbidden
+
+
 def resolve(
     knowledge: Knowledge | None,
     d: int,
@@ -430,33 +478,13 @@ def resolve(
             f"{method} learns no time lags, but knowledge gives the lagged link {lagged[0]!r}; "
             "give its edges as (cause, effect) pairs"
         )
-    names = list(labels) if labels is not None else None
-
-    def position(node: Node, what: str) -> int:
-        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
-
-    def label(i: int) -> str:
-        return repr(names[i]) if names is not None else str(i)
-
+    position, label = _columns(d, labels)
     forbidden = np.zeros((d, d), dtype=bool)
     required = np.zeros((d, d), dtype=bool)
-    tier = np.full(d, -1, dtype=np.intp)
     for edge in knowledge.forbidden:
         forbidden[position(edge[0], "forbidden"), position(edge[1], "forbidden")] = True
-    for k, nodes in enumerate(knowledge.tiers):
-        for v in nodes:
-            i = position(v, "tiers")
-            if tier[i] >= 0:
-                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
-            tier[i] = k
-    tiered = tier >= 0
-    forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
-    if knowledge.allowed is not None:
-        allowed = np.zeros((d, d), dtype=bool)
-        for a, b in knowledge.allowed:
-            i, j = position(a, "allowed"), position(b, "allowed")
-            allowed[i, j] = allowed[j, i] = True
-        forbidden |= ~allowed
+    tier, by_tiers_and_allowed = _tiers_and_allowed(knowledge, d, position, label)
+    forbidden |= by_tiers_and_allowed
     np.fill_diagonal(forbidden, False)
     for edge in knowledge.required:
         i, j = position(edge[0], "required"), position(edge[1], "required")
@@ -529,38 +557,18 @@ def resolve_lagged(
     if knowledge is None or not _given(knowledge):
         return None
     _check_parts(knowledge, method, honors)
-    names = list(labels) if labels is not None else None
-
-    def position(node: Node, what: str) -> int:
-        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
-
-    def label(i: int) -> str:
-        return repr(names[i]) if names is not None else str(i)
-
+    position, label = _columns(d, labels)
     lags = tau_max + 1
     forbidden = np.zeros((lags, d, d), dtype=bool)
     required = np.zeros((lags, d, d), dtype=bool)
-    tier = np.full(d, -1, dtype=np.intp)
     for edge in knowledge.forbidden:
         i, j = position(edge[0], "forbidden"), position(edge[1], "forbidden")
         if len(edge) == 2:
             forbidden[:, i, j] = True
         elif edge[2] <= tau_max:
             forbidden[edge[2], i, j] = True
-    for k, nodes in enumerate(knowledge.tiers):
-        for v in nodes:
-            i = position(v, "tiers")
-            if tier[i] >= 0:
-                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
-            tier[i] = k
-    tiered = tier >= 0
-    forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
-    if knowledge.allowed is not None:
-        allowed = np.eye(d, dtype=bool)
-        for a, b in knowledge.allowed:
-            i, j = position(a, "allowed"), position(b, "allowed")
-            allowed[i, j] = allowed[j, i] = True
-        forbidden |= ~allowed
+    tier, by_tiers_and_allowed = _tiers_and_allowed(knowledge, d, position, label)
+    forbidden |= by_tiers_and_allowed
     np.fill_diagonal(forbidden[0], False)
     for edge in knowledge.required:
         i, j = position(edge[0], "required"), position(edge[1], "required")
