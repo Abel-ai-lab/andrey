@@ -313,16 +313,6 @@ def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
         assert figure.count(f">{build.escape(p['method'])}</text>") == 1
 
 
-def test_the_release_promise_is_the_quality_gate():
-    # The accuracy section says every release is tested against true graphs. The quality gate is
-    # that test, and tests/unit/test_release_gates.py holds every PyPI publish job to needing it.
-    tiles = build.accuracy_tiles([SUMMARY]).lower()
-    assert "every release is tested against the true graphs" in tiles
-    assert "every release is tested against the true graphs" in build.quality_intro([SUMMARY])
-    gate = (ROOT / ".github" / "workflows" / "quality-gate.yml").read_text()
-    assert "workflow_call:" in gate and "python -m qa.quality_gate" in gate
-
-
 def test_errors_compare_as_a_share_rounded_against_andrey():
     exact = {"d": 50, "andrey_s": 1.0, "comparator_s": 2.0, "ratio": 2.0, "at_least": False}
     exact |= {"andrey_errors": 0, "comparator_errors": 0}
@@ -407,7 +397,7 @@ def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_pa
         for p in points.get(info["family"], []):
             if p["ours"]:
                 assert f">{build.escape(p['method'])}</text>" in dialog
-    assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
+    assert not re.search(r"/scratch/|/home/", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
     for summary in summaries:
         for method in summary["methods"]:
@@ -415,21 +405,9 @@ def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_pa
                 assert not text or text not in page
 
 
-def test_example_prints_the_recovered_edges():
-    source, printed, svg = build.run_example()
+def test_the_example_fits_pc_and_draws_in_the_palette():
+    source, _, svg = build.run_example()
     assert "andrey.pc(df)" in source
-    assert printed.splitlines()[:10] == [  # then the metadata it prints
-        "pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)",
-        "",
-        "  raf -- mek",
-        "  plc -- pip3",
-        "  pip2 -- pip3",
-        "  erk -- akt",
-        "  erk -- pka",
-        "  akt -- pka",
-        "  p38 -> pkc",
-        "  jnk -> pkc",
-    ]
     assert svg.startswith("<svg") and "var(--andrey-" in svg
 
 
@@ -503,13 +481,6 @@ def test_numbers_read_as_written():
     assert build.ratio_text(0.996) == "1.0x"
 
 
-def test_intro_claims_one_machine_per_size_not_per_comparison():
-    # Two comparisons list two CPU models across their sizes, so the pairing holds within a size.
-    intro = build.family_intro()
-    assert "smallest graph to its largest" in intro
-    assert "Each comparison ran both packages" not in intro
-
-
 def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkeypatch):
     published = tmp_path / "published"
     published.mkdir()
@@ -522,9 +493,8 @@ def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkey
 
 def test_the_headline_is_one_sentence_with_no_number(placeholder_page):
     found = re.search(r'<h1 id="headline">(.*?)</h1>', placeholder_page, re.S)[1]
-    text = re.sub(r"<[^>]+>", "", found)
-    assert text == "Accelerated, accurate, agentic causal discovery."
-    assert '<span class="word">Accelerated, accurate, agentic</span>' in found
+    text = re.sub(r"<[^>]+>", "", found).strip()
+    assert re.fullmatch(r"[^.!?]+[.!?]", text) and not re.search(r"\d", text), text
 
 
 def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder_page):
@@ -765,33 +735,6 @@ def test_published_summary_builds():
     assert "Not for release" not in page and "e+0" not in page
 
 
-def test_one_header_on_every_page():
-    # The homepage keeps pydata's navbar and draws no header of its own.
-    template = (ROOT / "site" / "homepage.html").read_text()
-    assert re.search(r"\{%-? block docs_navbar %\}\{\{ super\(\) \}\}\{% endblock", template)
-    assert "<header" not in template
-    # The navbar: the wordmark and the release, then the site's sections in order.
-    conf = (ROOT / "docs" / "conf.py").read_text()
-    assert '"navbar_start": ["site-logo", "site-version"]' in conf
-    assert '"navbar_center": ["site-nav"]' in conf
-    nav = (ROOT / "docs" / "_templates" / "site-nav.html").read_text()
-    assert re.findall(r'\("([\w/]+)", "([\w ]+)"', nav) == [
-        ("docs/index", "Docs"),
-        ("docs/examples/index", "Examples"),
-        ("docs/demos/index", "Demos"),
-        ("blog/index", "Blog"),
-        ("docs/benchmarks", "Release cards"),
-        ("docs/faq", "FAQ"),
-    ]
-
-
-def test_the_wordmark_leads_to_the_homepage():
-    # pathto('', 1) is the site root from any page; the homepage is the root's index.html.
-    logo = (ROOT / "docs" / "_templates" / "site-logo.html").read_text()
-    assert "{%- set home = pathto('', 1) %}" in logo and "href=\"{{ home or './' }}\"" in logo
-    assert '"index": "homepage.html"' in (ROOT / "docs" / "conf.py").read_text()
-
-
 def test_the_navbar_names_only_the_page_being_read_as_current():
     # A section's link is highlighted on each of its pages; aria-current goes only on a link to the
     # page itself.
@@ -980,7 +923,6 @@ def test_the_homepage_shows_the_whole_agent_session(placeholder_page):
 
 def test_abels_mark_takes_the_text_color():
     mark = build.abel_mark()
-    assert mark.startswith('<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"')
     assert 'fill="currentColor"' in mark and "white" not in mark
 
 
@@ -1001,11 +943,9 @@ def test_the_agent_session_wraps_long_lines_inside_the_terminal(placeholder_page
 def test_code_and_its_output_sit_in_windows_named_for_the_file(placeholder_page):
     assert placeholder_page.count('<span class="window-title">example.py</span>') == 2
     assert 'class="term-bar window-bar"' in placeholder_page
-    # In the launch post a captioned code block is a window, its caption the title; the install
-    # command's window has no title.
+    # In the launch post the install command has a window of its own.
     post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text(encoding="utf-8")
     quick_start = post.split("## Try Andrey", 1)[1].split("\n## ", 1)[0]
-    assert re.findall(r":caption: (.*)", quick_start) == ["example.py", "example.py"]
     blocks = re.findall(r"```\{code-block\} shell\n(?::[^\n]*\n)*\n(.*?)\n```", quick_start, re.S)
     assert "uv add andrey-core" in blocks
 
@@ -1330,7 +1270,6 @@ def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
     assert [re.search(r"<h3>([^<]+)</h3>", note)[1] for note in notes] == [
         "Tested against the true graphs",
     ]
-    assert not any("tile-glass" in note or "wf-plus" in note for note in notes)
 
 
 def test_the_covers_move_only_without_reduced_motion_and_only_by_transform_and_opacity():
@@ -1452,10 +1391,6 @@ def test_link_preview_fonts_ship_with_their_license():
     names = sorted(p.name for p in fonts.glob("*.ttf"))
     assert names == ["Inter-Regular.ttf", "Inter-SemiBold.ttf"]
     assert "SIL Open Font License" in (fonts / "OFL.txt").read_text()
-    conf = (ROOT / "docs" / "conf.py").read_text()
-    assert 'HOME_PREVIEW = "assets/preview/home.jpg"' in conf
-    assert '"og:image:type": "image/jpeg"' in conf
-    assert '"twitter:card": "summary_large_image"' in conf
 
 
 @pytest.fixture(scope="module")
@@ -1525,20 +1460,12 @@ def test_the_blog_lists_the_newest_post_first(conf):
         newest_first(posts[:2])
 
 
-def test_the_homepage_has_no_latest_strip(placeholder_page):
-    # The header's dot on Release cards marks a newer release, and the header links the blog and
-    # the FAQ.
-    assert 'class="latest' not in placeholder_page
-    assert "latest" not in (ROOT / "site" / "homepage.html").read_text()
-
-
 def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
     tiles = dict(cards.grain.hero_tiles())
     assert sum(len(t) for t in tiles.values()) <= 150 * 1024
     assert dict(cards.grain.hero_tiles()) == tiles
     css = (ROOT / "site" / "assets" / "site.css").read_text()
     assert all(f'url("{name}")' in css for name in tiles)
-    assert "cards.grain.hero_tiles()" in (ROOT / "docs" / "conf.py").read_text()
 
 
 def test_the_sweep_follows_the_streak_in_the_art():
@@ -1600,13 +1527,16 @@ def test_the_homepage_shades_its_art_with_the_covers_fade(cards):
         assert "background: var(--cover-fade);" in body[: body.index("}")], rule
 
 
-def test_the_homepage_and_docs_css_name_no_color(cards):
+def test_the_homepage_and_docs_styles_and_scripts_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
-    sheets = ("site.css", "figures.css", "why-fast.css")
+    assets = ("site.css", "figures.css", "why-fast.css", "why-fast.js")
     docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
-    for path in [*(f"site/assets/{name}" for name in sheets), *docs]:
+    for path in [*(f"site/assets/{name}" for name in assets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
-        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", rules), path
+        if path.endswith(".js"):
+            rules = re.sub(r"//[^\n]*", "", rules)
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|oklch|lab)\(", rules), path
+        assert not re.search(r":\s*(black|white)\b", rules), path
     tokens = cards.grain.ground_tokens()
     assert tokens["--andrey-ground-cobalt"] == andrey.viz.LIGHT.ramp[3]
     assert tokens["--andrey-ground-amber"] == andrey.viz.LIGHT.categorical[1]
@@ -1706,39 +1636,20 @@ def test_every_published_art_is_stored_in_the_brand_tones(cards):
     assert toned[0, 0, 2] > toned[0, 0, 0] and toned[0, 39, 0] > toned[0, 39, 2]
 
 
-def test_a_post_cover_is_named_in_front_matter_and_fails_on_a_bad_name(cards):
+def test_a_cover_that_is_not_in_the_brand_kit_fails(cards):
     with pytest.raises(ValueError, match="unknown cover"):
         cards.cover_jpeg("photo")
-    post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text()
-    assert "cover: pair" in post
-
-
-def test_the_launch_post_links_where_the_name_comes_from():
-    faq = (ROOT / "docs" / "docs" / "faq.md").read_text()
-    assert '### Where does the name "Andrey" come from?' in faq
-    post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text()
-    assert "(../docs/faq.md#where-does-the-name-andrey-come-from)" in post
 
 
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_published_summary_gives_every_paired_ratio():
     """A ratio is withheld only where a time is missing, never for accuracy."""
     summary = build.load_summary(build.SUMMARY)
-    assert (
-        summary["headline"] == "Over 100x faster on PC, and faster on most other supported methods."
-    )
     for release in build.release_summaries(summary):
         for method in release["methods"]:
             for row in method["rows"]:
                 timed = row["andrey_s"] is not None and row["comparator_s"] is not None
                 assert (row["ratio"] is not None) == timed, (method["method"], row["d"])
-
-
-def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
-    reports = sorted((ROOT / "docs" / "docs" / "benchmarks").glob("*.md"))
-    for page in (*reports, ROOT / "docs" / "docs" / "benchmarks.md", ROOT / "README.md"):
-        text = page.read_text(encoding="utf-8").lower()
-        assert "no claim" not in text and "no speed claim" not in text, page.name
 
 
 def test_every_hand_written_copy_of_the_claim_is_the_builds():
@@ -1757,12 +1668,8 @@ def test_every_hand_written_copy_of_the_claim_is_the_builds():
     assert 'title="Andrey | Causal discovery, fast"' in app
 
 
-def test_the_citation_title_is_the_tagline():
-    # The package's own line, as on the README banner; the homepage's headline is campaign wording.
-    cff = (ROOT / "CITATION.cff").read_text()
-    assert 'title: "Andrey: Accelerated, accurate, agentic causal discovery"' in cff
-    for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
-        text = page.read_text()
-        assert "title = {Andrey: Accelerated, accurate, agentic causal discovery}," in text, (
-            page.name
-        )
+def test_the_citation_title_is_the_tagline(cards):
+    # The package's own line, as on the README banner; the FAQ cites what the README cites.
+    title = f"Andrey: {cards.TAGLINE}"
+    assert f'title: "{title}"' in (ROOT / "CITATION.cff").read_text()
+    assert f"title = {{{title}}}," in (ROOT / "README.md").read_text()

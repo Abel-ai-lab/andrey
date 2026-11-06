@@ -14,31 +14,29 @@ follow, with its rule implementations, conditional-independence tests, and mark 
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from itertools import combinations
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, marginal_separated, separating_subsets
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    marginal_separated,
+    separating_subsets,
+    vote_triples,
+)
 from andrey.constraint.fci import (
     _adjacent,
-    _arrow_allowed,
     _circle_pag,
-    _fast_adjacency_search,
     _fci_orient,
-    _is_def_collider,
     _knowledge_marks,
     _largest_size,
-    _neighbor_lists,
-    _remove_by_possible_dsep,
-    _sepset,
-    _test_in_rank_order,
-    _triple,
+    _orient_colliders,
     _validate_possible_dsep,
-    _vote_sepsets,
+    possible_dsep_step,
 )
-from andrey.core import ARROW, NULL, GraphStructure, backend
+from andrey.constraint.pc import adjacency_search, knowledge_masks
+from andrey.core import NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
 from andrey.search.boss import boss
@@ -86,11 +84,11 @@ def gfci(
     ``workers`` worker processes share the GES passes and the adjacency search's larger
     conditioning-size passes, each above its own work threshold; ``None`` reads
     ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
-    the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
-    after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
-    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
-    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
-    non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    the triples the pattern shields by the vote of
+    :func:`~andrey.constraint._skeleton.vote_triples` after the possible-d-sep step. ``seed`` fixes
+    the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
+    ``None`` uses ``ANDREY_SEED``. The private ``_ambiguous`` sink receives the triples no
+    orientation rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
@@ -272,31 +270,40 @@ def fci_from_pattern(
     pattern = from_structure(cpdag)
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
-    keep = None if constraints is None else constraints.required | constraints.required.T
-    support, sepsets = _fast_adjacency_search(
-        X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
+    skeleton, sepsets, _ = adjacency_search(
+        test,
+        X.shape[1],
+        alpha,
+        support=pattern != NULL,
+        keep=knowledge_masks(constraints)[1],
+        max_depth=max_depth,
+        workers=workers,
     )
     sepsets.update(
         _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
     )
 
-    marks = _circle_pag(support)
+    marks = _circle_pag(skeleton)
     _knowledge_marks(marks, constraints)
-    _orient_colliders_from_pattern(marks, pattern, sepsets)
-    if possible_dsep == "fast":
-        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
-    else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
-        _remove_by_possible_dsep(
-            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
-        )
-    marks = _circle_pag(marks != NULL)
-    _knowledge_marks(marks, constraints)
+    _orient_colliders(marks, sepsets, pattern=pattern)
+    marks = possible_dsep_step(
+        marks,
+        X,
+        test,
+        alpha,
+        sepsets,
+        possible_dsep=possible_dsep,
+        indep_test=indep_test,
+        categorical=categorical,
+        seed=seed,
+        max_depth=max_depth,
+        constraints=constraints,
+    )
     ambiguous = (
         frozenset(
             triple
-            for triple in _vote_sepsets(
-                marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth
+            for triple in vote_triples(
+                marks, test, alpha, sepsets, collider_rule, max_depth=max_depth
             )
             if _adjacent(pattern, triple[0], triple[2])
         )
@@ -305,46 +312,12 @@ def fci_from_pattern(
     )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders_from_pattern(marks, pattern, sepsets, ambiguous)
+    _orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
     _fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")
-
-
-def _orient_colliders_from_pattern(
-    marks: np.ndarray,
-    pattern: np.ndarray,
-    sepsets: Mapping[tuple[int, int], tuple[int, ...]],
-    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-) -> None:
-    """Orient the unshielded colliders ``a *-> b <-* c`` of ``marks`` with the GES pattern.
-
-    For each node ``b`` and each non-adjacent pair ``(a, c)`` of its neighbors (visited in
-    ascending order): when ``a`` and ``c`` are not adjacent in ``pattern``, ``b`` is a collider iff
-    the pattern has ``a -> b <- c``; when they are, ``b`` is a collider iff a separating set for
-    ``a`` and ``c`` is recorded and does not contain ``b``, and the triple is not ``ambiguous``. An
-    already-directed tail at ``b`` blocks the orientation.
-    """
-    for b, adj in enumerate(_neighbor_lists(marks)):
-        for i in range(len(adj)):
-            for k in range(i + 1, len(adj)):
-                a, c = adj[i], adj[k]
-                if _adjacent(marks, a, c) or _is_def_collider(marks, a, b, c):
-                    continue
-                if _adjacent(pattern, a, c):
-                    if _triple(a, b, c) in ambiguous:
-                        continue
-                    sep = _sepset(sepsets, a, c)
-                    if sep is None or b in sep:
-                        continue
-                elif not (pattern[b, a] == ARROW and pattern[b, c] == ARROW):
-                    continue
-                if not _arrow_allowed(marks, a, b) or not _arrow_allowed(marks, c, b):
-                    continue
-                marks[b, a] = ARROW
-                marks[b, c] = ARROW
 
 
 def _derive_sepsets(

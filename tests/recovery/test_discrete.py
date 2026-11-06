@@ -96,7 +96,9 @@ def test_independent_columns_give_no_edges(fit):
     assert out.structure.oriented_edges() == []
 
 
-@pytest.mark.parametrize("fit", list(CPDAG_FITS))
+# The test or score each search builds reads the categories, so one search per test and score
+# covers the recoding.
+@pytest.mark.parametrize("fit", ["pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic", "cdnod-chisq"])
 def test_the_codes_need_not_start_at_zero(fit):
     """Each distinct value is a category, so recoding a column leaves the graph unchanged."""
     x = datagen.generate(CASE)

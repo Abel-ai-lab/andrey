@@ -411,7 +411,7 @@ def unit_free(method: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
-            out = facade(method)(*unit_inputs(method, exponents))
+            out = facade(method)(*unit_inputs(method, exponents), **SHORT.get(method, {}))
             fits.append(graphs_and_orders(out))
     return all(fit == fits[0] for fit in fits[1:])
 
@@ -494,7 +494,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss", "tabu"):
+    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
@@ -549,7 +549,7 @@ def records_the_test_and_score_it_used(method: str) -> bool:
 
 #: A required edge, its data, and the settings that make a method fit it: a series or panel
 #: method's link is x -> y at lag 1.
-SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True}}
+SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True, **SHORT["varma_lingam"]}}
 
 
 def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:

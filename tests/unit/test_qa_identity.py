@@ -16,6 +16,7 @@ import andrey
 from andrey import GraphStructure, StructureOutput
 from andrey.core import ci, score_delta
 from andrey.core.ci import make_indep_test
+from andrey.core.score import BICScore
 from qa import identity
 from qa import quality_gate as qg
 
@@ -225,10 +226,10 @@ def test_a_fall_in_a_count_passes_only_when_allowed(capsys) -> None:
 
 
 def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
-    gram = importlib.import_module("andrey.search.exact")._GramBICScore(x)
+    bic = BICScore(x)
     with identity.counting(None) as counts:
-        gram.score_many(0, [(1,), (2,), (3,)])
-        gram.score(1, (0, 2))  # calls score_many, which is part of the call
+        bic.score_many(0, [(1,), (2,), (3,)])
+        bic.score(1, (0, 2))
     assert counts.summary() == {
         "score_queries": 4,
         "score_sets": {"1": 3, "2": 1},

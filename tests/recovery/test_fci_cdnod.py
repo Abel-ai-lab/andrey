@@ -8,8 +8,9 @@ import pytest
 
 import andrey
 from andrey import data
-from andrey.constraint.pc import _discover_skeleton, _orient_colliders
+from andrey.constraint.pc import _orient_colliders, adjacency_search
 from andrey.core import TAIL, GraphStructure
+from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, pdag2dag
 from andrey.core.ties import tie_ranks
 from andrey.data.interventions import soft
@@ -318,7 +319,9 @@ def test_cdnod_collider_order_follows_tie_break_unless_given():
 def test_cdnod_is_invariant_to_column_order():
     x, context = shifted_domains()
     augmented = np.column_stack([x, context])
-    skeleton, sepsets, pvalues = _discover_skeleton(augmented, 0.05)
+    skeleton, sepsets, pvalues = adjacency_search(
+        make_indep_test("fisherz", augmented), augmented.shape[1], 0.05, record_pvalues=True
+    )
     trace: list[dict] = []
     _orient_colliders(skeleton, sepsets, pvalues, _trace=trace)
     assert any(

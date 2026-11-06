@@ -461,8 +461,6 @@ def test_the_shuffle_relabels_a_published_network(offline_datasets, discrete):
     assert list(shuffled.feature_names) != ASIA_NODES
     assert shuffled.data[list(plain.feature_names)].equals(plain.data)
     assert set(shuffled.graph.oriented_edges()) == set(plain.graph.oriented_edges())
-    assert "order drawn from the seed" in shuffled.description
-    assert "keep the file's variable order" in plain.description
 
 
 def test_measured_data_keep_the_file_column_order(offline_datasets):

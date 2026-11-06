@@ -219,9 +219,10 @@ the R package bnlearn. With a `target`, each returns that variable's set, whatev
 decides whether the middle node of an unshielded triple `x - z - y` is a collider. `"sepsets"`, the
 default, reads the separating set that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang,
 and Spirtes 2006) and `"majority"` (Colombo and Maathuis 2014) test `x` and `y` again given every
-subset of either one's neighbors and make `z` a collider when none, or fewer than half, of the
-separating subsets contain it. A triple the vote cannot decide is ambiguous: no rule orients through
-it, and `metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+subset of either one's neighbors and, if at least one subset separates them, make `z` a collider
+when none, or fewer than half, of the separating subsets contain it. A triple the vote cannot decide
+is ambiguous: no rule orients through it, and `metadata["ambiguous_triples"]` lists it. Each
+method's Notes give every outcome.
 `pcmciplus` takes the same three rules for its same-step colliders, with `"majority"` as its
 default, as in tigramite, since its orientations do not depend on the order of the variables.
 

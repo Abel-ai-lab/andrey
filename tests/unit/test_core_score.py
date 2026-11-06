@@ -7,6 +7,7 @@ from the implementation's internals; the inline baseline pins current outputs.
 
 from __future__ import annotations
 
+import itertools
 import re
 
 import numpy as np
@@ -137,15 +138,32 @@ def test_cache_order_invariant(data):
 def test_score_many_matches_per_set(data):
     scorer = BICScore(data)
     parent_sets = [[], [0], [1, 2], [0, 1, 2, 3]]
-    assert scorer.score_many(4, parent_sets) == [scorer.score(4, pa) for pa in parent_sets]
+    want = [scorer.score(4, pa) for pa in parent_sets]
+    assert scorer.score_many(4, parent_sets) == pytest.approx(want, rel=1e-12)
 
 
 def test_score_many_preserves_request_order(data):
     scorer = BICScore(data)
-    ordered = scorer.score_many(5, [[0], [0, 1], []])
-    assert ordered[0] == scorer.score(5, [0])
-    assert ordered[1] == scorer.score(5, [0, 1])
-    assert ordered[2] == scorer.score(5, [])
+    parent_sets = [[0], [0, 1], [], [2, 3], [1]]
+    ordered = scorer.score_many(5, parent_sets)
+    assert ordered == [scorer.score_many(5, [pa])[0] for pa in parent_sets]
+
+
+def test_a_batch_scores_each_set_as_it_scores_it_alone(data):
+    # Exact search compares the scores of one batch with those of others and of sets alone.
+    scorer = BICScore(data)
+    parent_sets = [list(pa) for pa in itertools.combinations(range(5), 3)]
+    alone = [scorer.score_many(5, [pa])[0] for pa in parent_sets]
+    assert scorer.score_many(5, parent_sets) == alone
+
+
+def test_score_many_solves_a_singular_set_on_its_own(data):
+    # Column 2 copies column 1, so every set holding both has a singular block.
+    x = np.column_stack([data[:, :2], data[:, 1], data[:, 2:]])
+    scorer = BICScore.from_cov(np.cov(x, rowvar=False), x.shape[0])
+    parent_sets = [[1, 3], [1, 2], [3, 4]]
+    want = [scorer.score(0, pa) for pa in parent_sets]
+    assert scorer.score_many(0, parent_sets) == pytest.approx(want, rel=1e-12)
 
 
 # ---- determinism --------------------------------------------------------------------------------

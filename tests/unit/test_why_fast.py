@@ -58,31 +58,6 @@ def test_counts_without_script_are_the_scenes_final_counts():
         assert counts[0] < counts[1]
 
 
-def test_the_readme_links_the_post_in_learn_more():
-    readme = (ROOT / "README.md").read_text()
-    learn_more = readme[readme.index("## Learn more") :]
-    assert "[Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)" in (
-        learn_more
-    )
-
-
-def test_the_scenes_load_only_where_they_appear():
-    conf = (ROOT / "docs" / "conf.py").read_text()
-    pages = re.search(r"WHY_FAST_PAGES = \{(.*?)\}", conf).group(1)
-    assert set(re.findall(r'"([^"]+)"', pages)) == {"blog/20261008-why-andrey-is-fast"}
-    # Motion loads before the script that uses it.
-    assert '"motion.js", "why-fast.js"' in conf
-
-
-def test_styles_and_script_name_no_color_value():
-    # Every color is a palette token or derived from one, so a theme change reaches all of them.
-    for name in ("why-fast.css", "why-fast.js"):
-        text = (ROOT / "site" / "assets" / name).read_text()
-        assert not re.search(r"#[0-9a-fA-F]{3,8}\b", text), name
-        assert not re.search(r"\b(rgba?|hsla?|oklch|lab)\(", text), name
-        assert not re.search(r":\s*(black|white)\b", text), name
-
-
 def test_motion_is_the_pinned_build_with_its_license():
     data = (ROOT / "site" / "assets" / "motion.js").read_bytes()
     banner, body = data.split(b"*/\n", 1)

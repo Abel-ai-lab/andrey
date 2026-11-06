@@ -48,15 +48,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples
+from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
 from andrey.constraint.pc import (
-    _discover_skeleton,
     _orient_colliders,
     _undirect_conflicts,
+    adjacency_search,
     check_collider_order,
     check_knowledge_cycle,
     collider_conflicts,
-    vote_colliders,
+    knowledge_masks,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
@@ -112,7 +112,7 @@ def cdnod(
     context is unconstrained. Every edge they decide is directed before the independent-change
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
-    (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
+    (:func:`~andrey.constraint.pc.adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
     ``GraphStructure`` tagged ``"cpdag"``: its directions
@@ -144,21 +144,22 @@ def cdnod(
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            X,
+        allowed, keep, apart = knowledge_masks(constraints)
+        skeleton, sepsets, pvalues = adjacency_search(
+            make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+            d,
             alpha,
-            indep_test,
-            categorical=categorical,
-            record_pvalues=ranked,
-            workers=workers,
+            support=allowed,
+            keep=keep,
+            apart=apart,
             max_depth=max_depth,
-            constraints=constraints,
-            seed=seed,
+            workers=workers,
+            record_pvalues=ranked,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
         if collider_rule != "sepsets":
             test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
-            ambiguous |= vote_colliders(
+            ambiguous |= vote_triples(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
         pdag = _orient_with_context(
@@ -174,16 +175,17 @@ def cdnod(
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
         padded = None if constraints is None else constraints.padded(d + 1)
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            augmented,
+        allowed, keep, apart = knowledge_masks(padded)
+        skeleton, sepsets, pvalues = adjacency_search(
+            make_indep_test(indep_test, augmented, categorical=mask, seed=seed),
+            d + 1,
             alpha,
-            indep_test,
-            categorical=mask,
-            record_pvalues=ranked,
-            workers=workers,
+            support=allowed,
+            keep=keep,
+            apart=apart,
             max_depth=max_depth,
-            constraints=padded,
-            seed=seed,
+            workers=workers,
+            record_pvalues=ranked,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
         if _index_edges is not None:
@@ -192,7 +194,7 @@ def cdnod(
             test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}
-            ambiguous |= vote_colliders(
+            ambiguous |= vote_triples(
                 skeleton,
                 test,
                 alpha,

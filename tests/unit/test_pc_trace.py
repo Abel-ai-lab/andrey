@@ -13,10 +13,20 @@ import pytest
 import andrey
 from andrey import data
 from andrey.constraint._skeleton import scan_conditioning_sets
-from andrey.constraint.pc import _discover_skeleton, pc
+from andrey.constraint.pc import adjacency_search, pc
 from andrey.core.ci import make_indep_test
 
 ALPHA = 0.05
+
+
+def search(X, *, workers=1, trace=None):
+    """PC's adjacency search over ``X``, with the p-values the p-value collider order reads."""
+    test = make_indep_test("fisherz", X)
+    return adjacency_search(
+        test, X.shape[1], ALPHA, workers=workers, record_pvalues=True, trace=trace
+    )
+
+
 CASES = [(d, density, seed) for d in (6, 12, 25) for density in (2.0, 4.0) for seed in range(4)]
 
 
@@ -85,7 +95,7 @@ def test_trace_replays_to_the_graph_pc_returns(d, density, seed):
     np.testing.assert_array_equal(traced.to_numpy(), expected)
     marks, sepsets, pvalues = replay(trace, d)
     np.testing.assert_array_equal(marks, expected)
-    _, engine_sepsets, engine_pvalues = _discover_skeleton(X, ALPHA)
+    _, engine_sepsets, engine_pvalues = search(X)
     assert sepsets == engine_sepsets
     assert pvalues == engine_pvalues
 
@@ -134,10 +144,10 @@ def test_trace_is_identical_across_runs():
 def test_closed_form_passes_record_the_same_tests_as_the_scan(monkeypatch):
     X = observations(25, 4.0, 2)
     fast, scanned = [], []
-    fast_result = _discover_skeleton(X, ALPHA, _trace=fast)
+    fast_result = search(X, trace=fast)
     pc_module = importlib.import_module("andrey.constraint.pc")
     monkeypatch.setattr(pc_module, "prescreen_capable", lambda test: False)
-    scanned_result = _discover_skeleton(X, ALPHA, _trace=scanned)
+    scanned_result = search(X, trace=scanned)
     np.testing.assert_array_equal(fast_result[0], scanned_result[0])
 
     def keyed(trace):
@@ -150,8 +160,8 @@ def test_closed_form_passes_record_the_same_tests_as_the_scan(monkeypatch):
 def test_tracing_scans_serially_with_the_same_record():
     X = observations(12, 4.0, 0)
     serial, requested = [], []
-    _discover_skeleton(X, ALPHA, _trace=serial)
-    _discover_skeleton(X, ALPHA, workers=2, _trace=requested)
+    search(X, trace=serial)
+    search(X, workers=2, trace=requested)
     assert digest(serial) == digest(requested)
 
 

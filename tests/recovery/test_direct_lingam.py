@@ -72,22 +72,13 @@ def test_lingam_weighted_orientation_matches_structure():
     assert weighted_edges == graph_edges
 
 
-def test_pwling_serial_and_vectorized_agree(monkeypatch):
-    # Code-path equivalence on the shared pwling foundation: the batched scoring must pick the
-    # same causal order as the readable per-pair reference -- float associativity in the batched
-    # mean stays below any order-flipping gap. Guards the acceleration against a silent order flip.
-    X = datagen.generate("lingam_5v_uniform")
-    vectorized = pwling.find_causal_order(X)
-    reference = _order_by_serial_scores(X, monkeypatch)
-    assert vectorized == reference
-
-
 @pytest.mark.parametrize("d", [8, 20])
 @pytest.mark.parametrize("noise", ["uniform", "gaussian"])
 def test_pwling_serial_vectorized_property(d: int, noise: str, monkeypatch):
-    # Beyond the single baseline: batched and serial pwling must agree on random SEMs up to d=20,
-    # including near-tie Gaussian inputs (where pwling scores cluster) -- the FP-equivalence guard
-    # that a one-input test can't give. `_random_linear_sem` is seeded, so this is reproducible.
+    # Batched and serial pwling must pick the same causal order on random SEMs up to d=20,
+    # including near-tie Gaussian inputs (where pwling scores cluster): float associativity in the
+    # batched mean stays below any order-flipping gap. `_random_linear_sem` is seeded, so this is
+    # reproducible.
     X = _random_linear_sem(seed=0, n=600, d=d, noise=noise)
     vectorized = pwling.find_causal_order(X)
     reference = _order_by_serial_scores(X, monkeypatch)
