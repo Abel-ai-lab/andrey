@@ -1,7 +1,8 @@
 """Statistical primitives with automatic backend selection.
 
-``cov``, ``corrcoef``, and ``entropy`` accept numpy arrays and return ``float64`` arrays. Numpy is
-the exact oracle for ``cov`` and ``corrcoef`` and the reference for ``entropy`` (``atol 1e-3``).
+``cov``, ``corrcoef``, and ``entropy`` accept NumPy arrays and return ``float64`` arrays. The
+``"numpy"`` backend is the exact oracle for ``cov`` and ``corrcoef`` and the reference for
+``entropy`` (``atol 1e-3``).
 
 Auto-dispatch uses per-device element-count cutoffs because compute and host-to-device transfer
 scale with that metric. ``cov`` and ``corrcoef`` gate on ``n*d``; ``entropy`` gates on ``n*B``.
@@ -406,8 +407,9 @@ def checked_matrix(
 def cov(X: np.ndarray, *, rowvar: bool = True, ddof: int = 1) -> np.ndarray:
     """Covariance matrix, matching ``np.cov(X, rowvar=rowvar, ddof=ddof)``.
 
-    ``rowvar=True`` treats each row as a variable (numpy's default); ``ddof=1`` is the sample
-    covariance. numpy is the exact oracle; the torch path equals it within device tolerance.
+    ``rowvar=True`` treats each row as a variable (NumPy's default); ``ddof=1`` is the sample
+    covariance. The ``"numpy"`` backend is the exact oracle; the torch path equals it within device
+    tolerance.
     """
     X = np.asarray(X, dtype=np.float64)
     thr = _resolve_thresholds(

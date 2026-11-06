@@ -109,14 +109,29 @@ def reject_digraph_pag(k_est: Kind, k_true: Kind) -> None:
 
 
 def shd(estimated: object, true: object, *, endpoint_aware: bool = False) -> int:
-    """Structural Hamming distance between two graphs (lower is better; ``shd(g, g) == 0``).
+    """Return the structural Hamming distance between two graphs.
 
     The default structural count charges one edit per unordered pair whose ``(mark_i, mark_j)``
     differs, so an inserted, deleted, or reversed edge each costs 1. ``endpoint_aware=True`` sums
-    the per-endpoint mark mismatches instead -- the standard PAG distance, where a reversal or a
-    deleted directed edge costs 2 and tail/arrow/circle are distinguished. When either graph is
-    ``undirected``, whose edges claim no direction, the count is the skeleton SHD: one edit per
-    pair adjacent in one graph and not in the other, whatever the marks.
+    the per-endpoint mark mismatches instead, the standard PAG distance, where a reversal or a
+    deleted directed edge costs 2 and tail, arrowhead, and circle are distinguished. When either
+    graph is ``undirected``, whose edges claim no direction, the count is the skeleton SHD: one
+    edit per pair adjacent in one graph and not in the other, whatever the marks.
+
+    Parameters
+    ----------
+    estimated : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The estimated graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph, over the same variables in the same order.
+    endpoint_aware : bool, default=False
+        Count the mismatched endpoint marks instead of the pairs that differ.
+
+    Returns
+    -------
+    int
+        The number of edits, lower being better; ``shd(g, g) == 0``.
 
     Raises
     ------
@@ -142,7 +157,24 @@ def shd(estimated: object, true: object, *, endpoint_aware: bool = False) -> int
 
 
 def skeleton_scores(estimated: object, true: object) -> dict[str, float]:
-    """Precision/recall/f1 of the undirected skeleton (edge presence, orientation ignored).
+    """Return the precision, recall, and F1 of the estimated skeleton against the true one.
+
+    The skeleton is the set of adjacent pairs, whatever their marks. When either graph is a
+    ``digraph``, its self-loops count as well.
+
+    Parameters
+    ----------
+    estimated : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The estimated graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph, over the same variables in the same order.
+
+    Returns
+    -------
+    dict
+        ``"precision"``, ``"recall"``, and ``"f1"``, each a float in ``[0, 1]``. A ratio with no
+        denominator scores 1.0, so two graphs with nothing to score agree perfectly.
 
     Examples
     --------
@@ -154,10 +186,24 @@ def skeleton_scores(estimated: object, true: object) -> dict[str, float]:
 
 
 def orientation_scores(estimated: object, true: object) -> dict[str, float]:
-    """Precision/recall/f1 of arrowhead (``ARROW``) marks -- the orientation agreement.
+    """Return the precision, recall, and F1 of the estimated arrowheads against the true ones.
 
-    For DAGs this is directed-edge F1 (one arrowhead per directed edge, a reversal is one false
-    positive and one false negative); for PAGs it is arrowhead precision/recall.
+    For DAGs this is the directed-edge F1: one arrowhead per directed edge, so a reversal is one
+    false positive and one false negative. For PAGs it scores the arrowhead marks.
+
+    Parameters
+    ----------
+    estimated : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The estimated graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph, over the same variables in the same order.
+
+    Returns
+    -------
+    dict
+        ``"precision"``, ``"recall"``, and ``"f1"``, each a float in ``[0, 1]``. A ratio with no
+        denominator scores 1.0, so two graphs with nothing to score agree perfectly.
 
     Examples
     --------
@@ -171,11 +217,25 @@ def orientation_scores(estimated: object, true: object) -> dict[str, float]:
 
 
 def confounder_pair_scores(estimated: object, true: object) -> dict[str, float]:
-    """Precision/recall/f1 of bidirected (``<->``) pairs -- the latent-confounder signals of a PAG.
+    """Return the precision, recall, and F1 of the estimated bidirected (``<->``) pairs.
 
-    Assumes both graphs speak the same PAG vocabulary (a latent confounder shows as a bidirected
-    edge). Scoring a PAG estimate against a plain true DAG that has no bidirected edges reports the
-    class mismatch as low recall, not a method error.
+    A bidirected edge is a PAG's sign of a latent confounder, so both graphs should be PAGs or
+    MAGs. Scoring a PAG estimate against a true DAG, which has no bidirected edge, reports the class
+    mismatch as low recall, not a method error.
+
+    Parameters
+    ----------
+    estimated : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The estimated graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph, over the same variables in the same order.
+
+    Returns
+    -------
+    dict
+        ``"precision"``, ``"recall"``, and ``"f1"``, each a float in ``[0, 1]``. A ratio with no
+        denominator scores 1.0, so two graphs with nothing to score agree perfectly.
 
     Examples
     --------
@@ -212,14 +272,26 @@ def _vstructures(m: np.ndarray) -> set[tuple[int, frozenset[int]]]:
 
 
 def markov_equivalent(estimated: object, true: object) -> bool:
-    """Whether two graphs lie in the same Markov equivalence class (Verma-Pearl 1990).
+    """Return whether two graphs lie in the same Markov equivalence class (Verma and Pearl 1990).
 
-    Two DAGs (or their CPDAGs) are Markov equivalent iff they share the same skeleton and the same
-    set of v-structures (unshielded colliders). Comparing GES / PC output this way lets a discovered
-    CPDAG match any score-equivalent member of its equivalence class -- looser than a byte-for-byte
-    adjacency comparison, exactly the invariance a score search is entitled to. Both inputs are read
-    as endpoint marks (a :class:`~andrey.core.GraphStructure`, a :class:`StructureOutput`, or a raw
-    directed adjacency), so a raw DAG and its essential-graph CPDAG compare equal.
+    Two DAGs, or their CPDAGs, are Markov equivalent when they share the same skeleton and the same
+    set of v-structures (unshielded colliders). Comparing a PC or GES result this way lets a
+    discovered CPDAG match any member of its equivalence class, which is looser than comparing the
+    adjacencies and is exactly the invariance a score search is entitled to. A raw DAG and its
+    CPDAG compare equal.
+
+    Parameters
+    ----------
+    estimated : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The estimated graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph, over the same variables in the same order.
+
+    Returns
+    -------
+    bool
+        ``True`` when the graphs share their skeleton and their v-structures.
 
     Raises
     ------
@@ -241,11 +313,22 @@ def markov_equivalent(estimated: object, true: object) -> bool:
 
 
 def to_cpdag(graph: object) -> GraphStructure:
-    """Canonicalize a DAG to its CPDAG (essential graph); CPDAG/PAG inputs pass through unchanged.
+    """Return the CPDAG (essential graph) of a DAG; a CPDAG, PAG, or MAG passes through.
 
-    Comparing MEC-identified graphs (PC / GES / ...) through their CPDAG lets a DAG and
-    any score-equivalent member of its Markov equivalence class score identically. A ``digraph``
-    (directed, cyclic) or an ``undirected`` graph has no essential graph and raises.
+    Comparing graphs that a method identifies up to their Markov equivalence class, such as PC's or
+    GES's, through their CPDAGs lets a DAG and any member of its class score identically. A
+    ``digraph`` (directed, cyclic) or an ``undirected`` graph has no essential graph and raises.
+
+    Parameters
+    ----------
+    graph : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The graph. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the edge
+        ``i -> j``.
+
+    Returns
+    -------
+    GraphStructure
+        The CPDAG of a DAG, of kind ``"cpdag"``; a CPDAG, PAG, or MAG with its marks and kind.
 
     Examples
     --------

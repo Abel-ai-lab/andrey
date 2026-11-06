@@ -19,6 +19,7 @@ import warnings
 import pytest
 
 import andrey
+from andrey import metrics
 from andrey.api import __all__ as API_ALL
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
@@ -262,6 +263,16 @@ def test_public_data_classes_document_every_field(cls_name):
     cls = getattr(data, cls_name)
     fields = [f.name for f in dataclasses.fields(cls)]
     assert _docstring_param_names(inspect.getdoc(cls) or "") == fields
+
+
+@pytest.mark.parametrize("name", metrics.__all__)
+def test_public_metrics_document_their_parameters_and_returns(name):
+    """Each metric names its arguments in a ``Parameters`` section, in order, and describes what
+    it returns, such as the keys of a dict of scores, in a ``Returns`` section."""
+    func = getattr(metrics, name)
+    doc = inspect.getdoc(func) or ""
+    assert _docstring_param_names(doc) == list(inspect.signature(func).parameters)
+    assert re.search(r"^Returns\n-{3,}", doc, re.MULTILINE), f"{name}: no Returns section"
 
 
 def test_cmd_run_wires_every_input_flag():

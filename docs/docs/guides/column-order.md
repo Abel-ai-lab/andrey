@@ -32,7 +32,8 @@ arbitrary with respect to the causal structure.
 Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
 column in the other sign, or two columns whose rows also appear with the two swapped. These rank by
 their values in row order instead, so for them a row shuffle can change which ranks first, while
-reordering the columns still relabels the result.
+reordering the columns still relabels the result. In rare cases a change of units rounds two
+values of a column to one, which changes its rank.
 
 Scores are compared at a fixed precision, so candidates whose scores differ only in their last
 bits count as tied and go to the rank.

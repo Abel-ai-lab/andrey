@@ -44,12 +44,24 @@ def _ancestor_pairs(true_dag: object) -> tuple[np.ndarray, int]:
 
 
 def causal_order_scores(order: object, true_dag: object) -> dict[str, float]:
-    """Accuracy, Kendall tau, and comparable-pair count of an order against a true DAG.
+    """Return the accuracy, Kendall tau, and comparable-pair count of an order against a true DAG.
 
-    ``accuracy`` is the fraction of true ancestral pairs the order sequences correctly;
-    ``kendall_tau`` is ``2 * accuracy - 1`` over those comparable pairs; ``n_comparable_pairs`` is
-    how many ancestral pairs exist (so tau and accuracy carry distinct information). A valid
-    topological order scores accuracy 1.0; an order with no comparable pairs scores 1.0 / tau 1.0.
+    Parameters
+    ----------
+    order : StructureOutput or array-like of int, shape (n,)
+        The causal order, causes first: a permutation of ``range(n)``, or a result whose
+        ``ordering`` holds one.
+    true_dag : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true DAG. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the edge
+        ``i -> j``.
+
+    Returns
+    -------
+    dict
+        ``"accuracy"``, the fraction of the true ancestral pairs the order sequences correctly;
+        ``"kendall_tau"``, ``2 * accuracy - 1`` over those pairs; and ``"n_comparable_pairs"``,
+        the number of ancestral pairs, which tells how much the other two rest on. A topological
+        order of the true DAG scores 1.0, and so does any order when the DAG has no edge.
 
     Examples
     --------
@@ -71,7 +83,21 @@ def causal_order_scores(order: object, true_dag: object) -> dict[str, float]:
 
 
 def causal_order_accuracy(order: object, true_dag: object) -> float:
-    """Fraction of true ancestral pairs the order places in the right sequence (1.0 is perfect).
+    """Return the fraction of the true ancestral pairs the order places in the right sequence.
+
+    Parameters
+    ----------
+    order : StructureOutput or array-like of int, shape (n,)
+        The causal order, causes first: a permutation of ``range(n)``, or a result whose
+        ``ordering`` holds one.
+    true_dag : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true DAG. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the edge
+        ``i -> j``.
+
+    Returns
+    -------
+    float
+        The fraction, 1.0 for a topological order of the true DAG.
 
     Examples
     --------
@@ -82,9 +108,22 @@ def causal_order_accuracy(order: object, true_dag: object) -> float:
 
 
 def causal_order_kendall_tau(order: object, true_dag: object) -> float:
-    """Kendall tau over comparable (ancestral) pairs: ``(concordant - discordant) / comparable``.
+    """Return the Kendall tau of an order over the true DAG's ancestral pairs.
 
-    Ranges from ``-1`` (every ancestral pair reversed) to ``1``; equals ``2 * accuracy - 1``.
+    Parameters
+    ----------
+    order : StructureOutput or array-like of int, shape (n,)
+        The causal order, causes first: a permutation of ``range(n)``, or a result whose
+        ``ordering`` holds one.
+    true_dag : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true DAG. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the edge
+        ``i -> j``.
+
+    Returns
+    -------
+    float
+        ``(concordant - discordant) / comparable`` over the ancestral pairs, from ``-1``, every
+        pair reversed, to ``1``; it equals ``2 * accuracy - 1``.
 
     Examples
     --------

@@ -75,17 +75,15 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
 
 ## Run extras
 
-- `ordering` - the causal order, from `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
-  `cam`, `resit`, and `varma_lingam`.
-- `weighted_adjacency` - dense `float64` weights from `calm`, `notears`, `dagma`, `direct_lingam`,
-  `ica_lingam`, `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam`. `W[i, j]` is the
+- `ordering` - the causal order, from {{ ordering_names }}.
+- `weighted_adjacency` - dense `float64` weights from {{ weighted_names }}. `W[i, j]` is the
   weight of `i -> j`, so rows are causes. This is the transpose of lingam's `adjacency_matrix_`,
   where `B[i, j]` is the effect of $x_j$ on $x_i$ in $x = Bx + e$.
 - `metadata` - JSON-safe, method-specific values; `andrey --help --json` lists each method's keys
-  under `output.metadata`, and a key means the same thing in every method but `score`. GES, GIES,
-  GnIES, XGES, HC, Tabu, BOSS, GRaSP, MMHC, and RSMAX2 report the result's `score`; IGSP and UT-IGSP
-  report as `score` the number of edges of the DAG found, plus its number of targets for UT-IGSP,
-  not a score of the data. CALM reports `objective`. ExactSearch reports the DAG it found as `dag`,
+  under `output.metadata`, and a key means the same thing in every method but `score`.
+  {{ score_methods }} report a `score`: the result's score, except for IGSP and UT-IGSP, whose
+  `score` is the number of edges of the DAG found, plus its number of targets for UT-IGSP, not a
+  score of the data. CALM reports `objective`. Exact search reports the DAG it found as `dag`,
   its `[i, j]` edges for `i -> j`. ANM and PNL report `p_values` and `statistics`, each with the
   test of `x -> y` under `forward` and of `y -> x` under `backward`; each two-node graph holds the
   direction they decide, by the rule the method's `alpha` parameter selects. PCMCI reports each
@@ -125,9 +123,9 @@ can create cycles.
 
 ## Reading and converting
 
-`print(out)`, or `out` alone in a notebook, shows the algorithm, the graph kind, the node and
-edge counts, and the first 30 edges, then the causal order and the metadata values that are not
-empty: the text `andrey run` prints in a terminal. `print(out.structure)` shows the graph part alone.
+`print(out)`, or `out` alone in a notebook, shows the algorithm, the graph kind, the node and edge
+counts, and the first 30 edges, then the causal order and the metadata values that are not empty:
+the text `andrey run` prints in a terminal. `print(out.structure)` shows the graph part alone.
 
 ```python
 import numpy as np
@@ -203,8 +201,8 @@ or `"dag"`) writes `i -> j` at `[j, i]`, the child's row, and an undirected edge
 cells, so the methods transpose it too. An `undirected` graph is written as `amat.cpdag` and reads
 back as a `cpdag`, since `from_pcalg` has no `undirected` kind. A `digraph` has no pcalg matrix.
 
-Andrey has no converters for other packages' objects. Build their matrices into a `GraphStructure`
-with `from_numpy`:
+Andrey has no converters for causal-learn's or lingam's objects. Build their matrices into a
+`GraphStructure` with `from_numpy`:
 
 ```python
 import numpy as np
