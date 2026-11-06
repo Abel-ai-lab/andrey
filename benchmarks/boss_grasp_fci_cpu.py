@@ -24,9 +24,10 @@ against the gated reference, causal-cmd 1.12.0's ``bfci`` and ``grasp-fci`` (tet
 Tetrad's documented defaults (:mod:`~andrey_bench.adapters.tetrad_pag`), run :data:`DRAWS` times
 per dataset with no seed. At the paper's settings, P20 adds context arms: tetrad-lib 7.6.10's
 ``BossFci`` and ``GraspFci``, the paper's code, once (also on P100); causal-cmd's GFCI and FCI and
-Andrey's ``gfci`` and ``fci``; Andrey's hybrids with the possible-d-separation step's removals
-skipped (``no_possible_dsep``, the step neither Tetrad hybrid has); and ``grasp_fci`` with its tuck
-depth at ``d`` (Tetrad's GRaSP has none). P100 and O1 add ``grasp_fci`` at tuck depth 7.
+Andrey's ``gfci`` and ``fci``; and Andrey's hybrids with the possible-d-separation step's removals
+skipped (``no_possible_dsep``, the step neither Tetrad hybrid has). P20, P100, and O1 at the
+paper's settings add ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a
+tuck depth of ``d`` runs past minutes at 200 rows, where ties between scores are many.
 
 The truth is the PAG of the measured variables (``andrey.data.latent.marginal``); ``check-truth``
 compares it with pcalg's ``dag2pag`` on the DAG numbered in a topological order. Every estimate is
@@ -38,7 +39,9 @@ SHD. Each Andrey fit also records the largest possible-d-separation candidate se
 Per dataset, each package runs in one child process pinned to one core with one BLAS thread:
 Andrey's in :mod:`~andrey_bench.adapters.andrey_boss_fci`, Tetrad's in this file
 (``python boss_grasp_fci_cpu.py <request.npz> <out.jsonl>``), which starts one JVM per run with one
-untimed warm-up search before the timed one. ``run`` writes ``records.jsonl``, ``datasets.jsonl``,
+untimed warm-up search before the timed one; Andrey's child runs each fit once untimed on the same
+data first. A call past the cell's cap (1,800 s; 3,600 s at 100 variables and out of claim) is a
+timeout, never scored. ``run`` writes ``records.jsonl``, ``datasets.jsonl``,
 ``run_meta.json``, ``provenance.json``, and ``done.json``; ``summarize`` the paired comparisons.
 
     source the reference environments (ANDREY_BENCH_JAVA, ANDREY_BENCH_TETRAD_JAR,
@@ -70,6 +73,8 @@ from pathlib import Path
 
 import numpy as np
 from ut_igsp_cpu import compare, floor_interval, parse_seeds, replication, run_child, same_run
+
+from andrey_bench.adapters.andrey_boss_fci import FitTimeout, capped
 
 HERE = Path(__file__).resolve().parent
 ANDREY_CHILD = HERE / "andrey_bench" / "adapters" / "andrey_boss_fci.py"
@@ -353,11 +358,10 @@ def andrey_fits(cell: Cell) -> list[dict]:
         fits += [
             fit("boss_fci", "paper-no-possible-dsep", "no_possible_dsep"),
             fit("grasp_fci", "paper-no-possible-dsep", "no_possible_dsep"),
-            fit("grasp_fci", f"paper-grasp-depth-{cell.d}", grasp_depth=cell.d),
             fit("gfci"),
             fit("fci"),
         ]
-    if cell.block in ("P100", "O1"):
+    if cell.block in ("P20", "P100", "O1") and cell.setting == "paper":
         fits.append(fit("grasp_fci", "paper-grasp-depth-7", grasp_depth=7))
     return fits
 
@@ -407,10 +411,12 @@ def tetrad_solutions() -> dict:
 def tetrad_child(request_path: str, out_path: str) -> int:
     """Run a request's Tetrad fits, one JVM per draw with one warm-up search; append a line each.
 
-    A line's ``wall_s`` is Tetrad's search inside the JVM and ``call_s`` the whole call.
+    A line's ``wall_s`` is Tetrad's search inside the JVM and ``call_s`` the whole call; a call
+    past ``cap_s`` is stopped, its JVM killed, and its line a ``"timeout"``.
     """
     request = np.load(request_path)
     X = np.asarray(request["X"], dtype=np.float64)
+    cap = float(request["cap_s"])
     solutions = tetrad_solutions()
     with open(out_path, "a") as sink:
         for fit in json.loads(str(request["fits"])):
@@ -426,12 +432,17 @@ def tetrad_child(request_path: str, out_path: str) -> int:
                 line["solution"] = adapter.name
                 t0 = time.perf_counter()
                 try:
-                    marks = adapter.fit(X, params)
+                    with capped(cap):
+                        marks = adapter.fit(X, params)
                     line.update(
                         status="ok",
                         wall_s=adapter.search_s,
                         call_s=time.perf_counter() - t0,
                         marks=np.asarray(marks).astype(int).tolist(),
+                    )
+                except FitTimeout as exc:
+                    line.update(
+                        status="timeout", call_s=time.perf_counter() - t0, error_text=str(exc)
                     )
                 except Exception:
                     line.update(status="error", error_text=traceback.format_exc()[-2000:])
@@ -467,7 +478,7 @@ def run_dataset(cell: Cell, seed: int, packages: list[str], args, cpu: int | Non
             runs = sum(len(f["draws"]) + 1 for f in fits)  # each fit's warm-up and draws
         else:
             fits, script = tetrad_fits(cell, package), Path(__file__)
-            runs = sum(2 * len(f["draws"]) for f in fits)  # one warm-up search per draw
+            runs = sum(len(f["draws"]) for f in fits)  # one JVM per draw
         if args.smoke:
             fits = [{**f, "draws": f["draws"][:1]} for f in fits]
         if not fits:
@@ -475,7 +486,8 @@ def run_dataset(cell: Cell, seed: int, packages: list[str], args, cpu: int | Non
         request = {
             "X": X,
             "fits": json.dumps(fits),
-            "warmup_rows": max(50, 2 * X.shape[1]),
+            "warmup_rows": X.shape[0],
+            "cap_s": cell.cap_draw_s,
         }
         lines, killed, code, err = run_child(
             args.python, script, request, runs * cell.cap_draw_s + 300, cpu, args.workdir

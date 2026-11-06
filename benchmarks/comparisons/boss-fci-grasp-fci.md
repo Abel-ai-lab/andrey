@@ -80,8 +80,9 @@ The implementations differ in parts each adapter names and the lane measures rat
 | GRaSP's tuck depth | 3, independent of `max_depth` | `depth`, -1 (none) by default, the FCI cap too |
 
 Context arms at the paper's settings measure each part: Andrey's hybrids with the
-possible-d-separation step's removals skipped (`no_possible_dsep`), GRaSP-FCI at a tuck depth of
-`d` on P20 and of 7 at 100 variables, and GFCI and FCI from both packages on P20.
+possible-d-separation step's removals skipped (`no_possible_dsep`), Andrey's GRaSP-FCI at a tuck
+depth of 7 on P20, P100, and O1, and GFCI and FCI from both packages on P20. A tuck depth of `d`,
+nearer Tetrad's, runs past minutes at 200 rows, where many scores tie, so the lane stops at 7.
 
 ## Scores
 
@@ -124,7 +125,7 @@ $ANDREY_BENCH_PYTHON benchmarks/boss_grasp_fci_cpu.py summarize --runs outputs/b
 
 `run` fits each dataset's packages back to back, one child process per package, each pinned to one
 core with one BLAS thread; Tetrad starts one JVM per run, with one untimed warm-up search before
-the timed one. `--blocks`, `--settings`, `--degrees`, and `--latents` cut a campaign into small
+the timed one, and Andrey runs each fit once untimed on the same data first. `--blocks`, `--settings`, `--degrees`, and `--latents` cut a campaign into small
 runs, `--seeds 100-119` reruns cells on fresh seeds, and `--resume` continues a run.
 `check-truth` needs R with pcalg (see the README). Tetrad's time is its search inside the JVM
 (`wall_s`); the whole call, with the JVM's start, is `call_s`.

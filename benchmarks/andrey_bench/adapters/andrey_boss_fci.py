@@ -29,14 +29,16 @@ edge into ``o-o``, so the colliders and rules run as after a step that removed n
 private functions, so each line keeps the Andrey version that ran.
 
 Before the first draw of each fit, one untimed warm-up runs the same call on the first
-``warmup_rows`` rows. Each draw appends its line as it finishes, so a killed child keeps the draws
-it finished.
+``warmup_rows`` rows. Each call stops at ``cap_s`` seconds (:func:`capped`): a draw past it is a
+``"timeout"``, and a warm-up past it makes every draw of its fit one without running it. Each draw
+appends its line as it finishes, so a killed child keeps the draws it finished.
 """
 
 from __future__ import annotations
 
 import json
 import resource
+import signal
 import sys
 import time
 import traceback
@@ -45,6 +47,31 @@ from contextlib import contextmanager
 from typing import Any, Iterator
 
 import numpy as np
+
+
+class FitTimeout(Exception):
+    """A call ran past its cap."""
+
+
+@contextmanager
+def capped(seconds: float) -> Iterator[None]:
+    """Raise :class:`FitTimeout` in the block once ``seconds`` pass; main thread only.
+
+    The alarm interrupts Python code between bytecodes; ``subprocess.run`` kills its child when
+    the exception reaches it.
+    """
+
+    def expire(signum, frame):
+        raise FitTimeout(f"past the {seconds:g} s cap")
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
 
 #: The score names of the harness that Andrey calls by another name.
 _SCORE = {"local_score_BIC": "bic"}
@@ -116,20 +143,29 @@ def fit_request(request, sink) -> None:
 
     X = np.asarray(request["X"], dtype=np.float64)
     head = X[: int(request["warmup_rows"])]
+    cap = float(request["cap_s"])
     for fit in json.loads(str(request["fits"])):
-        warmup_s, warmup_error = None, None
+        warmup_s, warmup_error, expired = None, None, False
         t0 = time.perf_counter()
         try:
-            run_fit(fit, head, draw=0)
+            with capped(cap):
+                run_fit(fit, head, draw=0)
             warmup_s = time.perf_counter() - t0
+        except FitTimeout as exc:
+            warmup_error, expired = str(exc), True
         except Exception as exc:  # a warm-up failure is recorded; the timed draws still run
             warmup_error = f"{type(exc).__name__}: {exc}"
         for draw in fit["draws"]:
             line = {"algorithm": fit["algorithm"], "config": fit["config"], "draw": draw}
             t0 = time.perf_counter()
             try:
-                result = run_fit(fit, X, draw)
+                if expired:
+                    raise FitTimeout(f"the warm-up ran past the {cap:g} s cap")
+                with capped(cap):
+                    result = run_fit(fit, X, draw)
                 line.update(status="ok", wall_s=time.perf_counter() - t0, **result)
+            except FitTimeout as exc:
+                line.update(status="timeout", wall_s=time.perf_counter() - t0, error_text=str(exc))
             except Exception:
                 line.update(status="error", error_text=traceback.format_exc()[-2000:])
             line.update(

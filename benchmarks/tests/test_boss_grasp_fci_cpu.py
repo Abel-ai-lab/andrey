@@ -146,6 +146,7 @@ def test_arms_per_cell() -> None:
     assert [f["config"] for f in lane.andrey_fits(default)] == ["default", "default"]
     traces = [f for f in lane.andrey_fits(paper) if f["trace"] == "no_possible_dsep"]
     assert sorted(f["algorithm"] for f in traces) == ["boss_fci", "grasp_fci"]
+    assert lane.andrey_fits(paper)[-1]["params"]["grasp_depth"] == 7
     gated = lane.tetrad_fits(paper, "tetrad-7.6.3")[:2]
     assert [f["solution"] for f in gated] == list(lane.GATED.values())
     assert all(f["draws"] == list(range(lane.DRAWS)) for f in gated)
@@ -240,3 +241,14 @@ def test_truth_check_flags_a_pag_pcalg_does_not_give(tmp_path) -> None:
     assert lane.check_truth(args) == 1
     result = json.loads((tmp_path / "truth-check.json").read_text())
     assert result["agree"] == 1 and result["disagree"][0]["cells"] == [[_cell().name, 1]]
+
+
+def test_a_call_past_its_cap_stops() -> None:
+    import time
+
+    with pytest.raises(andrey_boss_fci.FitTimeout):
+        with andrey_boss_fci.capped(0.05):
+            while True:
+                time.sleep(0.01)
+    with andrey_boss_fci.capped(5.0):
+        pass
