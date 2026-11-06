@@ -30,15 +30,12 @@ from andrey.constraint.fci import (
     validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
+from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
-
-#: The kind of an index edge, by the mark at the index; the mark at the data variable is an
-#: arrowhead.
-_INDEX_EDGE = {TAIL: "directed", CIRCLE: "partially_directed", ARROW: "bidirected"}
 
 
 def fci_jci(
@@ -163,7 +160,8 @@ def fci_jci(
     )
 
     index_edges = [
-        (int(j), _INDEX_EDGE[int(marks[d, j])]) for j in np.flatnonzero(marks[d, :d] != NULL)
+        (int(j), EDGE_TYPES[(int(marks[d, j]), int(marks[j, d]))][0])
+        for j in np.flatnonzero(marks[d, :d] != NULL)
     ]
     return GraphStructure.from_numpy(marks[:d, :d].copy(), kind="pag"), index_edges
 

@@ -733,7 +733,8 @@ def _cpdag_search(
         categorical,
         knowledge,
         method=name,
-        index_categorical=index is not None,
+        # One environment adds no index column (index_column), so it is not a categorical one.
+        index_categorical=index is not None and np.ptp(index) > 0,
     )
     augmented, augmented_mask, augmented_constraints, column = index_column(
         X, mask, constraints, index, "score_func", score_func
@@ -1491,7 +1492,8 @@ def _fci_hybrid(
         categorical,
         knowledge,
         method=name,
-        index_categorical=index is not None,
+        # One environment adds no index column (index_column), so it is not a categorical one.
+        index_categorical=index is not None and np.ptp(index) > 0,
     )
     augmented, augmented_mask, augmented_constraints, column = index_column(
         X, mask, constraints, index, "indep_test", indep_test
@@ -1758,12 +1760,12 @@ def boss_fci(
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
     Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
-    to 12 variables, 2 of them hidden, with 2,000 rows from two environments, and on Sachs's 11
-    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
-    read a numeric ``env`` as a number, so with three or more environments a shift that does not
-    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
-    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    to 12 measured variables and 2 hidden ones, with 2,000 rows from two environments, and on
+    Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and
+    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
+    that does not follow the labels' values can go unnoticed. ``max_parents`` counts the index as a
+    parent in the score phase. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2016,9 +2018,8 @@ def grasp_fci(
     1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
     time beside BOSS's. It returns a PAG, and with ``env`` takes rows pooled from several
     environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
-    :func:`~andrey.grasp`;
-    :func:`~andrey.boss_fci` and :func:`~andrey.gfci` run the same pipeline with BOSS's and GES's
-    searches.
+    :func:`~andrey.grasp`; :func:`~andrey.boss_fci` and :func:`~andrey.gfci` run the same pipeline
+    with BOSS's and GES's searches.
 
     The steps are :func:`~andrey.boss_fci`'s with the CPDAG from :func:`~andrey.grasp`, and differ
     from the published template [1]_ as that function's Notes describe: Andrey keeps GFCI's
@@ -2049,12 +2050,12 @@ def grasp_fci(
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
     Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
-    to 12 variables, 2 of them hidden, with 2,000 rows from two environments, and on Sachs's 11
-    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
-    read a numeric ``env`` as a number, so with three or more environments a shift that does not
-    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
-    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    to 12 measured variables and 2 hidden ones, with 2,000 rows from two environments, and on
+    Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and
+    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
+    that does not follow the labels' values can go unnoticed. ``max_parents`` counts the index as a
+    parent in the score phase. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------

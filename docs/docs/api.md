@@ -646,15 +646,15 @@ with the shorter run's fits. A method that takes a row-aligned input (`env`, or 
 matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
 rows. When `env` holds text labels, or for the methods that take `targets` ({{ targets_names }}),
 each resample takes the same share of every environment's rows, at least one, so no resample drops
-an environment; the numeric index of `cdnod` and `fci_jci`, such as a time step, resamples the rows
-as a whole. For the methods that take `targets` and return a CPDAG ({{ cpdag_targets_names }}), the
-averaged graph is made a CPDAG without the targets, so an edge that only the interventions orient is
-undirected there; the edge frequencies keep its direction. `multi_group_direct_lingam` resamples
-each dataset on its own and returns one result per dataset; `longitudinal_lingam` resamples the
-units, the same rows of every dataset. A time-series method on one series subsamples one stretch of
-consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length` consecutive
-rows, by default at least ten times its `tau_max`. `gin` is the one method it does not take, since
-its number of latent nodes differs from fit to fit.
+an environment; a numeric `env` of a method without `targets`, such as a time step, resamples the
+rows as a whole. For the methods that take `targets` and return a CPDAG ({{ cpdag_targets_names }}),
+the averaged graph is made a CPDAG without the targets, so an edge that only the interventions
+orient is undirected there; the edge frequencies keep its direction. `multi_group_direct_lingam`
+resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
+resamples the units, the same rows of every dataset. A time-series method on one series subsamples
+one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
+consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
+take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,

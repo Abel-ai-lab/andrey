@@ -19,10 +19,12 @@ import pytest
 import andrey
 from andrey import Knowledge, data
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
+from andrey.core.orient import dag2cpdag
 from andrey.data.interventions import soft
 from andrey.metrics import shd, skeleton_scores
+from andrey.search import boss as boss_search
 from tests.recovery.helpers.essential import essential
-from tests.recovery.test_fci_jci import _oracle_fit, _random_dag, _sample
+from tests.recovery.helpers.jci import oracle_fit, random_dag, sample_pooled
 
 pytestmark = pytest.mark.filterwarnings(
     "ignore::andrey.ExperimentalWarning", "ignore::andrey.DataTypeWarning"
@@ -113,6 +115,18 @@ def test_one_environment_gives_the_search_alone(name):
 
 
 @pytest.mark.parametrize("name", ALL)
+def test_one_environment_warns_that_a_mixed_data_setting_runs_linear_gaussian(name):
+    """One environment adds no index column, so with no categorical column a mixed-data setting
+    runs as its linear-Gaussian form and says so, as it does without ``env``."""
+    x, _ = chain()
+    settings = {"score_func": "cond_gauss", "categorical": []}
+    if name in HYBRIDS:
+        settings["indep_test"] = "cond_gauss"
+    with pytest.warns(andrey.DataTypeWarning, match="linear-Gaussian"):
+        fit(name, x, np.ones(len(x)), **settings)
+
+
+@pytest.mark.parametrize("name", ALL)
 def test_bic_reads_a_numeric_env_as_a_number(name):
     """Three environments coded 0, 1, 2, the middle one shifting ``x0``: the shift does not follow
     the codes, so the linear score and test miss it, and the mixed-data ones, which read each code
@@ -133,7 +147,7 @@ def test_hybrid_marks_a_hidden_common_cause_the_index_reveals(name):
     """``env -> x0 <- L -> x1 <- x2`` with ``L`` hidden: ``x0 <-> x1``, which the index tells
     apart, and the index edge's mark at the index follows ``confounded_index``."""
     dag = nx.DiGraph([(3, 0), (4, 0), (4, 1), (2, 1)])
-    x, env = _sample(dag, 3, 2000, seed=0)
+    x, env = sample_pooled(dag, 3, 2000, seed=0)
     out = fit(name, x, env)
     assert out.structure.oriented_edges() == [(0, 1, "bidirected"), (2, 1, "partially_directed")]
     assert out.metadata["index_edges"] == [[0, "partially_directed"]]
@@ -168,9 +182,9 @@ def test_hybrid_comes_near_the_oracle_jci_pag(name, confounded, monkeypatch):
     d, errors, empty_errors = 12, 0, 0
     empty = GraphStructure.from_numpy(np.zeros((d, d), dtype=np.int8), kind="pag")
     for seed in range(6):
-        dag = _random_dag(seed, d, 2)
-        x, env = _sample(dag, d, 2000, seed=seed)
-        oracle, _ = _oracle_fit(dag, d, monkeypatch, confounded_index=confounded)
+        dag = random_dag(seed, d, 2)
+        x, env = sample_pooled(dag, d, 2000, seed=seed)
+        oracle, _ = oracle_fit(dag, d, monkeypatch, confounded_index=confounded)
         out = fit(name, x, env, confounded_index=confounded)
         errors += shd(out.structure, oracle, endpoint_aware=True)
         empty_errors += shd(empty, oracle, endpoint_aware=True)
@@ -260,16 +274,20 @@ def test_knowledge_holds_with_env(name):
         assert {kind for _, kind in out.metadata["index_edges"]} == {"directed"}
 
 
-@pytest.mark.parametrize("name", SEARCHES)
-def test_the_index_never_gets_a_parent(name):
-    """Given the index as a source, the engine's graph directs every edge at the index out of it."""
-    from andrey.search.boss import boss
-    from andrey.search.grasp import grasp
+@pytest.mark.parametrize("name", ALL)
+def test_the_search_never_gives_the_index_a_parent(name, monkeypatch):
+    """The DAG each search settles on, before the edges at the index are directed out of it, has no
+    edge into the index: the index leads every order the search tries."""
+    dags = []
 
-    engine = {"boss": boss, "grasp": grasp}[name]
-    for seed in range(5):
-        ds = shifted(seed, d=8)
-        marks = engine(np.column_stack([ds.data, ds.env]), sources=(8,), n_starts=2)[0].to_numpy()
-        neighbors = np.flatnonzero(marks[8] != NULL)
-        assert neighbors.size
-        assert (marks[8, neighbors] == TAIL).all() and (marks[neighbors, 8] == ARROW).all()
+    def settled(dag):
+        dags.append(dag.copy())
+        return dag2cpdag(dag)
+
+    monkeypatch.setattr(boss_search, "dag2cpdag", settled)
+    for seed in range(10):
+        ds = shifted(seed)
+        fit(name, ds.data, ds.env)
+    assert len(dags) == 10 and all(dag.shape == (13, 13) for dag in dags)
+    # The last row holds the marks at the index's end of its edges: an arrowhead there is a parent.
+    assert not any((dag[-1] == ARROW).any() for dag in dags)
