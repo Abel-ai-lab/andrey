@@ -2043,7 +2043,8 @@ def calm(
     use_moral_graph : bool, default=True
         With ``False`` every pair is a candidate edge, and ``screen_alpha`` has no effect.
     standardize : bool, default=False
-        Scale each column to unit variance first.
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns.
     w_threshold : float, default=0.3
         An edge is kept when its weight magnitude reaches this value, at least ``0``.
     gate_threshold : float, default=0.5
@@ -2087,9 +2088,10 @@ def calm(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
-        ``"seed"`` used, ``"objective"`` (half the sum of the log residual
-        variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
-        acyclicity residual of the returned graph, ``0`` when it is acyclic).
+        ``"seed"`` used, ``"objective"`` (half the sum of the log residual variances plus
+        ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the acyclicity
+        residual ``h`` of the noise-free gates before the thresholds, the value the rounds compare
+        with ``h_tol``).
 
     Raises
     ------

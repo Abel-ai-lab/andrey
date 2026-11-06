@@ -149,6 +149,15 @@ def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_varia
     assert shd(robust, truth) <= shd(default, truth)
 
 
+@pytest.mark.parametrize("name", NAMES)
+def test_standardize_makes_the_fit_independent_of_the_units(name, tree) -> None:
+    """Scaling by powers of two leaves the standardized columns equal bit for bit."""
+    units = np.array([4.0, 0.25, 1.0, 8.0, 0.5])
+    plain = _fit(name, tree, standardize=True)
+    rescaled = _fit(name, tree * units, standardize=True)
+    np.testing.assert_array_equal(rescaled.weighted_adjacency, plain.weighted_adjacency)
+
+
 # ---- determinism and column order ----------------------------------------------------------------
 
 
