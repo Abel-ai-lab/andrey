@@ -23,13 +23,15 @@ BLAS thread (:func:`andrey_bench.runner.run_task`), at alpha 0.01 and 0.05 (:dat
   ``cdnod``, Andrey's ``fci_jci`` with the columns in reverse order, and, in the merged cells,
   Andrey's ``fci_jci`` with the mixed-data test, which reads the environment as categorical.
 
-The truth of each assumption set is FCI-JCI's PAG under d-separation in the true DAG: Andrey's
-engine with :class:`~andrey.data.latent.DSepOracle` in place of the tests (:func:`truth`). Each
-dataset checks it against the true MAG and the plain PAG of :func:`andrey.data.latent.marginal`:
-the same adjacencies, every mark that is not a circle the MAG's, and every mark the plain PAG sets
-kept. ``--check-pcalg`` also checks the plain PAG against pcalg's ``dag2pag`` (on the DAG numbered
-in a topological order, which it needs) and each truth against pcalg's ``fci`` with ``jci`` and a
-d-separation oracle; ``truth_ok`` on the dataset line says whether every check passed.
+The truth of each assumption set is FCI-JCI's PAG at the true distribution, built as
+:func:`andrey.data.latent.marginal` builds the plain PAG, with FCI-JCI's marks on the environment's
+edges (:func:`projected_pag`). Each dataset checks it against the true MAG and the plain PAG: the
+same adjacencies, every mark that is not a circle the MAG's, and every mark the plain PAG sets kept;
+up to 10 variables, also that Andrey's engine with :class:`~andrey.data.latent.DSepOracle` in place
+of its tests returns it. ``--check-pcalg`` also checks the plain PAG against pcalg's ``dag2pag`` (on
+the DAG numbered in a topological order, which it needs) and each truth against pcalg's ``fci``
+with ``jci`` and a d-separation oracle; ``truth_ok`` on the dataset line says whether every check
+passed.
 
 A fit past its cap is a ``timeout`` with no scores, never an empty graph. :func:`scores` computes,
 against the truth of the arm's assumptions, the endpoint SHD over the data variables and the
@@ -274,9 +276,50 @@ def dag_marks(dag: np.ndarray) -> np.ndarray:
     return marks
 
 
+#: The largest cell whose truth is also built by Andrey's FCI-JCI engine with d-separation in
+#: place of its tests, a check of the projection; the engine's possible-d-separation step tests every
+#: subset of each set, too many past this size.
+ENGINE_CHECK_MAX_P = 10
+
+
+def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, int]:
+    """FCI-JCI's PAG over the observed nodes of `graph`, the environment at `p`, by projection.
+
+    The steps of :func:`andrey.data.latent.marginal`'s PAG, with FCI-JCI's marks on the
+    environment's edges where ``marginal`` sets background knowledge, before the colliders, and the
+    rules without R5-R7, as FCI-JCI runs them: the adjacencies of the true MAG, the separating sets
+    of the observed ancestors, and the discriminating-path rule answered by d-separation. Also
+    returns the largest possible-d-separation set FCI forms on the true graph at the step where it
+    forms them, after the colliders.
+    """
+    from andrey.constraint.fci_jci import _mark_index
+    from andrey.data import latent
+
+    fci = importlib.import_module("andrey.constraint.fci")
+    n_obs, dag, anc = latent._observed_dag(graph, max_nodes=graph.n_nodes)
+    observed = range(n_obs)
+    support = latent._ancestral_adjacency(dag, observed, ())
+    sepsets = latent._AncestorSepsets(support, observed, anc, set())
+    marks = fci._circle_pag(support)
+    _mark_index(marks, p, confounded_index)
+    fci._orient_colliders(marks, sepsets)
+    neighbors, reach = fci._neighbor_lists(marks), fci._semidirected_reach(marks)
+    largest = max(
+        (
+            len(fci._possible_dsep(marks, x, y, neighbors, reach))
+            for a, b in zip(*np.nonzero(np.triu(marks)))
+            for x, y in ((int(a), int(b)), (int(b), int(a)))
+        ),
+        default=0,
+    )
+    fci._fci_orient(marks, latent.DSepOracle(dag, observed, ()), 0.5, sepsets, selection_bias=False)
+    return np.asarray(marks, dtype=np.int8), largest
+
+
 def truth(data: Dataset) -> dict[str, Any]:
-    """Both truths, the plain PAG and the MAG of :func:`andrey.data.latent.marginal`, the checks
-    that relate them, and the oracle's largest possible-d-separation set."""
+    """Both truths (:func:`projected_pag`), the plain PAG and the MAG of
+    :func:`andrey.data.latent.marginal`, the checks that relate them, and the largest
+    possible-d-separation set on the true graph."""
     from andrey import GraphStructure
     from andrey.core.structure import LATENT, OBSERVED
     from andrey.data.latent import marginal
@@ -286,17 +329,17 @@ def truth(data: Dataset) -> dict[str, Any]:
     graph = GraphStructure.from_numpy(dag_marks(dag), kind="dag", node_types=types)
     t0 = time.perf_counter()
     out: dict[str, Any] = {
-        "plain": np.asarray(marginal(graph, "pag").to_numpy()),
-        "mag": np.asarray(marginal(graph, "mag").to_numpy()),
+        "plain": np.asarray(marginal(graph, "pag", max_nodes=p + 1).to_numpy()),
+        "mag": np.asarray(marginal(graph, "mag", max_nodes=p + 1).to_numpy()),
     }
-    pdsep = {}
+    largest = {}
     for variant, confounded in (("1", True), ("123", False)):
-        out[variant], pdsep[variant] = oracle_pag(dag, p, confounded)
+        out[variant], largest[variant] = projected_pag(graph, p, confounded)
     out["seconds"] = time.perf_counter() - t0
-    out["pdsep_max_oracle"] = max(s["max"] for s in pdsep.values())
+    out["pdsep_max_true"] = max(largest.values())
     checks = {}
     known = (out["plain"] != NULL) & (out["plain"] != CIRCLE)
-    for variant in ("1", "123"):
+    for variant, confounded in (("1", True), ("123", False)):
         found = out[variant]
         resolved = (found != NULL) & (found != CIRCLE)
         checks[f"jci{variant}_skeleton_is_the_mag"] = bool(
@@ -308,6 +351,9 @@ def truth(data: Dataset) -> dict[str, Any]:
         checks[f"jci{variant}_keeps_the_plain_marks"] = bool(
             np.array_equal(found[known], out["plain"][known])
         )
+        if p <= ENGINE_CHECK_MAX_P:
+            engine, _ = oracle_pag(dag, p, confounded)
+            checks[f"jci{variant}_is_the_engines_oracle_pag"] = bool(np.array_equal(engine, found))
     out["checks"] = checks
     return out
 
@@ -689,7 +735,7 @@ def dataset_record(data: Dataset, true: dict, check: dict | None) -> dict[str, A
         "pcalg_check": check,
         "truth_ok": bool(ok),
         "truth_s": true["seconds"],
-        "pdsep_max_oracle": true["pdsep_max_oracle"],
+        "pdsep_max_true": true["pdsep_max_true"],
     }
 
 
@@ -977,7 +1023,7 @@ def summarize(args) -> int:
         "truth_checked_by_pcalg": sum(d["pcalg_check"] is not None for d in datasets),
         "truth_failures": failed,
         "pdsep_max": max((r.get("pdsep_max") or 0 for r in recs.values()), default=None),
-        "pdsep_max_oracle": max((d["pdsep_max_oracle"] for d in datasets), default=None),
+        "pdsep_max_true": max((d["pdsep_max_true"] for d in datasets), default=None),
         "status": _statuses(recs.values()),
         "rows": rows,
         "context": context,

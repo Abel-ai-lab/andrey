@@ -99,16 +99,19 @@ against a truth Tetrad computes.
 
 ## The truth
 
-The truth of each assumption set is the PAG FCI-JCI returns with d-separation in the true DAG in
-place of the tests (Andrey's engine with `andrey.data.latent.DSepOracle`), over the data variables
-and the environment. Every dataset checks it against `andrey.data.latent.marginal`: the adjacencies
-are the true MAG's, every mark that is not a circle is the MAG's, and every mark the plain PAG (no
-JCI assumption) sets is kept. In the cells of 4 and 10 variables, every dataset also checks the
-plain PAG against pcalg's `dag2pag`, on the DAG numbered in a topological order (its ancestor search
-reads parents among lower numbers only), and each truth against pcalg's `fci` with `jci` and a
-d-separation oracle. That oracle answers by the moral graph of the ancestral set and is checked
-against pcalg's `dsepTest` on 200 random queries per dataset. A difference in any check stops the
-comparison.
+The truth of each assumption set is FCI-JCI's PAG at the true distribution, over the data
+variables and the environment, built as `andrey.data.latent.marginal` builds the plain PAG: the
+adjacencies of the true MAG, the observed ancestors as separating sets, FCI-JCI's marks on the
+environment's edges before the colliders, and the orientation rules without R5 to R7, the
+discriminating-path rule answered by d-separation in the true DAG. Every dataset checks it against
+the true MAG and the plain PAG: the same adjacencies, every mark that is not a circle the MAG's,
+and every mark the plain PAG (no JCI assumption) sets kept. In the cells of 4 and 10 variables,
+every dataset also checks that Andrey's FCI-JCI with d-separation in place of its tests returns the
+same PAG, checks the plain PAG against pcalg's `dag2pag`, on the DAG numbered in a topological
+order (its ancestor search reads parents among lower numbers only), and checks each truth against
+pcalg's `fci` with `jci` and a d-separation oracle. That oracle answers by the moral graph of the
+ancestral set and is checked against pcalg's `dsepTest` on 200 random queries per dataset. A
+difference in any check stops the comparison.
 
 ## Scores
 
@@ -120,6 +123,7 @@ The parent scores every graph with one function, against the truth of the arm's 
 | `shd_data` | the same over the data variables alone, the only scope of the arms without the environment |
 | `adjacency_*`, `arrowhead_*`, `tail_*` | precision, recall, and F1; an arrowhead or a tail is an endpoint, found when the estimate has the same edge with the same mark at that node |
 | `pdsep_max` | the largest possible-d-separation set an Andrey FCI fit forms, from an untimed repeat of the fit that must return the same graph |
+| `pdsep_max_true` | the largest possible-d-separation set FCI-JCI forms on the true graph, on the dataset's line |
 | `wall_s` | the timed fit, from the array in memory to the returned graph; for pcalg the transfer into R, `cor(X)`, and the call |
 | empty | the empty graph's `shd` and `shd_data` |
 
