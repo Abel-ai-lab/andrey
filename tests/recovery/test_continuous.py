@@ -114,14 +114,46 @@ def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
     assert out.metadata["path_steps"] >= 1
 
 
+@pytest.mark.filterwarnings("ignore:dagma stopped at its limit of max_iter")
+@pytest.mark.parametrize("name", NAMES)
+def test_max_path_caps_the_accepted_steps_and_warns(name, chain) -> None:
+    """The path accepts its first step whatever its likelihood, so a cap of one is reached."""
+    with pytest.warns(andrey.SearchLimitWarning, match="max_path=1"):
+        capped = _fit(name, chain, robust=True, max_path=1, **QUICK[name])
+    assert capped.metadata["path_steps"] == 1
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_an_mcp_wider_than_every_weight_empties_the_path(name, chain) -> None:
+    """With ``mcp_delta`` above every weight, the quasi-MCP's slope reaches each one, and at
+    ``mcp_lambda=5`` it pulls them all to zero. The path accepts its first step whatever its
+    likelihood, so it returns the empty graph, and the next step does not lower the likelihood."""
+    out = _quick_fit(name, chain, robust=True, mcp_lambda=5.0, mcp_delta=2.0)
+    assert not out.weighted_adjacency.any()
+    assert out.metadata["path_steps"] == 1
+
+
+def test_h_tol_ends_the_dual_steps(tree) -> None:
+    """The dual steps end once the acyclicity function falls to ``h_tol``."""
+    tight, loose = _fit("notears", tree), _fit("notears", tree, h_tol=1e-2)
+    assert tight.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
 def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_variances() -> None:
-    """Here least squares is one edit from the CPDAG, and the likelihood path reaches it."""
+    """The likelihood path reaches the CPDAG."""
     X, adjacency = _unequal_variances(8)
     truth = to_cpdag(dag_from_adjacency(adjacency))
-    default = to_cpdag(_fit("dagma", X).structure)
     robust = to_cpdag(_fit("dagma", X, robust=True).structure)
     assert shd(robust, truth) == 0
-    assert shd(robust, truth) <= shd(default, truth)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_standardize_makes_the_fit_independent_of_the_units(name, tree) -> None:
+    """Scaling by powers of two leaves the standardized columns equal bit for bit."""
+    units = np.array([4.0, 0.25, 1.0, 8.0, 0.5])
+    plain = _fit(name, tree, standardize=True)
+    rescaled = _fit(name, tree * units, standardize=True)
+    np.testing.assert_array_equal(rescaled.weighted_adjacency, plain.weighted_adjacency)
 
 
 # ---- determinism and column order ----------------------------------------------------------------

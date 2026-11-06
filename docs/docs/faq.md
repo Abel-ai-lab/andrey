@@ -145,8 +145,8 @@ each method at growing sizes against the packages that implement it. A few publi
 PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
 search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
 BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
-takes eight minutes. Finishing is not the same as being accurate:
-see [Are the classic methods accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+takes eight minutes. Finishing is not the same as being accurate: see [Are the classic methods
+accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
 
 ### Can it use more CPU cores?
 
@@ -170,38 +170,36 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2,
-IGSP, UT-IGSP, PCMCI, PCMCI+, and LPCMCI test independence on categorical data with
-`indep_test="chisq"` or `"gsq"`, and GES, GIES, XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
-exact search, MMHC, and RSMAX2 score it with `score_func="bdeu"` or `"discrete_bic"`. For mixed
-data, with continuous and categorical columns, the same methods take `indep_test="degen_gauss"` or
-`"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and
-the score from the column types you declare, with `categorical` or a DataFrame's `category`, `bool`,
-or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when some are. A
-column of a few whole numbers that you have not declared reads as numbers, with a warning. The
-[release cards](benchmarks.md) benchmark PC, FCI, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, GES, hill
-climbing, BOSS, and GRaSP on categorical data, and PC, GES, and hill climbing on mixed data, against
-causal-learn, Tetrad, bnlearn, pgmpy, or an earlier Andrey release; the other methods are not
-benchmarked on those data yet. [Data types](guides/getting-started.md#data-types) explains the
-settings. The LiNGAM methods assume continuous non-Gaussian noise.
+text, booleans, or a pandas `category`. {{ indep_test_methods }} test independence on categorical
+data with `indep_test="chisq"` or `"gsq"`, and {{ score_func_methods }} score it with
+`score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
+the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or
+`"cond_gauss"`. By default they pick the test and the score from the column types you declare, with
+`categorical` or a DataFrame's `category`, `bool`, or text columns: `gsq` and `bdeu` when every
+column is categorical, `cond_gauss` when some are. A column of a few whole numbers that you have not
+declared reads as numbers, with a warning. The [release cards](benchmarks.md) benchmark PC, FCI,
+IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, GES, hill climbing, BOSS, and GRaSP on categorical data, and
+PC, GES, and hill climbing on mixed data, against causal-learn, Tetrad, bnlearn, pgmpy, or an
+earlier Andrey release; the other methods are not benchmarked on those data yet.
+[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods assume
+continuous non-Gaussian noise.
 
 ### Does it handle missing values?
 
-Yes, in PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, LPCMCI, ANM, and PNL. Mark a
-missing value with `NaN` or pandas' `NA`, or leave its field empty in a CSV file. Each
-conditional-independence test then reads only the samples where all of its variables are observed
-(test-wise deletion), so the fit keeps the samples that dropping every incomplete one would lose.
-The other methods refuse missing values with an error that says what to do instead. Test-wise
-deletion is sound when values are missing completely at random; when whether a value is missing
-depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure it
-against dropping incomplete samples, and
+Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
+empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
+variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
+incomplete one would lose. The other methods refuse missing values with an error that says what to
+do instead. Test-wise deletion is sound when values are missing completely at random; when whether a
+value is missing depends on the variables, a test can be biased. The [release cards](benchmarks.md)
+measure it against dropping incomplete samples, and
 [Missing values](guides/getting-started.md#missing-values) explains it.
 
 ### Can I tell it what I already know?
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except ICP, ANM, PNL, and GIN.
+takes it except {{ no_knowledge_methods }}.
 
 ### How sure is each edge?
 
@@ -222,10 +220,10 @@ Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `gra
 fits a linear structural vector autoregression by continuous optimization. The
 [release cards](benchmarks.md) benchmark them against tigramite, lingam, causal-learn, and
 CausalNex. `multi_group_direct_lingam` fits several datasets that share one causal order, `cdnod`
-takes data from several domains, and `gies`, `gnies`, `igsp`, `ut_igsp`, and `icp` take data from
-several environments: `gies` and `igsp` with known interventions, `gnies` learning the variables
-whose noise variance changed, `ut_igsp` learning the targets it is not given, and `icp` the parents
-of one target. All are supported.
+takes data from several domains, and {{ targets_names }} take data from several environments: `gies`
+and `igsp` with known interventions, `gnies` learning the variables whose noise variance changed,
+`ut_igsp` learning the targets it is not given, and `icp` the parents of one target. All are
+supported.
 
 ## Command line and agents
 

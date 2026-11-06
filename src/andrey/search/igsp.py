@@ -23,7 +23,7 @@ Yang, Katcoff, and Uhler 2018; Squires, Wang, and Uhler 2020):
    first on a tie, so a later start replaces an earlier one only with a strictly lower objective.
 
 Every choice that goes by variable index follows the engine's variable order: the caller sorts the
-columns by :func:`~andrey.search.hc.tie_ranks` first. Start ``0`` breaks the minimum-degree ties by
+columns by :func:`~andrey.core.ties.tie_ranks` first. Start ``0`` breaks the minimum-degree ties by
 the lowest index and visits children in the order of their arrows ``(i, j)``; start ``s >= 1``
 draws both from :func:`~andrey.core.seeding.start_rng`.
 
@@ -59,14 +59,14 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, make_indep_test
+from andrey.core._bitset import nodes
+from andrey.core.ci import MIXED_INDEP_TESTS, make_indep_test
 from andrey.core.invariance import InvarianceTest, make_invariance_test
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import to_structure
 from andrey.core.seeding import start_rng
+from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search.gies import cut_pairs, replace_unprotected
-from andrey.search.hc import tie_ranks
 
 __all__ = [
     "DEPTH",
@@ -160,20 +160,10 @@ def _memoized(independent: Independent) -> Callable[[int, int, int], bool]:
     def test(i: int, j: int, mask: int) -> bool:
         key = (i, j, mask) if i < j else (j, i, mask)
         if key not in memo:
-            memo[key] = bool(independent(key[0], key[1], _members(mask)))
+            memo[key] = bool(independent(key[0], key[1], tuple(nodes(mask))))
         return memo[key]
 
     return test
-
-
-def _members(mask: int) -> tuple[int, ...]:
-    """The set bits of ``mask``, ascending."""
-    out = []
-    while mask:
-        low = mask & -mask
-        out.append(low.bit_length() - 1)
-        mask ^= low
-    return tuple(out)
 
 
 def _min_degree_order(
@@ -212,7 +202,7 @@ def _imap(order: Sequence[int], test: Callable[[int, int, int], bool], know: _Kn
     parents = [0] * len(order)
     earlier = 0
     for j in order:
-        for i in _members(earlier):
+        for i in nodes(earlier):
             if know is not None and know[0][i, j]:
                 parents[j] |= 1 << i
             elif know is not None and know[1][i, j]:
@@ -241,7 +231,7 @@ def reverse(
     old = parents[i]
     new_i = old | (1 << j)
     out[i], out[j] = new_i, old
-    for q in _members(old):
+    for q in nodes(old):
         bit = 1 << q
         if (required is None or not required[q, i]) and test(i, q, new_i & ~bit):
             out[i] &= ~bit
@@ -307,7 +297,7 @@ def _moves(
     """
     moves = []
     for j, pa in enumerate(parents):
-        for i in _members(pa):
+        for i in nodes(pa):
             if pa != parents[i] | (1 << i):
                 continue
             if know is not None and (know[0][i, j] or know[1][j, i] or know[2][i, j]):
@@ -348,7 +338,7 @@ def ut_igsp_rules(
 
     def variant(j: int, mask: int, k: int) -> bool:
         if (j, mask, k) not in memo:
-            memo[j, mask, k] = not invariant(j, _members(mask), k)
+            memo[j, mask, k] = not invariant(j, tuple(nodes(mask)), k)
         return memo[j, mask, k]
 
     terms: dict[tuple[int, int], int] = {}
@@ -404,7 +394,7 @@ def igsp_rules(
 
     def variant(j: int, mask: int, k: int) -> bool:
         if (j, mask, k) not in memo:
-            memo[j, mask, k] = not invariant(j, _members(mask), k)
+            memo[j, mask, k] = not invariant(j, tuple(nodes(mask)), k)
         return memo[j, mask, k]
 
     single = all(len(t) <= 1 for t in family)
@@ -443,7 +433,7 @@ def igsp_rules(
         if last[0] != parents:
             adjacent = list(parents)
             for j, pa in enumerate(parents):
-                for i in _members(pa):
+                for i in nodes(pa):
                     adjacent[i] |= 1 << j
             last[:] = [parents, adjacent]
         return last[1]
@@ -459,7 +449,7 @@ def igsp_rules(
         )
 
     def objective(parents: Parents) -> tuple[int, int]:
-        arrows = [(i, j) for j, pa in enumerate(parents) for i in _members(pa)]
+        arrows = [(i, j) for j, pa in enumerate(parents) for i in nodes(pa)]
         return len(arrows), sum(contradicting(parents, i, j) for i, j in arrows)
 
     return Rules(
@@ -501,7 +491,7 @@ def _prepared(
     """
     d = X.shape[1]
     mixed = indep_test in MIXED_INDEP_TESTS
-    mask = column_mask(categorical, d) if mixed else np.full(d, indep_test in DISCRETE_INDEP_TESTS)
+    mask = tie_mask(indep_test, categorical, d)
     ranks = tie_ranks(X, mask)
     by_rank = np.argsort(ranks)
     sorted_x = np.ascontiguousarray(X[:, by_rank])
@@ -546,7 +536,7 @@ def _essential(
     d = len(found)
     dag = np.zeros((d, d), dtype=np.int8)
     for j, pa in enumerate(found):
-        for i in _members(pa):
+        for i in nodes(pa):
             dag[i, j], dag[j, i] = TAIL, ARROW
     dag = dag[np.ix_(ranks, ranks)]
     rows = np.zeros((len(family) + 1, d), dtype=bool)
@@ -579,7 +569,7 @@ def igsp(
     nonempty set for a setting. The conditional-independence test ``indep_test`` at ``alpha``
     reads the observational rows; the invariance test ``invariance_test`` at ``invariance_alpha``
     compares each setting with them. ``categorical`` is the mixed-data tests' mask. The search runs
-    over the columns sorted by :func:`~andrey.search.hc.tie_ranks` (:func:`igsp_search`,
+    over the columns sorted by :func:`~andrey.core.ties.tie_ranks` (:func:`igsp_search`,
     :func:`igsp_rules`).
 
     Returns the ``cpdag`` interventional essential graph of the DAG found under the observational
@@ -631,7 +621,7 @@ def ut_igsp(
     ``indep_test`` at ``alpha`` reads the observational rows; the invariance test
     ``invariance_test`` at ``invariance_alpha`` compares each setting with them. ``categorical`` is
     the mixed-data tests' mask. The search runs over the columns sorted by
-    :func:`~andrey.search.hc.tie_ranks` (:func:`igsp_search`, :func:`ut_igsp_rules`).
+    :func:`~andrey.core.ties.tie_ranks` (:func:`igsp_search`, :func:`ut_igsp_rules`).
 
     Returns the ``cpdag`` interventional essential graph of the DAG found, under the
     observational setting and each setting's targets, the most oriented under ``constraints``;

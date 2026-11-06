@@ -25,7 +25,7 @@ The choices Algorithm 1 leaves open:
   column's units nor its offset changes a test.
 - The bandwidth is the median over every pair of rows with a positive distance.
 - p-values are compared as their logarithms, computed directly so that a p-value below the
-  smallest double keeps its place, rounded to ``_KEY_DP`` decimal places, as :func:`andrey.hc`
+  smallest double keeps its place, rounded to ``KEY_DP`` decimal places, as :func:`andrey.hc`
   compares its score changes; a tie goes to the earlier column.
 - The parents are tried in column order, and :func:`andrey.resit` passes the columns in their rank
   order, so they are tried by rank. Each removal changes the fits after it, so another order can
@@ -50,10 +50,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from andrey.core.independence import gamma_gram, hsic_gamma_log_p
+from andrey.core.independence import hsic_gram, hsic_log_p
+from andrey.core.ties import tie_key
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
-from andrey.search._parallel import _KEY_DP
 
 _log = logging.getLogger(__name__)
 
@@ -71,38 +71,6 @@ def _residual(bases: BasisCache, child: int, parents: list[int]) -> np.ndarray:
     return fit_gam(bases, child, parents, k=K).residuals
 
 
-def _gram(side: np.ndarray) -> tuple[np.ndarray, float, float]:
-    """The gamma HSIC gram of ``side``, one column or several read jointly, its median over every
-    row, with the centered gram's sum of squares, which the product-form variance reads, so the
-    edge removal's tests against one predecessor gram sum it once."""
-    centered, mu = gamma_gram(side, median_rows=None)
-    return centered, mu, np.sum(centered * centered)
-
-
-def _log_p(gram: tuple[np.ndarray, float, float], residual: np.ndarray) -> float:
-    """The log HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the
-    null variance in its product form.
-
-    Raises
-    ------
-    FloatingPointError
-        If the test's value is not finite, so that no choice rests on it.
-    """
-    n = residual.shape[0]
-    log_p = hsic_gamma_log_p(gram, _gram(residual), n, variance="product")
-    if not math.isfinite(log_p):
-        raise FloatingPointError(
-            "resit: an HSIC test gave a non-finite p-value; the kernels could not be computed "
-            "from these data"
-        )
-    return log_p
-
-
-def _key(log_p: float) -> float:
-    """``log_p`` rounded to ``_KEY_DP`` decimal places."""
-    return round(log_p, _KEY_DP)
-
-
 def causal_order(
     bases: BasisCache,
     unit: np.ndarray,
@@ -113,7 +81,8 @@ def causal_order(
 
     Each step regresses every candidate on the remaining variables it may have as parents and tests
     its residual against all the other remaining ones; the candidate of largest p-value is the next
-    sink. The log p-values are compared by :func:`_key`, and a tie goes to the earlier column.
+    sink. The log p-values are compared by :func:`~andrey.core.ties.tie_key`, and a tie goes to the
+    earlier column.
 
     Parameters
     ----------
@@ -142,9 +111,10 @@ def causal_order(
         for k in candidates:
             others = [i for i in remaining if i != k]
             parents = [i for i in others if allowed[i, k]]
-            log_p = _log_p(_gram(unit[:, others]), _residual(bases, k, parents))
+            side = hsic_gram(unit[:, others])
+            log_p = hsic_log_p(side, hsic_gram(_residual(bases, k, parents)), "resit")
             _log.debug("%d remaining: sink %d, log p-value %.9g", len(remaining), k, log_p)
-            keys[k] = _key(log_p)
+            keys[k] = tie_key(log_p)
         sink = min(candidates, key=lambda k: (-keys[k], k))
         remaining.remove(sink)
         sinks.append(sink)
@@ -175,13 +145,13 @@ def remove_edges(
     dag = np.zeros((d, d), dtype=bool)
     for position in range(1, d):
         child = int(order[position])
-        gram = _gram(unit[:, order[:position]])
+        gram = hsic_gram(unit[:, order[:position]])
         parents = sorted(int(i) for i in order[:position] if allowed[i, child])
         for parent in list(parents):
             if required[parent, child]:
                 continue
             rest = [i for i in parents if i != parent]
-            log_p = _log_p(gram, _residual(bases, child, rest))
+            log_p = hsic_log_p(gram, hsic_gram(_residual(bases, child, rest)), "resit")
             _log.debug("edge %d -> %d: log p-value without it %.9g", parent, child, log_p)
             if log_p > math.log(alpha):
                 parents.remove(parent)

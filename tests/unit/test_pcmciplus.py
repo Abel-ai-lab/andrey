@@ -13,9 +13,9 @@ from scipy.linalg import solve_discrete_lyapunov
 
 import andrey.temporal.pcmciplus as pcmciplus_module
 from andrey.api._temporal import _adapt_pcmciplus
+from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.temporal.pcmciplus import (
-    COLLIDER_RULES,
     PCMCIPlusResult,
     apply_orientations,
     collider_verdict,
@@ -228,8 +228,9 @@ def test_pcmciplus_on_data_orients_the_contemporaneous_chain(indep_test):
 def test_unknown_names_raise_naming_the_choices():
     with pytest.raises(NotImplementedError, match="unknown indep_test 'spearman'"):
         pcmciplus(_chain_series(100), indep_test="spearman")
-    with pytest.raises(ValueError, match=r"collider_rule must be one of \['sepsets', "):
+    with pytest.raises(ValueError, match="collider_rule") as error:
         pcmciplus(_chain_series(100), collider_rule="vote")
+    assert all(repr(rule) in str(error.value) for rule in COLLIDER_RULES)
 
 
 def test_pcmciplus_runs_its_phases_on_one_blas_thread(monkeypatch):

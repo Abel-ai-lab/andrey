@@ -6,7 +6,7 @@ target, candidates sharing ``base = sorted(NA u T u Pa)`` are scored in one batc
 caches across passes.
 
 The move key is :func:`move_key`: ``stable_key(delta, n)``, which quantizes ``delta / n``, then the
-:func:`~andrey.search.hc.tie_ranks` of ``x``, of ``y``, and of the subset ``T`` or ``H``. Moves
+:func:`~andrey.core.ties.tie_ranks` of ``x``, of ``y``, and of the subset ``T`` or ``H``. Moves
 with equal quantized deltas are chosen by ranks that follow the columns, so reordering the columns
 reorders the CPDAG the same way. Each key is unique, so the CPDAG is byte-identical across
 partitions and worker assignments.
@@ -38,10 +38,10 @@ from andrey.core import _bitset, env
 from andrey.core.knowledge import Constraints, admits
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, stable_key
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
 
 _pick_context = par.pick_context
 
@@ -60,7 +60,7 @@ def move_key(
     """The reduce key of the move of edge ``x``-``y`` with ``subset`` (``T`` or ``H``); lower wins.
 
     ``(stable_key(delta, n), ranks[x], ranks[y], sorted ranks of subset)``, with ``ranks`` from
-    :func:`~andrey.search.hc.tie_ranks`. A candidate's ``(x, y, subset)`` is unique in a pass, so
+    :func:`~andrey.core.ties.tie_ranks`. A candidate's ``(x, y, subset)`` is unique in a pass, so
     the key is too.
     """
     return (stable_key(delta, n), ranks[x], ranks[y], tuple(sorted(ranks[v] for v in subset)))
@@ -170,7 +170,7 @@ def backward_chunk_best(
     Enumerates the chunk's valid Delete candidates score-free (residual-clique check; Delete carries
     no reachability test) and scores each with one scalar ``("remove", x)`` off ``base = sorted(
     residual u Pa u {x})`` -- the PURE Schur remove delta. Improving iff the raw delta is below
-    ``-_EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
+    ``-EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
     ``(y, base, x)``'s delta across passes: a scalar remove depends on nothing else.
 
     With ``constraints``, a required pair is never deleted, and ``H`` holds no ``h`` whose
@@ -208,7 +208,7 @@ def backward_chunk_best(
                     delta = delta_engine.delta_many_with_base(y, base, [("remove", int(x))])[0]
                     if kept is not None:
                         kept[(y, base, x)] = delta
-                if delta < -_EPS_IMPROVE:
+                if delta < -EPS_IMPROVE:
                     key = move_key(delta, n, x, y, H, ranks)
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:
@@ -348,7 +348,7 @@ class _ForwardScan:
         heapq.heapify(heap)
         scored: dict[tuple[int, tuple[int, ...]], tuple[dict[int, float], int]] = {}
         best: ForwardResult = None
-        limit = -_EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
+        limit = -EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
         while heap and heap[0][0] <= limit:
             _low, y, i = heapq.heappop(heap)
             moves = self.screened[y]
@@ -359,7 +359,7 @@ class _ForwardScan:
             if exact is None:
                 exact = scored[(y, base)] = self._exact(y, base)
             deltas, passing = exact
-            if not (passing >> x) & 1 or not deltas[x] < -_EPS_IMPROVE:
+            if not (passing >> x) & 1 or not deltas[x] < -EPS_IMPROVE:
                 continue  # a y ~> x path misses the clique, or the Insert does not improve
             delta = deltas[x]
             key = move_key(delta, self.n, x, y, T, self.ranks)
@@ -372,7 +372,7 @@ class _ForwardScan:
                 # A delta that can still win rounds to this key or below, so it lies within half a
                 # quantization step of it; the limit allows two steps as slack against rounding.
                 # At a key of minus infinity, only a delta of minus infinity can tie.
-                limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
+                limit = min(-EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-KEY_DP))
         return best
 
     def _refresh(self, adj: np.ndarray) -> None:
@@ -457,7 +457,7 @@ class _ForwardScan:
             for x, t_index, T in cands:
                 bound = bounds[x]
                 low = -math.inf if bound == math.inf else deltas[x] - bound
-                if low < -_EPS_IMPROVE:
+                if low < -EPS_IMPROVE:
                     screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
@@ -604,13 +604,13 @@ def _backward_task(
 # counts the targets the in-process scan would enumerate again: those touched since the graph it
 # kept, which is every target on the first pass and after the workers ran the passes in between. A
 # backward pass counts every target. It is checked per pass, and the worker set is created lazily
-# on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK`` below;
+# on the first pass that crosses. The default is the fixed ``MIN_POOL_GES_WORK`` below;
 # ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a fit with
 # workers warns once on the default when a pass nears it.
 
 # Estimated candidate evaluations below which a pass runs in-process. The default is a starting
 # point, not tuned for any machine; `andrey calibrate` measures the value for this one.
-_DEFAULT_MIN_WORK = 10_000
+MIN_POOL_GES_WORK = 10_000
 
 # The largest estimated work of a pass in the last fit with more than one worker; `andrey calibrate`
 # reads it to state a measured crossover in the gate's units.
@@ -623,7 +623,7 @@ _DEGREE_CAP = (
 
 def _min_work() -> int:
     """The crossover gate in estimated candidate evals (env override, fixed default)."""
-    return par.min_work(env.GES_PARALLEL_MIN_WORK, _DEFAULT_MIN_WORK)
+    return par.min_work(env.GES_PARALLEL_MIN_WORK, MIN_POOL_GES_WORK)
 
 
 def forward_work_per_target(
@@ -755,7 +755,7 @@ def run_ges(
     it the pass fans out to one lazily-created worker set that spans all remaining passes -- each
     worker owns a FIXED contiguous target partition, so its inv-cov cache persists across passes.
     Either way the reduce keys on :func:`move_key`, so the selected CPDAG is partition-invariant;
-    ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`. Returns only the CPDAG;
+    ``ranks`` holds each column's :func:`~andrey.core.ties.tie_ranks`. Returns only the CPDAG;
     ``ges()`` recomputes the objective from it. Pooled workers only ever run Schur on BIC, so any
     score other than :class:`~andrey.core.score.BICScore` (BDeu and the mixed-data scores) is held
     in-process and never fans out.

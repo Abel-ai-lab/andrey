@@ -10,8 +10,8 @@ html_theme.sidebar_secondary.remove: true
 
 Each notebook runs one method or task, on your own machine or in Colab; each has **Open in Colab**
 and **Download this notebook** links. The [demos](../demos/index) run in your browser instead. From
-a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A notebook that needs another
-package installs it in a cell with `uv pip install`.
+a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A notebook that needs
+another package installs it in a cell with `uv pip install`.
 
 To run one in Colab, choose **Open in Colab**, select a CPU runtime, and run the setup cell before
 the example. The setup cell installs Andrey in the Colab runtime only; the speed notebook labels
@@ -49,8 +49,9 @@ Recover a three-variable chain with GES.
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, CD-NOD on data from
-several domains, and ICP's parents of one variable from several environments.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
+MMPC, which join each variable's local structure into a graph; CD-NOD on data from several domains;
+and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -62,8 +63,8 @@ several domains, and ICP's parents of one variable from several environments.
 :img-alt: The graph BOSS or GRaSP recovers in this notebook
 
 BOSS and GRaSP search over orderings of the variables for the best-scoring graph; IGSP does
-too, on settings whose changed variables it is told, and UT-IGSP on settings whose changed
-variables it is told in part or not at all.
+too, on interventional settings, one per environment, whose changed variables it is told, and
+UT-IGSP on settings whose changed variables it is told in part or not at all.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -74,8 +75,9 @@ variables it is told in part or not at all.
 :img-top: /_generated/thumbs/score_search.svg
 :img-alt: The true graph of this notebook's data
 
-XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
-GIES also learns from interventions, and GnIES from environments whose changes it is not told.
+XGES, hill climbing, tabu search, and exact search look for the graph with the best score, by
+default the extended BIC; MMHC and RSMAX2 restrict the search with tests first; GIES also learns
+from interventions, and GnIES from environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -154,7 +156,7 @@ ANM and PNL test which of two variables causes the other.
 :img-top: /_generated/thumbs/time_series.svg
 :img-alt: The true graph of this notebook's series, its lags merged
 
-PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, and longitudinal LiNGAM on data over
+PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, and Longitudinal LiNGAM on data over
 time.
 
 {bdg-secondary-line}`Notebook · Colab`

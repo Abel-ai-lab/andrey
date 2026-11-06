@@ -11,7 +11,6 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 from __future__ import annotations
 
 import importlib
-import math
 import subprocess
 import sys
 import warnings
@@ -28,7 +27,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.pc import pc as pc_engine
-from andrey.core import backend, ci, ci_cmiknn, ci_kernel
+from andrey.core import backend, ci, ci_cmiknn, ci_kernel, env
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _distances,
@@ -123,6 +122,29 @@ def test_independent_discrete_columns_stay_independent(name):
     """Two independent binary columns: ties must not turn the row order into a dependence."""
     data = np.random.default_rng(0).integers(0, 2, size=(200, 2)).astype(float)
     assert _build(name, data)(0, 1) > ALPHA
+
+
+def test_hsic_gamma_separates_dependence_from_independence():
+    """Check gamma HSIC on seeded independent and nonlinear dependent samples.
+
+    Repeated calls on the same input must return the same result.
+    """
+    from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+
+    def hsic_gamma_test(x, y):
+        return hsic_gamma_from_grams(gamma_gram(x), gamma_gram(y), len(x))
+
+    rng = np.random.default_rng(0)
+    for _ in range(6):
+        a = rng.standard_normal(200)
+        independent = rng.standard_normal(200)
+        dependent = a**2 + 0.3 * rng.standard_normal(200)
+        _stat, p_independent = hsic_gamma_test(a, independent)
+        _stat, p_dependent = hsic_gamma_test(a, dependent)
+        # One seeded null p-value falls below 0.05; the dependent p-values are zero.
+        assert p_independent > 0.01, f"independent draws rejected at p={p_independent}"
+        assert p_dependent < 0.01, f"quadratic dependence missed at p={p_dependent}"
+    assert hsic_gamma_test(a, dependent) == hsic_gamma_test(a, dependent)
 
 
 # ---- reference values --------------------------------------------------------------------------
@@ -718,12 +740,16 @@ def test_pc_selects_each_nonlinear_test_by_name(name):
 
 @pytest.mark.parametrize(
     ("method", "kind"),
-    [("fci", "pag"), ("gfci", "pag"), ("cdnod", "cpdag")],
+    [
+        *(("fci", "pag"), ("gfci", "pag"), ("boss_fci", "pag"), ("grasp_fci", "pag")),
+        ("cdnod", "cpdag"),
+        ("fci_jci", "pag"),
+    ],
 )
 def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
-    """FCI, GFCI, and CD-NOD select the nonlinear tests by name, as PC does."""
+    """The searches with a test phase select the nonlinear tests by name, as PC does."""
     data = _common_cause(seed=0, n=60, n_cond=1)
-    args = (data, np.repeat([0.0, 1.0], 30)) if method == "cdnod" else (data,)
+    args = (data, np.repeat([0.0, 1.0], 30)) if method in ("cdnod", "fci_jci") else (data,)
     for name in TESTS:
         assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
 
@@ -776,46 +802,27 @@ def test_the_other_nonlinear_tests_use_one_blas_thread(cls):
 # ---- device dispatch ---------------------------------------------------------------------------
 
 
+_GPU_SETTINGS = {"kci": env.KCI_GPU_THRESHOLD, "cmiknn": env.CMIKNN_GPU_THRESHOLD}
+
+
 @pytest.mark.parametrize(("name", "module"), [("kci", ci_kernel), ("cmiknn", ci_cmiknn)])
 def test_device_dispatch_gates_on_rows_squared(name, module, monkeypatch):
-    """KCI and CMIknn ask for a device by rows squared, may start one, and never take ``mps``."""
+    """KCI and CMIknn ask for a device by rows squared, may start one, never take ``mps``, and read
+    their own cutoff variable."""
+    monkeypatch.delenv(_GPU_SETTINGS[name].name, raising=False)
     seen = []
 
     def spy(pinnable, auto_order, *, metric=None, thresholds=None, amortized=True, op=None):
-        seen.append((metric, amortized, op, "mps" in pinnable))
+        seen.append((metric, amortized, op, "mps" in pinnable, thresholds["cuda"]))
         return "numpy"
 
     monkeypatch.setattr(module.backend, "select", spy)
-    _build(name, _common_cause(seed=0, n=60, n_cond=1))(0, 1, [2])
-    assert set(seen) == {(60 * 60, True, name, False)}
-
-
-@pytest.mark.parametrize(
-    ("choose", "cutoffs", "var"),
-    [
-        (ci_kernel._kci_backend, ci_kernel._KCI_GPU_THRESHOLDS, "ANDREY_KCI_GPU_THRESHOLD"),
-        (
-            ci_cmiknn._cmiknn_backend,
-            ci_cmiknn._CMIKNN_GPU_THRESHOLDS,
-            "ANDREY_CMIKNN_GPU_THRESHOLD",
-        ),
-    ],
-)
-def test_device_cutoff_is_rows_squared_and_reads_its_variable(choose, cutoffs, var, monkeypatch):
-    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", var):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
-    first = math.isqrt(cutoffs["cuda"] - 1) + 1  # the fewest rows whose square reaches the cutoff
-    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
-    monkeypatch.setenv(var, "100")
-    assert (choose(9), choose(10)) == ("numpy", "cuda")
-    with andrey.config(backend="mps"):
-        assert choose(10) == "cuda"  # float32 mps is not a backend of these tests
-
-
-def test_device_cutoffs_never_choose_mps():
-    assert ci_kernel._KCI_GPU_THRESHOLDS["mps"] is None
-    assert ci_cmiknn._CMIKNN_GPU_THRESHOLDS["mps"] is None
+    data = _common_cause(seed=0, n=60, n_cond=1)
+    _build(name, data)(0, 1, [2])
+    monkeypatch.setenv(_GPU_SETTINGS[name].name, "100")
+    _build(name, data)(0, 1, [2])
+    cutoff = backend.GPU_THRESHOLDS[name]["cuda"]
+    assert set(seen) == {(60 * 60, True, name, False, cutoff), (60 * 60, True, name, False, 100)}
 
 
 @pytest.mark.parametrize("n_cond", [0, 1, 2])

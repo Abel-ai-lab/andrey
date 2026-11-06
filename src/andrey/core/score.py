@@ -380,7 +380,8 @@ class Score(Protocol):
 class BICScore:
     """Linear-Gaussian BIC score over a fixed dataset.
 
-    Precomputes the covariance, sample count, and ``log(n)``. Memoizes negative local scores.
+    Precomputes the covariance, sample count, and ``log(n)``. :meth:`score` memoizes the negative
+    local scores; :meth:`score_many` is not memoized and agrees with :meth:`score` up to rounding.
 
     Parameters
     ----------
@@ -409,13 +410,7 @@ class BICScore:
         ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        data = np.asarray(data, dtype=np.float64)
-        if data.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={data.ndim}"
-            )
-        if not np.isfinite(data).all():
-            raise ValueError("data contains NaN or Inf; cannot compute BIC scores")
+        data = stats.checked_matrix(data, "compute BIC scores")
         # np.cov of a single column is a 0-d variance; keep the (1, 1) matrix the score reads.
         cov = np.atleast_2d(stats.cov(data, rowvar=False))
         check_columns(cov, data.shape[0])
@@ -505,8 +500,37 @@ class BICScore:
         return self._score_key(int(node), key)
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the negative local BIC scores for many parent sets, in request order."""
-        return [self.score(node, parents) for parents in parent_sets]
+        """Return the negative local BIC scores for many parent sets, in request order.
+
+        The sets of each size share one stacked solve of their normal equations on the covariance,
+        or a solve each (:func:`_solve`) when one is singular, so a set's score is the one a call
+        with that set alone gives. It agrees with :meth:`score`, which takes closed forms for one
+        and two parents, up to rounding, and it is not memoized.
+        """
+        node = int(node)
+        variance = float(self._cov_diag[node])
+        values = [math.inf] * len(parent_sets)
+        for size in {len(parents) for parents in parent_sets}:
+            at = [k for k, parents in enumerate(parent_sets) if len(parents) == size]
+            if size > self.n - 2:
+                continue
+            penalty = self.log_n * size * self.penalty_discount
+            if self.ebic_gamma:
+                penalty += ebic_penalty(size, self.cov.shape[0], self.ebic_gamma)
+            if not size:
+                for k in at:
+                    values[k] = _from_residual(variance, variance, self.n, penalty)
+                continue
+            pa = np.array([parent_sets[k] for k in at], dtype=np.intp)
+            xx = self.cov[pa[:, :, None], pa[:, None, :]]
+            xy = self.cov[node, pa]
+            try:
+                betas = np.linalg.solve(xx, xy[..., None])[..., 0]
+            except np.linalg.LinAlgError:  # one singular set fails the whole stacked call
+                betas = [_solve(a, b) for a, b in zip(xx, xy, strict=True)]
+            for k, b, beta in zip(at, xy, betas, strict=True):
+                values[k] = _from_residual(variance - b @ beta, variance, self.n, penalty)
+        return values
 
 
 class _CountScore:
@@ -622,13 +646,7 @@ class BDeuScore(_CountScore):
         structure_prior: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot compute BDeu scores")
+        arr = stats.checked_matrix(data, "compute BDeu scores", dtype=None)
         for name, value in (
             ("equivalent_sample_size", equivalent_sample_size),
             ("structure_prior", structure_prior),
@@ -719,13 +737,7 @@ class CategoricalBICScore(_CountScore):
         penalty_discount: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot compute categorical BIC scores")
+        arr = stats.checked_matrix(data, "compute categorical BIC scores", dtype=None)
         self.n: int = arr.shape[0]
         self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
@@ -969,9 +981,8 @@ def make_score(
     ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
     ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
     it out but still check its range, as BDeu does ``penalty_discount``'s.
-    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A search
-    checks ``score_func`` against the names it takes before calling this. Raises
-    :class:`NotImplementedError` for any other name.
+    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. Raises
+    :class:`NotImplementedError` for a name outside :data:`SCORES`.
     """
     if score_func in LINEAR_SCORES:
         return BICScore(

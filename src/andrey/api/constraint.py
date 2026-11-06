@@ -3,9 +3,9 @@
 The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z and
 Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
 conditional Gaussian likelihood ratios on mixed data, and the nonlinear tests) and orientation.
-``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a
-BIC, BDeu, or mixed-data score. ``icp`` tests the invariance of one target's regressions across
-environments and returns its estimated parents.
+``pc`` and ``cdnod`` produce CPDAGs; ``fci``, ``gfci``, and ``fci_jci`` produce PAGs. GFCI also
+uses GES with a BIC, BDeu, or mixed-data score. ``icp`` tests the invariance of one target's
+regressions across environments and returns its estimated parents.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from andrey.api._adapt import (
     data_kind,
     default_score,
     default_test,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -64,7 +65,8 @@ def pc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
@@ -82,10 +84,7 @@ def pc(
         picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See Notes. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values.
+        values. See **Categorical data.** and **Mixed data.** in Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
@@ -101,11 +100,11 @@ def pc(
         separating set that removed the edge ``x - y``. ``"conservative"`` [11]_ and
         ``"majority"`` [3]_ test ``x`` and ``y`` again given every subset of ``x``'s neighbors and
         every subset of ``y``'s neighbors, and count the subsets that separate them
-        (``p >= alpha``): ``"conservative"`` makes ``z`` a collider when none of them contains it
-        and a non-collider when all do; ``"majority"`` when fewer than half contain it and when
-        more than half do. Any other triple is ambiguous, and no rule orients through it. Both run
-        up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
-    categorical : sequence of str or int, optional
+        (``p >= alpha``). If at least one does, ``"conservative"`` makes ``z`` a collider when none
+        of them contains it and a non-collider when all do; ``"majority"`` when fewer than half
+        contain it and when more than half do. Any other triple is ambiguous, and no rule orients
+        through it. Both run up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -145,26 +144,28 @@ def pc(
         column positions, the middle node second and ``x < y``, in ascending order.
         ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
         ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
-        which orientation each keeps.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        which orientation each keeps. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
-        if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
-        ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if a continuous test meets
-        a column declared categorical, by ``categorical`` or by its type. With ``"fisherz"`` or
-        ``"student_t"``, also if a column repeats another up to scale and shift, before any test
-        runs; one message names every group of copies and says to keep one column per group. Also if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has too few samples
+        for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``, if ``data``
+        holds a value that is not a whole number; or, with ``"degen_gauss"`` or ``"cond_gauss"``, if
+        ``categorical`` names a column ``data`` lacks, or if a categorical column holds a number
+        that is not whole or a missing value. Also if a continuous test meets a column declared
+        categorical, by ``categorical`` or by its type. With ``"fisherz"`` or ``"student_t"``, also
+        if a column repeats another up to scale and shift, before any test runs; one message names
+        every group of copies and says to keep one column per group. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -175,11 +176,6 @@ def pc(
         When a mixed-data test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
-
-    See Also
-    --------
-    andrey.fci : Allows unmeasured common causes and selection bias.
-    andrey.direct_lingam : Orients every edge when the noise is non-Gaussian.
 
     Notes
     -----
@@ -206,25 +202,25 @@ def pc(
     it. Two colliders conflict when they would orient one edge in opposite directions, so the order
     in which they are oriented can change the result [3]_. A collider is skipped when it would give
     an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
-    kept. With ``collider_order="p_value"`` (the default), each collider ``x -> y <- z`` ranks by
-    the largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders
-    are oriented from the highest rank to the lowest. When two conflicting colliders rank equal to
-    nine decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
-    colliders therefore do not depend on the column order. This adapts the conflict rule of Ramsey
-    [10]_, which ranks a collider by separating sets that additional tests choose; Andrey ranks it
-    by the tests that removed the edge, so orienting runs no new test. With
-    ``collider_order="column"``, colliders are oriented by middle node, then by endpoint pair, in
-    column order, so the result can depend on the column order. After the colliders, Meek's rules
-    run in rounds: each round collects every orientation they imply on the graph as it stands and
-    applies them together, except that an edge two of them would direct both ways stays
-    undirected, and so do orientations that would together close a directed cycle. The rounds
-    repeat until one orients nothing, so Meek's rules do not depend on the column order. Such
-    conflicts arise only when no DAG on the skeleton has exactly the colliders found, as test errors
-    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives. Under
-    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order instead,
-    and of two firings that would orient one edge in opposite directions the first decides. The
-    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
-    each method.
+    kept. With ``collider_order="p_value"``, which the default ``None`` picks under the default
+    ``andrey.config.tie_break="rank"``, each collider ``x -> y <- z`` ranks by the largest p-value
+    among the conditioning sets that separated ``x`` and ``z``, and colliders are oriented from the
+    highest rank to the lowest. When two conflicting colliders rank equal to nine decimals, the edge
+    they dispute stays undirected, and Meek's rules do not orient it. The colliders therefore do not
+    depend on the column order. This adapts the conflict rule of Ramsey [10]_, which ranks a
+    collider by separating sets that additional tests choose; Andrey ranks it by the tests that
+    removed the edge, so orienting runs no new test. With ``collider_order="column"``, colliders are
+    oriented by middle node, then by endpoint pair, in column order, so the result can depend on the
+    column order. After the colliders, Meek's rules run in rounds: each round collects every
+    orientation they imply on the graph as it stands and applies them together, except that an edge
+    two of them would direct both ways stays undirected, and so do orientations that would together
+    close a directed cycle. The rounds repeat until one orients nothing, so Meek's rules do not
+    depend on the column order. Such conflicts arise only when no DAG on the skeleton has exactly
+    the colliders found, as test errors can cause; otherwise the rounds give the CPDAG that firing
+    the rules one at a time gives. Under ``andrey.config(tie_break="position")``, the rules fire one
+    at a time in column order instead, and of two firings that would orient one edge in opposite
+    directions the first decides. The :doc:`column-order guide </docs/guides/column-order>` lists
+    what reordering the columns does to each method.
 
     **Collider rules.** A test error can make the separating set that removed an edge disagree with
     other sets that also separate the pair, and ``collider_rule="sepsets"`` then decides a collider
@@ -235,54 +231,15 @@ def pc(
     ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
     every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
     than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
-    triple whose ends no subset separates is ambiguous under both: the search separated them only
-    given sets holding a node whose edge to that end it removed later. An ambiguous triple is never
-    oriented as a collider, and Meek's rules do not read it as a non-collider, so edges around it
-    can stay undirected. The colliders are then oriented in ``collider_order`` as under
-    ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
+    triple whose ends no subset separates is ambiguous under both, as both rules call a triple
+    unambiguous only when some subset separates its ends [3]_ (Section 4.2): the search separated
+    them only given sets holding a node whose edge to that end it removed later. An ambiguous
+    triple is never oriented as a collider, and Meek's rules do not read it as a non-collider, so
+    edges around it can stay undirected. The colliders are then oriented in ``collider_order`` as
+    under ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
     Conservative PC's orientations are correct under adjacency-faithfulness, a weaker assumption
     than PC's [11]_, at the cost of more undirected edges; the majority rule orients more of them
     [3]_.
-
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
-    where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
-    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [13]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [13]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows. With missing values, the
-    skeleton search runs in one process.
-
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
-    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
-    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
-    200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 500, 2,000,
-    or 10,000 rows; and 3,200 and 3,200 at mean degree 4 or 8 with 2,000 rows. At 1,600 variables
-    (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
-    row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
-    at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
-    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
-    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
-    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
-    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
-    ``"normal_scores"`` returned one. The numbers below were measured with
-    ``collider_order="column"``. On the 223-variable ANDES network with 1,000 simulated rows, its
-    median errors passed the empty graph's (372 against 338). Its run time grows combinatorially
-    with the largest neighborhood. On
-    simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
-    half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
-    rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with
-    ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical networks
-    with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with ``"chisq"``
-    and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s with
-    ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test, on 4
-    cores. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests
-    run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up
-    to 20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -316,6 +273,46 @@ def pc(
     difference in their numbers of parameters. With no categorical column, both are the
     likelihood-ratio form of the partial-correlation test, which agrees with ``"fisherz"`` as the
     rows grow.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [13]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [13]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows. With missing values, the
+    skeleton search runs in one process.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
+    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
+    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
+    200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 500, 2,000,
+    or 10,000 rows; and 3,200 and 3,200 at mean degree 4 or 8 with 2,000 rows. At 1,600 variables
+    (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
+    row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
+    at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
+    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
+    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
+    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
+    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
+    ``"normal_scores"`` returned one. The ANDES, mixed-data, and categorical numbers that follow
+    were measured with ``collider_order="column"``. On the 223-variable ANDES network with 1,000
+    simulated rows, its median errors passed the empty graph's (372 against 338). Its run time grows
+    combinatorially with the largest neighborhood. On simulated mixed data (conditional linear
+    Gaussian networks on sparse random graphs, the first half of the variables categorical with 2 to
+    5 categories), from 10 to 40 variables with 2,000 rows, its median errors stayed below the empty
+    graph's at every size: at 40 variables, 18.5 with ``"degen_gauss"`` and 9.5 with
+    ``"cond_gauss"``, against 40. On simulated categorical networks with 2 or 3 categories per
+    variable, of the same sizes and rows, they were 14 with ``"chisq"`` and 16 with ``"gsq"`` at 40
+    variables. The median fit at 40 variables took 0.38 s with ``"degen_gauss"``, 0.42 s with
+    ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
+    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
+    20 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -379,7 +376,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -456,7 +453,8 @@ def fci(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
@@ -473,11 +471,7 @@ def fci(
         ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
         the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -485,12 +479,12 @@ def fci(
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
         that removed the edge ``x - y``. ``"conservative"`` [4]_ [5]_ and ``"majority"`` [4]_ test
         ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
-        neighbors, and count the subsets that separate them (``p >= alpha``): ``"conservative"``
-        makes ``z`` a collider when none of them contains it and a non-collider when all do;
-        ``"majority"`` when fewer than half contain it and when more than half do. Any other
-        triple is ambiguous, and no rule orients through it. Both run up to
-        ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
-    categorical : sequence of str or int, optional
+        neighbors, and count the subsets that separate them (``p >= alpha``). If at least one
+        does, ``"conservative"`` makes ``z`` a collider when none of them contains it and a
+        non-collider when all do; ``"majority"`` when fewer than half contain it and when more
+        than half do. Any other triple is ambiguous, and no rule orients through it. Both run up
+        to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -537,23 +531,25 @@ def fci(
         position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
         ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
         or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``x < y``, in ascending order. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        too few samples for a test or a singular correlation matrix, or if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
-        ``"student_t"``, also if a column repeats another up to scale and shift, before any test
-        runs; one message names every group of copies and says to keep one column per group. Also if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has too few samples
+        for a test or a singular correlation matrix, or if ``data`` or ``categorical`` does not suit
+        the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column
+        repeats another up to scale and shift, before any test runs; one message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -561,10 +557,11 @@ def fci(
         When a mixed-data test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
-
-    See Also
-    --------
-    andrey.pc : Orients more of the graph, with fewer tests, when every common cause is measured.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -631,14 +628,13 @@ def fci(
     ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
     every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
     than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
-    triple whose ends no subset separates is a collider under both: no kept subset contains ``z``,
-    and the separating set that removed the edge, from a possible-d-separation set or an earlier
-    neighborhood, does not vote. With exact tests this can be wrong where only nodes beyond both
-    ends' neighbors separate them and ``z`` is a non-collider, so on such graphs the voting rules
-    can orient a collider that ``"sepsets"`` does not. An ambiguous triple is never oriented as a
-    collider, and rules R1-R10 do not read it as a non-collider, so endpoints around it can stay
-    circles. A vote reads only the skeleton and the tests, so the rules keep the result independent
-    of the column order wherever ``"sepsets"`` does.
+    triple whose ends no subset separates is ambiguous under both, as both rules call a triple
+    unambiguous only when some subset separates its ends [4]_ (Sections 4.2 and 4.4): the
+    separating set that removed the edge, from a possible-d-separation set or an earlier
+    neighborhood, does not vote. An ambiguous triple is never oriented as a collider, and rules
+    R1-R10 do not read it as a non-collider, so endpoints around it can stay circles. A vote reads
+    only the skeleton and the tests, so the rules keep the result independent of the column order
+    wherever ``"sepsets"`` does.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
@@ -672,21 +668,22 @@ def fci(
     at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
     those settings the median fit took 0.0064 s at 20 variables and 114 s at 800; with one variable
     in five hidden and 50 rows per variable it took 78 s at 400 and 4,829 s at 800, where two of
-    five fits ran past 7,200 s. The default, ``"order_free"``, took 0.99 to 1.05 times as long as
-    ``"fast"`` up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint
-    errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more
-    tests than the column order: on one with 400 variables, mean degree 4, one variable in five
-    hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"`` over five
-    column orders. ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES
-    network with 1,000 simulated rows, its median endpoint errors passed the empty graph's (696
-    against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
-    its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
-    the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
-    variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
-    benchmarked yet; their tests run them on up to 8 variables. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
-    up to a fifth of the values missing completely at random.
+    five fits ran past 7,200 s. ``"order_free"``, which the default ``None`` picks under the default
+    ``andrey.config.tie_break="rank"``, took 0.99 to 1.05 times as long as ``"fast"`` up to 200
+    variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint errors were within 2%
+    of ``"fast"``'s. On some graphs from 400 variables its order needs more tests than the column
+    order: on one with 400 variables, mean degree 4, one variable in five hidden, and 50 rows per
+    variable, it took 34 s against 23 to 29 s for ``"fast"`` over five column orders.
+    ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES network with
+    1,000 simulated rows, its median endpoint errors passed the empty graph's (696 against 676).
+    Rule R5 stops searching a pair after a fixed number of partial paths and leaves its circles, so
+    on graphs with many circle-circle edges it can miss an undirected cycle. With the mixed-data
+    tests, it is experimental and not benchmarked yet; its tests run it on 5 variables with 3,000
+    rows. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests
+    run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up
+    to 20 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -719,7 +716,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -801,7 +798,8 @@ def gfci(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -821,7 +819,8 @@ def gfci(
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where the tests
         removed the GES edge between ``x`` and ``y``; on the other triples whose ends are not
@@ -829,16 +828,16 @@ def gfci(
         is not in the recorded separating set of ``x`` and ``y``. ``"conservative"`` [3]_ [5]_ and
         ``"majority"`` [3]_ test ``x`` and ``y`` given every subset of ``x``'s neighbors and every
         subset of ``y``'s neighbors and count the subsets that separate them (``p >= alpha``), as
-        for :func:`~andrey.fci`: ``"conservative"`` makes ``z`` a collider when none of them
-        contains it and a non-collider when all do; ``"majority"`` when fewer than half contain it
-        and when more than half do. Any other triple is ambiguous, and no rule orients through it.
-        Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
-    categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
-        names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
-        columns, never a column by its values. ``[]`` marks none. A categorical setting reads every
-        column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
-        named here or by its type. See *Data types* in the
+        for :func:`~andrey.fci`. If at least one does, ``"conservative"`` makes ``z`` a collider
+        when none of them contains it and a non-collider when all do; ``"majority"`` when fewer
+        than half contain it and when more than half do. Any other triple is ambiguous, and no
+        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for the mixed-data score and test: column labels
+        (strings) or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and
+        text columns, never a column by its values. ``[]`` marks none. A categorical setting reads
+        every column as categorical, and a continuous setting raises ``ValueError`` on a declared
+        column, named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
@@ -883,26 +882,29 @@ def gfci(
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
         ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
-        ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
-        ascending order.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in ascending
+        order. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
-        ``score_func`` and ``indep_test`` read different data (continuous, categorical, or mixed),
-        or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
-        BIC score, also if a column repeats another up to scale and shift given more than two rows
-        or, with more rows than columns, is a linear function of other columns. One message names
-        every group of copies and says to keep one column per group. Also if a given
-        ``max_parents`` is below the parents some graph of the required edges of ``knowledge``
-        gives a node, or if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group. Also if a given ``max_parents`` is below the parents
+        some graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -910,6 +912,11 @@ def gfci(
         When the mixed-data score or test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -993,22 +1000,23 @@ def gfci(
     variable). With those settings the median fit took 0.53 s at 100 variables, 2.6 s at 200, and
     132 s at 800. Every fit at 800 variables finished within 7,200 s in four of the eight settings;
     with mean degree 4, one variable in five hidden, and 50 rows per variable, none did, and three
-    of five fits at 400 ran past 3,600 s. The default, ``"order_free"``, took 1.00 to 1.02 times as
-    long as ``"fast"`` up to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median
-    endpoint errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order
-    needs more tests than the column order: on one with 400 variables, mean degree 2, one variable
-    in five hidden, and 50 rows per variable, it took 407 s against 120 to 336 s for ``"fast"`` over
-    five column orders. ``possible_dsep="fast"`` gives the column-order mode. It runs a full
-    :func:`~andrey.ges` search before any test, so it takes at least as long as GES on the same
-    data. Its BIC score and Fisher-Z tests assume linear relations with Gaussian noise. With fewer
-    rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
-    variables fits its child exactly, so the GES search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. Rule R5 has the
-    search bound described under :func:`~andrey.fci`. With the mixed-data score and test, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
-    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    of five fits at 400 ran past 3,600 s. ``"order_free"``, which the default ``None`` picks under
+    the default ``andrey.config.tie_break="rank"``, took 1.00 to 1.02 times as long as ``"fast"`` up
+    to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median endpoint errors were
+    within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more tests than the
+    column order: on one with 400 variables, mean degree 2, one variable in five hidden, and 50 rows
+    per variable, it took 407 s against 120 to 336 s for ``"fast"`` over five column orders.
+    ``possible_dsep="fast"`` gives the column-order mode. It runs a full :func:`~andrey.ges` search
+    before any test, so it takes at least as long as GES on the same data. Its BIC score and
+    Fisher-Z tests assume linear relations with Gaussian noise. With fewer rows than columns the BIC
+    score is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly,
+    so the GES search never selects one, nor any parent set that leaves its child a residual
+    variance of at most ``1e-12`` times its variance. Rule R5 has the search bound described under
+    :func:`~andrey.fci`. With the mixed-data score and test, it is experimental and not benchmarked
+    yet; its tests run it on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and
+    ``"majority"`` are not benchmarked yet; their tests run them on up to 8 variables. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1036,7 +1044,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     score_func, _ = default_score(data, score_func, categorical=categorical)
@@ -1095,9 +1103,9 @@ def cdnod(
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
+    """Learn a partially directed graph over the data variables from multi-domain data with CD-NOD.
 
-    CDNOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
+    CD-NOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
     distribution shifts across environments are modeled, then runs PC-style discovery. It applies
     to samples pooled across domains, regimes, or time blocks. The environment index is appended as
     a trailing pseudo-node and removed from the result.
@@ -1123,7 +1131,8 @@ def cdnod(
         the data come from one domain, and the result equals :func:`~andrey.pc`'s. ``None``
         needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
         test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
@@ -1148,11 +1157,12 @@ def cdnod(
         How an unshielded triple ``x - z - y`` is decided, as for :func:`~andrey.pc`: by the
         separating set that removed the edge ``x - y`` (``"sepsets"``), or by a vote over the
         subsets of ``x``'s and ``y``'s neighbors that separate them, with the index among the
-        variables, which makes ``z`` a collider when none of them contains it and a non-collider
-        when all do (``"conservative"`` [3]_), or when fewer than half and when more than half do
-        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it. A
-        triple whose middle node is the index is not voted: the index is never a collider.
-    categorical : sequence of str or int, optional
+        variables, which, if at least one subset separates them, makes ``z`` a collider when none
+        of them contains it and a non-collider when all do (``"conservative"`` [3]_), or when
+        fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
+        ambiguous, and no rule orients through it. A triple whose middle node is the index is not
+        voted: the index is never a collider.
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. The domain index is categorical too, so
@@ -1191,41 +1201,51 @@ def cdnod(
     StructureOutput
         Wraps a :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
         ``metadata["algorithm"]`` is ``"cdnod"``. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones left open. The graph is partially directed, not the CPDAG of
-        an observational equivalence class: the index orients edges that the true DAG's CPDAG
-        leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
-        can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
-        :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
-        against the graph CD-NOD can identify instead.
-        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
-        read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
-        ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
-        reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
-        middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
-        numbered ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that
-        two colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
-        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        undirected (``--``) the ones left open. The graph is partially directed, not the CPDAG of an
+        observational equivalence class: the index orients edges that the true DAG's CPDAG leaves
+        undirected, and the graph stands for the DAGs that agree on every direction CD-NOD can
+        identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
+        :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result against
+        the graph CD-NOD can identify instead. ``metadata["index_edges"]`` lists the index's edges,
+        each ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, under CD-NOD's assumption that the index is only a cause
+        and no hidden common cause varies apart from it [1]_. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single environment.
+        With ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, only a change in a variable's
+        mean that follows the index's values is found. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
+        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order; the index, in a triple through it, is numbered
+        ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that two
+        colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
+        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``env``
-        is given with each domain's rows apart; if those rows' tables differ in kind or columns,
-        or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
-        of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
-        names a column ``data`` lacks; if ``data`` has too few rows
-        for a test, if ``data`` or ``categorical`` does not suit the test, as for
-        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if a numeric ``env`` holds a
-        value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a column of
-        ``data``, or ``env`` with more than one domain, repeats another up to scale and shift,
-        before any test runs; one message names every group of copies and says to keep one column
-        per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``env`` is given with each
+        domain's rows apart; if those rows' tables differ in kind or columns, or one has no rows or
+        holds ``inf``; if ``env`` does not hold one value per row of ``data``, holds ``NaN`` /
+        ``inf`` or a missing label, mixes strings and numbers, or names a column ``data`` lacks; if
+        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the test,
+        as for :func:`~andrey.pc`, or, with a categorical or mixed-data test, if a numeric ``env``
+        holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a
+        column of ``data``, or ``env`` with more than one domain, repeats another up to scale and
+        shift, before any test runs; one message names every group of copies and says to keep one
+        column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself,
+        as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1233,6 +1253,11 @@ def cdnod(
         When a mixed-data test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -1255,16 +1280,17 @@ def cdnod(
     environment, not which variables changed in it; when every environment's intervened variables
     are known, :func:`~andrey.gies` uses them.
 
-    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a change in a variable's mean that follows the index's values. With two domains the coding
-    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. A change in a variable's noise
-    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
-    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
-    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
-    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
-    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
-    index is categorical, so every data column may be continuous.
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values. With
+    two domains the coding does not matter. With three domains coded ``0, 1, 2``, a shift in domain
+    ``1`` alone can go undetected, and recoding the domains can change the result. A change in a
+    variable's noise variance alone, or in the size of an effect whose cause has mean zero, leaves
+    the mean unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
+    conditional-independence test the paper uses [1]_ [2]_, detects such changes, at a far higher
+    cost per test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index
+    value as a category, so they find a shift in any domain, whatever the coding. With
+    ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so every data column may be
+    continuous.
 
     With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
     between two variables that both keep an edge to the index. For a candidate direction
@@ -1367,8 +1393,8 @@ def cdnod(
     [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
     from andrey.core.environments import normalize_env_targets
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     if env is None:
         raise TypeError(
@@ -1405,6 +1431,7 @@ def cdnod(
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    index_edges: list[int] = []
     with (
         copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
@@ -1424,14 +1451,342 @@ def cdnod(
             seed=seed,
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _index_edges=index_edges,
         )
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
+        "index_edges": [[variable(j), "directed"] for j in index_edges],
+        "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+@method_spec("fci_jci")
+def fci_jci(
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
+    *,
+    alpha: float = 0.05,
+    indep_test: str | None = None,
+    collider_rule: str = "sepsets",
+    categorical: Sequence[str | int] | None = None,
+    possible_dsep: str | None = None,
+    confounded_index: bool = True,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a PAG from multi-domain data with FCI and the environment index as a context variable.
+
+    FCI-JCI [1]_ runs FCI [2]_ [3]_ on data pooled from several domains, regimes, or experiments,
+    with the environment index as one more variable that no data variable causes. It allows hidden
+    common causes, as :func:`~andrey.fci` does, and uses the index, as :func:`~andrey.cdnod` does,
+    to remove the edges that pooling adds and to orient more edges. The index is removed from the
+    result, and its edges are listed in ``metadata``: they mark the variables whose distribution the
+    domains change and no other variable explains.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample, pooled across the domains. Coerced to ``float64``. A
+        DataFrame's column names become the structure's ``labels``. A column that ``env`` names is
+        not a variable: it leaves the data before the fit, and ``categorical``, ``knowledge``, and
+        the result's positions count the other columns. A list of DataFrames or 2-D arrays gives
+        each domain's rows apart, labeled by position ``0, 1, ...``, and a mapping labels each by
+        its key: the rows are stacked in that order, and ``env`` stays ``None``. A position is the
+        domain's number, so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the
+        order of the list can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
+        or the name of a column of the DataFrame ``data`` that holds them. Numbers are coerced to
+        ``float64`` and read as numbers; whole numbers with ``"chisq"``, ``"gsq"``,
+        ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted
+        order, whatever the row order; a label is a string or a number, not both. When every row
+        has the same value, the data come from one domain, and the result equals
+        :func:`~andrey.fci`'s. ``None`` needs ``data`` as each domain's rows apart.
+    alpha : float, default=0.05
+        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+    indep_test : str or None, default=None
+        Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
+        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
+        column's normal scores. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
+        likelihood ratio) test categorical data, coded by whole numbers, and ``"degen_gauss"`` and
+        ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. Each as for
+        :func:`~andrey.fci`. The index is one more column of the data it tests: the continuous
+        tests read it as a number, and the categorical and mixed-data tests as a category; see
+        Notes. ``None`` picks from the declared column types: ``"gsq"`` when every column is
+        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
+        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
+        never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
+        from the declared column types when this is ``None``.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
+        as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
+        (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
+        separate them, with the index among the variables, which, if at least one subset separates
+        them, makes ``z`` a collider when none of them contains it and a non-collider when all do
+        (``"conservative"`` [4]_ [5]_), or when fewer than half and when more than half do
+        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. The environment index is categorical too,
+        so ``data`` may have no categorical column. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    possible_dsep : {"order_free", "fast"} or None, default=None
+        The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
+        visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
+        order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
+        ``"fast"`` under ``"position"``.
+    confounded_index : bool, default=True
+        Whether a hidden variable may cause both the index and a data variable, such as a patient's
+        health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
+        is set from outside, as in a randomized experiment, so every edge the index keeps points out
+        of it, which can orient more edges: FCI-JCI123, which with one context variable is
+        FCI-JCI12. See Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the possible-d-separation step, the conservative and majority
+        rules, and the discriminating-path rule.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and
+        can leave a circle at ``b``, and a required one is ``a -> b``; knowledge that puts an
+        arrowhead at ``a`` on an edge ``a - b`` while its required edges lead from ``a`` to ``b``
+        raises ``ValueError``. The environment index is unconstrained.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``pag`` :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
+        ``metadata["algorithm"]`` is ``"fci_jci"``. Endpoints carry arrowheads, tails, or circle
+        marks (``o``); a bidirected edge (``<->``) marks a probable hidden common cause.
+        ``metadata["index_edges"]`` lists the index's edges as ``[variable, kind]`` pairs, by name
+        or 0-based position, in column order: ``"directed"`` for ``index -> variable``,
+        ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+        ``index <-> variable``; it is empty for a single environment. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
+        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order; the index, in a triple through it, is numbered
+        ``n_variables``. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``env`` is given with each
+        domain's rows apart; if those rows' tables differ in kind or columns, or one has no rows or
+        holds ``inf``; if ``env`` does not hold one value per row of ``data``, holds ``NaN`` /
+        ``inf`` or a missing label, mixes strings and numbers, or names a column ``data`` lacks; if
+        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the
+        test, as for :func:`~andrey.fci`, or, with a categorical or mixed-data test, if a numeric
+        ``env`` holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``,
+        also if a column of ``data``, or ``env`` with more than one domain, repeats another up to
+        scale and shift, before any test runs; one message names every group of copies and says to
+        keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** FCI-JCI suits independent rows pooled from several domains, sites, batches,
+    or experiments, with each row's domain known, where hidden common causes may act on the data
+    variables and on the domain itself [1]_. It assumes no selection bias and a distribution
+    faithful to the graph over the data and the domain. Its authors simulate linear-Gaussian models
+    of 4, 10, and 100 variables with hidden common causes, and binary context variables that each
+    shift one variable, with 100 or 500 rows per context, tested by partial correlation at an alpha
+    of 0.01; with one context variable, as here, that is two domains. It returns a PAG over the data
+    variables and the domain's edges. When no hidden common cause acts, use :func:`~andrey.cdnod`;
+    when the rows come from one domain, :func:`~andrey.fci`.
+
+    The index is appended to the data as a last column, the context variable of Joint Causal
+    Inference [1]_, and FCI's adjacency search and possible-d-separation step run over the data and
+    the index, as for :func:`~andrey.fci`. Pooling makes the domain a common cause of every variable
+    it shifts; with the index among the variables, a test can condition on it, so two variables the
+    domain shifts together keep no edge unless they depend within the domains.
+
+    Before each collider pass, every edge the index keeps gets an arrowhead at its data variable,
+    because no data variable causes the index (JCI Assumption 1). With ``confounded_index=False``,
+    the edge also gets a tail at the index, because no hidden variable causes both (JCI Assumption
+    2), so the edge is ``index -> variable`` and the index is never a collider; otherwise the end at
+    the index stays a circle until a rule orients it. JCI assumes no selection bias, so Zhang's
+    rules R1-R4 and R8-R10 [3]_ orient the rest, without R5-R7; they change only circles, so the
+    index's marks stay. An index edge then orients edges between data variables: from
+    ``index *-> x o-o y`` with ``y`` not adjacent to the index, rule R1 gives ``x -> y``. Mooij et
+    al. prove the procedure sound under Assumption 1, and sound and complete under Assumptions 1
+    and 2 with one context variable, where their Assumption 3, on how several context variables
+    relate, does not apply [1]_.
+
+    A variable keeps an edge to the index when its distribution changes across the domains and no
+    other variable explains the change: the domains change its causal module, the distribution given
+    its causes; or a path through hidden variables joins it to the index, as when the domains change
+    a hidden cause of it; or, with ``confounded_index=True``, a hidden variable causes both.
+    ``metadata["index_edges"]`` lists those variables, the index's neighbors; their descendants
+    change in distribution too, through them, and are not listed. An edge ``index -> x`` alone does
+    not make ``x`` a direct target of the change; Mooij et al. give the condition that does [1]_.
+
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values, as for
+    :func:`~andrey.cdnod`: with three or more domains coded ``0, 1, 2``, a shift in domain ``1``
+    alone can go undetected. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take
+    each index value as a category, so they find a shift in any domain, whatever the coding. A
+    change in a variable's noise variance alone, or in the size of an effect whose cause has mean
+    zero, leaves the means unchanged, so the tests other than the nonlinear ones do not find it.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value; ``env`` must be complete. Each
+    test reads only the rows where all of its variables are observed (test-wise deletion) [6]_
+    [7]_, the index among them, as for :func:`~andrey.fci`; ``metadata["rows_tested"]`` gives the
+    fewest and the median rows a test read. When values are missing completely at random, the rows
+    a test keeps are a random sample, so each test keeps its level [7]_. When whether a value is
+    missing depends on the variables, the rows a test keeps are a selected sample, which FCI-JCI,
+    assuming no selection bias, does not allow for. A test raises ``ValueError`` when it has fewer
+    rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the other
+    tests, or when a continuous column is constant on its rows. With missing values, the skeleton
+    search runs in one process.
+
+    **Limitations.** Not benchmarked yet; its tests run it on simulated linear-Gaussian data of up
+    to 10 variables with 1,000 to 3,000 rows from two or three domains, and on Sachs's 11 proteins,
+    7,466 cells from nine conditions, with ``"cond_gauss"``. It takes one environment variable: the
+    several context variables of the authors' designs, one per intervention, are not implemented, so
+    domains that change different variables share one index. Its possible-d-separation step tests
+    subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"``,
+    ``"student_t"``, and ``"normal_scores"`` can miss a shift in a middle domain of three or more,
+    as above. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [2] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
+    .. [3] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+       1873-1896.
+    .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [6] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [7] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import fci_jci
+    >>> rng = np.random.default_rng(1)
+    >>> env = np.repeat([0.0, 1.0], 500)
+    >>> x = 2.0 * env + rng.standard_normal(1000)
+    >>> y = x + rng.standard_normal(1000)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = fci_jci(np.column_stack([x, y]), env)
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    >>> out.metadata["index_edges"]
+    [[0, 'partially_directed']]
+    """
+    from andrey.constraint.fci_jci import fci_jci as _fci_jci
+    from andrey.core.environments import normalize_env_targets
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+
+    if env is None:
+        raise TypeError(
+            "fci_jci needs env, the environment of each row, or data as each environment's rows "
+            "apart"
+        )
+    data, codes, env_labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method="fci_jci"
+    )
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    # A mixed-data test takes the index as categorical, so every data column may be continuous.
+    X, mask = checked_data(
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        index_categorical=True,
+        method="fci_jci",
+        missing=True,
+    )
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="fci_jci")
+    # Numbers reach the search as given; text labels as their codes.
+    text = any(isinstance(label, str) for label in env_labels)
+    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
+    if data_kind(indep_test) != "continuous":
+        check_categories(c, None, f"indep_test={indep_test!r}", name="env")
+    # The search appends the index as column d, so a copy of it is named as the index.
+    d, column = X.shape[1], column_namer(labels)
+    ambiguous: set[tuple[int, int, int]] = set()
+    with (
+        copies_named(labels, lambda j: "env" if j == d else column(j)),
+        rows_tested() as rows,
+    ):
+        pag, index_edges = _fci_jci(
+            X,
+            c,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            confounded_index=confounded_index,
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
+            seed=seed,
+            _ambiguous=ambiguous,
+        )
+    variable = label_of(labels)
+    metadata = {
+        "index_edges": [[variable(j), kind] for j, kind in index_edges],
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 @method_spec("icp")
@@ -1472,7 +1827,7 @@ def icp(
         environments from ``data`` given as each environment's rows apart, or else from
         ``targets`` given as a column or a 0/1 matrix: rows with the same targets are one
         environment.
-    target : str or int
+    target : str, int, or None
         Required. The variable whose parents to find: a column label (a string) or a 0-based
         position (an integer). ``None`` raises ``ValueError``.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
@@ -1484,9 +1839,9 @@ def icp(
         environment are left out of the fit, and an environment whose targets are unknown is kept.
         ``None`` keeps every environment.
     alpha : float, default=0.05
-        The significance level of every set's invariance test, in ``(0, 1)``: the estimated parents
-        are a subset of the true parents with probability at least ``1 - alpha``. Smaller values
-        accept more sets and give fewer parents.
+        Significance level of every set's invariance test, in ``(0, 1)``: the estimated parents are
+        a subset of the true parents with probability at least ``1 - alpha``. Smaller values accept
+        more sets and give fewer parents.
     invariance_test : {"approximate", "exact"}, default="approximate"
         The invariance test of each set. ``"approximate"`` fits one regression on every row and
         compares each environment's residuals with the other rows' by Welch's t-test of their means
@@ -1520,35 +1875,31 @@ def icp(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
-        is ``None`` or names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with
-        at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats
-        another up to scale and shift or, with more rows than columns, is a linear function of
-        other columns, one message naming every group of copies; if ``data`` holds each
-        environment's rows apart with ``env`` or with ``targets`` other than a mapping, or its
-        tables differ in kind or columns, or one has no rows; if ``env`` does not hold one label
-        per row, misses a label, mixes strings and numbers, or names a column ``data`` lacks; if
-        ``targets`` names a variable or an environment ``data`` or ``env`` lacks, or gives two rows
-        of one environment different targets; if fewer than two environments remain once those
-        that intervened on ``target`` are left out, as with one table and neither ``env`` nor
-        ``targets``, or one has fewer than 3 rows; if a column is
-        constant on the rows that remain; or if a regression has as many coefficients as rows: under
-        ``"exact"``, on the rows outside each environment, where a variable constant there also
-        raises.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
+        names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with at least two
+        rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats another up to scale
+        and shift or, with more rows than columns, is a linear function of other columns, one
+        message naming every group of copies; if ``data`` holds each environment's rows apart with
+        ``env`` or with ``targets`` other than a mapping, or its tables differ in kind or columns,
+        or one has no rows; if ``env`` does not hold one label per row, misses a label, mixes
+        strings and numbers, or names a column ``data`` lacks; if ``targets`` names a variable or an
+        environment ``data`` or ``env`` lacks, or gives two rows of one environment different
+        targets; if fewer than two environments remain once those that intervened on ``target`` are
+        left out, as with one table and neither ``env`` nor ``targets``, or one has fewer than 3
+        rows; if a column is constant on the rows that remain; or if a regression has as many
+        coefficients as rows: under ``"exact"``, on the rows outside each environment, where a
+        variable constant there also raises.
 
     Warns
     -----
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.gies : The whole graph from environments whose intervened variables are known.
-    andrey.cdnod : The whole graph from environments whose changes are unknown.
 
     Notes
     -----
@@ -1591,6 +1942,10 @@ def icp(
     over the accepted sets. Together the intervals hold every coefficient of the target's equation
     with probability at least ``1 - 2 alpha`` [1]_.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test
+    regresses ``target`` on a set of the other variables in each environment. Drop the incomplete
+    rows first.
+
     **Limitations.** Measured on simulated linear Gaussian data drawn as in the paper's simulation
     study [1]_: two environments of 100 to 500 rows each, 5 to 12 variables, and noise interventions
     on one or more of them, with 200 datasets per scenario. When those interventions could also hit
@@ -1608,7 +1963,7 @@ def icp(
     ``2^(n_variables - 1)`` sets: the median fit of the approximate test took 0.24 s on one core at
     15 variables and 1,000 rows. The guarantee does not cover noise that is not Gaussian under
     ``"exact"``. The numbers are a reference, not a hard limit: they change with the data generator,
-    the settings, and the machine.
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1620,7 +1975,6 @@ def icp(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> import pandas as pd
     >>> from andrey import icp
@@ -1630,16 +1984,14 @@ def icp(
     >>> y = x + rng.standard_normal(1000)
     >>> z = y + rng.standard_normal(1000)
     >>> data = pd.DataFrame({"x": x, "y": y, "z": z})
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = icp(data, env, target="y")
+    >>> out = icp(data, env, target="y")
     >>> out.metadata["parents"], out.structure.oriented_edges()
     (['x'], [('x', 'y', 'directed')])
     """
     from andrey.api._adapt import dag_from_adjacency, data_matrix
     from andrey.constraint.icp import icp as _icp
     from andrey.core.environments import normalize_env_targets
-    from andrey.core.knowledge import _node, column_position
+    from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
     data, codes, env_labels, by_code = normalize_env_targets(
@@ -1653,7 +2005,7 @@ def icp(
             "icp: pass target, the variable whose parents to find, as a column label or a 0-based "
             "position"
         )
-    t = column_position(_node(target, "target"), labels, d, "icp: target")
+    t = column_position(as_node(target, "target"), labels, d, "icp: target")
     name = column_namer(labels)
     left_out = [k for k, hit in by_code.items() if hit is not None and t in hit]
     keep = ~np.isin(codes, left_out)
@@ -1697,7 +2049,7 @@ def icp(
         max_parents=max_parents,
         environments=environments,
     )
-    node = (lambda j: labels[j]) if labels is not None else int
+    node = label_of(labels)
     adjacency = np.zeros((d, d), dtype=np.int8)
     adjacency[list(result.parents), t] = 1
     p_values = [None if j == t else float(v) for j, v in enumerate(result.p_values)]

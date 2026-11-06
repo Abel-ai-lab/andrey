@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import subprocess
 import sys
 
@@ -9,8 +10,13 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import backend, stats, warning_policy
-from andrey.core.env import BACKENDS
+from andrey.core import backend, stats
+from andrey.core.env import (
+    BACKENDS,
+    CMIKNN_GPU_THRESHOLD,
+    KCI_GPU_THRESHOLD,
+    PNL_GPU_THRESHOLD,
+)
 
 
 def test_auto_dispatch_stays_on_numpy_below_threshold(monkeypatch):
@@ -106,7 +112,7 @@ def test_andrey_device_is_alias_of_andrey_backend(monkeypatch):
 
 def test_tie_break_precedence_context_over_config_over_env(monkeypatch):
     """Every layer reaches the ranks a fit reads: position ranks are the column positions."""
-    from andrey.search.hc import tie_ranks
+    from andrey.core.ties import tie_ranks
 
     monkeypatch.delenv("ANDREY_TIE_BREAK", raising=False)
     x = np.random.default_rng(0).standard_normal((50, 4))
@@ -145,24 +151,20 @@ def test_n_jobs_resolution(monkeypatch):
         andrey.config.n_jobs = -2
 
 
-def test_the_former_worker_names_set_n_jobs_for_one_release_with_one_warning(monkeypatch):
-    """``num_workers`` on ``andrey.config`` and ``ANDREY_NUM_WORKERS`` set ``n_jobs``, each with
-    a ``DeprecatedArgumentWarning``; ``ANDREY_N_JOBS`` wins over the former variable."""
+def test_the_former_worker_names_set_nothing(monkeypatch):
+    """``num_workers``, the former name of ``n_jobs``, raises as an argument of ``andrey.config``,
+    with its current name, and as a setting; ``ANDREY_NUM_WORKERS`` is not read, and any other
+    unknown argument raises too."""
     monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="ANDREY_NUM_WORKERS is now"):
-        assert andrey.config.n_jobs == 3
-    monkeypatch.setenv("ANDREY_N_JOBS", "2")
-    assert andrey.config.n_jobs == 2
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match=r"config\(num_workers=...\) is now"):
-        with andrey.config(num_workers=5):
-            assert andrey.config.n_jobs == 5
-    with pytest.raises(ValueError, match="pass only n_jobs"):
-        andrey.config(n_jobs=2, num_workers=2)
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="config.num_workers is now"):
+    assert andrey.config.n_jobs == 1
+    with pytest.raises(TypeError, match=r"'num_workers'.*`n_jobs` in 0\.12\.0"):
+        andrey.config(num_workers=5)
+    with pytest.raises(TypeError, match="'njobs'"):
+        andrey.config(njobs=5)
+    with pytest.raises(AttributeError, match="num_workers"):
         andrey.config.num_workers = 4
-    assert andrey.config.n_jobs == andrey.config.num_workers == 4
+    assert andrey.config.n_jobs == 1
 
 
 def test_bad_backend_value_raises():
@@ -331,10 +333,10 @@ def test_ges_fit_under_auto_never_imports_torch():
     env.pop("ANDREY_DEVICE", None)
     code = (
         "import sys; import numpy as np; import andrey; "
-        "from andrey.core.stats import _COV_GPU_THRESHOLDS; "
+        "from andrey.core.backend import GPU_THRESHOLDS; "
         # Derive the smallest matrix that clears the current covariance cutoff.
-        "d = 8; n = -(-_COV_GPU_THRESHOLDS['cuda'] // d) + 1; "
-        "assert n * d >= _COV_GPU_THRESHOLDS['cuda'], 'probe no longer clears the cov cutoff'; "
+        "d = 8; n = -(-GPU_THRESHOLDS['cov']['cuda'] // d) + 1; "
+        "assert n * d >= GPU_THRESHOLDS['cov']['cuda'], 'probe no longer clears the cov cutoff'; "
         "X = np.random.default_rng(0).standard_normal((n, d)); "
         "out = andrey.ges(X); "
         "assert out.structure.kind == 'cpdag'; "
@@ -411,6 +413,28 @@ def test_pinned_mps_is_selected(fake_mps, monkeypatch, var, value):
     monkeypatch.setattr(backend, "_is_live", lambda b: False)
     monkeypatch.setenv(var, value)
     assert backend.resolve(1, 10**9) == "mps"
+
+
+@pytest.mark.parametrize(
+    ("op", "setting"),
+    [("kci", KCI_GPU_THRESHOLD), ("cmiknn", CMIKNN_GPU_THRESHOLD), ("pnl", PNL_GPU_THRESHOLD)],
+)
+def test_select_by_size_reads_the_op_cutoff_and_never_chooses_mps(monkeypatch, op, setting):
+    # A metric of rows squared crosses at the op's cutoff, or at its variable when set.
+    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", setting.name):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
+
+    def choose(n):
+        return backend.select_by_size(op, setting, n * n, amortized=True)
+
+    first = math.isqrt(backend.GPU_THRESHOLDS[op]["cuda"] - 1) + 1  # the fewest rows reaching it
+    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
+    monkeypatch.setenv(setting.name, "100")
+    assert (choose(9), choose(10)) == ("numpy", "cuda")
+    with andrey.config(backend="mps"):
+        assert choose(10) == "cuda"  # float32 mps is not a backend of these ops
+    assert backend.GPU_THRESHOLDS[op]["mps"] is None
 
 
 def test_fork_reset_frees_a_held_dispatch_lock():

@@ -62,15 +62,6 @@ def column_mask(categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
     return mask
 
 
-def _matrix(data: npt.ArrayLike) -> np.ndarray:
-    arr = np.asarray(data, dtype=np.float64)
-    if arr.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
-    if not np.isfinite(arr).all():
-        raise ValueError("data contains NaN or Inf; cannot fit a mixed-data model")
-    return arr
-
-
 class DegenerateGaussian:
     """The covariance of the degenerate Gaussian embedding of mixed data.
 
@@ -102,7 +93,7 @@ class DegenerateGaussian:
     """
 
     def __init__(self, data: npt.ArrayLike, categorical: npt.ArrayLike | None = None) -> None:
-        arr = _matrix(data)
+        arr = stats.checked_matrix(data, "fit a mixed-data model")
         mask = column_mask(categorical, arr.shape[1])
         blocks: list[np.ndarray] = []
         self.groups: list[np.ndarray] = []
@@ -187,7 +178,7 @@ class ConditionalGaussian:
         *,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        arr = _matrix(data)
+        arr = stats.checked_matrix(data, "fit a mixed-data model")
         n, d = arr.shape
         self._mask = column_mask(categorical, d)
         self.n: int = n

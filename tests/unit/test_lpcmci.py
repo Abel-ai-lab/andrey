@@ -284,7 +284,7 @@ class Counting:
 def _data_search(test_wrapper=lambda test: test) -> engine._Search:
     """A search over four variables of white noise, ``tau_max=1``, with the Student-t test."""
     data = np.random.default_rng(0).standard_normal((300, 4))
-    test = PARTIAL_CORRELATION_TESTS["student_t"](lagged_design(data, 1))
+    test = PARTIAL_CORRELATION_TESTS["student_t"](lagged_design(data, 2))
     return engine._Search(test_wrapper(test), 4, 1, 0.05, range(4))
 
 

@@ -10,13 +10,13 @@ apply the constraints to an equivalence class.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from .structure import ARROW, NULL, TAIL
+from .structure import ARROW, NULL, TAIL, has_cycle
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -44,7 +44,11 @@ KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 KNOWLEDGE_PARTS: tuple[KnowledgePart, ...] = ("required", "forbidden", "allowed", "tiers")
 
 
-def _node(value: object, what: str) -> Node:
+def as_node(value: object, what: str) -> Node:
+    """Return ``value`` as a node: a column label (``str``) or a 0-based position (``int``).
+
+    Raises ``TypeError``, opening with ``what``, for any other value, a ``bool`` included.
+    """
     if isinstance(value, (bool, np.bool_)) or not isinstance(value, (str, int, np.integer)):
         raise TypeError(
             f"{what} names a node by column label or 0-based position, got {value!r} "
@@ -64,7 +68,7 @@ def _edges(values: Iterable | None, what: str, *, lagged: bool = False) -> tuple
     for pair in values:
         if isinstance(pair, (str, bytes)) or len(pair) not in ((2, 3) if lagged else (2,)):
             raise TypeError(f"{what} must be an iterable of {shape}, got {pair!r}")
-        a, b = _node(pair[0], what), _node(pair[1], what)
+        a, b = as_node(pair[0], what), as_node(pair[1], what)
         if len(pair) == 2:
             if a == b:
                 raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
@@ -165,14 +169,13 @@ class Knowledge:
         required edge that is forbidden, directly, by the tiers, or by ``allowed``, or required
         edges forming a cycle. ``boss``, ``grasp``, and the LiNGAM methods that search a causal
         order also raise it when the required edges and the tiers admit no causal order, through a
-        column in no tier. ``pc``,
-        ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a directed
-        cycle over the adjacencies the search kept; ``fci`` when a directed path of required edges
-        leads from ``a`` to ``b`` while ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the
-        edge between them. ``rcd`` raises it when the required edges close a directed cycle with
-        the parents it found. A time-series search raises it for a required link without a lag, or
-        at a lag the search does not learn; ``varma_lingam`` also for a forbidden lagged link with
-        ``prune=False``.
+        column in no tier. ``pc``, ``cdnod``, and ``pcmciplus`` raise it when the edges the
+        knowledge orients form a directed cycle over the adjacencies the search kept; ``fci`` and
+        ``fci_jci`` when a directed path of required edges leads from ``a`` to ``b`` while
+        ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the edge between them. ``rcd``
+        raises it when the required edges close a directed cycle with the parents it found. A
+        time-series search raises it for a required link without a lag, or at a lag the search does
+        not learn; ``varma_lingam`` also for a forbidden lagged link with ``prune=False``.
     NotImplementedError
         A method that learns no time lags raises it for an edge with a lag.
 
@@ -258,7 +261,7 @@ class Knowledge:
                 raise TypeError(
                     f"tiers must be an iterable of node iterables, got the tier {tier!r}"
                 )
-            nodes = tuple(_node(v, "tiers") for v in tier)
+            nodes = tuple(as_node(v, "tiers") for v in tier)
             for v in nodes:
                 if v in seen:
                     raise ValueError(f"tiers list {v!r} more than once")
@@ -362,7 +365,7 @@ class Constraints:
         before = self.required | (
             tiered[:, None] & tiered[None, :] & (self.tier[:, None] < self.tier[None, :])
         )
-        if _has_cycle(before):
+        if has_cycle(before):
             raise KnowledgeError(
                 "the required edges and the tiers admit no causal order: following them leads "
                 "from a column back to itself through an untiered column"
@@ -387,21 +390,6 @@ class Constraints:
         )
 
 
-def _has_cycle(edges: np.ndarray) -> bool:
-    """Whether the directed graph ``edges[i, j]`` (``i -> j``) has a cycle (Kahn's algorithm)."""
-    indegree = edges.sum(axis=0)
-    ready = list(np.flatnonzero(indegree == 0))
-    seen = 0
-    while ready:
-        i = ready.pop()
-        seen += 1
-        for j in np.flatnonzero(edges[i]).tolist():
-            indegree[j] -= 1
-            if indegree[j] == 0:
-                ready.append(j)
-    return seen < edges.shape[0]
-
-
 def _given(knowledge: object) -> bool:
     """Whether ``knowledge``, a :class:`Knowledge` or a ``TypeError``, sets any part."""
     if not isinstance(knowledge, Knowledge):
@@ -416,6 +404,54 @@ def _check_parts(knowledge: Knowledge, method: str, honors: Sequence[KnowledgePa
         raise NotImplementedError(
             f"{method} does not honor the knowledge part(s) {unsupported}; it honors {list(honors)}"
         )
+
+
+def _columns(
+    d: int, labels: Sequence[str] | None
+) -> tuple[Callable[[Node, str], int], Callable[[int], str]]:
+    """The column lookup of a knowledge part over ``d`` columns named ``labels``.
+
+    ``position`` gives the column a knowledge part names and raises :class:`KnowledgeError` when it
+    is missing; ``label`` gives the name a message uses for column ``i``.
+    """
+    names = list(labels) if labels is not None else None
+
+    def position(node: Node, what: str) -> int:
+        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
+
+    def label(i: int) -> str:
+        return repr(names[i]) if names is not None else str(i)
+
+    return position, label
+
+
+def _tiers_and_allowed(
+    knowledge: Knowledge,
+    d: int,
+    position: Callable[[Node, str], int],
+    label: Callable[[int], str],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Each column's tier, ``-1`` for none, and the links the tiers and ``allowed`` forbid.
+
+    The links form a ``(d, d)`` mask: the tiers forbid a link from a later tier into an earlier
+    one, and ``allowed`` forbids both directions of every pair of distinct columns it leaves out.
+    """
+    tier = np.full(d, -1, dtype=np.intp)
+    for k, nodes in enumerate(knowledge.tiers):
+        for v in nodes:
+            i = position(v, "tiers")
+            if tier[i] >= 0:
+                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
+            tier[i] = k
+    tiered = tier >= 0
+    forbidden = tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
+    if knowledge.allowed is not None:
+        allowed = np.eye(d, dtype=bool)
+        for a, b in knowledge.allowed:
+            i, j = position(a, "allowed"), position(b, "allowed")
+            allowed[i, j] = allowed[j, i] = True
+        forbidden |= ~allowed
+    return tier, forbidden
 
 
 def resolve(
@@ -442,33 +478,13 @@ def resolve(
             f"{method} learns no time lags, but knowledge gives the lagged link {lagged[0]!r}; "
             "give its edges as (cause, effect) pairs"
         )
-    names = list(labels) if labels is not None else None
-
-    def position(node: Node, what: str) -> int:
-        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
-
-    def label(i: int) -> str:
-        return repr(names[i]) if names is not None else str(i)
-
+    position, label = _columns(d, labels)
     forbidden = np.zeros((d, d), dtype=bool)
     required = np.zeros((d, d), dtype=bool)
-    tier = np.full(d, -1, dtype=np.intp)
     for edge in knowledge.forbidden:
         forbidden[position(edge[0], "forbidden"), position(edge[1], "forbidden")] = True
-    for k, nodes in enumerate(knowledge.tiers):
-        for v in nodes:
-            i = position(v, "tiers")
-            if tier[i] >= 0:
-                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
-            tier[i] = k
-    tiered = tier >= 0
-    forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
-    if knowledge.allowed is not None:
-        allowed = np.zeros((d, d), dtype=bool)
-        for a, b in knowledge.allowed:
-            i, j = position(a, "allowed"), position(b, "allowed")
-            allowed[i, j] = allowed[j, i] = True
-        forbidden |= ~allowed
+    tier, by_tiers_and_allowed = _tiers_and_allowed(knowledge, d, position, label)
+    forbidden |= by_tiers_and_allowed
     np.fill_diagonal(forbidden, False)
     for edge in knowledge.required:
         i, j = position(edge[0], "required"), position(edge[1], "required")
@@ -478,7 +494,7 @@ def resolve(
                 "(directly, by the tiers, or by leaving the pair out of allowed)"
             )
         required[i, j] = True
-    if (required & required.T).any() or _has_cycle(required):
+    if (required & required.T).any() or has_cycle(required):
         raise KnowledgeError("knowledge requires edges that form a directed cycle")
     forbidden |= required.T
     return Constraints(forbidden, required, tier)
@@ -541,38 +557,18 @@ def resolve_lagged(
     if knowledge is None or not _given(knowledge):
         return None
     _check_parts(knowledge, method, honors)
-    names = list(labels) if labels is not None else None
-
-    def position(node: Node, what: str) -> int:
-        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
-
-    def label(i: int) -> str:
-        return repr(names[i]) if names is not None else str(i)
-
+    position, label = _columns(d, labels)
     lags = tau_max + 1
     forbidden = np.zeros((lags, d, d), dtype=bool)
     required = np.zeros((lags, d, d), dtype=bool)
-    tier = np.full(d, -1, dtype=np.intp)
     for edge in knowledge.forbidden:
         i, j = position(edge[0], "forbidden"), position(edge[1], "forbidden")
         if len(edge) == 2:
             forbidden[:, i, j] = True
         elif edge[2] <= tau_max:
             forbidden[edge[2], i, j] = True
-    for k, nodes in enumerate(knowledge.tiers):
-        for v in nodes:
-            i = position(v, "tiers")
-            if tier[i] >= 0:
-                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
-            tier[i] = k
-    tiered = tier >= 0
-    forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
-    if knowledge.allowed is not None:
-        allowed = np.eye(d, dtype=bool)
-        for a, b in knowledge.allowed:
-            i, j = position(a, "allowed"), position(b, "allowed")
-            allowed[i, j] = allowed[j, i] = True
-        forbidden |= ~allowed
+    tier, by_tiers_and_allowed = _tiers_and_allowed(knowledge, d, position, label)
+    forbidden |= by_tiers_and_allowed
     np.fill_diagonal(forbidden[0], False)
     for edge in knowledge.required:
         i, j = position(edge[0], "required"), position(edge[1], "required")
@@ -595,7 +591,7 @@ def resolve_lagged(
                 "(directly, by the tiers, or by leaving the pair out of allowed)"
             )
         required[lag, i, j] = True
-    if (required[0] & required[0].T).any() or _has_cycle(required[0]):
+    if (required[0] & required[0].T).any() or has_cycle(required[0]):
         raise KnowledgeError("knowledge requires lag-0 links that form a directed cycle")
     forbidden[0] |= required[0].T
     return LaggedConstraints(forbidden, required, tier)

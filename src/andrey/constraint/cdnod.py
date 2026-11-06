@@ -32,7 +32,7 @@ arrow into ``vk`` puts ``z`` in the deconfounding set ``Z1``; any other qualifyi
 walk that ends in an arrow into ``vk`` or an undirected edge at ``vk`` puts it in the potential
 set ``Z2``.
 
-The step runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed
+The step runs on the data columns sorted by :func:`~andrey.core.ties.tie_ranks`, a rank computed
 from the data, so the order in which it visits the pairs, the directions of a pair, and the subsets
 of ``Z2``, and the order of the columns in each kernel, do not depend on the column order.
 Reordering the columns relabels the step's orientations and changes nothing else, unless two columns
@@ -48,22 +48,22 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples
+from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
 from andrey.constraint.pc import (
-    _discover_skeleton,
     _orient_colliders,
     _undirect_conflicts,
+    adjacency_search,
     check_collider_order,
     check_knowledge_cycle,
     collider_conflicts,
-    vote_colliders,
+    knowledge_masks,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -88,6 +88,7 @@ def cdnod(
     seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
     _conflicts: set[tuple[int, int]] | None = None,
+    _index_edges: list[int] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -111,7 +112,7 @@ def cdnod(
     context is unconstrained. Every edge they decide is directed before the independent-change
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
-    (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
+    (:func:`~andrey.constraint.pc.adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
     ``GraphStructure`` tagged ``"cpdag"``: its directions
@@ -119,7 +120,9 @@ def cdnod(
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
     ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
     ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
-    (:func:`~andrey.constraint.pc.collider_conflicts`).
+    (:func:`~andrey.constraint.pc.collider_conflicts`), and the private ``_index_edges`` sink the
+    data variables the context keeps an edge to, in column order: each such edge is
+    ``context -> variable``, and with a single domain there are none.
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -141,21 +144,22 @@ def cdnod(
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            X,
+        allowed, keep, apart = knowledge_masks(constraints)
+        skeleton, sepsets, pvalues = adjacency_search(
+            make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+            d,
             alpha,
-            indep_test,
-            categorical=categorical,
-            record_pvalues=ranked,
-            workers=workers,
+            support=allowed,
+            keep=keep,
+            apart=apart,
             max_depth=max_depth,
-            constraints=constraints,
-            seed=seed,
+            workers=workers,
+            record_pvalues=ranked,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
         if collider_rule != "sepsets":
             test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
-            ambiguous |= vote_colliders(
+            ambiguous |= vote_triples(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
         pdag = _orient_with_context(
@@ -171,23 +175,26 @@ def cdnod(
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
         padded = None if constraints is None else constraints.padded(d + 1)
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            augmented,
+        allowed, keep, apart = knowledge_masks(padded)
+        skeleton, sepsets, pvalues = adjacency_search(
+            make_indep_test(indep_test, augmented, categorical=mask, seed=seed),
+            d + 1,
             alpha,
-            indep_test,
-            categorical=mask,
-            record_pvalues=ranked,
-            workers=workers,
+            support=allowed,
+            keep=keep,
+            apart=apart,
             max_depth=max_depth,
-            constraints=padded,
-            seed=seed,
+            workers=workers,
+            record_pvalues=ranked,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
+        if _index_edges is not None:
+            _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":
             test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}
-            ambiguous |= vote_colliders(
+            ambiguous |= vote_triples(
                 skeleton,
                 test,
                 alpha,
@@ -281,7 +288,7 @@ def _orient_by_independent_changes(
     skipped, since the causal graph is acyclic. After an orientation the pairs are visited again;
     ``n`` grows until no undirected pair has that many candidates. Returns an updated copy.
 
-    The search runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's
+    The search runs on the data columns sorted by :func:`~andrey.core.ties.tie_ranks`, so a column's
     index in it is its rank. It visits the pairs, their two directions, and the subsets of ``Z2``
     in rank order, and each kernel stacks its columns in rank order, so reordering the columns
     relabels the orientations and changes nothing else, unless two columns are identical. With

@@ -9,7 +9,16 @@ import numpy as np
 import pytest
 
 from andrey.core import EDGE_DTYPE, GraphStructure, Structure, StructureOutput, TemporalStructure
-from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
+from andrey.core.structure import (
+    ARROW,
+    CIRCLE,
+    NULL,
+    TAIL,
+    directed_support,
+    endpoint_marks,
+    has_cycle,
+    topological_order,
+)
 
 
 def directed(pairs, n, kind="dag", labels=None):
@@ -823,3 +832,32 @@ def test_from_pcalg_rejects_what_pcalg_cannot_have_written(amat, kind, message):
 def test_to_pcalg_rejects_a_graph_pcalg_cannot_write(graph):
     with pytest.raises(ValueError):
         graph.to_pcalg()
+
+
+def test_endpoint_marks_end_a_pair_joined_both_ways_and_a_self_loop_in_arrowheads():
+    support = np.array([[1, 1, 1], [1, 0, 0], [0, 0, 0]], dtype=bool)  # 0 <-> 1, 0 -> 2, 0 -> 0
+    marks = endpoint_marks(support)
+    assert marks.dtype == np.int8
+    assert (marks[0, 1], marks[1, 0]) == (ARROW, ARROW)
+    assert (marks[0, 2], marks[2, 0]) == (TAIL, ARROW)
+    assert marks[0, 0] == ARROW
+    assert np.array_equal(directed_support(marks), support)
+
+
+def test_has_cycle_finds_a_directed_cycle_and_a_self_loop():
+    dag = np.zeros((3, 3), dtype=bool)
+    dag[0, 1] = dag[1, 2] = dag[0, 2] = True
+    assert not has_cycle(dag)
+    loop, cycle = dag.copy(), dag.copy()
+    loop[1, 1] = cycle[2, 0] = True
+    assert has_cycle(loop) and has_cycle(cycle)
+
+
+def test_topological_order_takes_the_lowest_key_among_the_ready_nodes():
+    adj = np.zeros((4, 4), dtype=bool)
+    adj[3, 1] = adj[2, 0] = True  # 3 -> 1, 2 -> 0
+    assert topological_order(adj) == [2, 0, 3, 1]
+    assert topological_order(adj, key=("d", "c", "b", "a")) == [3, 2, 1, 0]
+    adj[1, 3] = True
+    with pytest.raises(ValueError, match="the network has a directed cycle"):
+        topological_order(adj, what="the network")

@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.output import StructureOutput
-from andrey.core.structure import TemporalStructure
+from andrey.core.structure import TemporalStructure, directed_support
 
-from ._common import _offdiag, directed_adjacency, prf
+from ._common import _offdiag, prf_masks, unwrap
 
 
 def _temporal(x: object) -> TemporalStructure:
     """Unwrap a StructureOutput and require a TemporalStructure."""
-    if isinstance(x, StructureOutput):
-        x = x.structure
+    x = unwrap(x)
     if not isinstance(x, TemporalStructure):
         raise TypeError("temporal_scores needs a TemporalStructure")
     return x
@@ -34,34 +32,42 @@ def _temporal(x: object) -> TemporalStructure:
 def _lag_directed(t: TemporalStructure, lag: int, n: int) -> np.ndarray:
     """Directed support of lag ``lag`` (all-``False`` when that lag is absent)."""
     if lag in t.lags:
-        return directed_adjacency(t.lag(lag).to_numpy())
+        return directed_support(t.lag(lag).to_numpy())
     return np.zeros((n, n), dtype=bool)
-
-
-def _masks_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
-    """Precision/recall/f1 between two boolean supports."""
-    tp = int((est & true_).sum())
-    return prf(tp, int((est & ~true_).sum()), int((~est & true_).sum()))
 
 
 def _edge_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
     """Directed-edge precision/recall/f1 and Hamming SHD (reversal costs 2) over two supports."""
-    scores = _masks_scores(est, true_)
+    scores = prf_masks(est, true_)
     scores["shd"] = int((est != true_).sum())
     return scores
 
 
 def temporal_scores(estimated: object, true: object) -> dict[str, object]:
-    """Per-lag and summary scores for a temporal structure.
-
-    Returns ``per_lag`` (each lag's precision/recall/f1/shd), a ``contemporaneous`` block when
-    the estimate carries lag-0, an aggregate ``lagged`` block over lags >= 1, a ``summary`` graph
-    collapsing every scored lag (self-loops excluded so diagonals do not inflate it),
-    and ``coefficient_mae_per_lag`` when both structures carry lag weights.
+    """Return the per-lag and summary scores of an estimated temporal structure.
 
     Raises ``NotImplementedError`` for a time-carrying structure (``n_times > 0``): the ``(time,
     lag)`` axis has no metric yet, and scoring only the final-occasion projection would silently
     miss per-occasion differences.
+
+    Parameters
+    ----------
+    estimated : StructureOutput or TemporalStructure
+        The estimated structure, one graph per lag.
+    true : StructureOutput or TemporalStructure
+        The true structure, over the same variables in the same order.
+
+    Returns
+    -------
+    dict
+        ``"per_lag"`` maps each scored lag to its ``"precision"``, ``"recall"``, ``"f1"``, and
+        ``"shd"``, the Hamming distance of the directed edges, where a reversal costs 2. Lag 0 is
+        scored when the estimate carries it, and its scores are also ``"contemporaneous"``.
+        ``"lagged"``, present when either structure has a lag from 1, scores the edges of every
+        such lag together, and ``"summary"`` gives the precision, recall, and F1 of the graph that
+        merges every scored lag, self-loops left out.
+        ``"coefficient_mae_per_lag"`` maps each scored lag that both structures carry to its
+        weight error, when both carry lag weights.
 
     Examples
     --------
@@ -110,7 +116,7 @@ def temporal_scores(estimated: object, true: object) -> dict[str, object]:
     if lags_ge1:
         result["lagged"] = _edge_scores(lagged_est, lagged_true)
     off = _offdiag(n)
-    result["summary"] = _masks_scores(summary_est & off, summary_true & off)
+    result["summary"] = prf_masks(summary_est & off, summary_true & off)
 
     est_w, true_w = est.lag_weights, true_.lag_weights
     if est_w is not None and true_w is not None:

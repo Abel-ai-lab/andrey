@@ -48,9 +48,10 @@ import numpy as np
 from scipy import linalg, optimize, sparse
 from scipy.interpolate import BSpline
 
+from andrey.core.structure import topological_order
+from andrey.core.ties import KEY_DP
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.fcm.pruning import prune
-from andrey.search._parallel import _KEY_DP
 
 _log = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ def order_search(
     fit on its required parents (its sample variance with none). The gain of ``i -> j`` is
     ``log(v_j / v_j')``, ``v_j`` the residual variance (denominator ``n - 1``) of ``j``'s current
     fit and ``v_j'`` that of its fit with ``i`` added. The search adds the edge of largest gain,
-    whatever its sign. Gains are compared rounded to ``_KEY_DP`` decimal places, as
+    whatever its sign. Gains are compared rounded to ``KEY_DP`` decimal places, as
     :func:`andrey.hc` compares its score changes per row, so two gains that differ only in their
     rounding tie, and a tie goes to the smallest ``(i, j)``, the cause first; then it
     drops every candidate that would close a cycle or break ``precedence`` and refits ``j``'s
@@ -311,8 +312,8 @@ def order_search(
     while open_.any():
         # Monotone rounding puts every tie of the largest rounded gain within one grid step of it.
         best = gain[open_].max()
-        near = np.argwhere(open_ & (gain >= best - 2 * 10.0**-_KEY_DP)).tolist()
-        i, j = min(near, key=lambda e: (-round(float(gain[e[0], e[1]]), _KEY_DP), e[0], e[1]))
+        near = np.argwhere(open_ & (gain >= best - 2 * 10.0**-KEY_DP)).tolist()
+        i, j = min(near, key=lambda e: (-round(float(gain[e[0], e[1]]), KEY_DP), e[0], e[1]))
         adj[i, j] = True
         variance[j] = refit[i, j]
         before, after = path[:, i], path[j, :]
@@ -333,20 +334,6 @@ def _closure(reach: np.ndarray) -> np.ndarray:
     for k in range(out.shape[0]):
         out |= out[:, k : k + 1] & out[k : k + 1, :]
     return out
-
-
-def topological_order(adj: np.ndarray) -> np.ndarray:
-    """An order of the DAG ``adj``, causes first: each step takes the first ready node."""
-    indegree = adj.sum(axis=0)
-    placed = np.zeros(adj.shape[0], dtype=bool)
-    order = []
-    while len(order) < adj.shape[0]:
-        ready = np.flatnonzero(~placed & (indegree == 0))
-        v = int(ready[0])
-        order.append(v)
-        placed[v] = True
-        indegree = indegree - adj[v]
-    return np.array(order, dtype=np.int64)
 
 
 @dataclass(frozen=True)
@@ -386,4 +373,4 @@ def cam(
     )
     dag = prune(X, searched, cutoff=alpha, k=K, bases=bases).astype(bool) | required
     ordered = searched if precedence is None else searched | precedence
-    return CAMResult(dag=dag, order=topological_order(ordered))
+    return CAMResult(dag=dag, order=np.array(topological_order(ordered), dtype=np.int64))

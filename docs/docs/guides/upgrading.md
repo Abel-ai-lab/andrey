@@ -24,11 +24,60 @@ import andrey
 warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 ```
 
+## From 0.14 to 0.15
+
+### Former names from 0.12 and 0.14
+
+The former names that 0.12 and 0.14 kept with a warning stopped working in 0.15. A call that passes
+one raises `TypeError`, as it does for any argument the method does not take, and the message gives
+the current name and the release that renamed it:
+
+```text
+cdnod() got an unexpected keyword argument 'domain_index'; it was renamed `env` in 0.14.0
+```
+
+`collider_rule="none"` raises `ValueError`, which lists the rules that work and gives the current
+one. `andrey run` and `andrey bootstrap` refuse the former `key=value` names and the
+`--domain-index` and `--interventions` flags the same way. The table gives the current name of
+each:
+
+| Method | Former name | Name now |
+| --- | --- | --- |
+| `cdnod` | `domain_index` (`--domain-index`) | `env` (`--env`) |
+| `gies` | `interventions` (`--interventions`) | `targets` (`--env` with `targets=`) |
+| `grasp` | `depth` | `grasp_depth` |
+| `pcmci` | `pc_alpha` | `pc1_alpha` |
+| `pcmciplus` | `collider_rule="none"` | `collider_rule="sepsets"` |
+| `granger` | `cv` | none: `alpha` sets the level of the test of each link |
+| `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `pcmci`, `pcmciplus`, `lpcmci` | `max_categories` | none: declare the categorical columns with `categorical` or a column type |
+
+The other former names are gone too:
+
+- `gies` raises `ValueError` for a 0/1 matrix as its second argument, `env`: pass the matrix as
+  `targets`.
+- `andrey.bootstrap` raises `TypeError` for `n_boot`, and `andrey bootstrap` refuses `--n-boot`:
+  pass `n_resamples` (`--n-resamples`), and read a result's `n_resamples`, not `n_boot`.
+- `andrey.config` refuses `num_workers`, as an argument and as a setting: use `n_jobs`.
+- Andrey no longer reads `ANDREY_NUM_WORKERS`: set `ANDREY_N_JOBS`.
+
+### Ensembles of datasets
+
+`andrey.data.generate` and `andrey.data.Ensemble` still work in 0.15, with an
+`andrey.DeprecatedArgumentWarning`, and stop working in 0.16. A loop over `SCM.sample` draws the
+same datasets:
+
+```python
+# 0.14
+datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
+# 0.15
+datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
+```
+
 ## From 0.13 to 0.14
 
 Andrey 0.14.0 names each row's environment `env` in both `cdnod` and `gies`, and `gies` takes the
-variables intervened on in each environment as `targets`. A former name in the table still works
-in 0.14, with an `andrey.DeprecatedArgumentWarning`, and stops working in the release after:
+variables intervened on in each environment as `targets`. A former name in the table worked in
+0.14, with an `andrey.DeprecatedArgumentWarning`, and stopped working in 0.15:
 
 | Method | Former name | Name now |
 | --- | --- | --- |
@@ -56,8 +105,8 @@ as a file, such as `targets='{"0": [], "1": ["x"]}'`.
 ## From 0.11 to 0.12
 
 Andrey 0.12.0 renames the arguments below, reads a column's type only from what you declare, and
-removes the former names that 0.11 kept for one release. A former name in the table still works in
-0.12, with an `andrey.DeprecatedArgumentWarning`, and stops working in the next release:
+removes the former names that 0.11 kept for one release. A former name in the table worked in 0.12
+to 0.14, with an `andrey.DeprecatedArgumentWarning`, and stopped working in 0.15:
 
 | Method | Former name | Name now |
 | --- | --- | --- |
@@ -88,14 +137,14 @@ with andrey.config(n_jobs=8):
 of every variable by least squares and returns the lagged links whose coefficient has a
 Benjamini-Hochberg adjusted p-value of at most `alpha`, 0.05 by default, over all the links
 (`fdr_method="fdr_bh"`; `"none"` tests each link at `alpha`); `metadata["p_values"]` holds the
-adjusted p-values. `cv` is ignored, with the warning.
+adjusted p-values. `cv` was ignored, with the warning, until 0.15.
 
 `pcmci` keeps a link when its Benjamini-Hochberg adjusted p-value over all the links is at most
 `alpha` (`fdr_method="fdr_bh"`, the default), so it returns fewer links than in 0.11, mostly the
 false ones. `fdr_method="none"` returns the links of 0.11.
 
-A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
-one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
+A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` worked, with the
+warning, until 0.15, and the key `bootstrap.n_boot` of `andrey bootstrap --json` became
 `bootstrap.n_resamples`, with no former name.
 
 ### Former names from 0.10

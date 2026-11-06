@@ -76,7 +76,7 @@ def torch_cpu(monkeypatch):
     pytest.importorskip("torch")
     monkeypatch.setenv("ANDREY_DEVICE", "cpu")
     # A pinned device overrides the size threshold, so even a tiny call runs on torch-cpu.
-    assert backend.resolve(1, stats._COV_GPU_THRESHOLDS) == "cpu"
+    assert backend.resolve(1, backend.GPU_THRESHOLDS["cov"]) == "cpu"
 
 
 def test_torch_cov_matches_numpy(torch_cpu, data):
@@ -133,8 +133,8 @@ def test_cov_and_corrcoef_are_one_shot(monkeypatch):
 
 def test_mps_cutoffs_are_unmeasured_never():
     # mps has no measured crossover: None = auto never offloads there (a pin still can).
-    assert stats._ENTROPY_GPU_THRESHOLDS["mps"] is None
-    assert stats._COV_GPU_THRESHOLDS["mps"] is None
+    assert backend.GPU_THRESHOLDS["entropy"]["mps"] is None
+    assert backend.GPU_THRESHOLDS["cov"]["mps"] is None
 
 
 def test_probe_builders_measure_the_gate_metric():
@@ -162,7 +162,7 @@ def test_direct_lingam_batches_reach_the_gpu_under_auto(monkeypatch):
     from andrey.lingam.pwling import score_candidates
 
     # Derive both workloads from the configured cutoff.
-    cut = stats._ENTROPY_GPU_THRESHOLDS["cuda"]
+    cut = backend.GPU_THRESHOLDS["entropy"]["cuda"]
     X = np.random.default_rng(0).standard_normal((1000, 60))
     assert 1000 * 59 > cut  # the tall-batch case is above the gate
     backend._dispatch_counts.clear()
@@ -194,7 +194,7 @@ def _cov_thr(*, amortized=True):
     return stats._resolve_thresholds(
         "cov",
         env.COV_GPU_THRESHOLD,
-        stats._COV_GPU_THRESHOLDS,
+        backend.GPU_THRESHOLDS["cov"],
         stats._cov_probe,
         stats._cov_probe_call,
         stats._COV_PROBE_START,
@@ -220,7 +220,7 @@ def test_calibrate_is_a_noop_without_an_accelerator(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     monkeypatch.setattr(stats.backend, "_is_available", lambda b: b == "numpy")
-    assert _cov_thr() == stats._COV_GPU_THRESHOLDS
+    assert _cov_thr() == backend.GPU_THRESHOLDS["cov"]
 
 
 def test_calibrate_tunes_only_the_available_device(monkeypatch):
@@ -232,7 +232,7 @@ def test_calibrate_tunes_only_the_available_device(monkeypatch):
     monkeypatch.setattr(stats, "_calibrate", lambda *a, **k: 12345)
     thr = _cov_thr()
     assert thr["cuda"] == 12345  # calibrated for the present device
-    assert thr["mps"] == stats._COV_GPU_THRESHOLDS["mps"]  # others left at the default
+    assert thr["mps"] == backend.GPU_THRESHOLDS["cov"]["mps"]  # others left at the default
 
 
 def test_manual_env_override_beats_calibration(monkeypatch):
@@ -252,7 +252,7 @@ def test_pinned_call_skips_calibration(monkeypatch):
 
     monkeypatch.setattr(stats, "_calibrate", _boom)
     with backend.config(backend="numpy"):
-        assert _cov_thr() == stats._COV_GPU_THRESHOLDS
+        assert _cov_thr() == backend.GPU_THRESHOLDS["cov"]
 
 
 def test_calibration_cache_is_reused(monkeypatch):
@@ -414,7 +414,7 @@ def test_one_shot_op_does_not_calibrate_on_a_cold_device(monkeypatch):
         raise AssertionError("a one-shot op calibrated on a cold device")
 
     monkeypatch.setattr(stats, "_calibrate", _boom)
-    assert _cov_thr(amortized=False) == stats._COV_GPU_THRESHOLDS
+    assert _cov_thr(amortized=False) == backend.GPU_THRESHOLDS["cov"]
     # An already-live device may calibrate.
     monkeypatch.setattr(stats.backend, "_is_live", lambda b: b == "cuda")
     monkeypatch.setattr(stats, "_calibrate", lambda *a, **k: 4242)
@@ -478,3 +478,17 @@ def test_fingerprint_changes_when_the_timed_libraries_change(monkeypatch):
     assert after_torch != before
     monkeypatch.setattr(stats.np, "__version__", "0.0.0")
     assert stats._device_fingerprint("cuda") != after_torch
+
+
+def test_checked_matrix_keeps_a_code_matrix_and_checks_only_floats_for_nan():
+    codes = np.array([[0, 1], [2, 0]], dtype=np.int64)
+    assert stats.checked_matrix(codes, "count", dtype=None).dtype == np.int64
+    assert stats.checked_matrix(codes, "count").dtype == np.float64
+    floats = np.array([[0.0, np.nan], [1.0, 2.0]])
+    for dtype in (None, np.float64):
+        with pytest.raises(ValueError, match="NaN or Inf; cannot count"):
+            stats.checked_matrix(floats, "count", dtype=dtype)
+    with pytest.raises(ValueError, match="2-D"):
+        stats.checked_matrix(codes[0], "count")
+    with pytest.raises(ValueError, match="at least 3 rows to count, got 2"):
+        stats.checked_matrix(codes, "count", min_rows=3)

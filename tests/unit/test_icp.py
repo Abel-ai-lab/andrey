@@ -77,13 +77,16 @@ def _reference(X, env, target, test, alpha, max_parents=None):
     }
 
 
+@pytest.mark.parametrize("alpha", [0.05, 0.2])
 @pytest.mark.parametrize("max_parents", [None, 1])
 @pytest.mark.parametrize("invariance_test", ["approximate", "exact"])
 @pytest.mark.parametrize("sizes", [(70, 50), (40, 60, 50)], ids=["two envs", "three envs"])
-def test_every_output_equals_the_direct_computation(sizes, invariance_test, max_parents):
+def test_every_output_equals_the_direct_computation(sizes, invariance_test, max_parents, alpha):
     X, env = _data(sizes)
-    out = fit(X, env, target=2, invariance_test=invariance_test, max_parents=max_parents)
-    want = _reference(X, env, 2, invariance_test, 0.05, max_parents)
+    out = fit(
+        X, env, target=2, invariance_test=invariance_test, max_parents=max_parents, alpha=alpha
+    )
+    want = _reference(X, env, 2, invariance_test, alpha, max_parents)
     meta = out.metadata
     assert meta["accepted_sets"] == want["accepted_sets"] and meta["accepted_sets"]
     assert meta["parents"] == want["parents"]

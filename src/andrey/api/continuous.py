@@ -55,6 +55,7 @@ def notears(
     mcp_delta: float = 0.2,
     mcp_decay: float = 0.8,
     max_path: int = 50,
+    standardize: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with NOTEARS, a continuous-optimization structure learner.
@@ -95,6 +96,10 @@ def notears(
     max_path : int, default=50
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
+    standardize : bool, default=False
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns. Limitations gives the fit's errors on
+        standardized columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -105,27 +110,36 @@ def notears(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"notears"``),
-        ``"h_final"`` (the acyclicity function of the fit before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
-        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"notears"``,
+        ``metadata["h_final"]`` the acyclicity function of the fit before the threshold,
+        ``metadata["edges_removed"]`` the edges the threshold kept that the cycle repair dropped,
+        and ``metadata["path_steps"]`` the accepted steps of the path, ``0`` without ``robust``.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a finite numeric matrix of two or more rows without a constant column, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a finite
+        numeric matrix of two or more rows without a constant column, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    SearchLimitWarning
+        When the fit stops on ``max_iter`` rather than on ``h_tol`` or ``rho_max``, or, with
+        ``robust``, when the path takes ``max_path`` steps.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -250,6 +264,7 @@ def notears(
             mcp_delta=mcp_delta,
             mcp_decay=mcp_decay,
             max_path=max_path,
+            standardize=standardize,
             labels=labels,
             constraints=constraints,
         )
@@ -271,6 +286,7 @@ def dagma(
     mcp_delta: float = 0.2,
     mcp_decay: float = 0.8,
     max_path: int = 50,
+    standardize: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with DAGMA, a continuous-optimization structure learner.
@@ -315,6 +331,10 @@ def dagma(
     max_path : int, default=50
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
+    standardize : bool, default=False
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns. Limitations gives the fit's errors on
+        standardized columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -325,27 +345,36 @@ def dagma(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"dagma"``),
-        ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
-        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"dagma"``,
+        ``metadata["h_final"]`` the log-determinant acyclicity function at ``s = 1`` before the
+        threshold, ``metadata["edges_removed"]`` the edges the threshold kept that the cycle repair
+        dropped, and ``metadata["path_steps"]`` the accepted steps of the path, ``0`` without
+        ``robust``. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a finite numeric matrix of two or more rows without a constant column, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a finite
+        numeric matrix of two or more rows without a constant column, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    SearchLimitWarning
+        When the last stage takes ``max_iter`` steps without converging, or, with ``robust``, when
+        the path takes ``max_path`` steps.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -472,6 +501,7 @@ def dagma(
             mcp_delta=mcp_delta,
             mcp_decay=mcp_decay,
             max_path=max_path,
+            standardize=standardize,
             labels=labels,
             constraints=constraints,
         )

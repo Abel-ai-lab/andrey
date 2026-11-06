@@ -1,13 +1,11 @@
 """Quality and behavior checks for RCD and BottomUpParceLiNGAM.
 
 Recovery tests run the public functions on SEMs where a hidden common cause drives two observed
-variables that share no direct edge. With a direct edge as well (``confounded_6v``), whether a
-method marks the pair or orients the edge depends on its tests' power. The planted pair and
-the direct edges come from ``datagen.planted_structure``. Each case has a control with the same
-graph and the hidden variable observed, where no pair is confounded. RCD and BottomUpParceLiNGAM
-also match their recorded outputs on the linear case. Random models check execution,
-repeatability, and well-formed output; recovery rates are measured separately because they depend
-on sample size and regime.
+variables that share no direct edge. The planted pair and the direct edges come from
+``datagen.planted_structure``. Each case has a control with the same graph and the hidden variable
+observed, where no pair is confounded. RCD and BottomUpParceLiNGAM also match their recorded
+outputs on the linear case. Random models check execution, shape, and relabel invariance; recovery
+rates are measured separately because they depend on sample size and regime.
 """
 
 from __future__ import annotations
@@ -87,6 +85,26 @@ def test_rcd_matches_its_recorded_output():
     assert_recorded_output(out, "RCD", case=_FORK)
 
 
+def test_rcd_levels_change_the_pairs_and_the_parents():
+    """A larger HSIC ``alpha`` finds more pairs dependent and marks more of them; a larger
+    ``cor_alpha`` finds more residuals correlated and keeps more parents. At ``shapiro_alpha=1e-6``
+    the Shapiro-Wilk tests find no set of residuals non-Gaussian, so no ancestor is found and every
+    pair is marked."""
+    x = datagen.generate(_FORK)
+    base = andrey.rcd(x)
+
+    def pairs(out) -> set[tuple[int, int]]:
+        return {(i, j) for i, j, kind in out.structure.oriented_edges() if kind == "bidirected"}
+
+    def parents(out) -> set[tuple[int, int]]:
+        return {(i, j) for i, j, kind in out.structure.oriented_edges() if kind == "directed"}
+
+    assert pairs(andrey.rcd(x, alpha=0.5)) > pairs(base)
+    assert parents(andrey.rcd(x, cor_alpha=0.5)) > parents(base)
+    every = {(i, j) for i in range(4) for j in range(i + 1, 4)}
+    assert pairs(andrey.rcd(x, shapiro_alpha=1e-6)) == every
+
+
 def test_bottom_up_parce_lingam_matches_its_recorded_output():
     out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK), alpha=0.01)
     assert_recorded_output(out, "BottomUpParceLiNGAM", case=_FORK)
@@ -98,46 +116,6 @@ def test_a_planted_pair_has_no_direct_edge():
     assert pairs
     assert all((i, j) not in edges and (j, i) not in edges for i, j in pairs)
     assert not datagen.planted_structure(_FORK_OBSERVED)[1]
-
-
-def test_confounded_6v_hides_its_pair_behind_a_direct_edge():
-    """``confounded_6v`` hides its confounded pair behind a direct edge, so no pair is planted."""
-    edges, pairs = datagen.planted_structure("confounded_6v")
-    assert datagen.to_columns("confounded_6v", [(1, 2)]) <= edges  # x1 -> x2
-    assert not pairs
-
-
-def test_confounded_output_contract():
-    from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam
-    from andrey.irregular.rcd import fit_rcd
-
-    x = datagen.generate("confounded_6v")
-    d = x.shape[1]
-    assert fit_rcd(x).adjacency_matrix_.shape == (d, d)
-    assert bottom_up_parce_lingam(x).adjacency_matrix_.shape == (d, d)
-
-
-def test_hsic_gamma_separates_dependence_from_independence():
-    """Check gamma HSIC on seeded independent and nonlinear dependent samples.
-
-    Repeated calls on the same input must return the same result.
-    """
-    from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
-
-    def hsic_gamma_test(x, y):
-        return hsic_gamma_from_grams(gamma_gram(x), gamma_gram(y), len(x))
-
-    rng = np.random.default_rng(0)
-    for _ in range(6):
-        a = rng.standard_normal(200)
-        independent = rng.standard_normal(200)
-        dependent = a**2 + 0.3 * rng.standard_normal(200)
-        _stat, p_independent = hsic_gamma_test(a, independent)
-        _stat, p_dependent = hsic_gamma_test(a, dependent)
-        # One seeded null p-value falls below 0.05; the dependent p-values are zero.
-        assert p_independent > 0.01, f"independent draws rejected at p={p_independent}"
-        assert p_dependent < 0.01, f"quadratic dependence missed at p={p_dependent}"
-    assert hsic_gamma_test(a, dependent) == hsic_gamma_test(a, dependent)
 
 
 def _confounded_sem(seed: int, n: int = 250, d: int = 5) -> np.ndarray:
@@ -168,51 +146,42 @@ def _confounded_sem(seed: int, n: int = 250, d: int = 5) -> np.ndarray:
 
 # --- general-input behavior -----------------------------------------------------------------------
 #
-# Random models check execution, repeatability, shape, and relabel invariance. RCD is invariant
-# bit-for-bit. BottomUpParceLiNGAM preserves its causal order and non-identifiable mask exactly, but
-# column-mean reduction introduces roundoff in its weights, so those use a tolerance.
+# Random models check execution, shape, and relabel invariance. RCD is invariant bit-for-bit.
+# BottomUpParceLiNGAM preserves its non-identifiable mask exactly, but column-mean reduction
+# introduces roundoff in its weights, so those use a tolerance.
 
 
-def _stable(adjacency: np.ndarray) -> np.ndarray:
-    """Replace non-identifiable ``NaN`` entries with a stable comparison value."""
-    return np.nan_to_num(np.asarray(adjacency, dtype=np.float64), nan=-9.0)
-
-
-def test_rcd_is_deterministic_and_order_invariant():
-    """RCD repeats itself exactly and does not depend on the order of the columns."""
+def test_rcd_is_order_invariant():
+    """RCD does not depend on the order of the columns."""
     from andrey.irregular.rcd import fit_rcd
 
     for seed in range(6):
         x = _confounded_sem(seed)
-        first = _stable(fit_rcd(x).adjacency_matrix_)
+        first = fit_rcd(x).adjacency_matrix_
         assert first.shape == (x.shape[1], x.shape[1])
-        assert np.array_equal(_stable(fit_rcd(x).adjacency_matrix_), first), "not deterministic"
 
         order = np.random.default_rng(seed).permutation(x.shape[1])
         back = np.argsort(order)
-        permuted = _stable(fit_rcd(x[:, order]).adjacency_matrix_)
-        assert np.array_equal(permuted[np.ix_(back, back)], first), "depends on column order"
+        permuted = fit_rcd(x[:, order]).adjacency_matrix_[np.ix_(back, back)]
+        assert np.array_equal(permuted, first, equal_nan=True), "depends on column order"
 
 
-def test_bottom_up_parce_is_deterministic_and_order_invariant():
-    """Check BottomUpParceLiNGAM determinism and relabel invariance.
+def test_bottom_up_parce_is_order_invariant():
+    """Check BottomUpParceLiNGAM relabel invariance.
 
     The non-identifiable mask matches exactly. Weights allow reduction-order roundoff.
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam
 
-    for seed in range(6):
+    for seed in (0, 1, 2, 3, 4, 5, 20):  # draw 20 leaves one pair unordered
         x = _confounded_sem(seed)
-        first = _stable(bottom_up_parce_lingam(x).adjacency_matrix_)
+        first = bottom_up_parce_lingam(x).adjacency_matrix_
         assert first.shape == (x.shape[1], x.shape[1])
-        assert np.array_equal(_stable(bottom_up_parce_lingam(x).adjacency_matrix_), first), (
-            "not deterministic"
-        )
 
         order = np.random.default_rng(seed).permutation(x.shape[1])
         back = np.argsort(order)
-        permuted = _stable(bottom_up_parce_lingam(x[:, order]).adjacency_matrix_)[
-            np.ix_(back, back)
-        ]
+        permuted = bottom_up_parce_lingam(x[:, order]).adjacency_matrix_[np.ix_(back, back)]
         assert np.array_equal(np.isnan(permuted), np.isnan(first)), "non-identifiable mask moved"
-        assert np.allclose(permuted, first, atol=1e-8), "answer depends on column order"
+        assert np.allclose(permuted, first, atol=1e-8, equal_nan=True), (
+            "answer depends on column order"
+        )

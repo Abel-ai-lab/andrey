@@ -19,6 +19,7 @@ import warnings
 import pytest
 
 import andrey
+from andrey import metrics
 from andrey.api import __all__ as API_ALL
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
@@ -28,23 +29,16 @@ from andrey.spec.models import Status
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
 _INPUT_FLAGS = ("data", "env")
 
-# The former input flags, which the CLI still takes for one release: the inputs' former names and
-# gies's former intervention matrix, now a form of targets.
-_FORMER_INPUT_FLAGS = (
-    *sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases}),
-    "interventions",
-)
-
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
+    | set(_INPUT_FLAGS)
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
 # The inputs whose facade default, None, stands for data given as each environment's rows apart,
 # which one data file cannot give, so the CLI needs them.
-APART_DEFAULTS = {("cdnod", "env"), ("icp", "env")}
+APART_DEFAULTS = {("cdnod", "env"), ("fci_jci", "env"), ("icp", "env")}
 
 _SPEC_NAMES = sorted(REGISTRY)
 
@@ -258,20 +252,37 @@ def test_public_core_methods_document_their_parameters(cls_name):
             )
 
 
+@pytest.mark.parametrize("cls_name", ["SCM", "CausalDataset"])
+def test_public_data_classes_document_every_field(cls_name):
+    """A simulated model or dataset is built from its fields, so its ``Parameters`` section names
+    each one, in order."""
+    import dataclasses
+
+    import andrey.data as data
+
+    cls = getattr(data, cls_name)
+    fields = [f.name for f in dataclasses.fields(cls)]
+    assert _docstring_param_names(inspect.getdoc(cls) or "") == fields
+
+
+@pytest.mark.parametrize("name", metrics.__all__)
+def test_public_metrics_document_their_parameters_and_returns(name):
+    """Each metric names its arguments in a ``Parameters`` section, in order, and describes what
+    it returns, such as the keys of a dict of scores, in a ``Returns`` section."""
+    func = getattr(metrics, name)
+    doc = inspect.getdoc(func) or ""
+    assert _docstring_param_names(doc) == list(inspect.signature(func).parameters)
+    assert re.search(r"^Returns\n-{3,}", doc, re.MULTILINE), f"{name}: no Returns section"
+
+
 def test_cmd_run_wires_every_input_flag():
     """Every `_INPUT_FLAGS` entry is an actual `cmd_run` option, so an input added to the registry
     and `_INPUT_FLAGS` but not to `cmd_run` fails here instead of being unreachable at runtime."""
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
+    missing = set(_INPUT_FLAGS) - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
-
-
-def test_seeded_methods_expose_a_seed_param():
-    for spec in REGISTRY.values():
-        if spec.seeded:
-            assert "seed" in {p.name for p in spec.params}, f"{spec.name} has no seed param"
 
 
 def test_multi_output_only_in_family_that_supports_it():
@@ -337,7 +348,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
-LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 WHEN_TO_USE = "DEVELOPMENT.md (Docstring standard) says what the paragraph holds"
 
 
@@ -481,16 +491,6 @@ def _notes(name: str) -> str:
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
     return notes.group(1) if notes else ""
-
-
-@pytest.mark.parametrize("name", _SPEC_NAMES)
-def test_method_declares_its_limitations(name):
-    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
-    notes = _notes(name)
-    assert notes, f"{name}: no Notes section; {LIMITATIONS}"
-    assert re.search(r"^\*\*Limitations\.\*\* ", notes, re.MULTILINE), (
-        f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
-    )
 
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)

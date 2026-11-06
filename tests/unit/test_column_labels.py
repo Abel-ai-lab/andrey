@@ -17,6 +17,7 @@ from andrey.core import TemporalStructure, backend
 from andrey.core.knowledge import column_position
 from andrey.core.structure import node_labels
 from andrey.spec import list_specs
+from tests.unit.methods import domains, environments, fit_settings
 
 COLUMNS = ["x", "y", "z"]
 N = 400
@@ -37,7 +38,7 @@ def inputs(spec, frames) -> list:
     for inp in spec.data.inputs:
         if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             if spec.name in CONTEXT and inp.kind == "context":
-                args.append(np.arange(N) * 3 // N)
+                args.append(environments(N))
             continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
@@ -45,7 +46,7 @@ def inputs(spec, frames) -> list:
         elif inp.kind == "panel":
             args.append(frames)
         elif inp.kind == "context":
-            args.append(np.repeat([0.0, 1.0], N // 2).reshape(-1, 1))
+            args.append(domains(N))
     return args
 
 
@@ -61,9 +62,6 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
-#: Settings that shorten a slow fit, and the target ICP needs; the labels come from the same
-#: facade path.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 #: The targets of a method that reads three environments: observational, one with the known
 #: target z, and one whose targets are unknown (ut_igsp) or z again (igsp).
 CONTEXT = {
@@ -78,7 +76,7 @@ def labeled_fit(name: str) -> list:
     beside a string."""
     spec = next(spec for spec in TABLE_SPECS if spec.name == name)
     frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
-    settings = {**SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {})}
+    settings = {**fit_settings(spec.name), **CONTEXT.get(spec.name, {})}
     out = getattr(andrey, spec.name)(*inputs(spec, frames), **settings)
     return out if isinstance(out, list) else [out]
 
@@ -150,21 +148,14 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     resolve = backend._resolve_tie_break
     monkeypatch.setattr(backend, "_resolve_tie_break", lambda: reads.append(1) or resolve())
 
-    def fit(columns: list[str], **given):
+    def fit(columns: list[str]):
         frames = [frame(seed)[columns] for seed in range(3)]
         return getattr(andrey, spec.name)(
-            *inputs(spec, frames), **SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {}), **given
+            *inputs(spec, frames), **fit_settings(spec.name), **CONTEXT.get(spec.name, {})
         )
 
     want = named_marks(fit(COLUMNS))
     assert bool(reads) == spec.tie_break
-    for given in ({"collider_order": "p_value"}, {"possible_dsep": "order_free"}):
-        if given.keys() <= {param.name for param in spec.params}:
-            # An order given in the call does not consult the setting for that order.
-            read_by_default = len(reads)
-            reads.clear()
-            fit(COLUMNS, **given)
-            assert len(reads) == read_by_default - 1
     if spec.column_order != "can_change":
         pair = spec.family == "pairwise"
         for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):

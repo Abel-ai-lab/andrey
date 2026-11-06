@@ -26,6 +26,7 @@ from andrey.temporal import lpcmci as lpcmci_engine
 from andrey.temporal import pcmci as pcmci_engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
 from andrey.temporal import varma as varma_engine
+from tests.unit.methods import domains
 
 CAPS = (0, 1, 2)
 
@@ -80,7 +81,7 @@ def inputs(method: str) -> list:
     """The data, and a two-context index for a method that also requires one (cdnod)."""
     data = linear_data(0)
     extra = [inp for inp in REGISTRY[method].data.inputs[1:] if inp.required]
-    return [data] + [np.repeat([0.0, 1.0], len(data) // 2).reshape(-1, 1) for _ in extra]
+    return [data] + [domains(len(data)) for _ in extra]
 
 
 def pc1_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:

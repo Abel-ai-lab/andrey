@@ -20,7 +20,7 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
-from andrey.api._method import PENALTIES
+from andrey.api._method import PENALTIES, SCORE_ONLY
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
 from andrey.core.knowledge import KNOWLEDGE_PARTS
@@ -36,6 +36,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import REQUIRED, SHORT, domains, environments
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -119,25 +120,13 @@ def test_parameter_cell(concept, method):
         assert REGISTRY[method].knowledge == tuple(parts)
 
 
-@pytest.mark.parametrize(
-    ("concept", "deviation"),
-    [
-        pytest.param(c, d, id=f"{c.key}-{d.method}")
-        for c in CONCEPTS.values()
-        for d in c.deviations
-        if d.method in UTILITIES
-    ],
-)
-def test_utility_cell(concept, deviation):
-    live = signature(deviation.method)
-    assert deviation.name in live and live[deviation.name].default == deviation.default
-
-
 @pytest.mark.parametrize("key", list(BOOTSTRAP_PARAMS))
 def test_bootstrap_takes_each_of_its_concepts_as_its_spec_and_template_say(key):
     concept, spec = CONCEPTS[key], BOOTSTRAP_PARAMS[key]
-    deviation = concept.deviation("bootstrap")
-    assert spec.concept == key and signature("bootstrap")[key].default == spec.default
+    deviation, live = concept.deviation("bootstrap"), signature("bootstrap")
+    assert spec.concept == key and live[key].default == spec.default
+    if deviation is not None:
+        assert deviation.name in live and live[deviation.name].default == deviation.default
     assert spec.default == (concept.param.default if deviation is None else deviation.default)  # ty: ignore[possibly-missing-attribute]
     bounds = ("type", "minimum", "maximum", "exclusive_minimum", "exclusive_maximum")
     assert {f: getattr(spec, f) for f in bounds} == {f: getattr(concept.param, f) for f in bounds}
@@ -185,6 +174,68 @@ def test_docstring_entry_states_the_concept(concept, method):
     assert fragment.lower() in entry
 
 
+def docstring_section(doc: str, title: str) -> str:
+    """The text of one numpydoc section, up to the next section heading."""
+    section = doc.split(f"\n{title}\n{'-' * len(title)}\n", 1)[1]
+    return re.split(r"\n[A-Z][A-Za-z ]+\n-{3,}\n", section)[0]
+
+
+def raises_names(doc: str) -> list[str]:
+    """The exceptions a numpydoc ``Raises`` section lists, in order."""
+    return re.findall(r"^[A-Z]\w*$", docstring_section(doc, "Raises"), flags=re.MULTILINE)
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_raises_lists_each_error_a_bad_argument_raises_once(method):
+    """The Raises section lists every error a bad argument raises
+    (``test_a_bad_value_raises_one_message_shape``), each under one heading."""
+    names = raises_names(inspect.getdoc(getattr(andrey, method)) or "")
+    raised = {error.__name__ for p in REGISTRY[method].params for _, error in bad_values(p)}
+    assert raised <= set(names)
+    assert len(names) == len(set(names))
+
+
+@pytest.mark.parametrize(
+    ("method", "name"),
+    [
+        pytest.param(m, p.name, id=f"{m}-{p.name}")
+        for m in REGISTRY
+        if tagged(CONCEPTS["score_func"], m)
+        for p in REGISTRY[m].params
+        if p.concept in SCORE_ONLY
+    ],
+)
+def test_an_argument_one_score_reads_is_documented_as_the_call_checks_it(method, name):
+    """Passing an argument that one score reads with another score raises ``ValueError`` before
+    the fit (``check_penalties``), and its entry names that error."""
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[name]
+    assert "valueerror" in entry
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if tagged(CONCEPTS["ebic_gamma"], m)])
+def test_the_ebic_gamma_entry_states_the_bounds_the_call_checks(method):
+    param = tagged(CONCEPTS["ebic_gamma"], method)
+    assert param is not None
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[param.name]
+    assert f"from {param.minimum:g} to {param.maximum:g}" in entry
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_no_parameter_entry_states_a_sentence_twice(method):
+    for name, entry in docstring_entries(inspect.getdoc(getattr(andrey, method)) or "").items():
+        sentences = [s for s in re.split(r"(?<=\.) ", entry) if len(s.split()) > 3]
+        repeated = {s for s in sentences if sentences.count(s) > 1}
+        assert not repeated, f"{method}.{name}: {sorted(repeated)}"
+
+
+@pytest.mark.parametrize(
+    "method", [m for m, spec in REGISTRY.items() if "categorical" in spec.output.metadata]
+)
+def test_returns_names_the_categorical_columns_a_fit_records(method):
+    returns = docstring_section(inspect.getdoc(getattr(andrey, method)) or "", "Returns")
+    assert 'metadata["categorical"]' in returns
+
+
 # --- behaviors ------------------------------------------------------------------------------------
 
 N = 200
@@ -211,11 +262,6 @@ CONTEXT = {
     "igsp": {"targets": {0: [], 1: [0], 2: [1]}},
     "ut_igsp": {"targets": {0: [], 1: [0], 2: None}},
 }
-
-
-def environments(n: int) -> np.ndarray:
-    """Three environments of about ``n / 3`` rows each, in row order."""
-    return np.arange(n) * 3 // n
 
 
 def facade(method: str):
@@ -245,14 +291,11 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
         elif inp.kind == "panel":
             args.append(frames)
         else:
-            args.append(np.repeat([0.0, 1.0], N // 2).reshape(-1, 1))
+            args.append(domains(N))
     return args
 
 
-#: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
-#: The arguments a method needs beyond its inputs: ICP's target, by position.
-REQUIRED = {"icp": {"target": 2}}
+#: The settings that stop each loop at its cap.
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -300,9 +343,10 @@ def non_value_errors(method: str) -> str:
 UNIT_CASES = {
     **dict.fromkeys(
         (
-            *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc"),
+            "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
@@ -371,7 +415,7 @@ def unit_free(method: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
-            out = facade(method)(*unit_inputs(method, exponents))
+            out = facade(method)(*unit_inputs(method, exponents), **SHORT.get(method, {}))
             fits.append(graphs_and_orders(out))
     return all(fit == fits[0] for fit in fits[1:])
 
@@ -384,7 +428,10 @@ def declared_kind(out, method: str) -> bool:
 
 #: Settings that bring out the metadata keys a default fit leaves out.
 METADATA_FITS = {
-    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(
+        ("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+        {"collider_rule": "majority"},
+    ),
     **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
 }
 
@@ -427,7 +474,7 @@ def args_for(method: str, tables: list[pd.DataFrame]) -> list:
     """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
     domain column for CD-NOD and GnIES."""
     kinds = (i.kind for i in REGISTRY[method].data.inputs if needed(method, i))
-    domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
+    domain = domains(len(tables[0]))
     args = [
         tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
     ]
@@ -451,7 +498,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss", "tabu"):
+    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
@@ -506,7 +553,7 @@ def records_the_test_and_score_it_used(method: str) -> bool:
 
 #: A required edge, its data, and the settings that make a method fit it: a series or panel
 #: method's link is x -> y at lag 1.
-SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True}}
+SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True, **SHORT["varma_lingam"]}}
 
 
 def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
@@ -657,13 +704,25 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     assert out.metadata["seed"] == 11
 
 
+#: The CI searches whose score search visits the variables in a random order on every fit.
+ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
+
+
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     """A method without a seed, a CI search under a deterministic test, and a search that changes
     the best DAG at random only before a later start, run with one start, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
     for method in (*CI_SEARCHES, *PCMCI_FAMILY, *CONCEPTS["n_perturbations"].suitable):
+        if method in ORDER_SEARCH_FIRST:
+            continue
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
+
+
+@pytest.mark.parametrize("method", ORDER_SEARCH_FIRST)
+def test_a_search_over_random_orders_records_its_seed_under_a_deterministic_test(method):
+    out, _ = fit(method, codes=False, seed=7)
+    assert out.metadata["seed"] == 7
 
 
 def named_setting(method: str, key: str) -> str:
@@ -843,7 +902,10 @@ CI_CASES = {
     "pc": [{}, {"collider_rule": "conservative"}],
     "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "gfci": [{}, {"possible_dsep": "fast"}],
+    "boss_fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
+    "grasp_fci": [{}, {"possible_dsep": "fast"}],
     "cdnod": [{}, {"collider_rule": "conservative"}],
+    "fci_jci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
     "mmpc": [{}, {"target": 0}],
@@ -872,10 +934,12 @@ def test_every_search_with_a_ci_test_has_cases():
 def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings, gaps, monkeypatch):
     """A test registered with the single-query call alone runs every search that takes
     ``indep_test``, on complete data and, where the method takes missing values, on data with gaps,
-    and gives the graph of Fisher's z-test it wraps."""
+    is the test the search asks, and gives the graph of Fisher's z-test it wraps."""
     expected, _ = fit(method, codes=False, gaps=gaps, **settings)
     monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    monkeypatch.setattr(PValueOnly, "queries", 0)
     out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
+    assert PValueOnly.queries > 0
     assert out.structure == expected.structure
 
 
@@ -921,62 +985,6 @@ def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkey
         results.append((out.structure, out.metadata))
     assert results[0][0] == results[1][0]
     assert repr(results[0][1]) == repr(results[1][1])
-
-
-DROPPED = [(m, arg) for m, spec in REGISTRY.items() for arg in spec.dropped_args]
-
-
-@pytest.mark.parametrize(("method", "arg"), DROPPED)
-def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
-    assert arg not in signature(method)
-    assert all(p.name != arg for p in REGISTRY[method].params)
-    data = inputs(method, codes=False)
-    first = lambda out: out[0] if isinstance(out, list) else out  # noqa: E731
-    expected = first(facade(method)(*data))
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{arg} is ignored"):
-        out = first(facade(method)(*data, **{arg: 3}))
-    assert out.ordering == expected.ordering
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        facade(method)(*data, **{arg: 3})  # the message warns once
-
-
-ALIASED = [
-    pytest.param(m, a.name, old, id=f"{m}-{old}")
-    for m, spec in REGISTRY.items()
-    for a in (*spec.data.inputs, *spec.params)
-    for old in a.aliases
-]
-
-
-@pytest.mark.parametrize(("method", "name", "old"), ALIASED)
-def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warning(
-    method, name, old
-):
-    spec = REGISTRY[method]
-    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
-    data = inputs(method, codes=False)
-    settings = dict(SHORT.get(method, {}))
-    if argument in spec.data.inputs:  # the inputs before it stay positional
-        position = spec.data.inputs.index(argument)
-        value, data = data[position], data[:position]
-    else:
-        value = settings.pop(name, argument.default)
-
-    def call(**named):
-        out = facade(method)(*data, **settings, **named)
-        return [o.structure for o in (out if isinstance(out, list) else [out])]
-
-    expected = call(**{name: value})
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{old} is now {name}"):
-        assert call(**{old: value}) == expected
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        call(**{old: value})  # the message warns once
-    with pytest.raises(ValueError, match=f"pass only {name}"):
-        call(**{old: value, name: value})
 
 
 #: (method, former words, current words) for each former name and value the registry accepts and
@@ -1026,8 +1034,7 @@ def test_each_former_name_is_in_a_changelog_table(method, former, current):
     ), f"{method}: {sorted(former)} -> {sorted(current)} has no CHANGELOG table row"
 
 
-#: The rows of the table of argument names and choices that 0.11.0 renamed and 0.12.0 removed, one
-#: for each method.
+#: The rows of the table of removed argument names and choices, one for each method.
 REMOVED_NAMES = [
     pytest.param(m, row, id=f"{m}-{row.name}")
     for row in REMOVED
@@ -1083,9 +1090,10 @@ def test_a_former_score_name_is_not_one_of_the_choices(method):
         assert all(choice in str(error.value) for choice in param.choices)
 
 
-def test_a_name_only_some_methods_removed_gets_no_hint_from_the_others():
-    """`pc_alpha` is gone from `pcmciplus`; `pcmci` still takes it for one release."""
-    assert removal_hint("pcmciplus", "pc_alpha") and removal_hint("pcmci", "pc_alpha") is None
+def test_a_removed_name_gets_the_hint_of_its_own_method():
+    """`pc_alpha` became `alpha` in `pcmciplus` and `pc1_alpha` in `pcmci`; `pc` never took it."""
+    assert removal_hint("pcmciplus", "pc_alpha") == "it was renamed `alpha` in 0.11.0"
+    assert removal_hint("pcmci", "pc_alpha") == "it was renamed `pc1_alpha` in 0.12.0"
     assert removal_hint("pc", "pc_alpha") is None and removal_hint("ges", "score_func") is None
     assert removal_hint("ges", "score_func", ["local_score_BIC"]) is None
 
@@ -1093,17 +1101,17 @@ def test_a_name_only_some_methods_removed_gets_no_hint_from_the_others():
 @pytest.mark.parametrize(
     "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
 )
-def test_the_hint_gives_the_current_name_or_what_to_do(row):
+def test_the_hint_gives_the_current_name_or_what_to_do_and_the_release(row):
     hint = removal_hint(row.methods[0], row.name, row.value)
-    assert (row.now or row.note) in hint
+    assert (row.now or row.note) in hint and f"in {row.release}" in hint
 
 
 def guide_rows() -> set[tuple[frozenset[str], str, str | None, str | None]]:
-    """Each row of the upgrade guide's table of former names from 0.10, as the table lists it."""
+    """Each row of the upgrade guide's tables of removed former names, as the tables list it."""
     text = UPGRADING.read_text(encoding="utf-8")
-    section = text.split("### Former names from 0.10", 1)[1].split("\n#", 1)[0]
+    sections = [s.split("\n#", 1)[0] for s in text.split("### Former names from ")[1:]]
     rows = set()
-    for line in section.splitlines():
+    for line in "\n".join(sections).splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if not line.startswith("|") or cells[0] in ("Method", "---"):
             continue
@@ -1145,32 +1153,57 @@ def renamed(monkeypatch, method: str, name: str, **update) -> None:
 def test_a_former_name_maps_to_the_current_one_with_one_warning(monkeypatch):
     renamed(monkeypatch, "pc", "alpha", aliases=("significance",))
     data = inputs("pc", codes=False)
-    expected = andrey.pc(*data, alpha=0.01)
+    expected = andrey.pc(*data, alpha=0.5)
+    assert expected != andrey.pc(*data)  # the value tells a forwarded name from an ignored one
     warning_policy._warned.clear()
     with pytest.warns(andrey.DeprecatedArgumentWarning, match="significance is now alpha"):
-        out = andrey.pc(*data, significance=0.01)
-    assert out.structure.to_numpy().tolist() == expected.structure.to_numpy().tolist()
+        out = andrey.pc(*data, significance=0.5)
+    assert out == expected
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        andrey.pc(*data, significance=0.01)  # the message warns once
+        andrey.pc(*data, significance=0.5)  # the message warns once
     with pytest.raises(ValueError, match="pass only alpha"):
-        andrey.pc(*data, alpha=0.01, significance=0.01)
+        andrey.pc(*data, alpha=0.5, significance=0.5)
+
+
+def test_a_former_input_name_maps_to_the_current_one_with_one_warning(monkeypatch):
+    spec = REGISTRY["cdnod"]
+    env = spec.data.inputs[1].model_copy(update={"aliases": ("domain",)})
+    data = spec.data.model_copy(update={"inputs": (spec.data.inputs[0], env)})
+    monkeypatch.setattr(method_wrapper, "spec_of", lambda _: spec.model_copy(update={"data": data}))
+    x, index = inputs("cdnod", codes=False)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="domain is now env"):
+        out = andrey.cdnod(x, domain=index)
+    assert out == andrey.cdnod(x, index)
+    with pytest.raises(ValueError, match="pass only env"):
+        andrey.cdnod(x, env=index, domain=index)
+
+
+def test_a_dropped_argument_is_ignored_with_one_warning(monkeypatch):
+    spec = REGISTRY["pc"]
+    monkeypatch.setattr(
+        method_wrapper, "spec_of", lambda _: spec.model_copy(update={"dropped_args": ("former",)})
+    )
+    data = inputs("pc", codes=False)
+    expected = andrey.pc(*data)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="former is ignored"):
+        assert andrey.pc(*data, former=3) == expected
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        andrey.pc(*data, former=3)  # the message warns once
 
 
 def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
-    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("fisher", "fisherz"),))
+    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("student", "student_t"),))
     data = inputs("pc", codes=False)
+    expected = andrey.pc(*data, indep_test="student_t")
+    assert expected != andrey.pc(*data)  # the value tells a forwarded value from an ignored one
     warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='fisher' is now"):
-        out = andrey.pc(*data, indep_test="fisher")
-    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
-
-
-def test_an_indep_test_takes_the_registered_tests(monkeypatch):
-    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
-    data = inputs("pc", codes=False)
-    out = andrey.pc(*data, indep_test="fisherz_copy")
-    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='student' is now"):
+        out = andrey.pc(*data, indep_test="student")
+    assert out == expected
 
 
 # --- surfaces -------------------------------------------------------------------------------------
@@ -1229,6 +1262,21 @@ def test_documented_method_lists_match_the_table():
         else:
             takes = {m for m in REGISTRY if tagged(CONCEPTS[key], m) is not None}
         assert named == takes, f"{key}: documented {sorted(named)}, table {sorted(takes)}"
+
+
+def test_the_bootstrap_docstring_names_the_methods_it_stratifies_and_makes_a_cpdag():
+    """Every method that takes ``targets`` is resampled within each environment, and those that
+    return a CPDAG get a CPDAG without the targets as the averaged graph; the docstring names
+    exactly them."""
+    doc = " ".join((inspect.getdoc(andrey.bootstrap) or "").split())
+    stratified = re.search(r"takes ``targets`` \(([^)]*)\)", doc)
+    cpdag = re.search(r"takes ``targets`` and returns a CPDAG \(([^)]*)\)", doc)
+    assert stratified and cpdag
+    takes = {m for m, spec in REGISTRY.items() if any(p.type == "targets" for p in spec.params)}
+    assert set(re.findall(r"``(\w+)``", stratified.group(1))) == takes
+    assert set(re.findall(r"``(\w+)``", cpdag.group(1))) == {
+        m for m in takes if REGISTRY[m].output.graph_kind == "cpdag"
+    }
 
 
 def test_the_graph_types_guide_lists_each_method_under_its_kind():

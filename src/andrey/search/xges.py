@@ -7,8 +7,7 @@ forbids re-inserting the deleted edge, reruns the base search, and keeps lower-s
 
 :class:`_Search` keeps candidates in a priority queue per operator type. A popped operator is
 dropped when it no longer applies to the current CPDAG. After a move, only the operators it can
-affect are rescored, and the CPDAG is completed locally. The update rules and the local completion
-follow the authors' reference implementation.
+affect are rescored, and the CPDAG is completed locally.
 
 Scores are deltas of the deviance the local score minimizes; a negative delta improves it. Insert
 deltas come from :func:`~andrey.core.score_delta.add_deltas` under the BIC, which scores every
@@ -40,21 +39,12 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
-)
+from andrey.core.score import BICScore, LocalScore, make_score
 from andrey.core.score_delta import add_deltas, full_add_deltas
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_mask, tie_ranks
 from andrey.search.ges import _recompute_objective, _reform_cpdag, required_dag
-from andrey.search.hc import tie_ranks
-from andrey.search.operators import exceeds_parent_cap
+from andrey.search.operators import check_parent_cap
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
 # count (1e-7 times the sample count in log-likelihood units).
@@ -603,9 +593,9 @@ class _Search:
     Queue entries are ``(delta, seq, x, y, subset, E[, Pa(x)])``: ``seq`` orders entries of one
     operator found more than once, ``subset`` is an Insert's or Reverse's ``T`` and a Delete's
     ``C``, and ``E`` the target's parent set the delta was scored with. :meth:`tied` takes entries
-    by delta per sample rounded to :data:`~andrey.search._parallel._KEY_DP` decimals, then by the
+    by delta per sample rounded to :data:`~andrey.core.ties.KEY_DP` decimals, then by the
     ranks of ``x``, of ``y``, and of the subset, ranking only the entries whose rounded deltas tie;
-    ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`.
+    ``ranks`` holds each column's :func:`~andrey.core.ties.tie_ranks`.
 
     With ``constraints``, no operator adds a forbidden edge or removes or reverses a required one,
     and a move whose class holds no DAG that satisfies them is undone. With ``cap``, no Insert or
@@ -624,7 +614,7 @@ class _Search:
         self.d = d
         self.cap = cap
         self.n_samples = score.n
-        self.tie_gap = score.n * 10.0**-_KEY_DP
+        self.tie_gap = score.n * 10.0**-KEY_DP
         self.ranks = ranks
         self.constraints = constraints
         # Per target, the nodes forbidden into it; None without knowledge.
@@ -661,14 +651,14 @@ class _Search:
 
         The heap orders entries by raw delta, and the caller has checked that the next delta lies
         within ``tie_gap`` of ``entry``'s. The entries whose deltas per sample round to ``entry``'s
-        at ``_KEY_DP`` decimals are ranked by ``ranks[x]``, ``ranks[y]``, and the sorted ranks of
+        at ``KEY_DP`` decimals are ranked by ``ranks[x]``, ``ranks[y]``, and the sorted ranks of
         the subset, then by ``seq``; the others go back on the heap. Entries of one operator alone
         keep the heap's order: at most one of them matches the current parents.
         """
         n, gap, ranks = self.n_samples, self.tie_gap, self.ranks
-        lowest = round(entry[0] / n, _KEY_DP)
+        lowest = round(entry[0] / n, KEY_DP)
         tied = [entry]
-        while heap and heap[0][0] - entry[0] < gap and round(heap[0][0] / n, _KEY_DP) == lowest:
+        while heap and heap[0][0] - entry[0] < gap and round(heap[0][0] / n, KEY_DP) == lowest:
             tied.append(heapq.heappop(heap))
         if any(other[2:5] != entry[2:5] for other in tied[1:]):
 
@@ -723,7 +713,7 @@ class _Search:
                     if cap is not None and len(E) >= cap:
                         continue
                     deltas = self.add_deltas(y, E)[far]
-                    keep = deltas < -_EPS_IMPROVE
+                    keep = deltas < -EPS_IMPROVE
                     for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
                         heapq.heappush(self.inserts, (dl, next(self.seq), x, y, T, E))
         if self.into is not None:
@@ -738,7 +728,7 @@ class _Search:
                 delta = float(self.add_deltas(y, E)[x])
                 if out is not None:
                     out.append((delta, x, y, T, E))
-                elif delta < -_EPS_IMPROVE:
+                elif delta < -EPS_IMPROVE:
                     heapq.heappush(self.inserts, (delta, next(self.seq), x, y, T, E))
 
     def drop_delta(self, y: int, E: frozenset[int], x: int) -> float:
@@ -771,7 +761,7 @@ class _Search:
             entry = (delta, next(self.seq), x, y, C, E)
             if out is not None:
                 heapq.heappush(out, entry)
-            elif delta < -_EPS_IMPROVE:
+            elif delta < -EPS_IMPROVE:
                 heapq.heappush(self.deletes, entry)
 
     def find_reverse(self, y: int, x: int) -> None:
@@ -787,7 +777,7 @@ class _Search:
         self.find_inserts_to_y(y, x, inserts)
         for delta, _x, _y, T, E in inserts:
             delta += drop
-            if delta < -_EPS_IMPROVE:
+            if delta < -EPS_IMPROVE:
                 entry = (delta, next(self.seq), x, y, T, E, pa_x)
                 heapq.heappush(self.reverses, entry)
 
@@ -812,7 +802,7 @@ class _Search:
         empty: frozenset[int] = frozenset()
         for y in range(self.d):
             deltas = self.add_deltas(y, empty)
-            keep = np.nonzero(deltas < -_EPS_IMPROVE)[0]
+            keep = np.nonzero(deltas < -EPS_IMPROVE)[0]
             self.inserts.extend(
                 (dl, next(self.seq), x, y, empty, empty)
                 for x, dl in zip(keep.tolist(), deltas[keep].tolist(), strict=True)
@@ -1140,8 +1130,6 @@ def xges(
     ValueError
         If the required edges give a node more than ``max_parents`` parents.
     """
-    if score_func not in SCORES:
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {SCORES}")
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     score = make_score(
@@ -1152,17 +1140,10 @@ def xges(
         equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
-    columns = np.full(d, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        columns = column_mask(categorical, d)
-    ranks = tie_ranks(X, columns).tolist()
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, d)).tolist()
     # One BLAS thread for reproducible scores and move ties.
     start = None if constraints is None else _reform_cpdag(required_dag(constraints))
-    if max_parents is not None and start is not None and exceeds_parent_cap(start, max_parents):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents "
-            "in some graph of their class"
-        )
+    check_parent_cap(start, max_parents, in_class=True)
     with backend.one_blas_thread():
         search = _Search(score, d, ranks, constraints, max_parents)
         if start is None:

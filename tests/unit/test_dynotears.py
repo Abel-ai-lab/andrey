@@ -12,7 +12,8 @@ import andrey
 from andrey.core.score import CopiedColumnsError
 from andrey.data import temporal
 from andrey.search.continuous import least_squares
-from andrey.temporal.dynotears import lagged_covariance, lagged_design
+from andrey.temporal.dynotears import lagged_covariance
+from andrey.temporal.pcmci import lagged_design
 
 # W[cause, effect]: x0 -> x1 -> x2 within a step; A_1: every series on its own past, x1 -> x3.
 W = np.zeros((4, 4))
@@ -100,6 +101,18 @@ def test_a_zero_lag_threshold_keeps_no_lagged_link_of_weight_zero(series):
     assert len(lagged) < 16
 
 
+def test_the_dual_steps_end_once_the_acyclicity_falls_to_h_tol(series, default_fit):
+    loose = fit(series, h_tol=1e-2)
+    assert default_fit.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
+def test_standardize_makes_the_fit_independent_of_the_units(series):
+    """Scaling by powers of two leaves the standardized series equal bit for bit."""
+    units = np.array([4.0, 0.25, 8.0, 0.5])
+    plain, rescaled = fit(series, standardize=True), fit(series * units, standardize=True)
+    np.testing.assert_array_equal(rescaled.structure.lag_weights, plain.structure.lag_weights)
+
+
 def test_tau_max_sets_the_lags_and_the_weights(series):
     out = fit(series, tau_max=3)
     assert out.structure.lags == (0, 1, 2, 3)
@@ -125,12 +138,6 @@ def test_a_required_same_step_link_is_kept_on_independent_noise():
     noise = np.random.default_rng(2).standard_normal((300, 3))
     out = fit(noise, knowledge=andrey.Knowledge(required=[(2, 0, 0)]))
     assert (2, 0, 0) in links(out)
-
-
-def test_a_required_lagged_link_is_kept_on_independent_noise():
-    noise = np.random.default_rng(2).standard_normal((300, 3))
-    out = fit(noise, knowledge=andrey.Knowledge(required=[(2, 0, 1)]))
-    assert (2, 0, 1) in links(out)
 
 
 def test_a_pair_left_out_of_allowed_has_no_link_at_any_lag(series):

@@ -44,8 +44,12 @@ A page that states a fact about the methods, such as how many there are, how man
 or which ones a family holds, computes it from the registry when it is built; no page types it in.
 A typed count goes stale without failing anything when a method is added or promoted.
 
-- `docs/conf.py` gives the documentation pages substitutions (`{{ method_count }}`,
-  `{{ n_supported }}`, `{{ supported_methods }}`) from `_methods_text`.
+- `docs/conf.py` gives the documentation pages substitutions from `_methods_text`:
+  `{{ method_count }}`, `{{ n_supported }}`, `{{ supported_methods }}`, and the methods each
+  predicate of `METHOD_LISTS` selects, such as those that take `indep_test`, as
+  `{{ indep_test_methods }}` in prose names and `{{ indep_test_names }}` in code names. A page
+  that lists such methods uses the substitution; a method without a prose name in `PROSE_NAMES`
+  stops the build.
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
   methods (`COUNTED_WITH` names the methods that count with the one they extend).
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
@@ -109,19 +113,37 @@ registry. Every facade docstring has, in order:
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: always `StructureOutput`, naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
-  and the contents of `.metadata`, `.ordering`, and `.weighted_adjacency`.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
+  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
+  `.weighted_adjacency` when the method sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
+- **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
+  the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
+  boundary ended on a cap. A warning from a layer many methods share, such as a CI test's
+  `SampleSizeWarning`, a worker pool's `PerformanceWarning`, `BackendFallbackWarning`, or a
+  dependency's convergence warning raised again as `SearchLimitWarning`, is listed in the warnings
+  table of `docs/docs/api.md`.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
   series; observational, interventional, or multi-domain), the model assumptions that matter
   to a user, the scale it is designed for, what it returns, and the method to use outside that
-  setting. A **Limitations.** paragraph follows with the measured failures
-  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); the two do not
-  repeat each other.
+  setting. A **Missing values.** paragraph says whether a `NaN` is read or raises, why, and what
+  to do instead. A **Limitations.** paragraph follows with the measured failures
+  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); it and
+  **When to use.** do not repeat each other. Limitations is the last paragraph of Notes.
+- **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
-  shape, `ordering`), never a repr. Stochastic methods are seeded (`seed=0`); `[torch]`-only ones
-  carry `# doctest: +SKIP`.
+  shape, `ordering`), never a repr. An example whose result depends on the seed at its settings
+  passes `seed=0`; `[torch]`-only ones carry `# doctest: +SKIP`.
+
+A facade has no `See Also`: its **When to use.** paragraph names the methods to use instead.
+
+The sentences that state one rule for many methods come from one table, `SHARED` in
+`scripts/docstring_text.py`: the openers of the Raises entries, the `seed`, `knowledge`, and `env`
+entries, the closing sentences of **Missing values.** and **Limitations.**, the `tie_break` record
+in Returns, and the shared Warns entries. To change one, edit the table and run
+`uv run python scripts/docstring_text.py`, which rewrites every copy and names a method that should
+hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
 `TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their
@@ -150,7 +172,7 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
-   `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
+   `andrey.core.ties.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
    `tests/unit/test_column_labels.py` checks both fields on every method.
    List the method in `src/andrey/spec/concepts.py` under each concept, as suitable (taking the
    template with `concept_param`, or a recorded deviation) or exempt with the reason;
@@ -283,7 +305,7 @@ on a machine with CUDA or MPS and a device torch build
 ANDREY_REQUIRE_GPU=1 uv run --no-sync pytest tests/gpu -ra
 ```
 
-It compares each device with the numpy result within per-device tolerances;
+It compares each device with the NumPy result within per-device tolerances;
 `ANDREY_REQUIRE_GPU=1` fails, rather than skips, without an accelerator. No hosted runner has a
 GPU, so CI does not run it.
 

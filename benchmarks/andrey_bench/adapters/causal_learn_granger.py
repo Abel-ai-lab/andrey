@@ -62,5 +62,4 @@ class CausalLearnGranger:
         """Rebuild the temporal structure from the coefficients outside the timed region."""
         from andrey.api._temporal import _adapt_granger
 
-        d = native.shape[0]
-        return _adapt_granger(native, d, native.shape[1] // d).structure
+        return _adapt_granger(native, native.shape[1] // native.shape[0]).structure

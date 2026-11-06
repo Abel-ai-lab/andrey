@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import andrey
+import andrey.data
 from andrey.api import _boundary
 from andrey.api._experimental import warn_experimental
 from andrey.cli import main
@@ -55,7 +56,7 @@ def _default_pool_cutoff(monkeypatch):
     from andrey.search import _parallel_ges
 
     monkeypatch.delenv("ANDREY_GES_PARALLEL_MIN_WORK", raising=False)
-    monkeypatch.setattr(_parallel_ges, "_DEFAULT_MIN_WORK", 300)  # six variables reach a tenth
+    monkeypatch.setattr(_parallel_ges, "MIN_POOL_GES_WORK", 300)  # six variables reach a tenth
     data = np.random.default_rng(0).standard_normal((60, 6))
 
     def fit():
@@ -99,6 +100,15 @@ def _category_code_hint(monkeypatch):
     return lambda: andrey.pc(data)
 
 
+def _deprecated_class(monkeypatch):
+    scm = andrey.data.SCM(
+        graph=andrey.data.graphs.erdos_renyi(4, 1.0),
+        functional=andrey.data.functional.linear(),
+        noise=andrey.data.noise.gaussian(),
+    )
+    return lambda: andrey.data.Ensemble(scms=[scm], seeds=[0], n=10)  # a dataclass's __init__
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
@@ -109,6 +119,7 @@ TRIGGERS = {
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
     "no categorical column": (_no_categorical_column, andrey.DataTypeWarning),
     "category code hint": (_category_code_hint, andrey.DataTypeWarning),
+    "deprecated class": (_deprecated_class, andrey.DeprecatedArgumentWarning),
 }
 
 
@@ -138,6 +149,18 @@ def test_an_error_filter_on_the_category_fails_every_call(name, monkeypatch):
         for _ in range(2):  # a call the filter stopped does not use up the warning
             with pytest.raises(category):
                 call()
+
+
+def test_each_experimental_method_warns_on_its_own_first_call():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warn_experimental("first_method")
+        warn_experimental("second_method")
+        warn_experimental("first_method")
+    assert [str(w.message).split()[0] for w in _andrey_warnings(caught)] == [
+        "andrey.first_method",
+        "andrey.second_method",
+    ]
 
 
 def test_ignoring_the_base_class_silences_every_warning(monkeypatch):

@@ -44,27 +44,26 @@ requested backend uses `auto`, without a warning.
 ## Parallel search
 
 - `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the two
-  directions of `pnl`. PC, FCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker
-  processes for their skeleton search with the `fisherz`, `student_t`, `normal_scores`, and `rcot`
-  tests on complete data, and send a conditioning-set size to them only when it has enough tests to
-  repay them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap`
-  fits its resamples on them, one fit per worker, with the same result at any number. `1` (the
-  default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
-  threads unlimited and with several limits each thread to one, so on a machine with several cores
-  its p-values and statistics can differ in the last digits between one worker and several. Each
-  `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
-  4 GiB, fewer run, with a `PerformanceWarning`. `ANDREY_NUM_WORKERS`, its former name, is still
-  read when `ANDREY_N_JOBS` is unset, with a `DeprecatedArgumentWarning`, until the next release.
+  directions of `pnl`. PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"`
+  also use the worker processes for their skeleton search with the `fisherz`, `student_t`,
+  `normal_scores`, and `rcot` tests on complete data, and send a conditioning-set size to them only
+  when it has enough tests to repay them; with `rcot` the p-values are the same with any number of
+  workers. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same result
+  at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl` with one
+  worker leaves the BLAS threads unlimited and with several limits each thread to one, so on a
+  machine with several cores its p-values and statistics can differ in the last digits between one
+  worker and several. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask
+  for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
-  GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` uses the workers only when it holds at least this
-  many conditional-independence tests. The default is `500000`, measured on an AMD EPYC 9534 server
-  running Linux; `0` always uses them.
+  GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"` uses the workers only when it
+  holds at least this many conditional-independence tests. The default is `500000`, measured on an
+  AMD EPYC 9534 server running Linux; `0` always uses them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
-  far more than a Fisher-z test and its cost grows with the rows. The default is `2000000`, measured
-  on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
+  far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
+  measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
 The cutoffs matter only with more than one worker. `andrey calibrate` measures all three for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
@@ -75,9 +74,9 @@ The workers start from a forkserver, whose socket goes in your temporary directo
 that directory is on a file system that rejects the socket, as some cluster file systems do, we
 start the forkserver with its socket in `/dev/shm`, or `/tmp`, and warn once; if neither works,
 the workers start with `fork` or `spawn`. The results do not change. Set `TMPDIR` to a directory on
-a local file system to silence the warning. `andrey.data.generate` with several workers starts them
-the same way when your Python's default start method is the forkserver, as on Linux from Python
-3.14; otherwise it keeps the default.
+a local file system to silence the warning. `andrey.data.generate`, which is deprecated and stops
+working in 0.16.0, starts its workers the same way when your Python's default start method is the
+forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 
 ## GPU dispatch
 
@@ -113,11 +112,13 @@ already running in the process, so a CPU fit never pays to start a GPU.
   call that gives `seed=` does not depend on it. Deterministic methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
-  leaves in place, so reordering the columns relabels the result. `position` orders them by column
-  position, which skips computing the ranks, fires the orientation rules of `pc`, `cdnod`, `fci`,
-  and `gfci` one at a time in column order, and visits the possible-d-separation step of `fci` and
-  `gfci` in column order; the result can then depend on the column order. A fit whose result the
-  rule can change records it in `metadata["tie_break"]`.
+  leaves in place, with [a few exceptions](guides/column-order.md#how-andrey-breaks-ties), so
+  reordering the columns relabels the result. `position` orders them by column position, which skips
+  computing the ranks, fires the orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`,
+  `grasp_fci`, and `fci_jci` one at a time in column order, and visits the possible-d-separation
+  step of `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` in column order; the result can then
+  depend on the column order. A fit whose result the rule can change records it in
+  `metadata["tie_break"]`.
 
 Results repeat on the same machine; across platforms they can differ, CALM's most of all.
 [Column order and machines](guides/column-order.md) lists what each method keeps under a new column

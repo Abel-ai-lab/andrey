@@ -3,14 +3,17 @@ from __future__ import annotations
 import importlib
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import andrey
 from andrey import data
-from andrey.constraint.pc import _discover_skeleton, _orient_colliders
+from andrey.constraint.pc import _orient_colliders, adjacency_search
 from andrey.core import TAIL, GraphStructure
+from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, pdag2dag
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
+from andrey.data.interventions import soft
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 
@@ -50,6 +53,75 @@ def test_cdnod_orients_the_planted_graph_from_a_domain_shift():
     assert andrey.cdnod(x, domain).structure.oriented_edges() == planted
     # Without the index the same data leave every edge open.
     assert {kind for *_, kind in andrey.pc(x).structure.oriented_edges()} == {"undirected"}
+
+
+def test_cdnod_lists_the_variables_the_index_changes():
+    """Only variable 0's mean shifts, so the index keeps one edge, into it."""
+    x, domain = _domain_shift_chain()
+    out = andrey.cdnod(x, domain)
+    assert out.metadata["index_edges"] == [[0, "directed"]]
+    assert out.metadata["changing_variables"] == [0]
+    frame = pd.DataFrame(x, columns=list("abcde"))
+    out = andrey.cdnod(frame, domain)
+    assert out.metadata["index_edges"] == [["a", "directed"]]
+    assert out.metadata["changing_variables"] == ["a"]
+    out = andrey.cdnod(x, np.zeros(len(x)))
+    assert out.metadata["index_edges"] == [] and out.metadata["changing_variables"] == []
+
+
+def test_cdnod_finds_the_shifted_variables_in_its_claimed_setting():
+    """Linear-Gaussian data on a random 10-variable DAG, from two environments of 1,000 rows, the
+    second shifting the mean of two variables: the changing variables are those two on most draws.
+    """
+    exact = 0
+    for seed in range(10):
+        scm = data.SCM(
+            graph=data.graphs.erdos_renyi(d=10, avg_degree=2.0),
+            functional=data.functional.linear(),
+            noise=data.noise.gaussian(),
+        )
+        shifted = np.random.default_rng(seed).choice(10, size=2, replace=False)
+        envs = [{}, {int(j): soft(shift=1.0) for j in shifted}]
+        ds = scm.sample(n=[1000, 1000], seed=seed, envs=envs)
+        out = andrey.cdnod(ds.data, ds.env)
+        assert out.metadata["changing_variables"] == [v for v, _ in out.metadata["index_edges"]]
+        exact += out.metadata["changing_variables"] == sorted(ds.targets[1])
+    assert exact >= 7
+
+
+def test_cdnod_changing_variables_follow_the_column_order():
+    """Reordering the columns reorders both lists and leaves the variables in them unchanged."""
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=6, avg_degree=2.0),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(),
+    )
+    ds = scm.sample(n=[1000, 1000], seed=0, envs=[{}, {1: soft(shift=1.0), 4: soft(shift=1.0)}])
+    frame = pd.DataFrame(ds.data, columns=[f"x{j}" for j in range(6)])
+    assert andrey.cdnod(frame, ds.env).metadata["changing_variables"] == ["x1", "x4"]
+    rng = np.random.default_rng(0)
+    for _ in range(10):
+        columns = list(rng.permutation(frame.columns))
+        out = andrey.cdnod(frame[columns], ds.env)
+        changing = [c for c in columns if c in ("x1", "x4")]
+        assert out.metadata["changing_variables"] == changing
+        assert out.metadata["index_edges"] == [[c, "directed"] for c in changing]
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_and_gnies_name_the_same_changing_variable():
+    """In ``x0 -> x1 -> x2``, the second environment shifts both the mean and the noise scale of
+    ``x1``: CD-NOD's default test sees the mean shift and GnIES the noise change.
+    """
+    scm = data.SCM(
+        graph=data.graphs.FixedDAG(nodes=("x0", "x1", "x2"), arcs=(("x0", "x1"), ("x1", "x2"))),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(),
+    )
+    envs = [{}, {1: soft(shift=1.0, noise_scale=3.0)}]
+    ds = scm.sample(n=[1000, 1000], seed=0, envs=envs, shuffle=False)
+    assert andrey.cdnod(ds.data, ds.env).metadata["changing_variables"] == [1]
+    assert andrey.gnies(ds.data, ds.env).metadata["changing_variables"] == [1]
 
 
 def test_cdnod_finds_no_edge_between_independent_columns():
@@ -223,13 +295,6 @@ def test_cdnod_runs_the_independent_change_step_on_variables_that_change(monkeyp
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
 
 
-@pytest.mark.parametrize("threshold", [0.0, 1.0])
-def test_cdnod_rejects_a_dependence_threshold_outside_the_unit_interval(threshold):
-    x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
-    with pytest.raises(ValueError, match="dependence_threshold"):
-        andrey.cdnod(x, c, dependence_threshold=threshold)
-
-
 def shifted_domains() -> tuple[np.ndarray, np.ndarray]:
     """Two domains, with two variables shifted between them. Colliders of the augmented skeleton
     conflict on this seed, so the collider order decides which are kept."""
@@ -240,17 +305,12 @@ def shifted_domains() -> tuple[np.ndarray, np.ndarray]:
     return x, context
 
 
-def test_cdnod_passes_the_collider_order_on():
-    """On conflicting colliders the two orders keep different ones."""
-    x, context = shifted_domains()
-    column = andrey.cdnod(x, context, collider_order="column").structure
-    assert column != andrey.cdnod(x, context).structure
-
-
 def test_cdnod_collider_order_follows_tie_break_unless_given():
+    """On conflicting colliders the two orders keep different ones."""
     x, context = shifted_domains()
     default = andrey.cdnod(x, context).structure
     column = andrey.cdnod(x, context, collider_order="column").structure
+    assert column != default
     with andrey.config(tie_break="position"):
         assert andrey.cdnod(x, context).structure == column
         assert andrey.cdnod(x, context, collider_order="p_value").structure == default
@@ -259,7 +319,9 @@ def test_cdnod_collider_order_follows_tie_break_unless_given():
 def test_cdnod_is_invariant_to_column_order():
     x, context = shifted_domains()
     augmented = np.column_stack([x, context])
-    skeleton, sepsets, pvalues = _discover_skeleton(augmented, 0.05)
+    skeleton, sepsets, pvalues = adjacency_search(
+        make_indep_test("fisherz", augmented), augmented.shape[1], 0.05, record_pvalues=True
+    )
     trace: list[dict] = []
     _orient_colliders(skeleton, sepsets, pvalues, _trace=trace)
     assert any(
@@ -514,26 +576,6 @@ def test_possible_dsep_follows_tie_break_unless_given(monkeypatch, name, tie_bre
     assert received == [reaches]
 
 
-def test_fci_output_contract():
-    assert andrey.fci(datagen.generate("gauss_5v")).structure.kind == "pag"
-
-
-def test_cdnod_output_contract():
-    out = andrey.cdnod(datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v"))
-    assert out.structure.kind == "cpdag"
-
-
-def test_fci_rejects_unknown_indep_test():
-    with pytest.raises(ValueError):
-        andrey.fci(datagen.generate("gauss_5v"), indep_test="no_such_test")
-
-
-def test_cdnod_rejects_unknown_indep_test():
-    x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
-    with pytest.raises(ValueError):
-        andrey.cdnod(x, c, indep_test="no_such_test")
-
-
 def test_cdnod_rejects_mismatched_context():
     x = datagen.generate("gauss_5v")
     with pytest.raises(ValueError, match="one value per row"):
@@ -553,8 +595,7 @@ def test_cdnod_rejects_an_index_with_the_right_size_and_the_wrong_shape():
 
 # --- general-input behavior ----------------------------------------------------------------------
 #
-# Random latent-confounded models check repeatability and well-formed output beyond the fixed
-# baseline. FCI/GFCI column-order sensitivity is measured by qa.column_order.
+# FCI/GFCI column-order sensitivity is measured by qa.column_order.
 
 
 def _latent_confounded_sample(seed: int, d: int) -> np.ndarray:
@@ -566,34 +607,46 @@ def _latent_confounded_sample(seed: int, d: int) -> np.ndarray:
     ).data
 
 
-def _fit(learner: str, x: np.ndarray):
-    if learner == "cdnod":
-        context = np.zeros((len(x), 1))
-        context[len(x) // 2 :] = 1.0
-        return andrey.cdnod(x, context).structure
-    return getattr(andrey, learner)(x).structure
+def test_cdnod_on_a_latent_confounded_sample_is_invariant_to_column_order():
+    """A draw whose graph has both directed and undirected edges."""
+    x = _latent_confounded_sample(2, 8)
+    context = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
+    first = andrey.cdnod(x, context).structure.to_numpy()
+    order = np.random.default_rng(2).permutation(x.shape[1])
+    back = np.argsort(order)
+    permuted = andrey.cdnod(x[:, order], context).structure.to_numpy()[np.ix_(back, back)]
+    assert np.array_equal(permuted, first)
 
 
-@pytest.mark.parametrize(
-    ("learner", "kind"),
-    [("fci", "pag"), ("gfci", "pag"), ("cdnod", "cpdag")],
-)
-def test_constraint_family_is_deterministic_and_well_formed(learner, kind):
-    for seed in range(4):
-        for d in (6, 8):
-            x = _latent_confounded_sample(seed, d)
-            observed = x.shape[1]  # d nodes minus the hidden confounder
-            first = _fit(learner, x)
-            assert first.kind == kind
-            assert first.n_nodes == observed
-            first.validate()
-            repeat = _fit(learner, x).to_numpy()
-            assert np.array_equal(repeat, first.to_numpy()), f"{learner} is not deterministic"
+# --- real data ------------------------------------------------------------------------------------
 
-            if learner == "cdnod":
-                order = np.random.default_rng(seed).permutation(observed)
-                back = np.argsort(order)
-                permuted = _fit(learner, x[:, order]).to_numpy()[np.ix_(back, back)]
-                assert np.array_equal(permuted, first.to_numpy()), (
-                    f"{learner} changes when the columns are reordered"
-                )
+
+@pytest.fixture(scope="module")
+def sachs_conditions(tmp_path_factory):
+    """The Sachs cells of all nine conditions, log-transformed as Mooij et al. (2020) use them."""
+    import pandas as pd
+
+    from andrey.data import load_dataset
+    from tests.unit.conftest import serve_datasets_offline
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        serve_datasets_offline(monkeypatch, tmp_path_factory.mktemp("cache"))
+        pooled = load_dataset("sachs", conditions=True)
+    logged = pd.DataFrame(np.log(pooled.data.to_numpy()), columns=list(pooled.feature_names))
+    return logged, pooled.env, pooled.graph
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(sachs_conditions):
+    """Pooled across the nine conditions, under half of PC's adjacencies are in the consensus
+    network; with the condition as a categorical ``env``, over 85% of CD-NOD's and FCI-JCI's are.
+    On these data FCI-JCI's index keeps an edge to every protein."""
+    from andrey.metrics import skeleton_scores
+
+    data, env, consensus = sachs_conditions
+    assert skeleton_scores(andrey.pc(data).structure, consensus)["precision"] < 0.5
+    settings = {"env": env, "indep_test": "cond_gauss", "categorical": []}
+    for method in (andrey.cdnod, andrey.fci_jci):
+        out = method(data, **settings)
+        assert skeleton_scores(out.structure, consensus)["precision"] > 0.85
+    assert {variable for variable, _ in out.metadata["index_edges"]} == set(data.columns)

@@ -44,7 +44,7 @@ CASES = {
 
 
 def _graphs(x: np.ndarray, knowledge: Knowledge | None, score_func: str, tables: bool) -> list:
-    score = exact._GramBICScore(x) if score_func == "bic" else make_score(score_func, x)
+    score = make_score(score_func, x)
     d = x.shape[1]
     constraints = resolve(knowledge, d, None, method="exact_search")
     return [exact._generate_parent_graph(score, i, d, constraints, tables) for i in range(d)]

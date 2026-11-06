@@ -142,6 +142,16 @@ def test_tabu_never_scores_worse_than_hill_climbing_on_the_same_candidates(restr
     assert tabu <= andrey.rsmax2(x, restrict=restrict, maximize="hc").metadata["score"]
 
 
+def test_rsmax2_a_larger_max_tabu_never_scores_worse():
+    """A larger ``max_tabu`` follows the same tabu path further, keeping the best."""
+    x = _er_sample(20, 4).data
+    by_max_tabu = [
+        andrey.rsmax2(x, maximize="tabu", max_tabu=k).metadata["score"] for k in range(1, 11)
+    ]
+    assert by_max_tabu == sorted(by_max_tabu, reverse=True)
+    assert by_max_tabu[-1] < by_max_tabu[0]
+
+
 @pytest.mark.parametrize("seed", range(3))
 def test_each_restrict_phase_finds_the_true_skeleton_under_an_oracle(seed, oracle_test):
     from andrey.search.hybrid import candidate_graph
@@ -206,8 +216,6 @@ def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
 @pytest.mark.parametrize(
     ("setting", "error"),
     [
-        ({"restrict": "gs"}, ValueError),
-        ({"maximize": "ges"}, ValueError),
         ({"maximize": "tabu", "score_func": "cond_gauss"}, ValueError),
         ({"score_func": "bdeu"}, ValueError),  # a categorical score with fisherz
     ],

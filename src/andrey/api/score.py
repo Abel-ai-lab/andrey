@@ -29,12 +29,12 @@ from andrey.api._adapt import (
     default_score,
     int_in_range,
     json_safe,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -87,7 +87,8 @@ def ges(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -99,7 +100,7 @@ def ges(
         CPDAG would break the cap, in either phase, is skipped for the next best move. A cap can
         stop the search short of the lowest-scoring graph, which GES otherwise finds. ``None`` sets
         no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -121,28 +122,32 @@ def ges(
         the sum over variables of ``n * log(residual variance) + penalty_discount * log(n) *
         n_parents + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``; for BDeu, ``-2`` times the
         log of the structure prior times the marginal likelihood; for the multinomial BIC and the
-        mixed-data scores, see Notes. Directed marks
-        (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
-        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
-        read, by name or 0-based position.
+        mixed-data scores, see Notes. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if a given
-        ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
-        a node; with a categorical score, if ``data`` holds a number that is not whole; or, with a
-        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if a continuous score meets
-        a column declared categorical, by ``categorical`` or by its type. With the BIC score, also
-        if a column repeats another up to scale and shift given more than two rows or, with more
-        rows than columns, is a linear function of other columns. One message names every group of
-        copies and says to keep one column per group. Also if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if a given ``max_parents`` is
+        below the parents some graph of the required edges of ``knowledge`` gives a node; with a
+        categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
+        score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
+        number that is not whole or a missing value. Also if a continuous score meets a column
+        declared categorical, by ``categorical`` or by its type. With the BIC score, also if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
+        or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -150,11 +155,6 @@ def ges(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.fci : Allows unmeasured common causes and selection bias.
-    andrey.direct_lingam : Orients every edge when the noise is non-Gaussian.
 
     Notes
     -----
@@ -379,10 +379,10 @@ def gies(
         A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
-    env : array-like of shape (n_samples,), str, or None, default=None
-        The environment each row comes from: one label per row, strings or numbers, not both, or
-        the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
-        environments from ``targets``: its distinct values, or none, for observational data.
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name of
+        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
+        ``targets``: its distinct values, or none, for observational data.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, named by column label or 0-based position.
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
@@ -419,7 +419,8 @@ def gies(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -430,7 +431,7 @@ def gies(
         node more than ``max_parents`` parents (every DAG of a class has the same largest number of
         parents). A step that would give a node more is skipped for the next best step. A cap can
         stop the search short of the lowest-scoring graph. ``None`` sets no cap. See Notes.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -447,46 +448,49 @@ def gies(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
-        graph: directed marks (``->``) are edges every graph in the class orients alike,
-        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"gies"`` and
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential graph:
+        directed marks (``->``) are edges every graph in the class orients alike, undirected
+        (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"gies"`` and
         ``metadata["score"]`` the score of the result, the sum over variables of each one's local
-        score on the rows without an intervention on it; lower is better. For BIC, a variable's
-        term is ``n_v * log(residual variance) + penalty_discount * log(n_samples) * n_parents + 2 *
+        score on the rows without an intervention on it; lower is better. For BIC, a variable's term
+        is ``n_v * log(residual variance) + penalty_discount * log(n_samples) * n_parents + 2 *
         ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts those rows; for the
         other scores, see :func:`~andrey.ges`. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
-        column; if ``data`` holds each environment's rows apart with ``env`` or with ``targets``
-        other than a mapping, or its tables differ in kind or columns, or one has no rows; if a
-        ``targets`` matrix does not have ``data``'s shape, holds a value other than 0
-        or 1, or leaves a variable fewer than two rows, or one value, without an intervention; if an
-        environment's targets are unknown, or ``targets`` names a label ``env`` lacks or names one
-        label by two keys, such as ``1`` and ``"1"``; with a
-        categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
-        score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
-        number that is not whole. Also if a continuous score meets a column declared categorical, by
-        ``categorical`` or by its type. With the BIC score, also if a column repeats another up to
-        scale and shift given more than two rows or, with more rows than columns, is a linear
-        function of other columns. One message names every group of copies and says to keep one
-        column per group. Also if a given ``max_parents`` is below the parents some graph of the
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows, no ``NaN`` or ``inf``, and no constant column; if ``data``
+        holds each environment's rows apart with ``env`` or with ``targets`` other than a mapping,
+        or its tables differ in kind or columns, or one has no rows; if a ``targets`` matrix does
+        not have ``data``'s shape, holds a value other than 0 or 1, or leaves a variable fewer than
+        two rows, or one value, without an intervention; if an environment's targets are unknown, or
+        ``targets`` names a label ``env`` lacks or names one label by two keys, such as ``1`` and
+        ``"1"``; with a categorical score, if ``data`` holds a number that is not whole; or, with a
+        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole. Also if a continuous score meets a column declared
+        categorical, by ``categorical`` or by its type. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group. Also if a given ``max_parents`` is below the parents some graph of the
         required edges of ``knowledge`` gives a node, or if ``knowledge`` names a column ``data``
         lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` comes
         without ``targets``; if ``env`` does not hold one label per row, misses a label, or mixes
-        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label
-        ``env`` lacks, or leaves an environment's targets unknown; if a column or an array of
-        ``targets`` gives two rows of one environment different targets; if ``targets`` names a
-        variable ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks.
+        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label ``env``
+        lacks, or leaves an environment's targets unknown; if a column or an array of ``targets``
+        gives two rows of one environment different targets; if ``targets`` names a variable
+        ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks.
 
     Warns
     -----
@@ -494,11 +498,11 @@ def gies(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.ges : Searches the same way on observational data, without the turning phase.
-    andrey.cdnod : Learns from data pooled from several environments whose targets are unknown.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -633,17 +637,10 @@ def gies(
     from andrey.search.gies import intervention_mask
 
     if env is not None and np.ndim(env) == 2 and np.shape(env)[1] > 1:
-        if targets is not None:
-            raise ValueError(
-                "gies: the second argument is env, one label per row; pass the 0/1 matrix as "
-                "targets alone"
-            )
-        warn_once(
-            "andrey.gies: a 0/1 matrix as the second argument is now targets=; the former form "
-            "stops working in the next release",
-            DeprecatedArgumentWarning,
+        raise ValueError(
+            "gies: the second argument is env, one label per row; a 0/1 matrix of the intervened "
+            "variables goes in targets since 0.14.0"
         )
-        env, targets = None, env
     data, codes, _, by_code = normalize_env_targets(
         data, env, targets, require_known_targets=True, method="gies"
     )
@@ -702,7 +699,7 @@ def gnies(
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets``, when given, maps
         those labels to their known variables.
-    env : array-like of shape (n_samples,), str, or None, default=None
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name
         of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
         environments, each with at least two rows, and at least as many rows as variables once
@@ -731,7 +728,7 @@ def gnies(
         Weight on the extended-BIC term: each variable's score adds ``2 * ebic_gamma * log
         C(n_variables - 1, n_parents)``, which grows with the number of parent sets a variable can
         choose from. Larger values give sparser graphs; ``0.0`` is the standard BIC. The term
-        charges parents only, not targets. Must be finite and non-negative. See Notes.
+        charges parents only, not targets. Must be from 0 to 1. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
         node more than ``max_parents`` parents. Each search over graphs skips a step that would
@@ -747,57 +744,55 @@ def gnies(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
-        graph of the learned targets: directed marks (``->``) are edges every graph in the class
-        orients alike, among them every edge at a target, and undirected (``--``) the ones it
-        leaves open. ``metadata["algorithm"]`` is ``"gnies"``; ``metadata["score"]`` the score of
-        the result, lower is better (see Notes); ``metadata["changing_variables"]`` lists the
-        targets, known and learned, by label or 0-based position, in column order: the variables
-        whose noise variance differs between some two environments. A shift in a variable's mean
-        is not among them, since each environment's mean is taken out, and neither is a change
-        made alike in every environment. With ``env``, ``metadata["environments"]`` holds its
-        labels in sorted order, so ``targets=dict.fromkeys(out.metadata["environments"],
-        out.metadata["changing_variables"])`` gives every environment the learned targets as
-        known: a refit on it searches the graph alone and returns the same graph and score.
-        Without ``env``, ``targets`` gives every environment's targets, which are then known.
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential graph
+        of the learned targets: directed marks (``->``) are edges every graph in the class orients
+        alike, among them every edge at a target, and undirected (``--``) the ones it leaves open.
+        ``metadata["algorithm"]`` is ``"gnies"``; ``metadata["score"]`` the score of the result,
+        lower is better (see Notes); ``metadata["changing_variables"]`` lists the targets, known and
+        learned, by label or 0-based position, in column order: the variables whose noise variance
+        differs between some two environments. A shift in a variable's mean is not among them, since
+        each environment's mean is taken out, and neither is a change made alike in every
+        environment. With ``env``, ``metadata["environments"]`` holds its labels in sorted order, so
+        ``targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])``
+        gives every environment the learned targets as known: a refit on it searches the graph alone
+        and returns the same graph and score. Without ``env``, ``targets`` gives every environment's
+        targets, which are then known. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
-        column; if a column is declared categorical by a DataFrame's ``category``, ``bool``, or
-        text type; if the rows come from fewer than two environments, an environment has fewer
-        than two rows, ``n_samples - n_environments`` is below the variable count, or a column is
-        constant within one environment; if a column repeats another up to scale and shift or is a
-        linear function of other columns, within the environments (one message names every group
-        of copies and says to keep one column per group). Also if ``data`` holds each
-        environment's rows apart with ``env`` or with ``targets`` other than a mapping, or its
-        tables differ in kind or columns, or one has no rows; if ``env`` does not hold one label
-        per row, misses a label, or mixes strings and numbers; if a ``targets`` mapping comes
-        without ``env``, names a label ``env`` lacks, or names one label by two keys; if a column
-        or an array of ``targets``
-        gives two rows of one environment different targets, or an array does not have ``data``'s
-        shape or holds a value other than 0 or 1; if ``targets`` names a variable ``data`` lacks;
-        or if ``env`` or ``targets`` names a column ``data`` lacks. Also if a given
-        ``max_parents`` is below the parents some graph of the required edges of ``knowledge``
-        gives a node; if the required edges give a known target more parents than the smallest
-        environment's rows minus 2; or if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column is
+        declared categorical by a DataFrame's ``category``, ``bool``, or text type; if the rows come
+        from fewer than two environments, an environment has fewer than two rows,
+        ``n_samples - n_environments`` is below the variable count, or a column is constant within
+        one environment; if a column repeats another up to scale and shift or is a linear function
+        of other columns, within the environments (one message names every group of copies and says
+        to keep one column per group). Also if ``data`` holds each environment's rows apart with
+        ``env`` or with ``targets`` other than a mapping, or its tables differ in kind or columns,
+        or one has no rows; if ``env`` does not hold one label per row, misses a label, or mixes
+        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label ``env``
+        lacks, or names one label by two keys; if a column or an array of ``targets`` gives two rows
+        of one environment different targets, or an array does not have ``data``'s shape or holds a
+        value other than 0 or 1; if ``targets`` names a variable ``data`` lacks; or if ``env`` or
+        ``targets`` names a column ``data`` lacks. Also if a given ``max_parents`` is below the
+        parents some graph of the required edges of ``knowledge`` gives a node; if the required
+        edges give a known target more parents than the smallest environment's rows minus 2; or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.gies : Learns from environments whose targets are known and replaced by interventions.
-    andrey.cdnod : Learns from environments without a model of how they differ.
 
     Notes
     -----
@@ -852,33 +847,33 @@ def gnies(
     result, nor does shifting one environment's rows. Do not standardize each environment on its
     own: that rescales the noise variances the method reads, and changes the result.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured with the targets unknown on simulated data from the model above:
     Erdos-Renyi graphs of 10 variables at mean degree 2.7 or 4, two to ten environments with 10 to
     1,000 rows each, with or without an observational one, one or three targets per environment, 20
-    datasets per setting, one core per fit. Against the paper's reference implementation, the 95%
-    interval of the mean difference in errors lay above 0 in none of the 21 settings, on the SHD
-    against the interventional essential graph or on the targets learned wrongly or missed, and
-    below 0 on the SHD in 2 settings with 10 rows per environment and on the targets in 1 of them,
-    on 20 more datasets too; at the standard BIC the two returned the same graph and targets on 412
-    of the 420 datasets. With 100 or more rows per environment its errors were below the empty
-    graph's on both counts in every setting. With 10 rows per environment its target errors were
-    1.85 to 3 with 3 true targets and 4.35 and 7.7 with 9, and its SHD was not reliably below the
-    empty graph's at mean degree 4 (20 against 20) or with the targets' noise variances set to 3 to
-    4 instead of 5 to 10 (11.9 against 14; the 95% interval of the difference reached above 0 on
-    both sets of 20 datasets). Outside its model, with 1,000 rows per environment: after hard
-    interventions, which replace a target's mechanism, its mean SHD was 3.75 against the empty
-    graph's 14; a shifted mean alone is invisible to it, so it learned almost no targets (3.1 target
-    errors with 3 true targets) and returned close to the observational class (SHD 2.55 against it);
-    after a target's incoming weights were halved it beat the empty graph on neither count (SHD 11.6
-    against 14, 3.05 target errors with 3 true targets); with Laplace noise its SHD was 1.65, and
-    with additive nonlinear relations 7.55. With 1,000 rows in each of four environments, three of
-    them with one target, its median SHD at 20, 30, 50, and 100 variables was 0, 0, 1, and 2.5,
-    against the empty graph's 27, 40, 68, and 135, and its median fit took 3.5, 9.0, 30, and 176 s.
-    At 10 variables its median fit took 0.3 to 1.3 s per setting, a median 0.03 times the paper's
-    reference implementation's time on the same core; at 20 variables the reference implementation
-    took a median 388 s, and at 30 it finished 2 of 3 fits, in 2,735 and 3,327 s, within a cap of
-    3,600 s. Each set of targets it visits costs one search over graphs from the empty graph: each
-    forward step scores every variable not yet a target, and each backward step every target, about
+    datasets per setting, one core per fit; errors count the SHD against the interventional
+    essential graph and the targets learned wrongly or missed. With 100 or more rows per environment
+    its errors were below the empty graph's on both counts in every setting. With 10 rows per
+    environment its target errors were 1.85 to 3 with 3 true targets and 4.35 and 7.7 with 9, and
+    its SHD was not reliably below the empty graph's at mean degree 4 (20 against 20) or with the
+    targets' noise variances set to 3 to 4 instead of 5 to 10 (11.9 against 14; the 95% interval of
+    the difference reached above 0 on both sets of 20 datasets). Outside its model, with 1,000 rows
+    per environment: after hard interventions, which replace a target's mechanism, its mean SHD was
+    3.75 against the empty graph's 14; a shifted mean alone is invisible to it, so it learned almost
+    no targets (3.1 target errors with 3 true targets) and returned close to the observational class
+    (SHD 2.55 against it); after a target's incoming weights were halved it beat the empty graph on
+    neither count (SHD 11.6 against 14, 3.05 target errors with 3 true targets); with Laplace noise
+    its SHD was 1.65, and with additive nonlinear relations 7.55. With 1,000 rows in each of four
+    environments, three of them with one target, its median SHD at 20, 30, 50, and 100 variables was
+    0, 0, 1, and 2.5, against the empty graph's 27, 40, 68, and 135, and its median fit took 3.5,
+    9.0, 30, and 176 s. At 10 variables its median fit took 0.3 to 1.3 s per setting. Each set of
+    targets it visits costs one search over graphs from the empty graph: each forward step scores
+    every variable not yet a target, and each backward step every target, about
     ``(n_targets + 1) * n_variables - n_targets * (n_targets - 1) / 2`` searches per fit, with
     ``n_targets`` the targets it returns. Given every environment's targets, one search over graphs
     runs, and it can stop at a graph that scores worse than one the target search reaches: with the
@@ -935,7 +930,7 @@ def gnies(
     X = data_matrix(data, method="gnies")
     labels = column_labels(data)
     name = column_namer(labels)
-    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
+    variable = label_of(labels)
     # An environment taken from targets is named by its targets.
     shown = [[variable(j) for j in sorted(e)] if isinstance(e, frozenset) else e for e in envs]
     sizes = np.bincount(codes, minlength=len(envs))
@@ -1038,7 +1033,8 @@ def xges(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1053,7 +1049,7 @@ def xges(
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -1072,29 +1068,33 @@ def xges(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"xges"`` and ``metadata["score"]`` the score of the result, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
-        constant; with a categorical score, if ``data`` holds a number that is not whole; or, with a
-        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole. Also if a continuous score meets a column declared
-        categorical, by ``categorical`` or by its type. With the BIC score, also if a column repeats
-        another column up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group. Also if a given ``max_parents`` is below the parents some
-        graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is constant; with a
+        categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
+        score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
+        number that is not whole. Also if a continuous score meets a column declared categorical, by
+        ``categorical`` or by its type. With the BIC score, also if a column repeats another column
+        up to scale and shift given more than two rows or, with more rows than columns, is a linear
+        function of other columns. One message names every group of copies and says to keep one
+        column per group. Also if a given ``max_parents`` is below the parents some graph of the
+        required edges of ``knowledge`` gives a node, or if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1102,10 +1102,6 @@ def xges(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.ges : Adds edges, then removes them, in two separate phases.
 
     Notes
     -----
@@ -1270,15 +1266,15 @@ def hc(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See
-        Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
-        Maximum moves of each climb, at least ``1``; ``None`` sets no limit. The search still
+        Most moves of each climb, at least ``1``; ``None`` sets no limit. The search still
         terminates, since each move lowers the score. A given ``max_iter`` also bounds the edge
         count of the first climb, as each move adds at most one edge.
     seed : int or None, default=None
@@ -1301,7 +1297,7 @@ def hc(
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
         (every DAG of a class has the same largest number of parents). A cap can stop the search
         short of the lowest-scoring graph. ``None`` sets no cap.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -1325,22 +1321,27 @@ def hc(
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
         ``metadata["n_perturbations"]`` the number of changes before each later climb.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the required
-        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
-        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
-        also if a column repeats another up to scale and shift given more than two rows or, with
-        more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a
-        mixed-data score, requires an edge from a continuous into a categorical column.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the required edges of
+        ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or ``categorical``
+        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a mixed-data score,
+        requires an edge from a continuous into a categorical column.
 
     Warns
     -----
@@ -1393,9 +1394,8 @@ def hc(
     keeps the best score: hill climbing with random restarts, which changes many edges at each
     restart [1]_ [4]_. No change breaks the knowledge, ``max_parents``, the rule of the mixed-data
     scores, or acyclicity: a draw that would close a cycle changes nothing, and at most
-    ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [2]_ makes one change per restart by
-    default, which the next climb most often undoes, so ``n_perturbations`` defaults to the number
-    of variables.
+    ``3 * n_perturbations`` draws are made. The next climb most often undoes a single change, so
+    ``n_perturbations`` defaults to the number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
     defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 161.6 to 93.5 and took a
@@ -1535,8 +1535,8 @@ def tabu(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See
-        Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1548,7 +1548,7 @@ def tabu(
         Non-improving moves allowed without a better DAG, from ``1`` to ``tabu_length``. ``None``
         uses ``tabu_length``.
     max_iter : int or None, default=None
-        Maximum moves of each search, improving or not, at least ``1``; ``None`` sets no limit. The
+        Most moves of each search, improving or not, at least ``1``; ``None`` sets no limit. The
         search still terminates: non-improving runs are bounded by ``max_tabu``, and each new best
         DAG scores strictly lower.
     seed : int or None, default=None
@@ -1571,7 +1571,7 @@ def tabu(
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
         (every DAG of a class has the same largest number of parents). A cap can stop the search
         short of the lowest-scoring graph. ``None`` sets no cap.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -1591,23 +1591,29 @@ def tabu(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open. With ``n_starts`` above ``1``,
-        ``metadata["seed"]`` is the seed used and ``metadata["n_perturbations"]`` the number of
-        changes before each later search.
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
+        ``metadata["n_perturbations"]`` the number of changes before each later search.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``max_tabu``
-        is greater than ``tabu_length``; if the required edges of ``knowledge`` give a node more
-        than ``max_parents`` parents; or, with a categorical score, if ``data`` holds a number
-        that is not whole. With the BIC score, also if a column repeats another up to scale and
-        shift given more than two rows or, with more rows than columns, is a linear function of
-        other columns. One message names every group of copies and says to keep one column per
-        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``max_tabu`` is greater than
+        ``tabu_length``; if the required edges of ``knowledge`` give a node more than
+        ``max_parents`` parents; or, with a categorical score, if ``data`` holds a number that is
+        not whole. With the BIC score, also if a column repeats another up to scale and shift given
+        more than two rows or, with more rows than columns, is a linear function of other columns.
+        One message names every group of copies and says to keep one column per group. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -1637,7 +1643,9 @@ def tabu(
     list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
     score last improved; otherwise it takes the best non-improving move, leaving the score unchanged
     or worse. It also stops when every legal move leads into the list, or after ``max_iter`` moves
-    when set; with ``n_starts``, each search stops so.
+    when set; with ``n_starts``, each search stops so. Under a mixed-data score, no move gives a
+    categorical column a continuous parent, so the DAG found is a conditional linear Gaussian
+    network.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` and one start its score is never worse than hill climbing's. Ties
@@ -1660,9 +1668,8 @@ def tabu(
     keeps the best score: tabu search with the random restarts of hill climbing, which change many
     edges at each restart [5]_ [6]_. No change breaks the knowledge, ``max_parents``, the rule of
     the mixed-data scores, or acyclicity: a draw that would close a cycle changes nothing, and at
-    most ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [3]_ makes one change per restart
-    by default, which the next search most often undoes, so ``n_perturbations`` defaults to the
-    number of variables.
+    most ``3 * n_perturbations`` draws are made. The next search most often undoes a single change,
+    so ``n_perturbations`` defaults to the number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
     defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.6 and took a
@@ -1787,12 +1794,10 @@ def exact_search(
         Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers; or
         ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed
-        data, as for :func:`~andrey.ges`. Each BIC uses the penalty of ``penalty_discount=1``, and
-        the linear-Gaussian BIC adds the extended-BIC term that ``ebic_gamma`` weighs. ``None``
-        picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
+        data, as for :func:`~andrey.ges`. ``None`` picks from the declared column types:
+        ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
@@ -1804,7 +1809,8 @@ def exact_search(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1815,7 +1821,7 @@ def exact_search(
         and finds the best-scoring DAG whose every node keeps within it, so no DAG the returned
         CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
         the same largest number of parents). ``None`` sets no cap.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -1837,22 +1843,26 @@ def exact_search(
         the edges of the DAG the search found as ``[i, j]`` pairs for ``i -> j``, 0-based column
         positions in ascending order; ``metadata["algorithm"]`` is ``"exact_search"``. Under a
         mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read, by
-        name or 0-based position.
+        name or 0-based position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the required
-        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
-        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
-        also if a column repeats another up to scale and shift given more than two rows or, with
-        more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the required edges of
+        ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or ``categorical``
+        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1860,6 +1870,11 @@ def exact_search(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -2039,7 +2054,8 @@ def calm(
     use_moral_graph : bool, default=True
         With ``False`` every pair is a candidate edge, and ``screen_alpha`` has no effect.
     standardize : bool, default=False
-        Scale each column to unit variance first.
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns.
     w_threshold : float, default=0.3
         An edge is kept when its weight magnitude reaches this value, at least ``0``.
     gate_threshold : float, default=0.5
@@ -2082,23 +2098,41 @@ def calm(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
-        ``"seed"`` used, ``"objective"`` (half the sum of the log residual
-        variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
-        acyclicity residual of the returned graph, ``0`` when it is acyclic).
+        coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"calm"``,
+        ``metadata["seed"]`` the seed used, ``metadata["objective"]`` half the sum of the log
+        residual variances plus ``lambda1`` times the edge count (lower is better), and
+        ``metadata["h_final"]`` the acyclicity residual ``h`` of the noise-free gates before the
+        thresholds, the value the rounds compare with ``h_tol``. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
     ImportError
         If the ``[torch]`` extra is not installed.
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the fit's
-        loss or weights stop being finite, for example when the data's scale overflows its
-        covariance; ``standardize=True`` rescales the columns. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the fit's loss or weights stop
+        being finite, for example when the data's scale overflows its covariance;
+        ``standardize=True`` rescales the columns. Also if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    SearchLimitWarning
+        When the fit stops on ``max_iter`` rounds before the acyclicity residual clears ``h_tol`` or
+        ``rho`` reaches ``rho_max``; raise ``max_iter`` to let it run on.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----

@@ -19,16 +19,16 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.score import LocalScore
 from andrey.core.seeding import start_rng
+from andrey.core.ties import KEY_DP
 from andrey.metrics import to_cpdag
 from andrey.search import boss as boss_search
 from andrey.search import grasp as grasp_search
-from andrey.search._parallel import _KEY_DP
 
 
 def grid(n_samples: int) -> float:
     """One step of the grid hill climbing and tabu search round ``delta / n_samples`` to, in score
     units: a smaller gain is rounding."""
-    return n_samples * 10.0**-_KEY_DP
+    return n_samples * 10.0**-KEY_DP
 
 
 def _dag(adj: np.ndarray) -> GraphStructure:
@@ -147,7 +147,10 @@ def boss_gain(data: np.ndarray, score_func: str, seed: int = 0) -> tuple[float, 
         data, score_func, 1.0, 1.0, 1.0, None, None, None
     )
     order = list(range(data.shape[1]))
-    parents, total = boss_search._search_from(order, start_rng(seed, 0), trees, score, None)
+    parents = boss_search._search_from(order, start_rng(seed, 0), trees, None)
+    total = 0.0
+    for child in range(len(order)):
+        total += score.score(child, parents[child])
 
     def order_score(candidate: list[int]) -> float:
         prefix: set[int] = set()
@@ -174,7 +177,7 @@ def grasp_gain(
     the most one tuck of an edge of its end DAG raises the order's score, which GRaSP raises, and
     the CPDAG it returns."""
     data = np.asarray(data, dtype=np.float64)
-    _, ranks, trees, _ = grasp_search._search_state(
+    _, ranks, trees, _ = boss_search._search_state(
         data, score_func, 1.0, 1.0, 1.0, None, None, None
     )
     order = grasp_search._search_from(data.shape[1], start_rng(seed, 0), trees, depth, None)

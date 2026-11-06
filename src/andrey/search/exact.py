@@ -2,22 +2,21 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
-Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + penalty_discount *
-len(parents) * log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of
-``len(parents)`` when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the
-centered node on its centered parents, solved from the Gram matrix (a pseudo-inverse when the
-parents' block is singular). A parent set of more than ``n - 2`` members, or one that leaves
-``resid`` at most ``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never
-chosen. The categorical scores are :class:`~andrey.core.score.BDeuScore` and
-:class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
+The local scores are those :func:`~andrey.core.score.make_score` builds: the linear-Gaussian BIC
+:class:`~andrey.core.score.BICScore`, the categorical scores :class:`~andrey.core.score.BDeuScore`
+and :class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
 :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, whose BIC penalties
-``penalty_discount`` weighs as well; BDeu ignores it. Both searches, A* (``"astar"``) and the
+``penalty_discount`` weighs; BDeu ignores it. Every parent set is scored through the score's
+``score_many``, a batch of sets of one size per call, so the BIC solves the batch's normal
+equations in one stacked call. A parent set of more than ``n - 2`` members, or one that leaves a
+residual variance of zero up to rounding, scores ``inf`` under the BIC and is never chosen. Both
+searches, A* (``"astar"``) and the
 subset-lattice dynamic program (``"dp"``), run over the order graph, whose nodes are variable
 subsets: the shortest path from the empty set to the full set gives each variable its best parent
 set among the variables before it. Every DAG of the optimal DAG's Markov equivalence class has the
 same score, so the search's choice among them follows rounding and column order;
 :func:`_canonical_member` replaces it by one member fixed by the CPDAG and
-:func:`~andrey.search.hc.tie_ranks`.
+:func:`~andrey.core.ties.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -25,30 +24,17 @@ from __future__ import annotations
 import bisect
 import heapq
 import itertools
-from collections.abc import Sequence
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
+from andrey.core._bitset import bitmask
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    LINEAR_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    ZERO_RESIDUAL,
-    Score,
-    check_columns,
-    ebic_penalty,
-    make_score,
-    penalty_weight,
-)
-from andrey.search.hc import tie_ranks
-
-#: The local scores :func:`exact_search` accepts.
-EXACT_SCORES: tuple[str, ...] = SCORES
+from andrey.core.score import LocalScore, make_score
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_mask, tie_ranks
+from andrey.search.operators import check_parent_cap
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -62,14 +48,6 @@ _SCORE_BATCH = 4096
 # ``n_vars * 2**n_vars`` bytes and the per-mask minima ``8 * 2**n_vars``. A fit over it scans the
 # parent graphs instead (:func:`_best_subset`), which gives the same results.
 _LOOKUP_BYTES = 1 << 28
-
-
-def _structure_bits(structure: Sequence[int]) -> int:
-    """Bitmask of a parent set: bit ``v`` set iff ``v`` is in ``structure``."""
-    bits = 0
-    for v in structure:
-        bits |= 1 << int(v)
-    return bits
 
 
 def _best_subset(
@@ -116,82 +94,8 @@ def _subset_lookup(
     return first, options
 
 
-class _GramBICScore:
-    """Linear-Gaussian BIC score on mean-centered data.
-
-    Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
-    :meth:`score_many` regresses a node on each parent set through the normal equations on ``S`` to
-    get the residual sum of squares, then applies the BIC penalty weighted by ``penalty_discount``.
-    Without the centering, a nonzero mean would count as shared signal and link independent
-    variables. A nonzero ``ebic_gamma`` adds the extended-BIC term
-    :func:`~andrey.core.score.ebic_penalty`. Raises ``ValueError`` for a column
-    :func:`~andrey.core.score.check_columns` rejects, or for an ``ebic_gamma`` or
-    ``penalty_discount`` that is negative or non-finite.
-    """
-
-    def __init__(
-        self, data: np.ndarray, ebic_gamma: float = 0.0, penalty_discount: float = 1.0
-    ) -> None:
-        self._ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
-        self._penalty_discount = penalty_weight(penalty_discount)
-        self._n_vars = data.shape[1]
-        data = data - data.mean(axis=0)
-        self._gram = data.T @ data
-        self._diag = np.diag(self._gram)
-        self._n = data.shape[0]
-        self._log_n = float(np.log(self._n))
-        check_columns(self._gram / (self._n - 1), self._n)
-
-    def score(self, node: int, parents: Sequence[int]) -> float:
-        """Return the negative local BIC score for ``node`` given ``parents`` (lower is better)."""
-        return self.score_many(node, [parents])[0]
-
-    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the negative local BIC scores for parent sets of one size, in request order.
-
-        Solves the sets' normal equations in one stacked call, or each with
-        :func:`_solve_normal_equations` when one is singular; each score equals the one the set
-        gets alone.
-        """
-        size = len(parent_sets[0])
-        if size > self._n - 2:
-            return [float("inf")] * len(parent_sets)
-        if not size:
-            resids = [self._diag[node]] * len(parent_sets)
-        else:
-            pa = np.array(parent_sets)
-            gram_pa = self._gram[pa[:, :, None], pa[:, None, :]]
-            gram_node_pa = self._gram[node, pa]
-            try:
-                betas = np.linalg.solve(gram_pa, gram_node_pa[..., None])[..., 0]
-            except np.linalg.LinAlgError:  # one singular set fails the whole stacked call
-                pairs = zip(gram_pa, gram_node_pa, strict=True)
-                betas = [_solve_normal_equations(a, b) for a, b in pairs]
-            resids = [
-                self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
-            ]
-        penalty = self._penalty_discount * size * self._log_n
-        if self._ebic_gamma:
-            penalty += ebic_penalty(size, self._n_vars, self._ebic_gamma)
-        values = []
-        for resid in resids:
-            if not resid > ZERO_RESIDUAL * self._diag[node]:
-                values.append(float("inf"))
-            else:
-                values.append(float(self._n * np.log(resid / self._n) + penalty))
-        return values
-
-
-def _solve_normal_equations(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Solve ``a @ x = b``, falling back to the pseudo-inverse when ``a`` is singular."""
-    try:
-        return np.linalg.solve(a, b)
-    except np.linalg.LinAlgError:
-        return np.linalg.pinv(a) @ b
-
-
 def _generate_parent_graph(
-    score: Score,
+    score: LocalScore,
     node: int,
     n_vars: int,
     constraints: Constraints | None = None,
@@ -229,8 +133,8 @@ def _generate_parent_graph(
         required = tuple(np.flatnonzero(constraints.required[:, node]).tolist())
         legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
-    required_value = score.score(node, required)
-    required_bits = _structure_bits(required)
+    required_value = score.score_many(node, [required])[0]
+    required_bits = bitmask(required)
     insert(required, required_value, required_bits)
     # Each enumerated set's bitmask -> the lowest score of a retained set within it.
     lowest = np.full(1 << n_vars if tables else 0, np.inf)
@@ -243,13 +147,10 @@ def _generate_parent_graph(
         level = itertools.combinations(candidates, size)
         while extras := list(itertools.islice(level, _SCORE_BATCH)):
             combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
-            if isinstance(score, _GramBICScore):  # one stacked solve per batch
-                values = score.score_many(node, combos)
-            else:
-                values = [score.score(node, list(combo)) for combo in combos]
+            values = score.score_many(node, combos)
             if not tables:
                 for extra, combo, value in zip(extras, combos, values, strict=True):
-                    bits = _structure_bits(combo)
+                    bits = bitmask(combo)
                     maximal = True
                     for v in extra:  # dropping a required parent leaves no legal subset
                         _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
@@ -401,15 +302,14 @@ def exact_search(
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC, on mean-centered
-    data.
+    Scores candidates with ``score_func``; the default is the linear-Gaussian BIC.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
     number of variables, so intended for small problems.
 
     Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
     :func:`_canonical_member` fixes: the class's reversible edges that ``constraints`` leave open
-    are oriented by the order of :func:`~andrey.search.hc.tie_ranks`, ranks computed from the data.
+    are oriented by the order of :func:`~andrey.core.ties.tie_ranks`, ranks computed from the data.
     Both searches return this member, it does not depend on last-bit rounding, and reordering the
     columns relabels it.
 
@@ -420,8 +320,8 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"bic"``), a
-        categorical score, or a mixed-data BIC.
+        Local score, one of :data:`~andrey.core.score.SCORES`: the linear-Gaussian BIC
+        (``"bic"``), a categorical score, or a mixed-data BIC.
     penalty_discount : float
         Multiplier on the BIC penalty of ``log(n)`` per parameter; BDeu ignores it.
     ebic_gamma : float
@@ -451,33 +351,20 @@ def exact_search(
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
         raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
-    if score_func not in EXACT_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
-        )
-    if (
-        max_parents is not None
-        and constraints is not None
-        and (constraints.required.sum(axis=0) > max_parents).any()
-    ):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
-    score: Score = (
-        _GramBICScore(X, ebic_gamma, penalty_discount)
-        if score_func in LINEAR_SCORES
-        else make_score(
-            score_func,
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            categorical=categorical,
-        )
+    score = make_score(
+        score_func,
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        categorical=categorical,
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [
@@ -490,12 +377,9 @@ def exact_search(
     else:
         structures = _dp_shortest_path(parent_graphs, n_vars, tables)
 
-    adj = np.zeros((n_vars, n_vars), dtype=np.int8)
+    dag = np.zeros((n_vars, n_vars), dtype=bool)
     for child, parents in enumerate(structures):
-        for parent in parents:
-            adj[parent, child] = TAIL  # tail at the parent
-            adj[child, parent] = ARROW  # arrowhead at the child
-    mask = np.full(n_vars, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        mask = column_mask(categorical, n_vars)
-    return to_structure(_canonical_member(adj, tie_ranks(X, mask), constraints), kind="dag")
+        dag[list(parents), child] = True
+    adj = endpoint_marks(dag)
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, n_vars))
+    return to_structure(_canonical_member(adj, ranks, constraints), kind="dag")

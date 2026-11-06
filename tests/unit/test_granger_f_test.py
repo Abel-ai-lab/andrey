@@ -1,17 +1,27 @@
-"""Granger's lagged-coefficient tests agree with statsmodels' vector autoregression."""
+"""Granger's lagged-coefficient tests are the least-squares t-tests of each equation of the vector
+autoregression, computed here in closed form."""
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
 from scipy import stats
-from statsmodels.tsa.api import VAR
-from statsmodels.tsa.stattools import grangercausalitytests
 
 import andrey
 from andrey.temporal.granger import granger_f_test
+
+
+def least_squares(y: np.ndarray, regressors: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    """The least-squares fit of ``y`` on a constant and ``regressors``: each regressor's
+    coefficient, the two-sided t-test p-value of each on the residual degrees of freedom, and the
+    residual sum of squares."""
+    design = np.column_stack([np.ones(len(y)), regressors])
+    coef = np.linalg.lstsq(design, y, rcond=None)[0]
+    residuals = y - design @ coef
+    df = len(y) - design.shape[1]
+    rss = float(residuals @ residuals)
+    se = np.sqrt(rss / df * np.diag(np.linalg.inv(design.T @ design)))
+    return coef[1:], 2 * stats.t.sf(np.abs(coef / se), df)[1:], rss
 
 
 def var_series(n: int = 400, seed: int = 0) -> np.ndarray:
@@ -30,28 +40,32 @@ def var_series(n: int = 400, seed: int = 0) -> np.ndarray:
 @pytest.mark.parametrize("lags", [1, 2, 3])
 def test_coefficients_and_p_values_are_the_var_regression_ones(lags):
     """``[i, j + d * (k - 1)]`` is the coefficient of variable ``j`` at lag ``k`` in the regression
-    of ``i``, and its p-value is the two-sided t-test of ``VARResults``' t-ratio with its residual
-    degrees of freedom, the F-test of that regressor (row 0 of its tables is the constant, its
-    columns the equations). ``VARResults.pvalues`` takes the same t-ratio against the normal
-    distribution, which the t-test approaches as the series grows."""
+    of ``i`` on a constant and every variable's ``lags`` past values, and its p-value is that
+    coefficient's two-sided t-test on the regression's residual degrees of freedom, the F-test of
+    that one regressor."""
     x = var_series()
-    d = x.shape[1]
-    result = VAR(x).fit(maxlags=lags, ic=None, trend="c")
+    n, d = x.shape
+    design = np.hstack([x[lags - k : n - k] for k in range(1, lags + 1)])
     coeff, p_values = granger_f_test(x, maxlag=lags, alpha=1.0)
     assert coeff.shape == p_values.shape == (d, d * lags)
-    np.testing.assert_allclose(coeff, result.params[1:].T, rtol=1e-8, atol=1e-12)
-    reference = 2 * stats.t.sf(np.abs(result.tvalues[1:].T), result.df_resid)
-    np.testing.assert_allclose(p_values, reference, rtol=1e-6, atol=1e-300)
-    assert (p_values >= result.pvalues[1:].T).all()  # the t distribution has the heavier tails
+    for i in range(d):
+        reference, reference_p, _ = least_squares(x[lags:, i], design)
+        np.testing.assert_allclose(coeff[i], reference, rtol=1e-8, atol=1e-12)
+        np.testing.assert_allclose(p_values[i], reference_p, rtol=1e-6, atol=1e-300)
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2])
-def test_two_variables_at_one_lag_give_the_pairwise_granger_f_test(seed):
-    """With two variables and one lag, the coefficient test is statsmodels' ``ssr_ftest``."""
-    x = var_series(seed=seed)[:, :2]
+def test_two_variables_at_one_lag_give_the_pairwise_granger_f_test():
+    """With two variables and one lag, the coefficient test is the F-test of the cause's past
+    against the effect's own: ``F = (RSS_own - RSS_both) / (RSS_both / df)`` on 1 and ``df``
+    degrees of freedom, ``df`` the rows less the three coefficients of the larger regression."""
+    x = var_series()[:, :2]
     _, p_values = granger_f_test(x, maxlag=1)
     for cause, effect in ((0, 1), (1, 0)):
-        reference = grangercausalitytests(x[:, [effect, cause]], maxlag=1)[1][0]["ssr_ftest"][1]
+        y = x[1:, effect]
+        *_, own = least_squares(y, x[:-1, [effect]])
+        *_, both = least_squares(y, x[:-1, [effect, cause]])
+        df = len(y) - 3
+        reference = stats.f.sf((own - both) / (both / df), 1, df)
         np.testing.assert_allclose(p_values[effect, cause], reference, rtol=1e-8, atol=1e-300)
 
 
@@ -99,16 +113,6 @@ def test_the_edges_and_p_values_do_not_depend_on_the_units():
     )
     for k in (1, 2):
         assert plain.structure.lag(k).oriented_edges() == rescaled.structure.lag(k).oriented_edges()
-
-
-def test_cv_is_ignored_with_a_warning():
-    x = var_series()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="cv"):
-        out = andrey.granger(x, cv=5)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        same = andrey.granger(x)
-    np.testing.assert_array_equal(out.metadata["p_values"], same.metadata["p_values"])
 
 
 @pytest.mark.parametrize("alpha", [0, 1, -0.1, 1.5])

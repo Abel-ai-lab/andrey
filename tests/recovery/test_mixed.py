@@ -8,6 +8,8 @@ network from :func:`andrey.data.sample_mixed`, scored against its CPDAG with a m
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -48,37 +50,23 @@ def _independent(seed: int = 20261013, n: int = 3000) -> np.ndarray:
     ).astype(np.float64)
 
 
+#: The mixed-data settings: each name is both a test and a score.
+MIXED = ("degen_gauss", "cond_gauss")
 # Each fit that learns a CPDAG from mixed data, by its mixed-data setting.
 CPDAG_FITS = {
-    "pc-degen_gauss": lambda x, c: andrey.pc(x, indep_test="degen_gauss", categorical=c),
-    "pc-cond_gauss": lambda x, c: andrey.pc(x, indep_test="cond_gauss", categorical=c),
-    "ges-degen_gauss": lambda x, c: andrey.ges(x, score_func="degen_gauss", categorical=c),
-    "ges-cond_gauss": lambda x, c: andrey.ges(x, score_func="cond_gauss", categorical=c),
-    "gies-degen_gauss": lambda x, c: andrey.gies(x, score_func="degen_gauss", categorical=c),
-    "gies-cond_gauss": lambda x, c: andrey.gies(x, score_func="cond_gauss", categorical=c),
-    "xges-degen_gauss": lambda x, c: andrey.xges(x, score_func="degen_gauss", categorical=c),
-    "xges-cond_gauss": lambda x, c: andrey.xges(x, score_func="cond_gauss", categorical=c),
-    "hc-degen_gauss": lambda x, c: andrey.hc(x, score_func="degen_gauss", categorical=c),
-    "hc-cond_gauss": lambda x, c: andrey.hc(x, score_func="cond_gauss", categorical=c),
-    "tabu-degen_gauss": lambda x, c: andrey.tabu(x, score_func="degen_gauss", categorical=c),
-    "tabu-cond_gauss": lambda x, c: andrey.tabu(x, score_func="cond_gauss", categorical=c),
-    "boss-degen_gauss": lambda x, c: andrey.boss(x, score_func="degen_gauss", categorical=c),
-    "boss-cond_gauss": lambda x, c: andrey.boss(x, score_func="cond_gauss", categorical=c),
-    "grasp-degen_gauss": lambda x, c: andrey.grasp(x, score_func="degen_gauss", categorical=c),
-    "grasp-cond_gauss": lambda x, c: andrey.grasp(x, score_func="cond_gauss", categorical=c),
-    "cdnod-cond_gauss": lambda x, c: andrey.cdnod(
-        x, np.zeros(len(x)), indep_test="cond_gauss", categorical=c
+    **{f"pc-{test}": partial(andrey.pc, indep_test=test) for test in MIXED},
+    **{
+        f"{method}-{score}": partial(getattr(andrey, method), score_func=score)
+        for method in ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp")
+        for score in MIXED
+    },
+    "cdnod-cond_gauss": lambda x, categorical: andrey.cdnod(
+        x, np.zeros(len(x)), indep_test="cond_gauss", categorical=categorical
     ),
 }
 PAG_FITS = {
-    "fci-degen_gauss": lambda x, c: andrey.fci(x, indep_test="degen_gauss", categorical=c),
-    "fci-cond_gauss": lambda x, c: andrey.fci(x, indep_test="cond_gauss", categorical=c),
-    "gfci-degen_gauss": lambda x, c: andrey.gfci(
-        x, score_func="degen_gauss", indep_test="degen_gauss", categorical=c
-    ),
-    "gfci-cond_gauss": lambda x, c: andrey.gfci(
-        x, score_func="cond_gauss", indep_test="cond_gauss", categorical=c
-    ),
+    **{f"fci-{test}": partial(andrey.fci, indep_test=test) for test in MIXED},
+    **{f"gfci-{name}": partial(andrey.gfci, score_func=name, indep_test=name) for name in MIXED},
 }
 
 
@@ -88,7 +76,7 @@ def _edges(out, kinds):
 
 @pytest.mark.parametrize("fit", [fit for fit in CPDAG_FITS if not fit.startswith("hc-")])
 def test_cpdag_methods_recover_the_mixed_network(fit):
-    out = CPDAG_FITS[fit](_network(), CATEGORICAL)
+    out = CPDAG_FITS[fit](_network(), categorical=CATEGORICAL)
     assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == DIRECTED
     assert _edges(out, {"undirected"}) == UNDIRECTED
@@ -101,7 +89,7 @@ def test_hill_climbing_stops_at_a_local_optimum_on_the_mixed_network(score_func)
     categorical one."""
     x = _network()
     categorical = np.isin(np.arange(x.shape[1]), CATEGORICAL)
-    out = CPDAG_FITS[f"hc-{score_func}"](x, CATEGORICAL)
+    out = CPDAG_FITS[f"hc-{score_func}"](x, categorical=CATEGORICAL)
     score = make_score(score_func, x, categorical=categorical)
     forbidden = (
         ~categorical[:, None] & categorical[None, :]
@@ -111,7 +99,7 @@ def test_hill_climbing_stops_at_a_local_optimum_on_the_mixed_network(score_func)
 
 @pytest.mark.parametrize("fit", list(PAG_FITS))
 def test_pag_methods_find_the_skeleton_and_the_collider(fit):
-    out = PAG_FITS[fit](_network(), CATEGORICAL)
+    out = PAG_FITS[fit](_network(), categorical=CATEGORICAL)
     assert out.structure.kind == "pag"
     assert {(a, b) for a, b, _ in out.structure.oriented_edges()} == DIRECTED | UNDIRECTED
     marks = out.structure.to_numpy()
@@ -130,7 +118,7 @@ def test_exact_search_finds_a_dag_in_the_true_class(score_func):
 
 @pytest.mark.parametrize("fit", [*CPDAG_FITS, *PAG_FITS])
 def test_independent_columns_give_no_edges(fit):
-    out = {**CPDAG_FITS, **PAG_FITS}[fit](_independent(), [0, 2])
+    out = {**CPDAG_FITS, **PAG_FITS}[fit](_independent(), categorical=[0, 2])
     assert out.structure.oriented_edges() == []
 
 
@@ -142,8 +130,8 @@ def test_the_graph_does_not_depend_on_codes_or_units(fit):
     x = _network()
     recoded = x * np.array([3.0, 0.01, -2.0, 50.0, -1.0]) + np.array([-7.0, 4.0, 0.0, 11.0, 100.0])
     assert np.array_equal(
-        CPDAG_FITS[fit](recoded, CATEGORICAL).structure.to_numpy(),
-        CPDAG_FITS[fit](x, CATEGORICAL).structure.to_numpy(),
+        CPDAG_FITS[fit](recoded, categorical=CATEGORICAL).structure.to_numpy(),
+        CPDAG_FITS[fit](x, categorical=CATEGORICAL).structure.to_numpy(),
     )
 
 
@@ -217,7 +205,8 @@ def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10
     categorical = random_network.provenance["config"]["categorical"]
-    assert shd(CPDAG_FITS[fit](random_network.data, categorical).structure, truth) <= _MARGIN
+    out = CPDAG_FITS[fit](random_network.data, categorical=categorical)
+    assert shd(out.structure, truth) <= _MARGIN
 
 
 @pytest.mark.parametrize("score_func", ["degen_gauss", "cond_gauss"])

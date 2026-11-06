@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.output import StructureOutput
-from andrey.core.structure import LATENT, GraphStructure
+from andrey.core.structure import LATENT, GraphStructure, directed_support
 
-from ._common import directed_adjacency
+from ._common import unwrap
 
 
 def _graph(x: object) -> GraphStructure:
     """Unwrap a StructureOutput to its GraphStructure (latent info is in ``node_types``)."""
-    if isinstance(x, StructureOutput):
-        x = x.structure
+    x = unwrap(x)
     if not isinstance(x, GraphStructure):
         raise TypeError("latent metrics need a GraphStructure with node_types")
     return x
@@ -34,7 +32,7 @@ def _clusters(g: GraphStructure) -> dict[int, object]:
     marks = g.to_numpy()
     types = g.node_types
     latent = types == LATENT if types is not None else np.zeros(g.n_nodes, dtype=bool)
-    parents_of = directed_adjacency(marks).T  # parents_of[o] = nodes pointing into o
+    parents_of = directed_support(marks).T  # parents_of[o] = nodes pointing into o
     clusters: dict[int, object] = {}
     for o in np.nonzero(~latent)[0]:
         latent_parents = np.nonzero(parents_of[o] & latent)[0]
@@ -47,7 +45,21 @@ def _clusters(g: GraphStructure) -> dict[int, object]:
 
 
 def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
-    """Adjusted Rand index between two label vectors (chance-corrected; 1.0 is identical).
+    """Return the adjusted Rand index between two clusterings of the same items.
+
+    Parameters
+    ----------
+    labels_a : array-like of shape (n,)
+        Each item's cluster label.
+    labels_b : array-like of shape (n,)
+        Each item's cluster label in the other clustering.
+
+    Returns
+    -------
+    float
+        The chance-corrected agreement: 1.0 for the same partition, about 0.0 for chance. Fewer
+        than two items score 1.0, and so do two partitions that both put every item together or
+        both put every item apart.
 
     Examples
     --------
@@ -59,7 +71,7 @@ def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
     if a.shape != b.shape:
         raise ValueError(f"label-length mismatch: {a.shape} vs {b.shape}")
     n = a.shape[0]
-    if n < 2:  # 0 or 1 elements: the partition is trivially perfect (matches sklearn)
+    if n < 2:  # 0 or 1 elements: the partition is trivially perfect
         return 1.0
     _, ai = np.unique(a, return_inverse=True)
     _, bi = np.unique(b, return_inverse=True)
@@ -81,11 +93,23 @@ def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
 
 
 def latent_cluster_ari(estimated: object, true: object) -> float:
-    """Adjusted Rand index of the latent clustering of the observed variables.
+    """Return the adjusted Rand index of the latent clustering of the observed variables.
 
-    Clusters each observed node by its latent parent, then scores the two partitions. The two graphs
-    must describe the same observed variables (same indices and labels), though their latent counts
-    may differ; a mismatch raises. Returns 1.0 when there are no observed nodes.
+    Clusters each observed node by its latent parents, then scores the two partitions. The two
+    graphs must describe the same observed variables, at the same indices with the same labels,
+    though their latent counts may differ; a mismatch raises.
+
+    Parameters
+    ----------
+    estimated : StructureOutput or GraphStructure
+        The estimated graph, whose ``node_types`` flag its latent nodes.
+    true : StructureOutput or GraphStructure
+        The true graph, whose ``node_types`` flag its latent nodes.
+
+    Returns
+    -------
+    float
+        The adjusted Rand index of the two clusterings, or 1.0 when there is no observed node.
 
     Examples
     --------
@@ -125,7 +149,17 @@ def _int_labels(clusters: dict[int, object], nodes: list[int]) -> list[int]:
 
 
 def number_of_latents(graph: object) -> int:
-    """Count of nodes flagged ``LATENT`` (0 when ``node_types`` is unset).
+    """Return the number of nodes a graph flags ``LATENT``.
+
+    Parameters
+    ----------
+    graph : StructureOutput or GraphStructure
+        The graph, whose ``node_types`` flag its latent nodes.
+
+    Returns
+    -------
+    int
+        The number of latent nodes, 0 when ``node_types`` is unset.
 
     Examples
     --------

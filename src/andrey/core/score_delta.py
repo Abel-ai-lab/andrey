@@ -18,7 +18,7 @@ score (:func:`_add_error_bounds`). :func:`local_score_bic_delta` scores one move
 removal against one base at once, and :class:`DeltaBICScore` keeps the caches a search reuses.
 :class:`FullScoreDelta` differences two full local scores of any :class:`~andrey.core.score.Score`,
 for a score with no rank-one update, such as BDeu, and :func:`full_add_deltas` scores every add
-against one base that way.
+against one base that way. :func:`make_delta` picks the one of the two that fits a score.
 """
 
 from __future__ import annotations
@@ -1427,6 +1427,13 @@ class FullScoreDelta:
     def move_bound(self, i: int, base_parents: Sequence[int], op: str, u: int) -> float:
         """Return 0: every score is a full score."""
         return 0.0
+
+
+def make_delta(score: LocalScore) -> DeltaBICScore | FullScoreDelta:
+    """The move deltas of ``score``: :class:`DeltaBICScore` for a
+    :class:`~andrey.core.score.BICScore`, which has the Schur update, else :class:`FullScoreDelta`.
+    """
+    return DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
 
 
 def full_add_deltas(
