@@ -21,7 +21,6 @@ import pytest
 import andrey
 from andrey import metrics
 from andrey.api import __all__ as API_ALL
-from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
@@ -46,6 +45,26 @@ _SPEC_NAMES = sorted(REGISTRY)
 def test_registry_matches_api_all_both_ways():
     """No method is in one list but not the other -- the registry cannot silently drift."""
     assert set(REGISTRY) == set(API_ALL)
+
+
+def test_every_method_is_exported_at_the_top_level():
+    """``andrey.<name>`` is the facade of every method in ``andrey.api.__all__``."""
+    assert set(API_ALL) <= set(andrey.__all__)
+    assert all(getattr(andrey, name) is getattr(andrey.api, name) for name in API_ALL)
+
+
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_spec_references_are_in_the_docstring(name):
+    """Each of the spec's ``references``, which ``--help --json`` lists, names an entry of the
+    facade's References section by its first author and year."""
+    doc = inspect.getdoc(getattr(andrey, name)) or ""
+    section = doc.partition("References\n----------\n")[2]
+    entries = [" ".join(e.split()) for e in re.split(r"^\.\. \[\d+\] ", section, flags=re.M)[1:]]
+    cited = {(e.split(",")[0], year) for e in entries for year in re.findall(r"\((\d{4})\)", e)}
+    for reference in get_spec(name).references:
+        authors, year = reference.rsplit(" ", 1)
+        first = re.split(r",| & | et al\.", authors)[0]
+        assert (first, year) in cited, f"{name}: {reference!r} is not in its References"
 
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)
@@ -118,15 +137,14 @@ def _type_matches(ptype: str, default: object) -> bool:
 @pytest.mark.parametrize("name", list(REGISTRY))
 def test_knowledge_parts_match_the_facade(name):
     """A method takes ``knowledge`` exactly when its spec lists the parts it honors, and its
-    docstring names them."""
+    docstring says it honors all of them."""
     spec = get_spec(name)
     takes = "knowledge" in inspect.signature(getattr(andrey, name)).parameters
     assert takes is bool(spec.knowledge)
     if takes:
         doc = inspect.getdoc(getattr(andrey, name)) or ""
         entry = doc.split("knowledge : Knowledge or None", 1)[1].split("\n\n", 1)[0]
-        named = "all honored" if spec.knowledge == KNOWLEDGE_PARTS else ", ".join(spec.knowledge)
-        assert named in " ".join(entry.split())
+        assert "all honored" in " ".join(entry.split())
 
 
 def test_param_type_is_consistent_with_default():

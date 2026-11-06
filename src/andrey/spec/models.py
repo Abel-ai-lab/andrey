@@ -13,6 +13,8 @@ from typing import Any, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
+
 Family = Literal[
     "constraint", "score", "permutation", "functional", "temporal", "latent", "pairwise"
 ]
@@ -34,8 +36,6 @@ InputKind = Literal[
 # knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
 # targets: an object mapping each environment's label to its intervened variables (gies).
 ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge", "targets"]
-# The parts of an andrey.Knowledge a method honors.
-KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 
 EnvGroup = Literal["backend", "reproducibility", "determinism", "data"]
 
@@ -238,19 +238,32 @@ class MethodSpec(Spec):
     summary: str  # bounded "when to reach for this"
     data: DataSpec
     output: OutputSpec
-    determinism: Determinism
     accel: Accel
     status: Status
     column_order: ColumnOrder
     tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
     order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
-    seeded: bool = False  # takes a seed (the param tagged ``seed``), which ANDREY_SEED fills
     # Former arguments the method no longer has, ignored with a DeprecatedArgumentWarning for one
     # release.
     dropped_args: tuple[str, ...] = ()
     references: tuple[str, ...] = ()
-    knowledge: tuple[KnowledgePart, ...] = ()  # the Knowledge parts its knowledge= honors
+
+    @property
+    def seeded(self) -> bool:
+        """Whether the method takes a seed, the param tagged ``seed``, which ANDREY_SEED fills."""
+        return any(p.concept == "seed" for p in self.params)
+
+    @property
+    def determinism(self) -> Determinism:
+        """``stochastic`` for a seeded method, else ``deterministic``."""
+        return "stochastic" if self.seeded else "deterministic"
+
+    @property
+    def knowledge(self) -> tuple[KnowledgePart, ...]:
+        """The parts of an ``andrey.Knowledge`` the method honors: every part when it takes
+        ``knowledge``, else none."""
+        return KNOWLEDGE_PARTS if any(p.type == "knowledge" for p in self.params) else ()
 
 
 class EnvVarSpec(Spec):

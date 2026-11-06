@@ -180,34 +180,7 @@ class StructureOutput:
 
         A metadata entry whose value is an empty list, tuple, dict, or set is left out.
         """
-        return "\n".join(self._summary())
-
-    def _summary(
-        self, *, name: str | None = None, limit: int | None = SUMMARY_EDGES, more: str = ""
-    ) -> list[str]:
-        """Build the result summary as lines for ``repr`` and ``andrey run``.
-
-        ``name`` defaults to ``metadata["algorithm"]``. ``limit`` caps the listed edges, and
-        ``more`` extends the omitted-edge count. Edge weights come from the sparse store.
-        """
-        algorithm = self._metadata.get("algorithm")
-        if name is None and algorithm is not None:
-            name = str(algorithm)
-        weights = None if self._w_indptr is None else self.to_scipy_sparse()
-        s = self._structure
-        lines = s._summary(name=name, weights=weights, limit=limit, more=more)
-        if self._ordering is not None:
-            labels = s.labels
-            order = " -> ".join(labels[i] if labels else str(i) for i in self._ordering)
-            lines += ["", f"  order: {order}"]
-        meta = [
-            f"  {k}: {_brief(k, v)}"
-            for k, v in self._metadata.items()
-            if k != "algorithm" and not (isinstance(v, (list, tuple, dict, set)) and not v)
-        ]
-        if meta:
-            lines += ["", *meta]
-        return lines
+        return "\n".join(summary_lines(self))
 
     def to_scipy_sparse(self, *, weights: bool = True) -> scipy.sparse.csr_array:
         """Return the edge weights as a ``scipy.sparse.csr_array``, without a dense array.
@@ -500,6 +473,38 @@ class StructureOutput:
         return True
 
     __hash__ = None  # type: ignore[assignment]
+
+
+def summary_lines(
+    out: StructureOutput,
+    *,
+    name: str | None = None,
+    limit: int | None = SUMMARY_EDGES,
+    more: str = "",
+) -> list[str]:
+    """Return the result summary as lines, for ``repr`` and ``andrey run``.
+
+    ``name`` defaults to ``metadata["algorithm"]``. ``limit`` caps the listed edges, and ``more``
+    ends the line that counts the others. Edge weights come from the sparse store.
+    """
+    algorithm = out._metadata.get("algorithm")
+    if name is None and algorithm is not None:
+        name = str(algorithm)
+    weights = None if out._w_indptr is None else out.to_scipy_sparse()
+    s = out._structure
+    lines = s._summary(name=name, weights=weights, limit=limit, more=more)
+    if out._ordering is not None:
+        labels = s.labels
+        order = " -> ".join(labels[i] if labels else str(i) for i in out._ordering)
+        lines += ["", f"  order: {order}"]
+    meta = [
+        f"  {k}: {_brief(k, v)}"
+        for k, v in out._metadata.items()
+        if k != "algorithm" and not (isinstance(v, (list, tuple, dict, set)) and not v)
+    ]
+    if meta:
+        lines += ["", *meta]
+    return lines
 
 
 def _graph_to_doc(g: GraphStructure) -> dict:

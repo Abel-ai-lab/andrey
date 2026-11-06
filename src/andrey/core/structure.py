@@ -1440,36 +1440,6 @@ class GraphStructure(Structure):
         counts[0] += reciprocal_count
         return {_TYPE_NAMES[codes[k]]: int(counts[codes[k]]) for k in np.sort(first)}
 
-    def _edge_count_text(self) -> str:
-        """Format the edge count and type breakdown for a summary header."""
-        counts = self._type_counts()
-        types = ", ".join(f"{n} {t}" for t, n in counts.items()) or "no edges"
-        return f"{sum(counts.values())} edges ({types})"
-
-    def _edge_lines(
-        self,
-        *,
-        weights: np.ndarray | scipy.sparse.csr_array | None = None,
-        limit: int | None = SUMMARY_EDGES,
-        more: str = "",
-    ) -> list[str]:
-        """Format up to ``limit`` edges and append the omitted-edge count, if any."""
-        names = self._labels
-        pairs = self._mark_pairs()
-        lines = []
-        for s, t, edge_type in itertools.islice(self._oriented(pairs), limit):
-            directed = edge_type in ("directed", "partially_directed")
-            weight = f"  ({float(weights[s, t]):+.3g})" if weights is not None and directed else ""
-            source, target = (names[s], names[t]) if names else (str(s), str(t))
-            lines.append(f"{source} {EDGE_GLYPHS[edge_type]} {target}{weight}")
-        left = len(pairs[0]) - len(lines)
-        if self._kind == "digraph":
-            i, j, near, far = pairs
-            left += np.count_nonzero((i != j) & (near == ARROW) & (far == ARROW))
-        if left > 0:
-            lines.append(f"... and {left} more{more}")
-        return lines
-
     def _summary(
         self,
         *,
@@ -1479,9 +1449,9 @@ class GraphStructure(Structure):
         more: str = "",
     ) -> list[str]:
         """Build the graph header, edge lines, and optional latent-node line."""
-        head = f"{self._kind}  |  {self._n_nodes} nodes  |  {self._edge_count_text()}"
+        head = f"{self._kind}  |  {self._n_nodes} nodes  |  {edge_count_text(self)}"
         lines = [head if name is None else f"{name}  {head}"]
-        edges = self._edge_lines(weights=weights, limit=limit, more=more)
+        edges = edge_lines(self, weights=weights, limit=limit, more=more)
         if edges:
             lines += ["", *("  " + line for line in edges)]
         if self._node_types is not None and (self._node_types == LATENT).any():
@@ -1537,6 +1507,42 @@ class GraphStructure(Structure):
         return all(np.array_equal(x, y) for x, y in zip(a, b))
 
     __hash__ = None  # type: ignore[assignment]
+
+
+def edge_count_text(graph: GraphStructure) -> str:
+    """Return the edge count and type breakdown of a summary header, such as ``3 edges (2
+    directed, 1 undirected)``."""
+    counts = graph._type_counts()
+    types = ", ".join(f"{n} {t}" for t, n in counts.items()) or "no edges"
+    return f"{sum(counts.values())} edges ({types})"
+
+
+def edge_lines(
+    graph: GraphStructure,
+    *,
+    weights: np.ndarray | scipy.sparse.csr_array | None = None,
+    limit: int | None = SUMMARY_EDGES,
+    more: str = "",
+) -> list[str]:
+    """Return the summary lines of up to ``limit`` edges, then the count of the others, if any.
+
+    ``weights[source, target]`` follows a directed edge, and ``more`` ends the count's line.
+    """
+    names = graph._labels
+    pairs = graph._mark_pairs()
+    lines = []
+    for s, t, edge_type in itertools.islice(graph._oriented(pairs), limit):
+        directed = edge_type in ("directed", "partially_directed")
+        weight = f"  ({float(weights[s, t]):+.3g})" if weights is not None and directed else ""
+        source, target = (names[s], names[t]) if names else (str(s), str(t))
+        lines.append(f"{source} {EDGE_GLYPHS[edge_type]} {target}{weight}")
+    left = len(pairs[0]) - len(lines)
+    if graph._kind == "digraph":
+        i, j, near, far = pairs
+        left += np.count_nonzero((i != j) & (near == ARROW) & (far == ARROW))
+    if left > 0:
+        lines.append(f"... and {left} more{more}")
+    return lines
 
 
 @dataclass(frozen=True, eq=False, slots=True, kw_only=True, repr=False)
@@ -1918,8 +1924,8 @@ class TemporalStructure(Structure):
         head = f"temporal  |  {self._n_nodes} nodes  |  {self.n_lags} lags"
         lines = [head if name is None else f"{name}  {head}"]
         for lag, graph in zip(self._lag_indices, self._lags):
-            lines += ["", f"  lag {lag}  |  {graph._edge_count_text()}"]
-            lines += ["    " + line for line in graph._edge_lines(limit=limit, more=more)]
+            lines += ["", f"  lag {lag}  |  {edge_count_text(graph)}"]
+            lines += ["    " + line for line in edge_lines(graph, limit=limit, more=more)]
         return lines
 
     def summary_graph(self, *, include_lag0: bool = True) -> SummaryGraph:
