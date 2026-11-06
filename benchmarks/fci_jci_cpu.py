@@ -960,7 +960,9 @@ def summarize(args) -> int:
     """Pair the records of ``--runs`` into rows; ``--replications`` adds each row's rerun."""
 
     def load(dirs: list[str]) -> tuple[dict, dict, list]:
-        recs, empty, datasets = {}, {}, []
+        """The records by (cell, seed, arm, alpha) and the datasets by (cell, seed): runs split
+        into parts by seeds or arms repeat a dataset's line, with the same truth."""
+        recs, empty, datasets = {}, {}, {}
         for d in dirs:
             for path in sorted(Path(d).rglob("records.jsonl")):
                 for r in _read(path):
@@ -968,8 +970,8 @@ def summarize(args) -> int:
             for path in sorted(Path(d).rglob("datasets.jsonl")):
                 for r in _read(path):
                     empty[(r["cell"], r["seed"])] = r["empty"]
-                    datasets.append(r)
-        return recs, empty, datasets
+                    datasets[(r["cell"], r["seed"])] = r
+        return recs, empty, list(datasets.values())
 
     recs, empty, datasets = load(args.runs)
     again = load(args.replications) if args.replications else None
