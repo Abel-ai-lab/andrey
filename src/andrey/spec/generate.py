@@ -192,11 +192,13 @@ def _example_token(p: ParamSpec) -> str:
 
 
 def cli_example(spec: MethodSpec, command: str = "run", *, files: bool = False) -> str:
-    """A call of the method on the command line with one ``key=value`` override.
+    """A call of the method on the command line, with its first param as a ``key=value`` override
+    when it has params.
 
-    Each input reads ``<path>``, or ``<path|->`` when it is the only input, since only one input
-    can read stdin; ``files`` names example files instead: ``data.csv``, ``a.csv`` and ``b.csv``
-    for a panel, whose flag repeats, and ``<name>.csv`` for another input.
+    A panel input, whose flag repeats, reads ``<path>`` twice. Another input reads ``<path|->``
+    when it is the only input, since only one input can read stdin, and ``<path>`` otherwise.
+    ``files`` names example files instead: ``a.csv`` and ``b.csv`` for a panel, ``data.csv`` for
+    ``data``, and ``<name>.csv`` for another input.
     """
     parts = ["andrey", command, spec.name]
     lone = len(spec.data.inputs) == 1

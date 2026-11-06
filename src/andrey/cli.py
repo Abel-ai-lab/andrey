@@ -2156,9 +2156,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             hit = re.search(r"(?i)no such option:?\s+(--[\w-]+)", msg)
             if hit:
                 key = hit.group(1).lstrip("-").replace("-", "_")
-                did_you_mean = _flag_hint(hit.group(1)).get("did_you_mean")
-                if did_you_mean is not None:
-                    extra = {"did_you_mean": did_you_mean}
+                hint = _flag_hint(hit.group(1))
+                if "did_you_mean" in hint:
+                    extra = {"did_you_mean": hint["did_you_mean"]}
+                    msg = _with_hint(msg, hint["message"])
                 method = next((a for a in args if a in REGISTRY), "")
                 ctx = getattr(exc, "ctx", None)
                 name = ctx.info_name if ctx is not None else ""
