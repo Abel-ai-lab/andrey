@@ -43,6 +43,14 @@ def score(output: object, truth: object) -> dict[str, object]:
     on its clustering alone, since latent node indices are not aligned across the two graphs;
     CDNOD's appended domain node and similar extra variables must be dropped by the caller first.
 
+    Parameters
+    ----------
+    output : StructureOutput, Structure, or array-like of shape (n, n)
+        The estimated result. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    truth : StructureOutput, Structure, or array-like of shape (n, n)
+        The true structure, over the same variables in the same order.
+
     Returns
     -------
     dict

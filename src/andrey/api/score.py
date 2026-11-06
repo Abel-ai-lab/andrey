@@ -2054,7 +2054,8 @@ def calm(
     use_moral_graph : bool, default=True
         With ``False`` every pair is a candidate edge, and ``screen_alpha`` has no effect.
     standardize : bool, default=False
-        Scale each column to unit variance first.
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights are then those of the scaled columns.
     w_threshold : float, default=0.3
         An edge is kept when its weight magnitude reaches this value, at least ``0``.
     gate_threshold : float, default=0.5
@@ -2100,9 +2101,9 @@ def calm(
         coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"calm"``,
         ``metadata["seed"]`` the seed used, ``metadata["objective"]`` half the sum of the log
         residual variances plus ``lambda1`` times the edge count (lower is better), and
-        ``metadata["h_final"]`` the acyclicity residual of the returned graph, ``0`` when it is
-        acyclic. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        ``metadata["h_final"]`` the acyclicity residual ``h`` of the noise-free gates before the
+        thresholds, the value the rounds compare with ``h_tol``. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------

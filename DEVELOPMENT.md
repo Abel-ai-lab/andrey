@@ -44,8 +44,12 @@ A page that states a fact about the methods, such as how many there are, how man
 or which ones a family holds, computes it from the registry when it is built; no page types it in.
 A typed count goes stale without failing anything when a method is added or promoted.
 
-- `docs/conf.py` gives the documentation pages substitutions (`{{ method_count }}`,
-  `{{ n_supported }}`, `{{ supported_methods }}`) from `_methods_text`.
+- `docs/conf.py` gives the documentation pages substitutions from `_methods_text`:
+  `{{ method_count }}`, `{{ n_supported }}`, `{{ supported_methods }}`, and the methods each
+  predicate of `METHOD_LISTS` selects, such as those that take `indep_test`, as
+  `{{ indep_test_methods }}` in prose names and `{{ indep_test_names }}` in code names. A page
+  that lists such methods uses the substitution; a method without a prose name in `PROSE_NAMES`
+  stops the build.
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
   methods (`COUNTED_WITH` names the methods that count with the one they extend).
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
@@ -301,7 +305,7 @@ on a machine with CUDA or MPS and a device torch build
 ANDREY_REQUIRE_GPU=1 uv run --no-sync pytest tests/gpu -ra
 ```
 
-It compares each device with the numpy result within per-device tolerances;
+It compares each device with the NumPy result within per-device tolerances;
 `ANDREY_REQUIRE_GPU=1` fails, rather than skips, without an accelerator. No hosted runner has a
 GPU, so CI does not run it.
 

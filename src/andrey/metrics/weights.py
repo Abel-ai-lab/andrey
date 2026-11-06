@@ -22,12 +22,24 @@ def _weights(w: object) -> np.ndarray:
 
 
 def coefficient_mae(estimated_w: object, true_w: object) -> float:
-    """Mean absolute coefficient error over the true edges (edges absent in truth are ignored).
+    """Return the mean absolute error of the estimated edge weights over the true edges.
 
-    A missed true edge contributes its full ``|w_true|`` (so this blends coefficient error with
-    recall on the true support); returns 0.0 when the truth has no weighted edges. Both inputs use
-    the canonical ``W[i, j]`` = weight of edge ``i -> j`` orientation -- note LiNGAM's ``B`` is the
-    transpose, and adapters normalize to this before storing.
+    Edges absent from the truth are ignored, and a missed true edge contributes its full
+    ``|w_true|``, so the error blends coefficient error with recall on the true support. Both
+    inputs hold the weight of the edge ``i -> j`` at ``W[i, j]``; the LiNGAM model's ``B`` is the
+    transpose.
+
+    Parameters
+    ----------
+    estimated_w : StructureOutput or array-like of shape (n, n)
+        The estimated weights, or a result whose ``weighted_adjacency`` holds them.
+    true_w : StructureOutput or array-like of shape (n, n)
+        The true weights, or a result whose ``weighted_adjacency`` holds them.
+
+    Returns
+    -------
+    float
+        The mean absolute error, or 0.0 when the truth has no edge.
 
     Examples
     --------

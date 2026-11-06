@@ -9,7 +9,6 @@ lives in the private ``_temporal`` adapters.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -268,9 +267,8 @@ def varma_lingam(
         constraints=constraints,
         name=column_namer(labels),
     )
-    model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     required = None if constraints is None else constraints.required
-    return with_labels(_adapt_varma_lingam(model, required), labels)
+    return with_labels(_adapt_varma_lingam(causal_order, psis, omegas, required), labels)
 
 
 @method_spec("longitudinal_lingam")
@@ -428,7 +426,8 @@ def longitudinal_lingam(
     )
     model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
     required = None if constraints is None else constraints.required
-    return with_labels(_adapt_longitudinal_lingam(model, required), labels)
+    out = _adapt_longitudinal_lingam(model.adjacency_matrices_, model.causal_orders_, required)
+    return with_labels(out, labels)
 
 
 @method_spec("pcmci")
@@ -1560,7 +1559,7 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required, p_values), labels)
+    return with_labels(_adapt_granger(coeff, tau_max, required, p_values), labels)
 
 
 @method_spec("dynotears")
@@ -1574,6 +1573,7 @@ def dynotears(
     max_iter: int = 100,
     h_tol: float = 1e-8,
     rho_max: float = 1e16,
+    standardize: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted temporal causal structure from one multivariate time series with DYNOTEARS.
@@ -1609,6 +1609,10 @@ def dynotears(
     rho_max : float, default=1e16
         The fit stops when the penalty weight on the acyclicity function reaches this value, above
         ``1``, the weight the fit starts from.
+    standardize : bool, default=False
+        Scale each column to unit variance first, so the fit does not read the columns' units;
+        the weights, ``lag_weights`` included, are then those of the scaled columns. Limitations
+        gives the fit's errors on z-scored columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1628,12 +1632,12 @@ def dynotears(
         ``structure.lag(0)`` is a ``dag`` of the same-step edges and ``structure.lag(k)``,
         ``k >= 1``, a ``digraph`` with the edge ``i -> j`` from ``x_i(t - k)`` to ``x_j(t)``,
         self-loops included. ``structure.lag_weights[k][i, j]`` is the coefficient of that edge in
-        the data's units, and ``0`` where there is no edge. ``ordering`` is ``None``.
-        ``metadata["algorithm"]`` is ``"dynotears"``, ``metadata["h_final"]`` the acyclicity
-        function of the same-step weights before the threshold, and ``metadata["edges_removed"]``
-        the same-step edges the threshold kept that the cycle repair dropped.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        the data's units, or the scaled columns' with ``standardize=True``, and ``0`` where there
+        is no edge. ``ordering`` is ``None``. ``metadata["algorithm"]`` is ``"dynotears"``,
+        ``metadata["h_final"]`` the acyclicity function of the same-step weights before the
+        threshold, and ``metadata["edges_removed"]`` the same-step edges the threshold kept that
+        the cycle repair dropped. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1668,16 +1672,16 @@ def dynotears(
     unmeasured variable that causes two measured ones [1]_. Its ``l1`` penalty and both thresholds
     act on the weights in the data's units, so the columns should be in comparable units [4]_ [5]_:
     a cause recorded in thousandths multiplies its weight by 1,000, and the penalty can then remove
-    a true edge, or every edge, without a warning; convert such columns to comparable units first,
-    as standardizing them falls outside the setting the paper's simulations measure (see
-    Limitations). It fits ``(tau_max + 1) * d * d`` weights under an acyclicity function that takes
-    a matrix exponential, so it suits a moderate number of variables, a few lags, and a long
-    series. It returns a temporal structure with a DAG at lag ``0`` and the graphs at lags
-    ``1`` to ``tau_max``, self-lags included, with the weight of each edge. For nonlinear effects,
-    use :func:`~andrey.pcmciplus` with a nonlinear test such as ``"gpdc"`` or ``"rcot"``, and for
-    many lags, :func:`~andrey.pcmciplus` with its default test; when unmeasured common causes are
-    plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows rather than a series,
-    :func:`~andrey.notears`.
+    a true edge, or every edge, without a warning; convert such columns to comparable units first.
+    ``standardize=True`` scales them to unit variance instead, which falls outside the setting the
+    paper's simulations measure (see Limitations). It fits ``(tau_max + 1) * d * d`` weights under
+    an acyclicity function that takes a matrix exponential, so it suits a moderate number of
+    variables, a few lags, and a long series. It returns a temporal structure with a DAG at lag
+    ``0`` and the graphs at lags ``1`` to ``tau_max``, self-lags included, with the weight of each
+    edge. For nonlinear effects, use :func:`~andrey.pcmciplus` with a nonlinear test such as
+    ``"gpdc"`` or ``"rcot"``, and for many lags, :func:`~andrey.pcmciplus` with its default test;
+    when unmeasured common causes are plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows
+    rather than a series, :func:`~andrey.notears`.
 
     The model is ``x_t = x_t W + x_{t-1} A_1 + ... + x_{t-p} A_p + z_t`` for the row vector
     ``x_t`` of the variables at step ``t`` and ``p = tau_max``, where ``W`` is acyclic and the
@@ -1740,13 +1744,13 @@ def dynotears(
     against the empty graph's 13.5 to 283.2, with F1 at least 0.969. The defaults made more errors
     than the empty graph from 20 variables on at 50 time steps, so set ``lambda1=0.2`` and
     ``lag_threshold=0.2``, the paper's settings for 50 steps, for a short series. With the columns
-    z-scored at 500 steps the errors rose to more than half the empty graph's, over ten series each
-    at 5 to 50 variables. With 500 time steps on one core, four fits at a time on four cores, the
-    median fit took 0.3 s at 5 variables, about 30 s at 50, and 299 to 385 s at 100; from 50 to 100
-    variables the time grew faster than the cube of the number of variables, from the matrix
-    exponential of every evaluation and the ``(tau_max + 1) * d * d`` weights. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    z-scored (``standardize=True``) at 500 steps the errors rose to more than half the empty
+    graph's, over ten series each at 5 to 50 variables. With 500 time steps on one core, four fits
+    at a time on four cores, the median fit took 0.3 s at 5 variables, about 30 s at 50, and 299 to
+    385 s at 100; from 50 to 100 variables the time grew faster than the cube of the number of
+    variables, from the matrix exponential of every evaluation and the ``(tau_max + 1) * d * d``
+    weights. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1797,6 +1801,7 @@ def dynotears(
             max_iter=max_iter,
             h_tol=h_tol,
             rho_max=rho_max,
+            standardize=standardize,
             constraints=constraints,
         )
     return with_labels(_adapt_dynotears(result), labels)
