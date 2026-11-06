@@ -1445,7 +1445,8 @@ def hc(
     :func:`~andrey.cam`. With ``env``, it takes rows pooled from several environments, such as
     sites, batches, or experiments, whose shifts change variables it does not know;
     :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
-    runs PC with the same index.
+    runs PC with the same index. With ``env``, set ``n_starts`` above ``1`` (see **Several
+    environments.**).
 
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set; with ``n_starts``, each climb stops so. Under a mixed-data
@@ -1495,6 +1496,14 @@ def hc(
     ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
     each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
+    Through the ties between the two directions of an edge, one climb can direct a chain against
+    the index and then keep an edge from the index to each variable on it: no single move improves
+    the score there, though the true graph scores better. ``index_edges`` and
+    ``changing_variables`` then list every variable on the chain, not only the ones the environments
+    change. Each later start climbs again from a changed copy of the best DAG so far and can leave
+    such a DAG, so with ``env`` set ``n_starts`` above ``1``. :func:`~andrey.tabu`, which also takes
+    moves that do not improve the score, can leave it in one run.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -1528,11 +1537,11 @@ def hc(
     ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
     environments a shift that does not follow the labels' values, such as one in the middle
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
-    result. ``max_parents`` counts the index as a parent of each variable it points into. One climb
-    can direct a chain against the index and keep an edge from the index to each variable on it,
-    which no single move removes; ``n_starts`` above 1 can leave such a DAG, and
-    :func:`~andrey.tabu` takes the moves that do. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    result. ``max_parents`` counts the index as a parent of each variable it points into. At the
+    default ``n_starts=1``, ``changing_variables`` often lists variables the environments change
+    only through their causes (see **Several environments.**). The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

@@ -37,14 +37,22 @@ SEARCHES = ("boss", "grasp", "ges", "hc", "tabu")
 HYBRIDS = ("boss_fci", "grasp_fci", "gfci")
 ALL = SEARCHES + HYBRIDS
 
-#: Hill climbing restarts from changed copies of its best DAG: one climb can direct a chain against
-#: the index and keep an edge from the index to each variable of the chain, which no single move
-#: removes.
-SETTINGS = {"hc": {"n_starts": 20}}
-
 
 def fit(name: str, *args, **settings):
-    return getattr(andrey, name)(*args, **{**SETTINGS.get(name, {}), **settings})
+    return getattr(andrey, name)(*args, **settings)
+
+
+def restarted(names: tuple[str, ...]) -> list:
+    """``(name, settings)`` parameters for a check of what the index identifies, with hill climbing
+    at 20 starts: one climb can direct a chain against the index and keep an edge from the index to
+    each variable on it, which no single move removes. The one-start row is
+    ``test_one_hill_climb_finds_every_shifted_variable``."""
+    return [
+        pytest.param(name, {"n_starts": 20}, id="hc-20")
+        if name == "hc"
+        else pytest.param(name, {}, id=name)
+        for name in names
+    ]
 
 
 def scm(nodes: tuple[str, ...], arcs: tuple[tuple[str, str], ...]) -> data.SCM:
@@ -82,13 +90,13 @@ def chain():
 # --- fixed cases ----------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", SEARCHES)
-def test_env_orients_a_chain_from_its_shifted_root(name):
+@pytest.mark.parametrize(("name", "settings"), restarted(SEARCHES))
+def test_env_orients_a_chain_from_its_shifted_root(name, settings):
     """The chain's CPDAG leaves every edge undirected; the index points into ``x0`` alone and
     directs the chain."""
     x, env = chain()
     assert {kind for *_, kind in fit(name, x).structure.oriented_edges()} == {"undirected"}
-    out = fit(name, x, env)
+    out = fit(name, x, env, **settings)
     assert out.structure.oriented_edges() == [
         (0, 1, "directed"),
         (1, 2, "directed"),
@@ -166,20 +174,38 @@ def test_hybrid_marks_a_hidden_common_cause_the_index_reveals(name):
 # --- ground truth ---------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", SEARCHES)
-def test_search_recovers_the_interventional_essential_graph(name):
+@pytest.mark.parametrize(("name", "settings"), restarted(SEARCHES))
+def test_search_recovers_the_interventional_essential_graph(name, settings):
     """On 10 random models, the graph equals the essential graph of the observational environment
     and the shifted one, and ``changing_variables`` the shifted variables, on most draws."""
     exact, found = 0, 0
     for seed in range(10):
         ds = shifted(seed)
-        out = fit(name, ds.data, ds.env)
+        out = fit(name, ds.data, ds.env, **settings)
         truth = essential(ds.graph.to_numpy(), [ds.targets[1]])
         exact += shd(out.structure, truth) == 0
         found += out.metadata["changing_variables"] == sorted(ds.targets[1])
         assert out.metadata["changing_variables"] == [v for v, _ in out.metadata["index_edges"]]
-    # Recorded: 9 of 10 and 10 of 10 for GES, hill climbing, and Tabu search, 9 and 9 for the rest.
+    # Recorded: 9 of 10 and 10 of 10 for GES, Tabu search, and hill climbing with 20 starts, 9 and 9
+    # for the rest.
     assert exact >= 8 and found >= 8
+
+
+def test_one_hill_climb_finds_every_shifted_variable():
+    """At one start, on the models above, ``changing_variables`` holds every shifted variable, and
+    the graph is closer to the essential graph than the one without ``env``."""
+    with_env, without = 0, 0
+    for seed in range(10):
+        ds = shifted(seed)
+        out = andrey.hc(ds.data, ds.env)
+        truth = essential(ds.graph.to_numpy(), [ds.targets[1]])
+        assert set(ds.targets[1]) <= set(out.metadata["changing_variables"])
+        with_env += shd(out.structure, truth)
+        without += shd(andrey.hc(ds.data).structure, truth)
+    # Recorded: 64 against 137. The graph equals the essential graph on 1 of 10 models and
+    # ``changing_variables`` the shifted variables on 3, since one climb can keep the index's edges
+    # to a chain it directs against the index.
+    assert with_env < without / 1.5
 
 
 @pytest.mark.parametrize("confounded", [True, False])
@@ -239,14 +265,15 @@ def test_env_fits_repeat_and_follow_the_columns(name):
     assert relabeled == first.metadata["index_edges"]
 
 
-@pytest.mark.parametrize("name", ALL)
-def test_env_takes_a_column_of_text_labels(name):
+@pytest.mark.parametrize(("name", "settings"), restarted(ALL))
+def test_env_takes_a_column_of_text_labels(name, settings):
     """A column of text labels leaves the variables and fits what its codes fit, with the edges
     named by column."""
     x, env = chain()
     frame = pd.DataFrame(x, columns=["a", "b", "c", "d"])
-    by_codes = fit(name, frame, env)
-    out = fit(name, frame.assign(site=np.where(env == 1, "treated", "control")), "site")
+    by_codes = fit(name, frame, env, **settings)
+    site = frame.assign(site=np.where(env == 1, "treated", "control"))
+    out = fit(name, site, "site", **settings)
     assert out.structure == by_codes.structure
     assert out.structure.labels == ("a", "b", "c", "d")
     assert [variable for variable, _ in out.metadata["index_edges"]] == ["a"]
@@ -262,8 +289,8 @@ def test_a_fractional_env_is_refused_under_a_mixed_data_setting(name):
         fit(name, x, env + 0.5, **settings)
 
 
-@pytest.mark.parametrize("name", ALL)
-def test_knowledge_holds_with_env(name):
+@pytest.mark.parametrize(("name", "settings"), restarted(ALL))
+def test_knowledge_holds_with_env(name, settings):
     """A required edge is directed, a forbidden pair is not adjacent, and the index's edges reach
     only shifted variables: all of them for BOSS and GRaSP, each edge pointing out of the index."""
     ds = shifted(0)
@@ -271,7 +298,7 @@ def test_knowledge_holds_with_env(name):
     edges = [(int(u), int(v)) for u, v in zip(*np.nonzero((dag == TAIL) & (dag.T == ARROW)))]
     (a, b), (u, v) = edges[0], edges[1]
     knowledge = Knowledge(required=[(u, v)], forbidden=[(a, b), (b, a)])
-    out = fit(name, ds.data, ds.env, knowledge=knowledge)
+    out = fit(name, ds.data, ds.env, knowledge=knowledge, **settings)
     marks = out.structure.to_numpy()
     assert marks[u, v] == TAIL and marks[v, u] == ARROW
     assert marks[a, b] == NULL
@@ -286,13 +313,19 @@ def test_knowledge_holds_with_env(name):
 def test_a_required_edge_against_the_shift_holds(name):
     """``x0 -> x1`` with ``x0`` shifted, and knowledge requiring ``x1 -> x0``: no DAG of the class
     of ``env -> x0 -> x1`` keeps both the index without a parent and the required edge, so the
-    search settles on another class, and the result directs ``x1 -> x0``."""
+    search settles on another class, and the result directs ``x1 -> x0``. A score search keeps an
+    edge from the index into ``x1`` too, since ``x1 -> x0 <- env`` alone would make ``x1``
+    independent of the index; a hybrid's tests drop it, since ``x1`` is independent of the index
+    given ``x0``."""
     ds = scm(("x0", "x1"), (("x0", "x1"),)).sample(
         n=[1000, 1000], seed=0, envs=[{}, {0: soft(shift=2.0)}], shuffle=False
     )
     out = fit(name, ds.data, ds.env, knowledge=Knowledge(required=[(1, 0)]))
     assert out.structure.oriented_edges() == [(1, 0, "directed")]
-    assert [variable for variable, _ in out.metadata["index_edges"]][:1] == [0]
+    if name in HYBRIDS:
+        assert out.metadata["index_edges"] == [[0, "partially_directed"]]
+    else:
+        assert out.metadata["index_edges"] == [[0, "directed"], [1, "directed"]]
 
 
 @pytest.mark.parametrize("name", ("boss", "grasp", "boss_fci", "grasp_fci"))
