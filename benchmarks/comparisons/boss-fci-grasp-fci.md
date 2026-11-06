@@ -124,11 +124,11 @@ $ANDREY_BENCH_PYTHON benchmarks/boss_grasp_fci_cpu.py summarize --runs outputs/b
 ```
 
 `run` fits each dataset's packages back to back, one child process per package, each pinned to one
-core with one BLAS thread; Tetrad starts one JVM per run, with one untimed warm-up search before
-the timed one, and Andrey runs each fit once untimed on the same data first. `--blocks`, `--settings`, `--degrees`, and `--latents` cut a campaign into small
-runs, `--seeds 100-119` reruns cells on fresh seeds, and `--resume` continues a run.
-`check-truth` needs R with pcalg (see the README). Tetrad's time is its search inside the JVM
-(`wall_s`); the whole call, with the JVM's start, is `call_s`.
+core with one BLAS thread; Tetrad starts one JVM per run, with one untimed warm-up search before the
+timed one, and Andrey runs each fit once untimed on the same data first. `--blocks`, `--settings`,
+`--degrees`, and `--latents` cut a campaign into small runs, `--seeds 100-119` reruns cells on fresh
+seeds, and `--resume` continues a run. `check-truth` needs R with pcalg (see the README). Tetrad's
+time is its search inside the JVM (`wall_s`); the whole call, with the JVM's start, is `call_s`.
 
 ## References
 
