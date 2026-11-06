@@ -15,7 +15,7 @@ from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, Te
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
 from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
 from andrey.data.latent import DSepOracle, _AncestorSepsets, observed_ancestors
-from andrey.resample import EDGES, _default_block_length, _draw, _Job
+from andrey.resample import EDGES, Job, _default_block_length, _draw
 from andrey.spec import REGISTRY
 
 
@@ -557,7 +557,7 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
 
 def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
     """The job a worker draws a resample from, without the call that builds it."""
-    return _Job(
+    return Job(
         name,
         data,
         {},

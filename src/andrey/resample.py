@@ -758,7 +758,7 @@ def _decode(codes: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarr
 
 
 @dataclass(frozen=True, slots=True)
-class _Job:
+class Job:
     """Everything a resample needs, sent once to each worker."""
 
     name: str  # the facade, by name
@@ -789,7 +789,7 @@ def _kept(n: int, sample_fraction: float) -> int:
     return round(sample_fraction * n)
 
 
-def _draw(job: _Job, b: int) -> list[np.ndarray]:
+def _draw(job: Job, b: int) -> list[np.ndarray]:
     """Draw resample ``b``'s row indices, one array per data array."""
     rng = np.random.default_rng(np.random.SeedSequence(job.seed, spawn_key=(b, 0)))
     if job.strata is not None:  # the same share of each environment's rows, at least one
@@ -824,7 +824,7 @@ def _draw(job: _Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-def _run_one(job: _Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
+def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     """Fit resample ``b``; return the fit and the warnings it raised."""
     idx = _draw(job, b)
     if job.unit in ("units", "groups"):
@@ -849,11 +849,11 @@ def _run_one(job: _Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return out, [(w.category, str(w.message)) for w in caught]
 
 
-_JOB: _Job | None = None
+_JOB: Job | None = None
 _BLAS: object = None  # a held threadpoolctl controller capping this worker's BLAS to one thread
 
 
-def _init_worker(job: _Job) -> None:
+def _init_worker(job: Job) -> None:
     """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings."""
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
@@ -871,7 +871,7 @@ def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return _run_one(_JOB, b)
 
 
-def fit_resamples(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
+def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
         with _backend.one_blas_thread(), _backend.config(n_jobs=1):
@@ -1200,7 +1200,7 @@ def bootstrap(
     return outs if spec.output.multi else outs[0]
 
 
-def _column_ranks(job: _Job) -> np.ndarray:
+def _column_ranks(job: Job) -> np.ndarray:
     """Return the variables' :func:`~andrey.core.ties.tie_ranks` on all of the job's data.
 
     The variables are the columns the fit reads: a column that a row-aligned argument names, such
@@ -1274,7 +1274,7 @@ def build_job(
     seed: int,
     resampling: str,
     sample_fraction: float,
-) -> _Job:
+) -> Job:
     """Check the call against ``spec`` and bundle it for the workers.
 
     Data given as each environment's rows apart become one table and ``env`` first
@@ -1341,7 +1341,7 @@ def build_job(
             raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
         aligned[key] = kwargs.pop(key)
     strata = _strata(spec, data, aligned, kwargs, apart=apart) if unit == "rows" else None
-    return _Job(
+    return Job(
         name=spec.name,
         data=data,
         aligned=aligned,

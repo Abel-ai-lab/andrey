@@ -51,7 +51,7 @@ from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search._parallel import balanced_chunks as _balanced_chunks
 from andrey.search._parallel import collect as _collect
-from andrey.search._parallel import pick_context as _pick_context
+from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
     from andrey.core.ci_kernel import RCoT
@@ -131,7 +131,7 @@ class SkeletonWorkerPool:
             self._token = hash(self._corr.tobytes())
             self._pool = ProcessPoolExecutor(
                 max_workers=self._workers,
-                mp_context=_pick_context(),
+                mp_context=pick_context(),
                 initializer=_init_worker,
                 initargs=(self._test_class, self._corr, self._n, self._token),
             )
@@ -255,7 +255,7 @@ class RCoTWorkerPool:
             self._token = hash(self._test._data.tobytes())
             self._pool = ProcessPoolExecutor(
                 max_workers=self._workers,
-                mp_context=_pick_context(),
+                mp_context=pick_context(),
                 initializer=_init_rcot_worker,
                 initargs=(self._test._state(), self._token),
             )
