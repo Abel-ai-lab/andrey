@@ -5,7 +5,7 @@
  "method": "FCI-JCI",
  "status": "supported",
  "about": "FCI-JCI's own published measurements, one file per lane; the release summary's FCI-JCI entries are built from it",
- "build": "Andrey pre-release build of 6 November 2026 (version string 0.14.0)",
+ "build": "Andrey pre-release build of 6 November 2026 (version string 0.14.0); refitted on the 0.15.0 release branch of the same day, Andrey's two gated arms returned the same PAG on all 720 fits",
  "comparator": "pcalg 2.7-12 fci with jci = \"1\" and jci = \"123\", the implementation of FCI-JCI by the method's authors",
  "packages": {
   "pcalg": "2.7-12",

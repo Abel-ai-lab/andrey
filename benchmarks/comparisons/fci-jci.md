@@ -141,7 +141,8 @@ Andrey's pre-release build of 6 November 2026 against pcalg 2.7-12 on R 4.6.1, o
 one core of an AMD EPYC 7713 processor with one BLAS thread. Every number below is in
 [`published/0.15.0/fci-jci.json`](../published/0.15.0/fci-jci.json), with the context arms and the
 coverage of every row. All 200 truths passed their checks, the 140 in the cells of 4 and 10
-variables against pcalg's too, and every Andrey fit finished.
+variables against pcalg's too, and every Andrey fit finished. Refitted on the 0.15.0 release branch
+of the same day, Andrey's two gated arms returned the same PAG on all 720 fits.
 
 ### In the claim
 
