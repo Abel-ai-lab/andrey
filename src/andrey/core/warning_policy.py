@@ -80,7 +80,9 @@ class BoundaryWarning(AndreyWarning):
 
 
 class DeprecatedArgumentWarning(AndreyWarning):
-    """A former argument name or value, which works for one more release as the current one."""
+    """A former argument name or value, which works for one more release as the current one, or a
+    deprecated function, which also works for one more release.
+    """
 
 
 def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = None) -> None:
