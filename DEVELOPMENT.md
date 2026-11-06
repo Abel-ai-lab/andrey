@@ -113,15 +113,20 @@ registry. Every facade docstring has, in order:
   kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
   `.weighted_adjacency` when the method sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
-- **Warns**: every warning a fit can raise: the method's own, the data check's `DataTypeWarning`,
-  and `BoundaryWarning` when a ladder of the method's measured boundary ended on a cap.
+- **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
+  the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
+  boundary ended on a cap. A warning from a layer many methods share, such as a CI test's
+  `SampleSizeWarning`, a worker pool's `PerformanceWarning`, `BackendFallbackWarning`, or a
+  dependency's convergence warning raised again as `SearchLimitWarning`, is listed once, in the
+  warnings table of `docs/docs/api.md`.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
   series; observational, interventional, or multi-domain), the model assumptions that matter
   to a user, the scale it is designed for, what it returns, and the method to use outside that
-  setting. A **Limitations.** paragraph follows with the measured failures
-  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); the two do not
-  repeat each other. Limitations is the last paragraph of Notes.
+  setting. A **Missing values.** paragraph says whether a `NaN` is read or raises, why, and what
+  to do instead. A **Limitations.** paragraph follows with the measured failures
+  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); it and
+  **When to use.** do not repeat each other. Limitations is the last paragraph of Notes.
 - **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
   shape, `ordering`), never a repr. An example whose result depends on the seed at its settings

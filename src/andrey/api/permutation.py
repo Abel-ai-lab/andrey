@@ -185,13 +185,14 @@ def boss(
     (SHD) over 20 datasets from 7.9 to 2.1 and took a median of 7.7 times as long as one start.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
-    [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
-    variables allowed to precede it. Each sweep moves every variable to the position that most
-    improves the total score. Sweeps repeat until no move improves it. The final parent sets form a
-    DAG, which is reduced to its CPDAG.
+    [1]_; :func:`~andrey.grasp` [2]_ searches the same orders with different moves. Each variable
+    uses a grow-shrink tree to cache its best parent set for any set of variables allowed to precede
+    it. Each sweep moves every variable to the position that most improves the total score. Sweeps
+    repeat until no move improves it. The final parent sets form a DAG, which is reduced to its
+    CPDAG.
 
     A move or parent change must improve the score by more than ``1e-6``, a fixed absolute tolerance
-    shared with :func:`~andrey.grasp` [2]_. Scores within this tolerance of the best count as ties.
+    shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties.
     The earliest order position wins; among candidate parents, the column with the lowest tie rank
     wins. Under the linear-Gaussian BIC each comparison is decided as full local scores decide it: a
     fast update whose rounding-error bound could change the comparison is scored in full.

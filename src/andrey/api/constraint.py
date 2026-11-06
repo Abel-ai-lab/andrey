@@ -1105,7 +1105,7 @@ def cdnod(
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CD-NOD.
 
-    CDNOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
+    CD-NOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
     distribution shifts across environments are modeled, then runs PC-style discovery. It applies
     to samples pooled across domains, regimes, or time blocks. The environment index is appended as
     a trailing pseudo-node and removed from the result.

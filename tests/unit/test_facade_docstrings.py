@@ -1,8 +1,9 @@
 """Every method's docstring follows the docstring standard in ``DEVELOPMENT.md``.
 
 The sentences shared by many methods match the table in ``scripts/docstring_text.py``, the sections
-come in the standard's order, Warns lists each warning a fit can raise, Notes ends with
-Limitations, and an example whose fit draws random numbers passes ``seed=0``.
+come in the standard's order, Warns names each of ``DataTypeWarning``, ``SearchLimitWarning``,
+``ExperimentalWarning``, and ``BoundaryWarning`` a fit can raise, Notes ends with Limitations, and
+an example whose fit draws random numbers passes ``seed=0``.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import scripts.docstring_text as shared
 from andrey.api._method import draws_random_numbers
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
+from tests.unit.test_concepts import docstring_section as section
 
 #: The sections of a method's docstring, in order.
 SECTIONS = ["Parameters", "Returns", "Raises", "Warns", "Notes", "References", "Examples"]
@@ -24,12 +26,6 @@ SECTIONS = ["Parameters", "Returns", "Raises", "Warns", "Notes", "References", "
 
 def docstring(method: str) -> str:
     return inspect.getdoc(getattr(andrey, method)) or ""
-
-
-def section(doc: str, title: str) -> str:
-    """The text of one numpydoc section, up to the next section heading."""
-    body = doc.split(f"\n{title}\n{'-' * len(title)}\n", 1)[1]
-    return re.split(r"\n[A-Z][A-Za-z ]+\n-{3,}\n", body)[0]
 
 
 def test_every_shared_sentence_matches_the_table():
@@ -57,7 +53,7 @@ def test_notes_say_how_missing_values_are_read_and_end_with_limitations(method):
 
 
 @pytest.mark.parametrize("method", list(REGISTRY))
-def test_warns_lists_each_warning_a_fit_can_raise(method):
+def test_warns_lists_the_data_cap_experimental_and_boundary_warnings(method):
     listed = set(re.findall(r"^(\w+Warning)$", section(docstring(method), "Warns"), re.MULTILINE))
     raised = {
         "DataTypeWarning": method in CONCEPTS["category_codes"].suitable,

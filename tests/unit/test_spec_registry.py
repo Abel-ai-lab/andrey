@@ -343,7 +343,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
-LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 WHEN_TO_USE = "DEVELOPMENT.md (Docstring standard) says what the paragraph holds"
 
 
@@ -487,16 +486,6 @@ def _notes(name: str) -> str:
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
     return notes.group(1) if notes else ""
-
-
-@pytest.mark.parametrize("name", _SPEC_NAMES)
-def test_method_declares_its_limitations(name):
-    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
-    notes = _notes(name)
-    assert notes, f"{name}: no Notes section; {LIMITATIONS}"
-    assert re.search(r"^\*\*Limitations\.\*\* ", notes, re.MULTILINE), (
-        f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
-    )
 
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)

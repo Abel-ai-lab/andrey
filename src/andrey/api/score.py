@@ -1775,7 +1775,7 @@ def exact_search(
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn the CPDAG of the globally optimal DAGs from observational data by exact search.
+    """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
 
     The optimum is identified up to its Markov equivalence class, so the search returns the class's
     CPDAG, as the other score searches do; A* (``search_method="astar"``) [1]_ and dynamic

@@ -120,7 +120,7 @@ SHARED = {
         "of a column of the DataFrame ``data`` that holds them.",
         lambda m: any(i.name == "env" for i in REGISTRY[m].data.inputs) and m != "cdnod",
     ),
-    # gfci points to fci alone; icp, igsp, and ut_igsp read environments that pc and fci do not.
+    # gfci points to fci alone; icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
         "**Missing values.**",
