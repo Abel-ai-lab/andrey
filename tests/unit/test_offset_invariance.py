@@ -22,6 +22,7 @@ from andrey.core import TemporalStructure
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.spec import list_specs
 from tests.recovery.helpers import datagen
+from tests.unit.methods import domains, environments, fit_settings
 
 N = 400
 #: The grid spacing, ``2**-23``: the spacing of the floats in ``[2**29, 2**30)``, so a column on it
@@ -81,19 +82,17 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
     for inp in spec.data.inputs:
         if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             if spec.name in CONTEXT and inp.kind == "context":
-                args.append(np.arange(N) * 3 // N)
+                args.append(environments(N))
             continue
         if inp.kind == "matrix":
             args.append(moved(data[:, :2] if spec.family == "pairwise" else data))
         elif inp.kind == "panel":
             args.append([moved(chain(seed)) for seed in range(3)])
         elif inp.kind == "context":
-            args.append(np.repeat([0.0, 1.0], N // 2).reshape(-1, 1))
+            args.append(domains(N))
     return args
 
 
-#: Settings that shorten a slow fit, and the target ICP needs.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 #: The targets of a method that reads three environments: observational, one with the known
 #: target 2, and one whose targets are unknown (ut_igsp) or 0 (igsp).
 CONTEXT = {
@@ -112,7 +111,7 @@ def test_shifting_the_columns_keeps_every_methods_graphs(spec):
         pytest.importorskip("torch")
     fit = getattr(andrey, spec.name)
     data = chain()
-    settings = {**SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {})}
+    settings = {**fit_settings(spec.name), **CONTEXT.get(spec.name, {})}
     want = marks(fit(*inputs(spec, data, (1.0, 0.0)), **settings))
     for shift in SHIFTS.values():
         got = marks(fit(*inputs(spec, data, shift), **settings))
@@ -133,6 +132,9 @@ def test_shifting_the_columns_keeps_every_methods_graphs(spec):
 )
 @pytest.mark.parametrize("replicate", range(3))
 def test_rcd_and_gin_keep_their_graph_on_shifted_columns(method, case, replicate, shift):
+    """RCD and GIN keep their graph and metadata on rescaled and shifted columns. Each case runs
+    three replicates, each a new sample in a new column order: the claim covers every draw, and an
+    invariance test shows it only for the draws it runs."""
     scale, offset = shift
     data = on_grid(datagen.generate(case, replicate=replicate))
     fit = getattr(andrey, method)

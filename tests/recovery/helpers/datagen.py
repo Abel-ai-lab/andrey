@@ -389,7 +389,7 @@ CASES: dict[str, dict] = {
             [0.0, -0.8, 0.0, 0.0, 0.0],
         ],
     },
-    # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
+    # Stable VAR(1), non-Gaussian noise - Granger and PCMCI+.
     "var_4v_stable": {
         "model": "var",
         "noise": "uniform",
@@ -976,6 +976,29 @@ def generate_groups(case_id: str, *, shuffle: bool = True) -> list[np.ndarray]:
         return matrices
     order = column_order(case_id)
     return [np.ascontiguousarray(X[:, order]) for X in matrices]
+
+
+def domain_shift(
+    case_id: str, variables: tuple[int, ...], *, size: float = 2.0
+) -> tuple[np.ndarray, np.ndarray]:
+    """``case_id``'s pinned input in two domains, and their index: ``(data, index)``.
+
+    ``variables``, numbered as the case defines them, shift by ``size`` in the second domain of
+    :func:`domain_index`, and every descendant shifts with them through the case's linear weights,
+    as if the shift were a term of the structural equations. The columns then come in
+    :func:`column_order`. The input before the shift is the case's, so its recorded hash still
+    checks it. Linear SEM cases only.
+    """
+    spec = CASES[case_id]
+    if spec.get("model", "linear_sem") != "linear_sem":
+        raise ValueError(f"domain_shift needs a linear SEM case, got {case_id!r}")
+    weights = np.asarray(spec["weights"], dtype=np.float64)  # weights[child, parent]
+    shift = np.zeros(len(weights))
+    shift[list(variables)] = size
+    total = np.linalg.solve(np.eye(len(weights)) - weights, shift)
+    index = domain_index(case_id)
+    X = generate(case_id, shuffle=False) + index * total
+    return np.ascontiguousarray(X[:, column_order(case_id)]), index
 
 
 def domain_index(case_id: str, *, n_domains: int = 2) -> np.ndarray:

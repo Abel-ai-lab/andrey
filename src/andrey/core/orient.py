@@ -2,8 +2,9 @@
 
 ``meek`` completes a PDAG to a CPDAG with Meek's rules R1-R3, ``pdag2dag`` returns a consistent
 DAG extension of a PDAG, ``dag2cpdag`` returns a DAG's CPDAG, and ``orient_colliders`` orients a
-skeleton's unshielded colliders as PC does. :func:`to_structure` and :func:`from_structure` convert
-to and from a :class:`~andrey.core.structure.GraphStructure`.
+skeleton's unshielded colliders as PC does, reading each pair's separating set with
+:func:`separating_set`. :func:`to_structure` and :func:`from_structure` convert to and from a
+:class:`~andrey.core.structure.GraphStructure`.
 
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.structure`: ``adj[i, j]`` is the mark at ``i`` on edge ``i-j``, one of ``NULL``
@@ -34,13 +35,14 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 
 from ._bitset import nodes, row_masks
-from .structure import ARROW, NULL, TAIL, GraphStructure, Kind
+from .structure import ARROW, NULL, TAIL, GraphStructure, Kind, topological_order
 
 __all__ = [
     "meek",
     "pdag2dag",
     "dag2cpdag",
     "orient_colliders",
+    "separating_set",
     "to_structure",
     "from_structure",
 ]
@@ -107,36 +109,6 @@ def _reaches_directed(adj: np.ndarray, src: int, dst: int) -> bool:
                 seen[c] = True
                 stack.append(c)
     return False
-
-
-def _topological_positions(adj: np.ndarray) -> np.ndarray:
-    """Rank of each node in a topological order of the DAG (Kahn's algorithm).
-
-    Node ``v``'s parents are ``{u : adj[v, u] == ARROW}``. Raises if the directed graph has a cycle.
-    """
-    n = adj.shape[0]
-    parents = adj == ARROW  # parents[v, u] -> u is a parent of v
-    in_degree = parents.sum(axis=1).astype(np.int64)
-    ready = [v for v in range(n) if in_degree[v] == 0]
-    ready.sort()
-    pos = np.empty(n, dtype=np.int64)
-    rank = 0
-    while ready:
-        v = ready.pop(0)
-        pos[v] = rank
-        rank += 1
-        # children c of v: adj[c, v] == ARROW
-        children = np.nonzero(parents[:, v])[0]
-        newly = []
-        for c in children.tolist():
-            in_degree[c] -= 1
-            if in_degree[c] == 0:
-                newly.append(c)
-        if newly:
-            ready = sorted(ready + newly)
-    if rank != n:
-        raise ValueError("input is not acyclic; dag2cpdag requires a DAG")
-    return pos
 
 
 # ---- structure interop --------------------------------------------------------------------------
@@ -523,7 +495,8 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     if m == 0:
         return out
 
-    pos = _topological_positions(adj)
+    pos = np.empty(n, dtype=np.int64)
+    pos[topological_order(parent.T, what="dag2cpdag's input")] = np.arange(n)
     heads, tails = np.nonzero(parent)  # parent[head, tail]: tail -> head
     order = np.lexsort((pos[tails], -pos[heads]))
     tails = tails[order].astype(np.int64)
@@ -841,7 +814,7 @@ def orient_colliders(
                 x, y = nbrs[a], nbrs[b]
                 if _is_adjacent(adj, x, y):
                     continue
-                if z not in _lookup_sepset(sepsets, x, y):
+                if z not in (separating_set(sepsets, x, y) or ()):
                     pdag[z, x] = ARROW
                     pdag[x, z] = TAIL
                     pdag[z, y] = ARROW
@@ -849,13 +822,17 @@ def orient_colliders(
     return pdag
 
 
-def _lookup_sepset(
-    sepsets: Mapping[tuple[int, int], Iterable[int] | None], x: int, y: int
-) -> frozenset[int]:
-    """The separating set for the pair, in either key order; empty when absent or ``None``."""
-    value = sepsets.get((x, y))
+def separating_set(
+    sepsets: Mapping[tuple[int, int], Iterable[int] | None], a: int, c: int
+) -> frozenset[int] | None:
+    """The separating set ``sepsets`` records for the pair ``(a, c)``, under either key order.
+
+    The key ``(a, c)`` is read first, then ``(c, a)``. An empty set is a recorded set; ``None``
+    means neither key holds a set, the value ``None`` included.
+    """
+    value = sepsets.get((a, c))
     if value is None:
-        value = sepsets.get((y, x))
+        value = sepsets.get((c, a))
     if value is None:
-        return frozenset()
+        return None
     return frozenset(int(v) for v in value)

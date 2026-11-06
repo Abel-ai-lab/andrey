@@ -24,6 +24,7 @@ from scipy import stats
 from scipy.linalg import solve_triangular
 
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
+from andrey.temporal.pcmci import lagged_design
 
 
 def _ols(design: np.ndarray, targets: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -92,10 +93,7 @@ def granger_f_test(
     n_samples, d = data.shape
     targets = data[maxlag:]
     # Column (k - 1) * d + j + 1 of the design is variable j at lag k; column 0 is the intercept.
-    design = np.hstack(
-        [np.ones((n_samples - maxlag, 1))]
-        + [data[maxlag - k : n_samples - k] for k in range(1, maxlag + 1)]
-    )
+    design = np.hstack([np.ones((n_samples - maxlag, 1)), lagged_design(data, maxlag, first=1)])
     drop = np.zeros((d, d * maxlag), dtype=bool) if forbidden is None else _by_target(forbidden)
     force = np.zeros((d, d * maxlag), dtype=bool) if required is None else _by_target(required)
     coeff = np.zeros((d, d * maxlag), dtype=np.float64)

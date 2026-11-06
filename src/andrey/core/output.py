@@ -1,9 +1,10 @@
-"""``StructureOutput`` -- the one uniform return type of every algorithm.
+"""``StructureOutput`` -- the return type of every algorithm.
 
-A thin, immutable run envelope over a first-class ``Structure`` (``.structure``), plus the
-run-level slots that hang off the run rather than the graph: the discovered ``ordering``, a sparse
-``weighted_adjacency`` (its own asymmetric ``float64`` CSR), and JSON-safe ``metadata``. Every dense
-view derives lazily and uncached. ``save`` / ``load`` serialize the whole envelope.
+``multi_group_direct_lingam`` returns one per group. A thin, immutable run envelope over a
+first-class ``Structure`` (``.structure``), plus the run-level slots that hang off the run rather
+than the graph: the discovered ``ordering``, a sparse ``weighted_adjacency`` (its own asymmetric
+``float64`` CSR), and JSON-safe ``metadata``. Every dense view derives lazily and uncached.
+``save`` / ``load`` serialize the whole envelope.
 """
 
 from __future__ import annotations

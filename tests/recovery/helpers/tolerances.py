@@ -39,6 +39,8 @@ SPEC: dict[str, dict] = {
     "ExactSearch": GRAPH_ONLY,
     "FCI": GRAPH_ONLY,
     "GFCI": GRAPH_ONLY,
+    "BOSSFCI": GRAPH_ONLY,
+    "GRaSPFCI": GRAPH_ONLY,
     # CAM records no weights: its DAG and its causal order.
     "CAM": {
         "structural": ["graph", "causal_order"],
@@ -47,6 +49,8 @@ SPEC: dict[str, dict] = {
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
     "CALM": GRAPH_ONLY,
     "CDNOD": GRAPH_ONLY,
+    # FCI-JCI: the PAG over the data and the index's edges.
+    "FCIJCI": {"structural": ["graph", "index_edges"], "numeric": {}},
     # ICP: the DAG into the target and the accepted sets exactly; the p-values, NaN at the target,
     # within rounding.
     "ICP": {
@@ -70,10 +74,6 @@ SPEC: dict[str, dict] = {
         "numeric": {"group_weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
     },
     # --- Temporal (lagged) methods: causal order is the cross-source slice gate.
-    "VARLiNGAM": {
-        "structural": ["causal_order"],
-        "numeric": {"adjacency_matrices": {"atol": 1e-6, "rtol": 1e-5}},
-    },
     "VARMALiNGAM": {
         "structural": ["causal_order"],
         "numeric": {
@@ -123,10 +123,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"lag_weights": {"atol": 5e-3, "rtol": 0.0}},
     },
-    # Granger has no causal order; its structural gate is the binary support.
+    # Granger has no causal order: the per-lag graphs exactly, the weights within rounding.
     "Granger": {
-        "structural": ["adj"],
-        "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+        "structural": ["graph"],
+        "numeric": {"lag_weights": {"atol": 1e-6, "rtol": 1e-5}},
     },
     # CAM-UV: the PAG's marks and the pairs it marks through a hidden variable, both exact.
     "CAMUV": {

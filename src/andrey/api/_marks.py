@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import ARROW, CIRCLE, TAIL
+from andrey.core.structure import endpoint_marks
 
 
 def directed_marks(B: np.ndarray, *, allow_self_loops: bool = False) -> np.ndarray:
@@ -40,34 +40,24 @@ def directed_marks(B: np.ndarray, *, allow_self_loops: bool = False) -> np.ndarr
     sup = np.isfinite(arr) & (arr != 0.0)
     if not allow_self_loops:
         np.fill_diagonal(sup, False)
-    M = np.zeros(arr.shape, dtype=np.int8)
-    # Tail at ``a`` for every edge ``a -> b`` (that is, ``B[b, a] != 0`` == ``sup.T[a, b]``); then
-    # an arrowhead at ``a`` for every edge ``b -> a`` (``sup[a, b]``) overwrites it, so a pair
-    # carrying both directions collapses to a double arrowhead ``ARROW``/``ARROW`` (a 2-cycle or
-    # bidirected).
-    M[sup.T] = TAIL
-    M[sup] = ARROW
-    return M
+    return endpoint_marks(sup.T)
 
 
-def marks_from_signed(B: np.ndarray, *, nan_mark: str) -> np.ndarray:
+def marks_from_signed(B: np.ndarray, *, nan_mark: int) -> np.ndarray:
     """Endpoint marks for a signed matrix whose ``NaN`` entries carry a per-algorithm meaning.
 
     Builds the directed support with :func:`directed_marks`, then marks every unordered ``NaN``
-    pair once with ``nan_mark`` -- ``"bidirected"`` (RCD: latent confounder) or ``"circle"``
-    (BottomUpParceLiNGAM: order-unknown). Both require ``kind="pag"`` downstream. Centralizes the
-    NaN sweep both latent-confounder adapters share, so neither hand-rolls the sentinel translation;
-    the two marks stay distinct because they mean different things (a world-claim vs. epistemic).
+    pair once with ``nan_mark``: ``ARROW`` (RCD: latent confounder) or ``CIRCLE``
+    (BottomUpParceLiNGAM and CAM-UV: order-unknown). Both require ``kind="pag"`` downstream.
+    Centralizes the NaN sweep its callers share, so none hand-rolls the sentinel translation; the
+    two marks stay distinct because they mean different things (a world-claim vs. epistemic).
 
     Returns an ``(n, n)`` ``int8`` matrix ready for ``GraphStructure.from_numpy``.
     """
-    mark = {"bidirected": ARROW, "circle": CIRCLE}.get(nan_mark)
-    if mark is None:
-        raise ValueError(f"nan_mark must be 'bidirected' or 'circle', got {nan_mark!r}")
     arr = np.asarray(B, dtype=np.float64)
     marks = directed_marks(arr)
     pair = np.isnan(arr)
     pair |= pair.T  # symmetric: mark both endpoints of every NaN pair
     np.fill_diagonal(pair, False)  # a diagonal NaN is not a pairwise relation
-    marks[pair] = mark
+    marks[pair] = nan_mark
     return marks

@@ -80,7 +80,7 @@ def test_from_lag_graphs_validation():
 def test_json_roundtrip_single_stack(tmp_path):
     lags, ar = _var_stack()
     out = StructureOutput.new(
-        TemporalStructure.from_lag_graphs(lags, lag_weights=ar), metadata={"algorithm": "varlingam"}
+        TemporalStructure.from_lag_graphs(lags, lag_weights=ar), metadata={"algorithm": "granger"}
     )
     p = tmp_path / "var.json"
     out.save(p)

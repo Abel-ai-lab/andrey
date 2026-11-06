@@ -271,7 +271,6 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
                     "1, ... in sorted order.",
-                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
@@ -281,7 +280,10 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            doc="metadata['index_edges'] lists the index's edges as [variable, 'directed'] "
+            "pairs and metadata['changing_variables'] the same variables, whose causal module "
+            "changes across the environments, in column order; metadata['categorical'] lists "
+            "the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
@@ -317,6 +319,68 @@ _add(
             _TEST_SEED,
         ),
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
+    )
+)
+_add(
+    MethodSpec(
+        name="fci_jci",
+        family="constraint",
+        summary="FCI for data pooled from several domains or regimes, allowing hidden common "
+        "causes: adds the environment index as a variable no data variable causes (Joint Causal "
+        "Inference), which removes edges pooling adds and can orient more. Returns a PAG over the "
+        "data variables and lists the index's edges.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers are read as numbers; text labels are coded 0, 1, ... in sorted order.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+            notes="env becomes a trailing context node, then projected out of the result; its "
+            "edges go in metadata['index_edges'].",
+            missing=True,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['index_edges'] lists the index's edges as [variable, kind] pairs, kind "
+            "directed, partially_directed, or bidirected, in column order; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position, the index numbered "
+            "n_variables",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
+        seeded=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _POSSIBLE_DSEP,
+            concept_param("confounded_index"),
+            _TEST_SEED,
+        ),
+        references=(
+            "Mooij, Magliacane & Claassen 2020",
+            "Spirtes, Glymour & Scheines 2000",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
+        ),
     )
 )
 _add(
@@ -568,7 +632,6 @@ _add(
                 "observational environment. Every environment needs an entry. null, with no env, "
                 "is observational data.",
                 nullable=True,
-                aliases=("interventions",),
             ),
             concept_param(
                 "score_func",
@@ -891,12 +954,7 @@ _add(
                 default=True,
                 doc="false makes every pair a candidate edge.",
             ),
-            ParamSpec(
-                name="standardize",
-                type="bool",
-                default=False,
-                doc="Scale each column to unit variance first.",
-            ),
+            concept_param("standardize"),
             concept_param(
                 "w_threshold",
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
@@ -1084,6 +1142,7 @@ _add(
                 "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Zheng, Aragam, Ravikumar & Xing 2018",
@@ -1148,6 +1207,7 @@ _add(
                 exclusive_minimum=True,
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Bello, Aragam & Ravikumar 2022",
@@ -1347,7 +1407,6 @@ _add(
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
                 "search more chains and run longer.",
-                aliases=("depth",),
             ),
             _SEED,
             _N_STARTS,
@@ -1356,6 +1415,98 @@ _add(
         references=("Lam, Andrews & Ramsey 2022",),
     )
 )
+#: The parent cap of the BOSS or GRaSP phase of boss_fci and grasp_fci.
+_PERMUTATION_FCI_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents in the BOSS or GRaSP phase, at least 0. The test phase only "
+    "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of the PAG. "
+    "null sets no cap.",
+)
+#: The seed of boss_fci and grasp_fci: the order search's and a randomized test's.
+_PERMUTATION_FCI_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
+    "gpdc.",
+)
+for _name, _summary, _own, _refs in (
+    (
+        "boss_fci",
+        "GFCI with BOSS in place of GES: BOSS adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI, with BOSS's search for "
+        "highly connected variables. Returns a PAG.",
+        (),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",
+            "Zhang 2008",
+        ),
+    ),
+    (
+        "grasp_fci",
+        "GFCI with GRaSP in place of GES: GRaSP adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI. Returns a PAG.",
+        (
+            ParamSpec(
+                name="grasp_depth",
+                minimum=1,
+                type="int",
+                default=3,
+                doc="Maximum number of tucks in one chain of moves of the GRaSP phase, at least 1; "
+                "larger depths search more chains and run longer.",
+            ),
+        ),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Lam, Andrews & Ramsey 2022",
+        ),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="permutation",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="pag",
+                doc="metadata['categorical'] lists the categorical columns a mixed-data setting "
+                "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
+                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position",
+            ),
+            determinism="stochastic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            order_note=(
+                '`tie_break="position"` fires the orientation rules one at a time in column order '
+                "and records the first separating subset found, and it or "
+                '`possible_dsep="fast"` visits the possible-d-separation step in column order.'
+            ),
+            seeded=True,
+            params=(
+                _SCORE_FUNC,
+                _PENALTY_DISCOUNT,
+                _EBIC_GAMMA_STANDARD,
+                _EQUIVALENT_SAMPLE_SIZE,
+                *_own,
+                _INDEP_TEST,
+                _ALPHA,
+                _COLLIDER_RULE,
+                _CATEGORICAL,
+                _POSSIBLE_DSEP,
+                _PERMUTATION_FCI_SEED,
+                _N_STARTS,
+                _PERMUTATION_FCI_MAX_PARENTS,
+            ),
+            references=_refs,
+        )
+    )
 _add(
     MethodSpec(
         name="igsp",
@@ -1883,7 +2034,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "alpha",
@@ -1963,9 +2113,9 @@ _add(
                 "collider_rule",
                 default="majority",
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
-                "separating set found; majority = fewer than half of the separating subsets hold "
-                "the middle; conservative = none does. The default majority is tigramite's.",
-                choice_aliases=(("none", "sepsets"),),
+                "separating set found; majority and conservative = at least one subset separates "
+                "the ends and fewer than half (majority) or none (conservative) of them hold the "
+                "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
             _CATEGORICAL,
@@ -1973,8 +2123,8 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a skeleton or collider test takes beyond the default "
-                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
-                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "conditions, the lagged parents of both ends, at least 0; max_depth caps the "
+                "lagged phase. null sets no limit. A cap bounds the number of "
                 "tests and can keep links that a larger conditioning set would remove.",
             ),
             concept_param(
@@ -2041,7 +2191,7 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a test takes beyond the default conditions, the parents "
-                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "of both ends, at least 0; max_depth elsewhere counts the whole "
                 "conditioning set. null sets no limit. A cap bounds the number of tests and can "
                 "keep links that a larger conditioning set would remove.",
             ),
@@ -2090,7 +2240,6 @@ _add(
                 "link is kept when its adjusted p-value is at most alpha.",
             ),
         ),
-        dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
@@ -2170,6 +2319,7 @@ _add(
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
                 "this value, above 1, the weight the fit starts from.",
             ),
+            concept_param("standardize"),
         ),
         references=(
             "Pamfil et al. 2020",
@@ -2524,8 +2674,13 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
+    "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
     "and never removes a required pair. " + _PAG_MARKS,
+    "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
+    "BOSS found and never removes a required pair. " + _PAG_MARKS,
+    "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
+    "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
@@ -2642,19 +2797,11 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         )
 
 
-# Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
-for _name in CONCEPTS["categorical"].suitable:
-    if _name in ("igsp", "ut_igsp"):
-        continue
-    _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
-    REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
-
-
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
-    "cdnod": ("conflicts",),
+    "cdnod": ("conflicts", "index_edges", "changing_variables"),
+    "fci_jci": ("index_edges",),
     "icp": (
         "target",
         "parents",

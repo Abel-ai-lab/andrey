@@ -28,9 +28,9 @@ from ._marks import marks_from_signed
 
 
 def _coerce_float(value: Any) -> float:
-    """Coerce a p-value to a plain ``float`` (PNL returns each as a shape-``(1,)`` array).
+    """Return a p-value or a statistic as a plain ``float``.
 
-    ``_check_json_safe`` rejects numpy scalars / arrays, so metadata must hold Python ``float``.
+    PNL returns each as a shape-``(1,)`` array, which this flattens.
     """
     return float(np.asarray(value, dtype=np.float64).ravel()[0])
 
@@ -199,7 +199,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
     ``[i, j]`` lists, ride in ``metadata["confounded_pairs"]``.
     """
     B = _adjacency(model)
-    M = marks_from_signed(B, nan_mark="bidirected")
+    M = marks_from_signed(B, nan_mark=ARROW)
     structure = GraphStructure.from_numpy(M, kind="pag")
     return structure_output(
         structure,
@@ -227,7 +227,7 @@ def _adapt_bottom_up_parce(
     pair ``i - j``, and ``required[i, j]`` makes ``i -> j`` an edge even where its weight is ``0``.
     """
     B = _adjacency(model)
-    M = marks_from_signed(B, nan_mark="circle")
+    M = marks_from_signed(B, nan_mark=CIRCLE)
     if arrowheads is not None:
         M[arrowheads & (M == CIRCLE)] = ARROW
     if required is not None:

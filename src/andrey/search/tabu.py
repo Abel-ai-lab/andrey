@@ -1,87 +1,58 @@
 """Tabu search over DAGs, the engine behind :func:`andrey.tabu`.
 
-``_search`` uses :class:`andrey.search.hc.MoveScanner`, sharing hill climbing's tie rules. Output is
-the best DAG's CPDAG and total score; lower is better.
+``_search`` takes the moves of :class:`andrey.search.hc.MoveScanner`, and
+:func:`andrey.search.hc.greedy_search` runs its starts, so tabu search shares hill climbing's tie
+rules, knowledge, and restarts. Output is the best DAG's CPDAG and total score; lower is better.
 """
 
 from __future__ import annotations
 
 import math
 from collections import deque
+from functools import partial
 
 import numpy as np
 
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
-from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
-from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
-)
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.core.seeding import start_rng
-from andrey.core.warning_policy import warn_search_limit
-from andrey.search._parallel import _EPS_IMPROVE
-from andrey.search.hc import (
-    START_EPS,
-    MoveScanner,
-    StructureKey,
-    _apply_move,
-    perturb,
-    start_dag,
-    tie_ranks,
-)
+from andrey.core import GraphStructure
+from andrey.core.knowledge import Constraints
+from andrey.core.ties import EPS_IMPROVE
+from andrey.search.hc import MoveScanner, StructureKey, _apply_move, greedy_search
 
 __all__ = ["tabu"]
 
-#: The local scores :func:`tabu` accepts.
-TABU_SCORES: tuple[str, ...] = SCORES
-
 
 def _search(
-    score: LocalScore,
-    ranks: np.ndarray,
-    tabu_length: int,
-    max_tabu: int,
-    max_iter: int | None,
+    scanner: MoveScanner,
     adj_int: list[int],
     parents_of: dict[int, list[int]],
-    forbidden: np.ndarray | None = None,
-    required: np.ndarray | None = None,
-    max_parents: int | None = None,
-) -> tuple[StructureKey, int]:
-    """Run tabu search from the DAG ``adj_int``; return the best DAG's structure key and the moves.
+    max_iter: int | None,
+    *,
+    tabu_length: int,
+    max_tabu: int,
+) -> int:
+    """Run tabu search from the DAG ``adj_int``; end on the best DAG visited and count the moves.
 
     Each step adds the current DAG to the tabu list and takes the best improving move outside it.
     Without one, the search stops after ``max_tabu`` non-improving moves since the last new best;
     otherwise it counts one more and takes the best non-improving move outside the list, leaving the
-    score unchanged or worse. A new best score lower by more than ``_EPS_IMPROVE`` resets the count.
+    score unchanged or worse. A new best score lower by more than ``EPS_IMPROVE`` resets the count.
     The search also stops when every legal move leads into the list, or after ``max_iter`` moves
-    unless it is ``None``. ``ranks`` orders tied moves, :func:`~andrey.search.hc.tie_ranks` of the
-    data. ``adj_int`` and ``parents_of``, the bitset rows and sorted parent sets of the start DAG,
-    change in place. No move adds an edge ``u -> v`` that ``forbidden[v, u]`` bars, removes or
-    reverses one that ``required[v, u]`` holds, or, with ``max_parents``, gives a node more parents.
+    unless it is ``None``. The moves keep the rules of ``scanner``, and the totals add up its
+    ``score``. ``adj_int`` and ``parents_of``, the bitset rows and sorted parent sets of the start
+    DAG, become those of the best DAG visited.
     """
-    d = len(ranks)
+    score = scanner.score
+    d = len(adj_int)
     local = [score.score(i, parents_of[i]) for i in range(d)]
     best_key: StructureKey = tuple(adj_int)
     best_total = math.fsum(local)
     recent: deque[StructureKey] = deque(maxlen=tabu_length)
     losses = 0
     moves = 0
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
-    scanner = MoveScanner(
-        delta, d, ranks=ranks, forbidden=forbidden, required=required, max_parents=max_parents
-    )
     while max_iter is None or moves < max_iter:
         recent.append(tuple(adj_int))
         tabu = frozenset(recent)
-        found = scanner.best(adj_int, parents_of, floor=-_EPS_IMPROVE, tabu=tabu)
+        found = scanner.best(adj_int, parents_of, floor=-EPS_IMPROVE, tabu=tabu)
         if found is None:
             if losses >= max_tabu:
                 break
@@ -96,9 +67,12 @@ def _search(
         for node in (u, v) if op == "reverse" else (v,):
             local[node] = score.score(node, parents_of[node])
         total = math.fsum(local)
-        if total < best_total - _EPS_IMPROVE:
+        if total < best_total - EPS_IMPROVE:
             best_key, best_total, losses = tuple(adj_int), total, 0
-    return best_key, moves
+    adj_int[:] = best_key
+    for v in range(d):
+        parents_of[v] = [u for u in range(d) if best_key[u] >> v & 1]
+    return moves
 
 
 def tabu(
@@ -130,11 +104,11 @@ def tabu(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score, one of :data:`TABU_SCORES`: ``"bic"`` (linear-Gaussian BIC), ``"bdeu"``
-        (:class:`~andrey.core.score.BDeuScore` with its default structure prior) or
+        Local score, one of :data:`~andrey.core.score.SCORES`: ``"bic"`` (linear-Gaussian BIC),
+        ``"bdeu"`` (:class:`~andrey.core.score.BDeuScore` with its default structure prior) or
         ``"discrete_bic"`` (:class:`~andrey.core.score.CategoricalBICScore`), both on category
-        codes, or
-        ``"degen_gauss"`` or ``"cond_gauss"``, the mixed-data scores over ``categorical``.
+        codes, or ``"degen_gauss"`` or ``"cond_gauss"``, the mixed-data scores over
+        ``categorical``.
     penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
@@ -174,97 +148,23 @@ def tabu(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total score.
     """
-    if score_func not in TABU_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {TABU_SCORES}"
-        )
     if max_tabu is None:
         max_tabu = tabu_length
     if not 1 <= max_tabu <= tabu_length:
         raise ValueError(f"max_tabu must lie in [1, tabu_length={tabu_length}], got {max_tabu}")
-    X = np.asarray(data, dtype=np.float64)
-    d = X.shape[1]
-
-    def new_score() -> LocalScore:
-        return make_score(
-            score_func,
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            categorical=categorical,
-        )
-
-    score = new_score()
-    mask = np.full(d, score_func in DISCRETE_SCORES)
-    forbidden = None
-    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
-        mask = column_mask(categorical, d)
-        forbidden = mask[:, None] & ~mask[None, :]
-        if constraints is not None and (constraints.required & forbidden.T).any():
-            raise ValueError(
-                "knowledge requires an edge from a continuous into a categorical column, which a "
-                "mixed-data score does not allow"
-            )
-    required = None
-    if constraints is not None:
-        knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
-        forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
-        required = constraints.required.T
-
-    ranks = tie_ranks(X, mask)
-    start_adj, start_parents = start_dag(d, constraints, max_parents)
-    best: tuple[StructureKey, list[list[int]], float] | None = None
-    capped = False
-    for start in range(n_starts):
-        if start == 0:
-            adj_int, parents_of = start_adj, start_parents
-        else:
-            assert best is not None  # set by start 0
-            # Each start builds its own score, deltas, tables, and tabu list.
-            score = new_score()
-            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in enumerate(best[1])}
-            perturb(
-                adj_int,
-                parents_of,
-                n_perturbations,
-                start_rng(random_state, start),
-                ranks=ranks,
-                forbidden=forbidden,
-                required=required,
-                max_parents=max_parents,
-            )
-        # One BLAS thread keeps the Schur updates reproducible across thread counts.
-        with backend.one_blas_thread():
-            key, moves = _search(
-                score,
-                ranks,
-                tabu_length,
-                max_tabu,
-                max_iter,
-                adj_int,
-                parents_of,
-                forbidden,
-                required,
-                max_parents,
-            )
-        capped |= max_iter is not None and moves == max_iter
-        parents = [[u for u in range(d) if key[u] >> v & 1] for v in range(d)]
-        total = float(sum(score.score(i, parents[i]) for i in range(d)))
-        if best is None or total < best[2] - START_EPS:
-            best = (key, parents, total)
-    if capped and max_iter is not None:
-        warn_search_limit("tabu", "max_iter", max_iter, "moves")
-    assert best is not None  # n_starts >= 1
-    _, parents, total = best
-
-    # The best DAG as unsigned endpoint marks (u -> v: TAIL at u, ARROW at v), reduced to its CPDAG.
-    dag = np.full((d, d), NULL, dtype=np.int8)
-    for v in range(d):
-        for p in parents[v]:
-            dag[p, v] = TAIL
-            dag[v, p] = ARROW
-    cpdag = dag2cpdag(dag)
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), total
+    return greedy_search(
+        data,
+        partial(_search, tabu_length=tabu_length, max_tabu=max_tabu),
+        method="tabu",
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_iter=max_iter,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        n_perturbations=n_perturbations,
+        random_state=random_state,
+    )

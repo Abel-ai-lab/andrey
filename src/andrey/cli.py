@@ -37,7 +37,6 @@ from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
 from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, node_labels
-from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
 from andrey.spec.generate import (
@@ -738,6 +737,22 @@ def _with_hint(message: str, hint: str | None) -> str:
     return message if hint is None else f"{message}; {hint}"
 
 
+def _former_flag_hint(command: str, method: str, key: str) -> str | None:
+    """What the former flag ``--key`` of ``andrey <command> <method>`` is called now, if anything.
+
+    ``--n-boot`` of ``bootstrap`` is ``--n-resamples``, and ``gies``'s ``--interventions``, a 0/1
+    matrix, became ``--env`` with ``targets=``; another flag gets the hint of the method argument
+    of its name (:func:`~andrey.core.removed.removal_hint`), spelled as a flag when the method
+    takes it as one.
+    """
+    if command == "bootstrap" and key == "n_boot":
+        return "it was renamed `--n-resamples` in 0.12.0"
+    if method == "gies" and key == "interventions":
+        return "it was replaced by `--env` with `targets=` in 0.14.0"
+    flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
+    return removal_hint(method, key, flags=flags)
+
+
 def _flag_hint(token: str) -> dict:
     """A structured error for a stale `--flag` token, with a did_you_mean when it names a param."""
     name = token.lstrip("-").replace("-", "_")
@@ -881,49 +896,6 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
         if k not in spec.dropped_args
     }
     return fkwargs, resolved
-
-
-def _former_flags(
-    spec: MethodSpec, provided: dict[str, list[str] | None], fkwargs: dict, command: str
-) -> list[str]:
-    """Map the former `--domain-index` flag onto `--env` and the former `--interventions` matrix
-    onto `targets=`, and return the warning each one gives.
-
-    A method that never took the flag keeps it in ``provided``, where :func:`_load_method_inputs`
-    refuses it. Raises ``CliError`` when a call passes a former flag with its replacement.
-    """
-    messages = []
-    env = next((i for i in spec.data.inputs if i.name == "env"), None)
-    if provided.get("domain_index") and env is not None and "domain_index" in env.aliases:
-        if provided.get("env"):
-            raise CliError(
-                "bad_input",
-                "--domain-index is the former name of --env; pass only --env",
-                EXIT_USAGE,
-            )
-        provided["env"] = provided.pop("domain_index")
-        messages.append(
-            f"andrey {command}: --domain-index is now --env; the former flag stops working in the "
-            "next release"
-        )
-    targets = next((p for p in spec.params if p.type == "targets"), None)
-    paths = provided.get("interventions")
-    if paths and targets is not None and "interventions" in targets.aliases:
-        if fkwargs.get("targets") is not None:
-            raise CliError(
-                "bad_input",
-                "--interventions is the former form of targets=; pass only targets=",
-                EXIT_USAGE,
-            )
-        if len(paths) != 1:
-            raise CliError("bad_input", "--interventions takes a single path", EXIT_USAGE)
-        provided.pop("interventions")
-        fkwargs["targets"] = load(paths[0])[0]
-        messages.append(
-            f"andrey {command}: --interventions is now --env with targets=; the former flag stops "
-            "working in the next release"
-        )
-    return messages
 
 
 def _load_method_inputs(
@@ -1124,12 +1096,10 @@ def execute_run(
     output: str | None,
     as_json: bool,
     full: bool,
-    former: Sequence[str] = (),
 ) -> None:
     """Call the facade on the loaded inputs + coerced params, then emit the result (shell-aware).
 
-    ``labels`` (the data's header) name the result's nodes. Each message of ``former``, one per
-    former flag the call passed, warns with the fit's warnings.
+    ``labels`` (the data's header) name the result's nodes.
     """
     import time
 
@@ -1142,8 +1112,6 @@ def execute_run(
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            for message in former:
-                warn_once(message, DeprecatedArgumentWarning)
             out = fn(*positional, **fkwargs)
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
@@ -1184,7 +1152,6 @@ def execute_bootstrap(
     *,
     labels: tuple[str, ...] | None = None,
     n_resamples: int,
-    n_boot: int | None = None,
     seed: int | None,
     threshold: float,
     strict: bool,
@@ -1194,13 +1161,10 @@ def execute_bootstrap(
     output: str | None,
     as_json: bool,
     full: bool,
-    former: Sequence[str] = (),
 ) -> None:
     """Refit the method on resamples of the rows, then emit the edge frequencies (shell-aware).
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
-    ``n_boot`` is the former ``--n-boot`` flag, which replaces ``n_resamples`` and warns, as each
-    message of ``former`` does.
     """
     import time
 
@@ -1209,7 +1173,6 @@ def execute_bootstrap(
             "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
         )
     panel = spec.data.inputs[0].kind == "panel"
-    n_resamples = n_resamples if n_boot is None else n_boot
     bad = [
         message
         for ok, message in (
@@ -1249,14 +1212,6 @@ def execute_bootstrap(
     with _fit_errors():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            if n_boot is not None:
-                warn_once(
-                    "andrey bootstrap: --n-boot is now --n-resamples; the former flag stops "
-                    "working in the next release",
-                    DeprecatedArgumentWarning,
-                )
-            for message in former:
-                warn_once(message, DeprecatedArgumentWarning)
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
@@ -1958,21 +1913,9 @@ _EnvOption = Annotated[
     typer.Option(
         "--env",
         metavar="COLUMN|PATH",
-        help="cdnod, icp, gies, gnies, igsp, ut_igsp only: the environment of each row, a column "
-        "of --data's header (then not a variable) or a file with one value per row of --data.",
-    ),
-]
-_DomainIndexOption = Annotated[
-    Optional[list[str]],
-    typer.Option("--domain-index", metavar="PATH", hidden=True, help="Former name of --env."),
-]
-_InterventionsOption = Annotated[
-    Optional[list[str]],
-    typer.Option(
-        "--interventions",
-        metavar="PATH",
-        hidden=True,
-        help="Former 0/1 matrix of gies; use --env with targets=.",
+        help="cdnod, fci_jci, icp, gies, gnies, igsp, ut_igsp only: the environment of each row, "
+        "a column of --data's header (then not a variable) or a file with one value per row of "
+        "--data.",
     ),
 ]
 _ConfigOption = Annotated[
@@ -2015,8 +1958,6 @@ def cmd_run(
     ),
     data: _DataOption = None,
     env: _EnvOption = None,
-    domain_index: _DomainIndexOption = None,
-    interventions: _InterventionsOption = None,
     config: _ConfigOption = None,
     output: _OutputOption = None,
     as_json: _JsonOption = False,
@@ -2032,16 +1973,10 @@ def cmd_run(
     spec = _method_or_help(ctx, method, show_help, as_json)
     if spec is None:
         return
-    provided = {
-        "data": data,
-        "env": env,
-        "domain_index": domain_index,
-        "interventions": interventions,
-    }
+    provided = {"data": data, "env": env}
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
-    former = _former_flags(spec, provided, fkwargs, "run")
     positional, labels = _load_method_inputs(spec, provided)
     execute_run(
         spec,
@@ -2052,7 +1987,6 @@ def cmd_run(
         output=output,
         as_json=as_json,
         full=full,
-        former=former,
     )
 
 
@@ -2067,13 +2001,8 @@ def cmd_bootstrap(
     ),
     data: _DataOption = None,
     env: _EnvOption = None,
-    domain_index: _DomainIndexOption = None,
-    interventions: _InterventionsOption = None,
     n_resamples: Optional[int] = typer.Option(
         None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
-    ),
-    n_boot: Optional[int] = typer.Option(
-        None, "--n-boot", metavar="N", hidden=True, help="Former name of --n-resamples."
     ),
     seed: Optional[int] = typer.Option(
         None,
@@ -2128,22 +2057,10 @@ def cmd_bootstrap(
     spec = _method_or_help(ctx, method, show_help, as_json)
     if spec is None:
         return
-    provided = {
-        "data": data,
-        "env": env,
-        "domain_index": domain_index,
-        "interventions": interventions,
-    }
-    if n_boot is not None and n_resamples is not None:
-        raise CliError(
-            "bad_value",
-            "--n-boot is the former name of --n-resamples; pass only --n-resamples",
-            EXIT_USAGE,
-        )
+    provided = {"data": data, "env": env}
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
-    former = _former_flags(spec, provided, fkwargs, "bootstrap")
     positional, labels = _load_method_inputs(spec, provided)
     execute_bootstrap(
         spec,
@@ -2152,7 +2069,6 @@ def cmd_bootstrap(
         resolved,
         labels=labels,
         n_resamples=100 if n_resamples is None else n_resamples,
-        n_boot=n_boot,
         seed=seed,
         threshold=threshold,
         strict=strict,
@@ -2162,7 +2078,6 @@ def cmd_bootstrap(
         output=output,
         as_json=as_json,
         full=full,
-        former=former,
     )
 
 
@@ -2258,8 +2173,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if key in {p.name for s in REGISTRY.values() for p in s.params}:
                     extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
                 method = next((a for a in args if a in REGISTRY), "")
-                flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
-                msg = _with_hint(msg, removal_hint(method, key, flags=flags))
+                ctx = getattr(exc, "ctx", None)
+                name = ctx.info_name if ctx is not None else ""
+                msg = _with_hint(msg, _former_flag_hint(name, method, key))
             return emit_error(CliError("usage_error", msg, EXIT_USAGE, **extra))
         return emit_error(CliError("internal", f"{type(exc).__name__}: {exc}", EXIT_INTERNAL))
 

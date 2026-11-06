@@ -25,17 +25,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from andrey.constraint.blanket import blanket_graph
-from andrey.core import GraphStructure, StructureOutput
+from andrey.core import GraphStructure
 from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
-from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.orient import to_structure
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search.continuous import (
-    break_cycles,
-    endpoint_marks,
-    residual_variances,
-)
-from andrey.search.hc import tie_ranks
+from andrey.search.continuous import break_cycles, center, residual_variances
 
 
 def _require_torch():
@@ -54,16 +51,13 @@ class CalmResult:
     """Recovered structure from the continuous search.
 
     ``weighted_adjacency`` holds the thresholded real coefficients (``[i, j]`` is edge ``i -> j``).
-    ``dag`` is the acyclic endpoint-mark graph of the surviving edges and ``cpdag`` its essential
-    graph (the Markov-equivalence-class representative). ``output`` is the uniform run envelope
-    wrapping the DAG plus the weighted adjacency and run metadata. ``h_final`` is the acyclicity
-    residual of the returned support and ``objective`` its likelihood-plus-sparsity value.
+    ``dag`` is the acyclic endpoint-mark graph of the surviving edges. ``h_final`` is the
+    acyclicity residual of the noise-free gates before the thresholds, the value the fit compares
+    with ``h_tol``, and ``objective`` the returned support's likelihood-plus-sparsity value.
     """
 
     weighted_adjacency: np.ndarray
     dag: GraphStructure
-    cpdag: GraphStructure
-    output: StructureOutput
     h_final: float
     objective: float
 
@@ -115,14 +109,15 @@ def _optimize_gated_dag(
     lr: float,
     seed: int,
     required: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Fit gate logits and edge weights; return ``(gate_prob, weight)`` numpy arrays.
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Fit gate logits and edge weights; return ``(gate_prob, weight, h)``.
 
     Runs the quadratic-penalty schedule with a Gumbel-sigmoid gate over the moral-graph support.
     ``gate_prob`` is the noiseless edge probability ``sigmoid(logit / tau)`` and ``weight`` the real
-    coefficient matrix; the caller thresholds them into a binary support. A ``required`` edge's
-    gate is held at one and left out of the penalty; its weight is fitted. Raises ``ValueError``
-    when the loss or the fitted parameters are not finite.
+    coefficient matrix; the caller thresholds them into a binary support. ``h`` is the acyclicity
+    residual of the noise-free gates after the last round. A ``required`` edge's gate is held at
+    one and left out of the penalty; its weight is fitted. Raises ``ValueError`` when the loss or
+    the fitted parameters are not finite.
     """
     torch = _require_torch()
     gen = torch.Generator(device="cpu").manual_seed(seed)
@@ -189,7 +184,7 @@ def _optimize_gated_dag(
         weight_np = weight.detach().cpu().numpy()
     if not (np.isfinite(gate_prob).all() and np.isfinite(weight_np).all()):
         raise ValueError(_NOT_FINITE)
-    return gate_prob, weight_np
+    return gate_prob, weight_np, h_val
 
 
 # --------------------------------------------------------------------------------------------
@@ -229,7 +224,7 @@ def calm(
     ``rho`` reaches ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
     ``seed`` makes the run reproducible. The fit runs on the columns in order of their
-    :func:`~andrey.search.hc.tie_ranks`, so each column keeps its initial weights and gate noise
+    :func:`~andrey.core.ties.tie_ranks`, so each column keeps its initial weights and gate noise
     when the columns are reordered. ``constraints``, in the data's column order, edit the
     candidate edges and hold the required gates on, as the module describes. Returns a
     :class:`CalmResult`.
@@ -238,16 +233,10 @@ def calm(
     n, d = samples.shape
     order = np.argsort(tie_ranks(samples))  # the fit's column k is the data's column order[k]
     back = np.argsort(order)
-    samples = samples[:, order]
-    centered = samples - samples.mean(axis=0, keepdims=True)
-    if standardize:
-        scale = centered.std(axis=0, keepdims=True)
-        scale[scale == 0.0] = 1.0
-        centered = centered / scale
+    centered = center(samples[:, order], standardize=standardize)
     cov = centered.T @ centered / n
 
     mask = moral_graph(centered, alpha=alpha) if use_moral_graph else (1.0 - np.eye(d))
-    moral_edges = int(mask.sum() // 2)
     required = None
     if constraints is not None:
         fit = constraints.permuted(order)
@@ -259,8 +248,9 @@ def calm(
     if mask.sum() == 0:
         gate_prob = np.zeros((d, d))
         weight = np.zeros((d, d))
+        h_final = 0.0
     else:
-        gate_prob, weight = _optimize_gated_dag(
+        gate_prob, weight, h_final = _optimize_gated_dag(
             cov,
             mask,
             lambda1=lambda1,
@@ -284,31 +274,9 @@ def calm(
     resid_var = residual_variances(weighted, cov)
     support, weighted = (m[np.ix_(back, back)] for m in (support, weighted))
 
-    marks = endpoint_marks(support)
-    dag = to_structure(marks, kind="dag", labels=labels)
-    cpdag = to_structure(dag2cpdag(marks), kind="cpdag", labels=labels)
-
+    dag = to_structure(endpoint_marks(support), kind="dag", labels=labels)
     objective = 0.5 * float(np.sum(np.log(np.clip(resid_var, 1e-12, None))))
     objective += lambda1 * float(support.sum())
-    poly = np.linalg.matrix_power(np.eye(d) + support.astype(float) / d, d)
-    h_final = float(np.trace(poly) - d)
-
-    output = StructureOutput.new(
-        dag,
-        weighted_adjacency=weighted,
-        metadata={
-            "n_edges": int(support.sum()),
-            "h_final": h_final,
-            "objective": objective,
-            "used_moral_graph": bool(use_moral_graph),
-            "moral_edges": moral_edges,
-        },
-    )
     return CalmResult(
-        weighted_adjacency=weighted,
-        dag=dag,
-        cpdag=cpdag,
-        output=output,
-        h_final=h_final,
-        objective=objective,
+        weighted_adjacency=weighted, dag=dag, h_final=float(h_final), objective=objective
     )

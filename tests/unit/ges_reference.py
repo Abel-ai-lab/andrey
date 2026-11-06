@@ -16,9 +16,9 @@ import numpy as np
 import pytest
 
 from andrey.core.orient import _cpdag_of_pdag
+from andrey.core.ties import EPS_IMPROVE
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.ges import _reachable
 
 
@@ -68,7 +68,7 @@ def forward_chunk_best(
     per target by ``base = sorted(NA u T u Pa)``, and scores each group with one batched
     ``delta_many_with_base`` call over its ``("add", x)`` moves -- so one shared ``inv(cov[base,
     base])`` amortizes across all sources sharing a base. A candidate is improving iff its raw delta
-    is below ``-_EPS_IMPROVE``; the argmin is over the quantized key, so the visitation order
+    is below ``-EPS_IMPROVE``; the argmin is over the quantized key, so the visitation order
     cannot change the result. Grouping is per target, and a target lives wholly in one
     chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
     ``forbidden`` filters the candidates as in :func:`insert_candidates`; a move in ``excluded``
@@ -99,7 +99,7 @@ def forward_chunk_best(
             for (x, T), delta in zip(
                 cands, delta_engine.delta_many_with_base(y, base, moves), strict=True
             ):
-                if delta < -_EPS_IMPROVE:
+                if delta < -EPS_IMPROVE:
                     key = pg.move_key(delta, n, x, y, T, ranks)
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:

@@ -27,12 +27,18 @@ CI_TESTS = {
 
 
 class PValueOnly:
-    """A registered test with the single-query call alone: the p-value of Fisher's z-test."""
+    """A registered test with the single-query call alone: the p-value of Fisher's z-test.
+
+    ``queries`` counts the calls of every instance, so a test can see that a search asked it.
+    """
+
+    queries = 0
 
     def __init__(self, data: np.ndarray) -> None:
         self._test = FisherZ(data)
 
     def __call__(self, x: int, y: int, condition_set=()) -> float:
+        type(self).queries += 1
         return float(self._test(x, y, condition_set))
 
 

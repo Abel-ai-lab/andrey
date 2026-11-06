@@ -15,10 +15,9 @@ from andrey.core import NULL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag, required_dag
-from andrey.search.hc import tie_ranks
 from andrey.search.xges import (
     _ACCEPT_PER_SAMPLE,
     _extension_scores,
@@ -32,13 +31,13 @@ def _move_key(
 ) -> tuple:
     """The order of a move of edge ``x``-``y`` with ``subset`` (``T`` or ``C``); lower goes first.
 
-    ``(round(delta / n, _KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
-    samples and ``ranks`` from :func:`~andrey.search.hc.tie_ranks`: moves whose score changes per
-    sample agree to :data:`~andrey.search._parallel._KEY_DP` decimals are ordered by ranks that
+    ``(round(delta / n, KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
+    samples and ``ranks`` from :func:`~andrey.core.ties.tie_ranks`: moves whose score changes per
+    sample agree to :data:`~andrey.core.ties.KEY_DP` decimals are ordered by ranks that
     follow the columns.
     """
     ordered = tuple(sorted([ranks[v] for v in subset])) if subset else ()
-    return (round(delta / n, _KEY_DP), ranks[x], ranks[y], ordered)
+    return (round(delta / n, KEY_DP), ranks[x], ranks[y], ordered)
 
 
 def _sets(adj: np.ndarray, v: int) -> tuple[set[int], set[int], set[int]]:
@@ -148,7 +147,7 @@ def _ordered(candidates: Iterable[tuple], n: int, ranks: list[int]) -> list[tupl
 
 def _improving(candidates: list[tuple], n: int, ranks: list[int]) -> list[tuple]:
     """The improving candidates in :func:`_ordered` order."""
-    return _ordered((c for c in candidates if c[0] < -_EPS_IMPROVE), n, ranks)
+    return _ordered((c for c in candidates if c[0] < -EPS_IMPROVE), n, ranks)
 
 
 def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndarray:

@@ -1,7 +1,8 @@
 """Statistical primitives with automatic backend selection.
 
-``cov``, ``corrcoef``, and ``entropy`` accept numpy arrays and return ``float64`` arrays. Numpy is
-the exact oracle for ``cov`` and ``corrcoef`` and the reference for ``entropy`` (``atol 1e-3``).
+``cov``, ``corrcoef``, and ``entropy`` accept NumPy arrays and return ``float64`` arrays. The
+``"numpy"`` backend is the exact oracle for ``cov`` and ``corrcoef`` and the reference for
+``entropy`` (``atol 1e-3``).
 
 Auto-dispatch uses per-device element-count cutoffs because compute and host-to-device transfer
 scale with that metric. ``cov`` and ``corrcoef`` gate on ``n*d``; ``entropy`` gates on ``n*B``.
@@ -27,29 +28,12 @@ import threading
 import time
 
 import numpy as np
+import numpy.typing as npt
 
 from . import backend, env
 
 _log = logging.getLogger(__name__)
 
-# Per-device auto-dispatch cutoffs use element count because compute and host-to-device transfer
-# scale with it. DirectLiNGAM uses tall `n` by `B <= ~2d` batches. Column count alone is unsuitable.
-#
-# Five `qa/gpu_calibration_validate.py` runs on A100-SXM4-80GB GPUs produced these brackets:
-#
-#   entropy   7,433   7,433   6,250   7,433   7,433
-#   cov     148,651 125,000  88,388  37,163 250,000
-#
-# Each result is a lattice point within `_BRACKET_TOL`, not an exact crossover. Defaults are at the
-# low end of each band. A cutoff that is too low costs bounded overhead near the cutoff. A cutoff
-# that is too high forfeits the speedup. Entropy forms a narrow band. Cov spans nearly `7x`.
-# Its minimum is one noisy draw of five, so its default is above that minimum. The liveness rule,
-# not this value, keeps one-shot calls off a cold device. `auto` never reaches `mps`
-# (`backend._TORCH_AUTO`); its entries stay `None` because no Metal crossover has been measured,
-# and `qa/gpu_calibration_validate.py` reads them. Re-measure after a change to the timed path:
-# the torch or numpy kernels, `backend.to_numpy`, or the probe.
-_COV_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 90_000, "mps": None}  # elements n*d
-_ENTROPY_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 6_250, "mps": None}  # elements n*B
 
 # Maximum-entropy approximation of differential entropy (Hyvarinen 1998), DirectLiNGAM's measure.
 _K1 = 79.047
@@ -401,17 +385,37 @@ def _resolve_thresholds(
     return defaults
 
 
+def checked_matrix(
+    data: npt.ArrayLike, purpose: str, *, min_rows: int = 0, dtype: type | None = np.float64
+) -> np.ndarray:
+    """``data`` as an ``(n_samples, n_features)`` matrix of ``dtype``, checked before ``purpose``.
+
+    ``dtype=None`` keeps the data's own type, such as category codes. Raises ``ValueError`` when the
+    data is not 2-D, has fewer than ``min_rows`` rows, or, as floats, holds a ``NaN`` or an
+    infinity; the messages name what the data is for by ``purpose``, such as ``"run a KCI test"``.
+    """
+    arr = np.asarray(data, dtype=dtype)
+    if arr.ndim != 2:
+        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
+    if arr.shape[0] < min_rows:
+        raise ValueError(f"data needs at least {min_rows} rows to {purpose}, got {arr.shape[0]}")
+    if arr.dtype.kind == "f" and not np.isfinite(arr).all():
+        raise ValueError(f"data contains NaN or Inf; cannot {purpose}")
+    return arr
+
+
 def cov(X: np.ndarray, *, rowvar: bool = True, ddof: int = 1) -> np.ndarray:
     """Covariance matrix, matching ``np.cov(X, rowvar=rowvar, ddof=ddof)``.
 
-    ``rowvar=True`` treats each row as a variable (numpy's default); ``ddof=1`` is the sample
-    covariance. numpy is the exact oracle; the torch path equals it within device tolerance.
+    ``rowvar=True`` treats each row as a variable (NumPy's default); ``ddof=1`` is the sample
+    covariance. The ``"numpy"`` backend is the exact oracle; the torch path equals it within device
+    tolerance.
     """
     X = np.asarray(X, dtype=np.float64)
     thr = _resolve_thresholds(
         "cov",
         env.COV_GPU_THRESHOLD,
-        _COV_GPU_THRESHOLDS,
+        backend.GPU_THRESHOLDS["cov"],
         _cov_probe,
         _cov_probe_call,
         _COV_PROBE_START,
@@ -432,7 +436,7 @@ def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
     thr = _resolve_thresholds(
         "corrcoef",
         env.COV_GPU_THRESHOLD,
-        _COV_GPU_THRESHOLDS,
+        backend.GPU_THRESHOLDS["cov"],
         _cov_probe,
         _corrcoef_probe_call,
         _COV_PROBE_START,
@@ -461,7 +465,7 @@ def entropy(U: np.ndarray, *, work: np.ndarray | None = None) -> np.ndarray:
     thr = _resolve_thresholds(
         "entropy",
         env.ENTROPY_GPU_THRESHOLD,
-        _ENTROPY_GPU_THRESHOLDS,
+        backend.GPU_THRESHOLDS["entropy"],
         _entropy_probe,
         entropy,
         _ENTROPY_PROBE_START,

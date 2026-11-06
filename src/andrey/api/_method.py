@@ -185,13 +185,16 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
 
     A method with an ``indep_test`` draws them only under a randomized test
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) or, when it takes ``n_starts``, for the starts
-    after the first, with ``n_starts`` above 1; a method with ``n_perturbations`` only for the
+    after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
+    search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
+    ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
     random changes before a later start, with ``n_starts`` above 1; every other seeded method
     always does.
     """
     test = next((p for p in spec.params if p.name == "indep_test"), None)
-    if test is not None:
-        starts = next((p for p in spec.params if p.name == "n_starts"), None)
+    starts = next((p for p in spec.params if p.name == "n_starts"), None)
+    order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
+    if test is not None and not order_search:
         later = starts is not None and arguments.get("n_starts", starts.default) > 1
         return later or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
     if any(p.concept == "n_perturbations" for p in spec.params):

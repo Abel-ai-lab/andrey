@@ -658,7 +658,8 @@ def test_parity_fails_a_paired_row_whose_interval_lies_above_zero():
 
 def test_parity_passes_a_near_tie_that_the_count_rule_would_fail():
     # The reference has fewer errors on 6 datasets and Andrey on 1, but the interval reaches 0.
-    assert _failures(_paired_row([-0.05, 1.05])) != []
+    [failure] = _failures(_paired_row([-0.05, 1.05]))
+    assert "fewer errors on 6 series, Andrey on 1" in failure
     assert _paired_failures(_paired_row([-0.05, 1.05])) == []
     assert _paired_failures(_paired_row([0.0, 1.05])) == []
 
@@ -801,14 +802,6 @@ def test_parity_rejects_a_claim_it_does_not_know():
     for claim in ("outside", True, ""):
         with pytest.raises(ValueError, match="claim"):
             _paired({**_paired_row([0.05, 0.95]), "claim": claim})
-
-
-def test_parity_keeps_the_count_rule_for_a_summary_without_a_parity_rule():
-    # The same row: the interval reaches 0, but the reference has fewer errors on more datasets.
-    row = _paired_row([-0.05, 1.05])
-    assert _paired_failures(row) == []
-    [failure] = _failures(row)
-    assert "fewer errors on 6 series, Andrey on 1" in failure
 
 
 @pytest.mark.parametrize(

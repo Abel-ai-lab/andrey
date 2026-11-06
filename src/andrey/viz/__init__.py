@@ -3,8 +3,9 @@
 :func:`draw` renders a :class:`~andrey.core.structure.GraphStructure` as a self-contained SVG.
 Marks are drawn by shape (arrowhead, hollow circle, tail), and color is kept for uncertain edges
 and latent nodes, so a drawing reads without color. Intervened nodes are squares, with a bar across
-each edge the intervention cuts. Graphviz places the nodes when pygraphviz (the
-``viz`` extra) is installed, and a built-in layering otherwise; edges bend around nodes.
+each edge into them; a hard intervention cuts those edges, and a soft one keeps them. Graphviz
+places the nodes when pygraphviz (the ``viz`` extra) is installed, and a built-in layering
+otherwise; edges bend around nodes.
 
 Examples
 --------
@@ -303,9 +304,10 @@ def draw(
     targets : iterable of int or str, default=()
         The intervened variables, named by label or by 0-based position: the variables an
         experiment set from outside, such as the targets of ``do(x)`` or of a soft intervention.
-        Each is drawn as a square, and a bar crosses each arrowhead into it, the edge the
-        intervention cuts. A target no arrowhead points into gets a short barred arrow from
-        outside. A latent target keeps its dashed ring on the square. The default marks none.
+        Each is drawn as a square, and a bar crosses each arrowhead into it: a hard intervention
+        cuts that edge, and a soft one keeps it, under the same marks. A target no arrowhead points
+        into gets a short barred arrow from outside. A latent target keeps its dashed ring on the
+        square. The default marks none.
 
     Returns
     -------

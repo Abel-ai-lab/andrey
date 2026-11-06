@@ -109,24 +109,33 @@ def direct_lingam(
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
         adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
-        edge.
+        edge. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
-        named in the message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with
-        which the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column, named in the
+        message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with which the
+        pruning step can estimate the edge weights. Also if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
-    See Also
-    --------
-    andrey.pc, andrey.ges : Return the equivalence class, which is what Gaussian noise identifies.
-    andrey.fci : Allows unmeasured common causes and selection bias.
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -283,19 +292,22 @@ def ica_lingam(
         a tuple of column indices, causes first. ``weighted_adjacency[i, j]`` is the coefficient of
         edge ``i -> j``, estimated by adaptive Lasso, or by least squares for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
-        edge.
+        edge. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the
-        edge weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than
+        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
+        weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -303,11 +315,14 @@ def ica_lingam(
     SearchLimitWarning
         When FastICA does not converge within ``max_iter`` iterations, or the adaptive Lasso's LARS
         path reports that it stopped early (scikit-learn's ``ConvergenceWarning``, raised again).
-
-    See Also
-    --------
-    andrey.direct_lingam : The same model with a deterministic order search; it recovered most
-        edges on the published benchmarks.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -349,16 +364,16 @@ def ica_lingam(
     to 100 variables with ten rows per variable: its median errors (SHD) passed the empty graph's at
     every size, 27 against 19 at 20 variables and 181 against 99 at 100. The median fit took 0.44 s
     at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
-    variables), its errors were below the empty graph's (14 against 17). The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine. Its causal order depends on the columns' scale, as its authors note
-    [2]_: matching the rows of the unmixing matrix to the variables, and pruning its coefficients
-    from the smallest, both read the data's units, and the matching assumes every noise term has
-    the same scale [1]_. On simulated linear data with uniform noise and weights between 0.5 and 2
-    whose noise terms all have unit variance, at 50 variables, mean degree 4 and 2,000 rows, its
-    errors (SHD) summed over 5 datasets were 9 on the columns as drawn and 1,784 on the same columns
-    standardized, against 500 for the empty graph. ``direct_lingam`` finds the order in a way that
-    does not depend on the scale [2]_.
+    variables), its errors were below the empty graph's (14 against 17). Its causal order depends on
+    the columns' scale, as its authors note [2]_: matching the rows of the unmixing matrix to the
+    variables, and pruning its coefficients from the smallest, both read the data's units, and the
+    matching assumes every noise term has the same scale [1]_. On simulated linear data with uniform
+    noise and weights between 0.5 and 2 whose noise terms all have unit variance, at 50 variables,
+    mean degree 4 and 2,000 rows, its errors (SHD) summed over 5 datasets were 9 on the columns as
+    drawn and 1,784 on the same columns standardized, against 500 for the empty graph.
+    ``direct_lingam`` finds the order in a way that does not depend on the scale [2]_. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -433,21 +448,30 @@ def multi_group_direct_lingam(
     list[StructureOutput]
         One envelope per group, in input order. Each wraps a ``dag``
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
-        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
-        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
-        ``metadata["group_index"]`` is the group's position in ``data``.
+        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights
+        ``i -> j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
+        ``metadata["group_index"]`` is the group's position in ``data``. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if fewer than
-        two groups are given, if the groups disagree on the variable count or on their column names,
-        or if a group is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the
-        fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
-        names a column the groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if fewer than two groups are
+        given, if the groups disagree on the variable count or on their column names, or if a group
+        is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the fewest with which
+        the pruning step can estimate the edge weights. Also if ``knowledge`` names a column the
+        groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----

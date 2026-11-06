@@ -46,7 +46,7 @@ def _cutoff_warnings(caught):
 
 def _small_default(monkeypatch, method, cutoff):
     """Set the built-in cutoff of ``method`` so a six-variable fit reaches the warning threshold."""
-    monkeypatch.setattr(METHODS[method], "_DEFAULT_MIN_WORK", cutoff)
+    monkeypatch.setattr(METHODS[method], "MIN_POOL_GES_WORK", cutoff)
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -59,7 +59,6 @@ def test_default_cutoff_warns_once_naming_the_setting_and_command(method, monkey
     [warning] = _cutoff_warnings(caught)
     assert f"{cal.METHODS[method].variable}=300" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 
@@ -78,7 +77,7 @@ def test_the_default_cutoff_warns_once_the_largest_pass_reaches_a_tenth_of_it(d,
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         _fit("ges", workers=2, d=d)
-    reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg._DEFAULT_MIN_WORK
+    reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg.MIN_POOL_GES_WORK
     assert reached is warns  # the case lands on the side it names
     assert len(_cutoff_warnings(caught)) == int(reached)
 
@@ -92,7 +91,7 @@ def test_an_explicit_cutoff_never_warns(method, value, monkeypatch):
     """
     _small_default(monkeypatch, method, 300)
     if value == "default":
-        value = str(METHODS[method]._DEFAULT_MIN_WORK)
+        value = str(METHODS[method].MIN_POOL_GES_WORK)
     monkeypatch.setenv(cal.METHODS[method].variable, value)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -132,7 +131,7 @@ def test_a_fit_on_the_default_cutoff_runs_in_one_process(monkeypatch):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.PerformanceWarning)
         parallel = _fit("ges", workers=2, d=64)
-    assert 0 < pg.largest_pass_work < pg._DEFAULT_MIN_WORK
+    assert 0 < pg.largest_pass_work < pg.MIN_POOL_GES_WORK
     np.testing.assert_array_equal(parallel, _fit("ges", workers=1, d=64))
 
 
@@ -178,7 +177,7 @@ def test_bracket_extends_above_the_grid_and_stops_at_the_cap():
     serial, pooled = _timers(lambda d: 1.0, lambda d: 2.0, calls)  # the pool never pays
     c = cal.bracket(serial, pooled, grid=(16, 32, 64, 128))
     assert (c.below, c.above) == (cal._MAX_D, None)
-    assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg._DEFAULT_MIN_WORK)  # never below it
+    assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg.MIN_POOL_GES_WORK)  # never below it
     assert max(calls) == cal._MAX_D
 
 
@@ -313,7 +312,6 @@ def test_the_default_skeleton_cutoff_warns_once_naming_the_setting_and_command(p
     [warning] = _skeleton_warnings(probe)  # two pools, one warning
     assert f"{SKELETON_VARIABLE}={8 * probe.tests}" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 

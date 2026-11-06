@@ -12,9 +12,9 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import FastICA
 
 from andrey.core.seeding import resolve_seed
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.adjacency import estimate
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -89,7 +89,7 @@ def ica_lingam(
     the diagonal is largest, and each row is divided by its diagonal. The causal order is the
     permutation that makes ``I - W`` closest to lower-triangular, found by zeroing its smallest
     entries until a strict order appears. When several rows could come next, the one with the
-    lowest :func:`~andrey.search.hc.tie_ranks` rank does, so the choice moves with its column when
+    lowest :func:`~andrey.core.ties.tie_ranks` rank does, so the choice moves with its column when
     the columns are reordered. The weights are then re-estimated from that order with
     adaptive Lasso, as DirectLiNGAM does, so they depend only on the order and the data.
 

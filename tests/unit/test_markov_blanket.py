@@ -25,9 +25,8 @@ from andrey.constraint.blanket import (
 )
 from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
 from andrey.core.ci_missing import rows_tested
-from andrey.search._parallel import _KEY_DP
+from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.search.calm import moral_graph
-from andrey.search.hc import tie_ranks
 from tests.recovery.helpers.oracle import DSeparation
 
 
@@ -42,7 +41,7 @@ def _fisherz_iamb(test: FisherZ, target: int, d: int, alpha: float, ranks: list[
             if x == target or x in blanket:
                 continue
             r, p = test.statistic_pvalue(target, x, blanket)
-            key = (-round(abs(r), _KEY_DP), ranks[x])
+            key = (-round(abs(r), KEY_DP), ranks[x])
             if p <= alpha and (best_key is None or key < best_key):
                 best_key, best_x = key, x
         if best_x is None:
@@ -201,7 +200,7 @@ def _mmpc_on_every_set(test, target, d, alpha, ranks):
     while open_ := {x: w for x, w in weakest.items() if w[0] <= alpha}:
         best = min(
             open_,
-            key=lambda x: (round(open_[x][0], _KEY_DP), -round(open_[x][1], _KEY_DP), ranks[x]),
+            key=lambda x: (round(open_[x][0], KEY_DP), -round(open_[x][1], KEY_DP), ranks[x]),
         )
         del open_[best]
         conds = [
