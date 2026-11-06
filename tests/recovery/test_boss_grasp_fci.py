@@ -2,10 +2,10 @@
 
 Each hybrid is checked to equal FCI's phase applied to its own search's CPDAG. Fixed cases are a
 planted hidden common cause and independent columns. Ground truth comes from simulated
-linear-Gaussian data with hidden variables in the paper's setting, from data simulated on the
-published ASIA network with
-one node hidden, and from the Sachs measurements against their consensus network. Mixed data,
-determinism, column-order invariance, the recorded outputs, and input validation complete them.
+linear-Gaussian data with hidden variables at the paper's sizes, from data simulated on the
+published ASIA network with one node hidden, and from the Sachs measurements against their
+consensus network. Mixed data, determinism, column-order invariance, the recorded outputs, and
+input validation complete them.
 """
 
 from __future__ import annotations
@@ -118,11 +118,11 @@ def test_hybrid_finds_no_edges_between_independent_columns(name):
 @pytest.mark.parametrize(
     "params", [{}, {"penalty_discount": 2.0, "alpha": 0.01}], ids=["defaults", "paper"]
 )
-def test_hybrid_recovers_the_pag_in_the_papers_setting(name, params):
-    """The paper's central cell: 20 measured linear-Gaussian variables and 4 hidden common causes,
-    mean degree 4, 1,000 rows, against the true PAG, at the defaults and at the paper's penalty
-    discount and alpha. Nearly every adjacency found is true, and the endpoint errors stay below
-    0.85 times the empty graph's."""
+def test_hybrid_recovers_the_pag_near_the_papers_size(name, params):
+    """20 measured linear-Gaussian variables, 4 hidden common causes, mean degree 4, and 1,000
+    rows, the paper's sizes on ``sample_scm``'s defaults, against the true PAG, at the defaults and
+    at the paper's penalty discount and alpha. Nearly every adjacency found is true, and the
+    endpoint errors stay below 0.85 times the empty graph's."""
     ds = data.sample_scm(d=24, n=1000, seed=0, density=4.0, latents=4)
     truth = marginal(ds.graph, "pag")
     found = FIT[name](ds.data, **params).structure

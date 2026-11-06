@@ -1700,14 +1700,14 @@ def grasp_fci(
         ``andrey.config.tie_break``.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Seed for the random order in which the GRaSP
-        phase visits variables, as for :func:`~andrey.grasp`, and for the random draws of
-        ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make. Different seeds
-        can reach different graphs.
+        not a fresh random one, so a fit repeats. Seed for the random starting order and the order
+        in which the GRaSP phase visits variables, as for :func:`~andrey.grasp`, and for the random
+        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make.
+        Different seeds can reach different graphs.
     n_starts : int, default=1
-        Number of GRaSP searches, at least ``1``, as for :func:`~andrey.grasp`: the first starts
-        from the columns' tie-rank order, each later one from a random order drawn from ``seed``
-        and its own index. The test phase starts from the best-scoring search's CPDAG.
+        Number of GRaSP searches, at least ``1``, as for :func:`~andrey.grasp`, each from its own
+        random starting order: the first from ``seed``'s, each later one from an order drawn from
+        ``seed`` and its own index. The test phase starts from the best-scoring search's CPDAG.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer

@@ -1368,7 +1368,8 @@ _PERMUTATION_FCI_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
-    "variables, and for the random draws of rcot, cmiknn, and gpdc.",
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
+    "gpdc.",
 )
 for _name, _summary, _own, _refs in (
     (
@@ -1381,6 +1382,7 @@ for _name, _summary, _own, _refs in (
             "Ramsey, Andrews & Spirtes 2025",
             "Ogarrio, Spirtes & Ramsey 2016",
             "Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",
+            "Zhang 2008",
         ),
     ),
     (

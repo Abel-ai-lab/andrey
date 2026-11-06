@@ -400,11 +400,12 @@ RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMP
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
 
-FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
-apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
-bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
-The rules run in rounds, each setting together the marks every rule implies on the graph as it
-stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
+FCI, GFCI, BOSS-FCI, and GRaSP-FCI use uncovered paths for their R5, R9, and R10 tail
+orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
+path, up to a fixed search bound. R8 checks each pair of endpoints in both orders, so it does not
+depend on the node labels. The rules run in rounds, each setting together the marks every rule
+implies on the graph as it stands and leaving a circle where two of them disagree, so they do not
+depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
 with `possible_dsep="order_free"`, the default, their result does not depend on the column order
@@ -519,8 +520,8 @@ A method becomes supported once it has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, IGSP, UT-IGSP, PCMCI, PCMCI+, and
-LPCMCI take their conditional-independence test as `indep_test`:
+PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, IGSP, UT-IGSP,
+PCMCI, PCMCI+, and LPCMCI take their conditional-independence test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|

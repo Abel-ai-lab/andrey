@@ -266,7 +266,7 @@ def fci_from_pattern(
     FCI's adjacency search starts from the pattern's adjacencies; the pattern then decides the
     colliders on triples whose ends it leaves non-adjacent, and the separating sets the others,
     before the possible-d-separation step and the rules R1-R10. ``max_depth``, ``constraints``,
-    ``workers``, a worker count, ``seed``, and ``_ambiguous`` act on the test phase as for
+    ``workers`` (a worker count), ``seed``, and ``_ambiguous`` act on the test phase as for
     :func:`gfci`.
     """
     pattern = from_structure(cpdag)
