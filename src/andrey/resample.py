@@ -920,12 +920,12 @@ def bootstrap(
     ``ut_igsp``, and ``icp``), a resample is drawn within each environment of ``env``: of an
     environment's ``m`` rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a
     bootstrap resample draws ``m`` with replacement, so every resample keeps every environment. A
-    numeric ``env`` of ``cdnod`` or ``fci_jci``, which read it as numbers, such as a domain number
-    or a time step, resamples the rows as a whole. For a method that takes ``targets`` and returns
-    a CPDAG (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a CPDAG
-    without the targets, so an edge that only the interventions orient is undirected there; the
-    edge frequencies keep its direction. A time-series method on one series subsamples one stretch
-    of consecutive rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam``
+    numeric ``env`` of a method without ``targets``, which reads it as numbers, such as a domain
+    number or a time step, resamples the rows as a whole. For a method that takes ``targets`` and
+    returns a CPDAG (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a
+    CPDAG without the targets, so an edge that only the interventions orient is undirected there;
+    the edge frequencies keep its direction. A time-series method on one series subsamples one
+    stretch of consecutive rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam``
     resamples whole units, and ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
@@ -936,8 +936,7 @@ def bootstrap(
         The data, as the method takes it. ``multi_group_direct_lingam`` and
         ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
         each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
-        and resampled within each environment, the domains of ``cdnod`` and ``fci_jci``
-        included.
+        and resampled within each environment, even by a method that reads ``env`` as numbers.
     n_resamples : int, default=100
         The number of resamples and fits.
     seed : int or None, default=None

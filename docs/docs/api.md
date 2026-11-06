@@ -15,11 +15,12 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 ## Structure-learning methods
 
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with these
-exceptions: `cdnod` and `fci_jci` also take `env`, each row's environment, `gies`, `igsp`, and
-`ut_igsp` also take `env` with `targets`, the variables intervened on in each environment, `gnies`
-takes `env` and learns the targets, `icp` also takes `env` and `target`, the variable whose parents
-it finds, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
-list of datasets and returns one result per dataset. The first argument of every method is `data`;
+exceptions: `cdnod` and `fci_jci` also take `env`, each row's environment, and `boss`, `grasp`,
+`boss_fci`, and `grasp_fci` take it optionally, `gies`, `igsp`, and `ut_igsp` also take `env` with
+`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
+targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
+`longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
+datasets and returns one result per dataset. The first argument of every method is `data`;
 `andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
 dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
@@ -46,6 +47,7 @@ out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
 out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
+out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) pools the rows
 out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
@@ -172,11 +174,11 @@ as Laplace, and `"skew"` one through the square after a sign correction, which s
 they cost less, and `direct_lingam`'s Notes and Limitations give where each fails.
 
 % concept: confounded_index
-`fci_jci` takes `confounded_index`, whether a hidden variable may cause both the environment index
-and a data variable. `True`, the default (Mooij, Magliacane, and Claassen 2020's FCI-JCI1), leaves
-the index end of an edge a circle until a rule orients it. `False` assumes the environment is set
-from outside, as in a randomized experiment (FCI-JCI123), so every edge the index keeps points out
-of it.
+`fci_jci`, `boss_fci`, and `grasp_fci` take `confounded_index`, whether a hidden variable may cause
+both the environment index and a data variable; `boss_fci` and `grasp_fci` read it only with `env`.
+`True`, the default (Mooij, Magliacane, and Claassen 2020's FCI-JCI1), leaves the index end of an
+edge a circle until a rule orients it. `False` assumes the environment is set from outside, as in a
+randomized experiment (FCI-JCI123), so every edge the index keeps points out of it.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the
@@ -509,7 +511,9 @@ with a refit under the Gaussian likelihood, which does not depend on the scale o
 BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
 BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
 conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
-rules orient the rest into a PAG.
+rules orient the rest into a PAG. With `env`, the index leads every order of their search, and their
+tests and rules treat it as FCI-JCI, below, does. `boss` and `grasp` take `env` as well: the index
+joins the search as a variable that no data variable causes, as in `cdnod`.
 
 FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
 with the environment index as one more variable that no data variable causes, so hidden common
@@ -642,15 +646,15 @@ with the shorter run's fits. A method that takes a row-aligned input (`env`, or 
 matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
 rows. When `env` holds text labels, or for the methods that take `targets` ({{ targets_names }}),
 each resample takes the same share of every environment's rows, at least one, so no resample drops
-an environment; the numeric index of `cdnod` and `fci_jci`, such as a time step, resamples the rows
-as a whole. For the methods that take `targets` and return a CPDAG ({{ cpdag_targets_names }}), the
-averaged graph is made a CPDAG without the targets, so an edge that only the interventions orient is
-undirected there; the edge frequencies keep its direction. `multi_group_direct_lingam` resamples
-each dataset on its own and returns one result per dataset; `longitudinal_lingam` resamples the
-units, the same rows of every dataset. A time-series method on one series subsamples one stretch of
-consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length` consecutive
-rows, by default at least ten times its `tau_max`. `gin` is the one method it does not take, since
-its number of latent nodes differs from fit to fit.
+an environment; a numeric `env` of a method without `targets`, such as a time step, resamples the
+rows as a whole. For the methods that take `targets` and return a CPDAG ({{ cpdag_targets_names }}),
+the averaged graph is made a CPDAG without the targets, so an edge that only the interventions
+orient is undirected there; the edge frequencies keep its direction. `multi_group_direct_lingam`
+resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
+resamples the units, the same rows of every dataset. A time-series method on one series subsamples
+one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
+consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
+take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
@@ -837,10 +841,10 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 the 853 observational cells and eight conditions in which a reagent stimulated or inhibited the
 network. `env` gives each cell's condition as a code and `conditions` their names, and `targets` the
 measured variables each reagent acts on, `None` for PMA and b2cAMP, whose targets are unknown. They
-are the inputs of the methods that take `env`: `cdnod`, `fci_jci`, `gies`, `gnies`, `icp`, `igsp`,
-and `ut_igsp`. `gies` and `igsp` need every condition's targets, so you pass them the rows of the
-seven conditions whose targets are known; `ut_igsp` takes all nine and learns each condition's
-targets beyond the declared ones:
+are the inputs of the methods that take `env`: `cdnod`, `fci_jci`, `boss`, `grasp`, `boss_fci`,
+`grasp_fci`, `gies`, `gnies`, `icp`, `igsp`, and `ut_igsp`. `gies` and `igsp` need every condition's
+targets, so you pass them the rows of the seven conditions whose targets are known; `ut_igsp` takes
+all nine and learns each condition's targets beyond the declared ones:
 
 ```python
 pooled = load_dataset("sachs", conditions=True)

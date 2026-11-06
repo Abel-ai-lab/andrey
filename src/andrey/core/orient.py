@@ -1,9 +1,10 @@
 """Orientation primitives shared by the score- and constraint-based engines.
 
 ``meek`` completes a PDAG to a CPDAG with Meek's rules R1-R3, ``pdag2dag`` returns a consistent
-DAG extension of a PDAG, ``dag2cpdag`` returns a DAG's CPDAG, and ``orient_colliders`` orients a
-skeleton's unshielded colliders as PC does, reading each pair's separating set with
-:func:`separating_set`. :func:`to_structure` and :func:`from_structure` convert to and from a
+DAG extension of a PDAG, ``dag2cpdag`` returns a DAG's CPDAG, ``orient_out_of`` directs a CPDAG's
+edges out of nodes no other node causes, and ``orient_colliders`` orients a skeleton's unshielded
+colliders as PC does, reading each pair's separating set with :func:`separating_set`.
+:func:`to_structure` and :func:`from_structure` convert to and from a
 :class:`~andrey.core.structure.GraphStructure`.
 
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
@@ -41,6 +42,7 @@ __all__ = [
     "meek",
     "pdag2dag",
     "dag2cpdag",
+    "orient_out_of",
     "orient_colliders",
     "separating_set",
     "to_structure",
@@ -562,6 +564,22 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     out[rt, rh] = TAIL  # reversible edge becomes undirected
     out[rh, rt] = TAIL
     return out
+
+
+def orient_out_of(cpdag: np.ndarray, sources: Iterable[int]) -> np.ndarray:
+    """Direct every edge at ``sources`` out of them in the CPDAG ``cpdag``, then apply Meek's rules.
+
+    ``cpdag`` is the CPDAG of a DAG in which no source has a parent, so each edge at a source is
+    undirected or already points out of it. Directing those edges is the background knowledge that
+    no other node causes a source, and Meek's rules R1-R3 (:func:`meek`) orient what follows from
+    it. Returns a new mark matrix.
+    """
+    pdag = np.array(cpdag, dtype=np.int8)
+    for source in sources:
+        neighbors = np.flatnonzero(pdag[source] != NULL)
+        pdag[source, neighbors] = TAIL
+        pdag[neighbors, source] = ARROW
+    return meek(pdag)
 
 
 def cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
