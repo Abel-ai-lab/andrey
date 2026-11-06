@@ -38,6 +38,7 @@ from andrey.core.structure import (
     Kind,
     Structure,
     TemporalStructure,
+    endpoint_marks,
     is_ancestral_kind,
 )
 from andrey.core.warning_policy import AndreyWarning, warn_once
@@ -579,11 +580,8 @@ def _vote_graph(
         keep = np.array([_often(int(c), n_resamples, threshold) for c in s.counts], dtype=bool)
         edge = np.zeros((n, n), dtype=bool)
         edge[src[keep], dst[keep]] = True
-        marks = np.zeros((n, n), dtype=np.int8)
-        marks[edge] = TAIL
-        marks[edge.T] = ARROW  # a 2-cycle and a self-loop end as arrowheads
         return GraphStructure.from_numpy(
-            marks, kind="digraph", labels=labels, allow_self_loops=True
+            endpoint_marks(edge), kind="digraph", labels=labels, allow_self_loops=True
         )
     marks = _vote(s, n_resamples, threshold, n)
     kind = s.kind

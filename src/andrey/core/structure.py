@@ -18,10 +18,11 @@ its edges join two variables without a claim about direction or, for a moral gra
 from __future__ import annotations
 
 import dataclasses
+import heapq
 import itertools
 from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import numpy as np
 
@@ -953,11 +954,12 @@ class GraphStructure(Structure):
         -------
         np.ndarray of int32
             The adjacent node indices, ascending and read-only; includes ``i`` if it has a
-            self-loop.
+            self-loop. They are positions even when the graph has labels, by which
+            :meth:`parents` and the other graph queries name their nodes.
         """
-        from ._convert import _positions
+        from . import _queries
 
-        i = _positions(self, [i], "i")[0]
+        i = _queries.node(self, i, "i")
         if self._layout == "sym":
             return self._indices[self._indptr[i] : self._indptr[i + 1]]
         # compact: out-edges (row i) plus in-edges (i appearing as a column in another row).
@@ -1946,19 +1948,11 @@ class TemporalStructure(Structure):
         for lag, graph in zip(self._lag_indices, self._lags):
             if lag == 0 and not include_lag0:
                 continue
-            support = _directed_support(graph.to_numpy())
+            support = directed_support(graph.to_numpy())
             total |= support
             for i, j in zip(*np.nonzero(support)):
                 lag_sets.setdefault((int(i), int(j)), []).append(int(lag))
-        # Rebuild endpoint marks from the directed union: a mutual pair (or the diagonal) is a
-        # double arrowhead (2-cycle / self-loop), a one-way pair is tail -> arrow.
-        marks = np.zeros((n, n), dtype=np.int8)
-        one_way = total & ~total.T
-        both = total & total.T
-        marks[one_way] = TAIL
-        marks[one_way.T] = ARROW
-        marks[both] = ARROW
-        indptr, indices, mark_data = _dense_to_csr(marks)
+        indptr, indices, mark_data = _dense_to_csr(endpoint_marks(total))
         edge_lags = tuple((i, j, tuple(sorted(lag_sets[(i, j)]))) for i, j in sorted(lag_sets))
         return SummaryGraph(
             _n_nodes=n,
@@ -2105,6 +2099,20 @@ def node_labels(names: Iterable[object], what: str = "column") -> tuple[str, ...
     raise ValueError(
         f"{what} names must be unique as text, but {clashes}; give each {what} its own name"
     )
+
+
+def column_labels(data: object) -> tuple[str, ...] | None:
+    """Return a DataFrame's column names as node labels; ``None`` for arrays.
+
+    Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
+    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
+    name becomes text, and ``ValueError`` names each label two columns share (:func:`node_labels`).
+    """
+    columns = getattr(data, "columns", None)
+    if columns is None:
+        return None
+    names = list(columns)
+    return None if names == list(range(len(names))) else node_labels(names)
 
 
 def relabel(structure: Structure, labels: tuple[str, ...]) -> Structure:
@@ -2266,17 +2274,76 @@ def _expand_compact(
     return _frozen(new_indptr, np.int64), _frozen(c, np.int32), _frozen(m, np.int8)
 
 
-def _directed_support(m: np.ndarray) -> np.ndarray:
+def directed_support(m: np.ndarray) -> np.ndarray:
     """Boolean ``(n, n)`` directed support of a mark matrix: ``D[i, j]`` is the edge ``i -> j``.
 
     A plain directed edge (arrowhead at ``j``) sets ``D[i, j]``; a 2-cycle / bidirected pair sets
     both directions; an autoregressive self-loop (``m[i, i] == ARROW``) sets ``D[i, i]``. Undirected
-    and circle marks carry no direction and are ignored. Shared with ``metrics`` so the topological
-    collapse cannot drift between the summary-graph projection and temporal scoring.
+    and circle marks carry no direction and are ignored; :func:`endpoint_marks` turns a support
+    back into marks.
     """
     directed = (m == TAIL) & (m.T == ARROW)
     both_arrow = (m == ARROW) & (m.T == ARROW)
     return directed | both_arrow
+
+
+def endpoint_marks(support: np.ndarray) -> np.ndarray:
+    """The ``int8`` endpoint marks of the directed graph ``support`` (nonzero ``[i, j]`` is
+    ``i -> j``).
+
+    A one-way pair is ``i -> j``: ``TAIL`` at ``i`` and ``ARROW`` at ``j``. The tails are written
+    first and the arrowheads over them, so a pair joined both ways ends as two arrowheads, a 2-cycle
+    or a bidirected edge, and a self-loop as ``ARROW`` on the diagonal.
+    """
+    support = np.asarray(support, dtype=bool)
+    marks = np.zeros(support.shape, dtype=np.int8)
+    marks[support] = TAIL
+    marks[support.T] = ARROW
+    return marks
+
+
+def has_cycle(adj: np.ndarray) -> bool:
+    """Whether the directed graph ``adj`` (nonzero ``[i, j]`` is ``i -> j``) has a directed cycle,
+    a self-loop included (Kahn's algorithm)."""
+    adj = np.asarray(adj, dtype=bool)
+    waiting = adj.sum(axis=0)
+    ready = np.flatnonzero(waiting == 0).tolist()
+    placed = 0
+    while ready:
+        v = ready.pop()
+        placed += 1
+        for c in np.flatnonzero(adj[v]).tolist():
+            waiting[c] -= 1
+            if waiting[c] == 0:
+                ready.append(c)
+    return placed < adj.shape[0]
+
+
+def topological_order(
+    adj: np.ndarray, key: Sequence[Any] | None = None, what: str = "the graph"
+) -> list[int]:
+    """Kahn's topological order of the directed graph ``adj`` (nonzero ``[i, j]`` is ``i -> j``).
+
+    Of the nodes whose parents are all placed, the one with the lowest ``key[v]`` comes next; the
+    default key is the position. Raises ``ValueError`` when ``adj`` has a directed cycle, naming
+    the graph by ``what``.
+    """
+    adj = np.asarray(adj, dtype=bool)
+    rank: Sequence[Any] = range(adj.shape[0]) if key is None else key
+    waiting = adj.sum(axis=0)
+    ready = [(rank[v], v) for v in np.flatnonzero(waiting == 0).tolist()]
+    heapq.heapify(ready)
+    order: list[int] = []
+    while ready:
+        _, v = heapq.heappop(ready)
+        order.append(v)
+        for c in np.flatnonzero(adj[v]).tolist():
+            waiting[c] -= 1
+            if waiting[c] == 0:
+                heapq.heappush(ready, (rank[c], c))
+    if len(order) < adj.shape[0]:
+        raise ValueError(f"{what} has a directed cycle")
+    return order
 
 
 def _infer_kind(M: np.ndarray) -> Kind:

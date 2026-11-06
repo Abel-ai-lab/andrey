@@ -17,7 +17,7 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 
-from ._common import two_marks
+from ._common import two_marks, unwrap
 from .graph import (
     _confounder,
     _orientation,
@@ -99,8 +99,7 @@ def score(output: object, truth: object) -> dict[str, object]:
 
 def _structure(x: object) -> Structure | None:
     """The underlying Structure of an input, or ``None`` for a raw adjacency."""
-    if isinstance(x, StructureOutput):
-        return x.structure
+    x = unwrap(x)
     return x if isinstance(x, Structure) else None
 
 

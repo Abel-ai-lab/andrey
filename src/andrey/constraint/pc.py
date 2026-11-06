@@ -29,8 +29,9 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.knowledge import KnowledgeError, _has_cycle, orient
+from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, to_structure
+from andrey.core.structure import has_cycle
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 from andrey.search._parallel import _KEY_DP
 
@@ -217,7 +218,7 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
     cycle of arrowheads alone fits bidirected edges. The message names the cycle by column position.
     """
     closing = paths if closing is None else closing
-    if not _has_cycle(paths | closing):
+    if not has_cycle(paths | closing):
         return
     successors = [np.flatnonzero(row).tolist() for row in paths]
     for y in np.flatnonzero(closing.any(axis=0)).tolist():

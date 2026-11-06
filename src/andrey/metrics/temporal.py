@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.output import StructureOutput
-from andrey.core.structure import TemporalStructure
+from andrey.core.structure import TemporalStructure, directed_support
 
-from ._common import _offdiag, directed_adjacency, prf
+from ._common import _offdiag, prf_masks, unwrap
 
 
 def _temporal(x: object) -> TemporalStructure:
     """Unwrap a StructureOutput and require a TemporalStructure."""
-    if isinstance(x, StructureOutput):
-        x = x.structure
+    x = unwrap(x)
     if not isinstance(x, TemporalStructure):
         raise TypeError("temporal_scores needs a TemporalStructure")
     return x
@@ -34,19 +32,13 @@ def _temporal(x: object) -> TemporalStructure:
 def _lag_directed(t: TemporalStructure, lag: int, n: int) -> np.ndarray:
     """Directed support of lag ``lag`` (all-``False`` when that lag is absent)."""
     if lag in t.lags:
-        return directed_adjacency(t.lag(lag).to_numpy())
+        return directed_support(t.lag(lag).to_numpy())
     return np.zeros((n, n), dtype=bool)
-
-
-def _masks_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
-    """Precision/recall/f1 between two boolean supports."""
-    tp = int((est & true_).sum())
-    return prf(tp, int((est & ~true_).sum()), int((~est & true_).sum()))
 
 
 def _edge_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
     """Directed-edge precision/recall/f1 and Hamming SHD (reversal costs 2) over two supports."""
-    scores = _masks_scores(est, true_)
+    scores = prf_masks(est, true_)
     scores["shd"] = int((est != true_).sum())
     return scores
 
@@ -110,7 +102,7 @@ def temporal_scores(estimated: object, true: object) -> dict[str, object]:
     if lags_ge1:
         result["lagged"] = _edge_scores(lagged_est, lagged_true)
     off = _offdiag(n)
-    result["summary"] = _masks_scores(summary_est & off, summary_true & off)
+    result["summary"] = prf_masks(summary_est & off, summary_true & off)
 
     est_w, true_w = est.lag_weights, true_.lag_weights
     if est_w is not None and true_w is not None:

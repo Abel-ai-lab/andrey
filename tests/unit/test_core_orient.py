@@ -429,7 +429,7 @@ def test_rejects_asymmetric_support():
 def test_dag2cpdag_rejects_cyclic_input():
     # A directed cycle 0 -> 1 -> 2 -> 0 has no topological order.
     cycle = dag([(0, 1), (1, 2), (2, 0)], 3)
-    with pytest.raises(ValueError, match="acyclic"):
+    with pytest.raises(ValueError, match="directed cycle"):
         dag2cpdag(cycle)
 
 

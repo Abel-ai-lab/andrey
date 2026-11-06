@@ -14,7 +14,7 @@ import numpy as np
 from andrey.core.orient import dag2cpdag
 from andrey.core.structure import ARROW, GraphStructure, Kind, is_ancestral_kind
 
-from ._common import _offdiag, as_marks, prf, two_marks
+from ._common import _offdiag, as_marks, prf_masks, two_marks
 
 # ---- marks-level core (extract once, then stay in dense int8) ------------------------------------
 
@@ -45,19 +45,13 @@ def _shd_endpoint(m_est: np.ndarray, m_true: np.ndarray) -> int:
     return int(((m_est != m_true) & _offdiag(m_est.shape[0])).sum())
 
 
-def _prf_masks(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
-    """Precision/recall/f1 between two boolean masks over the same index set."""
-    tp = int((est & true_).sum())
-    return prf(tp, int((est & ~true_).sum()), int((~est & true_).sum()))
-
-
 def _skeleton(
     m_est: np.ndarray, m_true: np.ndarray, *, include_diagonal: bool = False
 ) -> dict[str, float]:
     iu = np.triu_indices(m_est.shape[0], 0 if include_diagonal else 1)
     est = ((m_est != 0) | (m_est.T != 0))[iu]
     true_ = ((m_true != 0) | (m_true.T != 0))[iu]
-    return _prf_masks(est, true_)
+    return prf_masks(est, true_)
 
 
 def _orientation(
@@ -65,14 +59,14 @@ def _orientation(
 ) -> dict[str, float]:
     n = m_est.shape[0]
     mask = np.ones((n, n), dtype=bool) if include_diagonal else _offdiag(n)
-    return _prf_masks((m_est == ARROW) & mask, (m_true == ARROW) & mask)
+    return prf_masks((m_est == ARROW) & mask, (m_true == ARROW) & mask)
 
 
 def _confounder(m_est: np.ndarray, m_true: np.ndarray) -> dict[str, float]:
     iu = np.triu_indices(m_est.shape[0], 1)
     est = ((m_est == ARROW) & (m_est.T == ARROW))[iu]
     true_ = ((m_true == ARROW) & (m_true.T == ARROW))[iu]
-    return _prf_masks(est, true_)
+    return prf_masks(est, true_)
 
 
 def canonicalize_marks(marks: np.ndarray, kind: Kind) -> np.ndarray:

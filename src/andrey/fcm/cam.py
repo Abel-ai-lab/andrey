@@ -48,6 +48,7 @@ import numpy as np
 from scipy import linalg, optimize, sparse
 from scipy.interpolate import BSpline
 
+from andrey.core.structure import topological_order
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.fcm.pruning import prune
 from andrey.search._parallel import _KEY_DP
@@ -335,20 +336,6 @@ def _closure(reach: np.ndarray) -> np.ndarray:
     return out
 
 
-def topological_order(adj: np.ndarray) -> np.ndarray:
-    """An order of the DAG ``adj``, causes first: each step takes the first ready node."""
-    indegree = adj.sum(axis=0)
-    placed = np.zeros(adj.shape[0], dtype=bool)
-    order = []
-    while len(order) < adj.shape[0]:
-        ready = np.flatnonzero(~placed & (indegree == 0))
-        v = int(ready[0])
-        order.append(v)
-        placed[v] = True
-        indegree = indegree - adj[v]
-    return np.array(order, dtype=np.int64)
-
-
 @dataclass(frozen=True)
 class CAMResult:
     """A CAM fit: the pruned DAG and a causal order of the order search's DAG."""
@@ -386,4 +373,4 @@ def cam(
     )
     dag = prune(X, searched, cutoff=alpha, k=K, bases=bases).astype(bool) | required
     ordered = searched if precedence is None else searched | precedence
-    return CAMResult(dag=dag, order=topological_order(ordered))
+    return CAMResult(dag=dag, order=np.array(topological_order(ordered), dtype=np.int64))

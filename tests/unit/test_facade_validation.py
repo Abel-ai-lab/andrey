@@ -1109,8 +1109,8 @@ def test_a_mixed_setting_rejects_a_fractional_category(setting):
         ("array", ["a"], ValueError, "data has no column names"),
         ("array", [3], ValueError, "lists column 3, but data has 3 columns"),
         ("array", "a", TypeError, "list of column names or positions"),
-        ("array", [1.5], TypeError, "names or 0-based positions, got float"),
-        ("array", [True], TypeError, "names or 0-based positions, got bool"),
+        ("array", [1.5], TypeError, "label or 0-based position, got 1.5"),
+        ("array", [True], TypeError, "label or 0-based position, got True"),
     ],
 )
 def test_categorical_lists_columns_the_data_has(data, categorical, error, message):
@@ -1227,7 +1227,7 @@ def test_an_empty_categorical_reads_as_none_where_no_column_types_are_read(fit, 
     "categorical", ["", "a", 0, [[]]], ids=["empty text", "text", "int", "nested"]
 )
 def test_a_categorical_that_is_not_an_empty_list_is_still_rejected(categorical):
-    with pytest.raises(TypeError, match="categorical must"):
+    with pytest.raises(TypeError, match=r"^categorical\b"):
         andrey.pc(_normal_data(), indep_test="fisherz", categorical=categorical)
 
 

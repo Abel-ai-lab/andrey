@@ -9,8 +9,9 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core.output import StructureOutput
+from andrey.core.structure import directed_support
 
-from ._common import as_marks, directed_adjacency
+from ._common import as_marks
 
 
 def _positions(order: object, n: int) -> np.ndarray:
@@ -31,7 +32,7 @@ def _ancestor_pairs(true_dag: object) -> tuple[np.ndarray, int]:
     """``(pairs, n)`` where ``pairs`` are the ``(a, b)`` with ``a`` a strict ancestor of ``b``."""
     marks, _ = as_marks(true_dag)
     n = marks.shape[0]
-    reach = directed_adjacency(marks)
+    reach = directed_support(marks)
     np.fill_diagonal(reach, False)
     while True:  # transitive closure by boolean reachability (fixed point in <= n steps)
         step = reach | ((reach.astype(np.int64) @ reach.astype(np.int64)) > 0)

@@ -12,9 +12,9 @@ import numpy as np
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
-from andrey.core.knowledge import column_position
+from andrey.core.knowledge import as_node, column_position
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import node_labels, relabel
+from andrey.core.structure import column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
@@ -60,10 +60,10 @@ def data_matrix(
 ) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
-    Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
-    the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
-    ``inf``, or a column is constant: no method can estimate a variance or a dependence from such
-    data. The message names every constant column.
+    Raises ``ValueError``, naming ``name``, when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), the values are not numeric, the array is not
+    2-D, it has fewer than ``min_rows`` rows, it holds ``inf``, or a column is constant: no method
+    can estimate a variance or a dependence from such data. The message names every constant column.
 
     ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
     delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
@@ -365,10 +365,11 @@ def checked_data(
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
     and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
 
-    Raises ``ValueError`` when two columns share a name (:func:`column_labels`), when
-    ``categorical`` lists a column ``data`` lacks, and, for a continuous setting, when a column is
-    declared categorical (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by
-    a DataFrame's ``category``, ``bool``, or text type. ``[]`` declares none.
+    Raises ``ValueError`` when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), when ``categorical`` lists a column ``data``
+    lacks, and, for a continuous setting, when a column is declared categorical
+    (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by a DataFrame's
+    ``category``, ``bool``, or text type. ``[]`` declares none.
     """
     column_labels(data)
     setting = f"{option}={value!r}"
@@ -574,19 +575,7 @@ def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) ->
         )
     mask = np.zeros(d, dtype=bool)
     for item in categorical:
-        if isinstance(item, str) or (
-            isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_))
-        ):
-            mask[
-                column_position(
-                    item if isinstance(item, str) else int(item), labels, d, "categorical"
-                )
-            ] = True
-        else:
-            raise TypeError(
-                "categorical must list column names or 0-based positions, got "
-                f"{type(item).__name__}"
-            )
+        mask[column_position(as_node(item, "categorical"), labels, d, "categorical")] = True
     return mask
 
 
@@ -739,21 +728,6 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
-def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels; ``None`` for arrays.
-
-    Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
-    name becomes text, and ``ValueError`` names each label two columns share
-    (:func:`~andrey.core.structure.node_labels`).
-    """
-    columns = getattr(data, "columns", None)
-    if columns is None:
-        return None
-    names = list(columns)
-    return None if names == list(range(len(names))) else node_labels(names)
-
-
 def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     """Name a column position by its label in ``labels``, quoted, or by its number.
 
@@ -763,6 +737,13 @@ def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     if labels is None:
         return str
     return lambda j: repr(labels[j]) if j < len(labels) else str(j)
+
+
+def label_of(labels: tuple[str, ...] | None) -> Callable[[int], str | int]:
+    """Name a column position as metadata names nodes: by its label, or by its number."""
+    if labels is None:
+        return int
+    return lambda j: labels[j]
 
 
 @contextlib.contextmanager
