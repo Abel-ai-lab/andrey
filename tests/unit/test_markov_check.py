@@ -3,6 +3,7 @@ level it promises."""
 
 from __future__ import annotations
 
+import functools
 import warnings
 
 import numpy as np
@@ -42,14 +43,21 @@ def test_the_uniformity_p_value_is_exact_for_one_p_value():
     assert stats.kstest(p, "uniform").pvalue > LEVEL
 
 
+@functools.cache
+def uniformity_p_values(m: int) -> np.ndarray:
+    """The uniformity p-values of 10,000 sets of ``m`` uniform p-values, drawn from seed ``m``."""
+    sets = np.random.default_rng(m).uniform(size=(10_000, m))
+    return np.array([anderson_darling_uniform(u)[1] for u in sets])
+
+
 @pytest.mark.parametrize("m", [1, 2, 5, 150])
 @pytest.mark.parametrize("level", [0.01, 0.05, 0.2])
 def test_uniform_p_values_are_rejected_at_the_level(m, level):
     """The share of uniform p-value sets that the test rejects at ``level`` is ``level``, to the
     binomial error of the number of sets (the verdict is made at these levels)."""
-    sets = np.random.default_rng(m).uniform(size=(10_000, m))
-    rejected = sum(anderson_darling_uniform(u)[1] <= level for u in sets)
-    assert stats.binomtest(int(rejected), len(sets), level).pvalue > LEVEL
+    p_values = uniformity_p_values(m)
+    rejected = int((p_values <= level).sum())
+    assert stats.binomtest(rejected, len(p_values), level).pvalue > LEVEL
 
 
 def test_the_statistic_is_the_definition():

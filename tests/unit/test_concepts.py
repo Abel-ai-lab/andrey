@@ -414,7 +414,7 @@ def unit_free(method: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
-            out = facade(method)(*unit_inputs(method, exponents))
+            out = facade(method)(*unit_inputs(method, exponents), **SHORT.get(method, {}))
             fits.append(graphs_and_orders(out))
     return all(fit == fits[0] for fit in fits[1:])
 
@@ -551,7 +551,7 @@ def records_the_test_and_score_it_used(method: str) -> bool:
 
 #: A required edge, its data, and the settings that make a method fit it: a series or panel
 #: method's link is x -> y at lag 1.
-SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True}}
+SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True, **SHORT["varma_lingam"]}}
 
 
 def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:

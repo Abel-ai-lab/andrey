@@ -132,6 +132,9 @@ def test_shifting_the_columns_keeps_every_methods_graphs(spec):
 )
 @pytest.mark.parametrize("replicate", range(3))
 def test_rcd_and_gin_keep_their_graph_on_shifted_columns(method, case, replicate, shift):
+    """RCD and GIN keep their graph and metadata on rescaled and shifted columns. Each case runs
+    three replicates, each a new sample in a new column order: the claim covers every draw, and an
+    invariance test shows it only for the draws it runs."""
     scale, offset = shift
     data = on_grid(datagen.generate(case, replicate=replicate))
     fit = getattr(andrey, method)

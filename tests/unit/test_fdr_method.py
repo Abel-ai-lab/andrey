@@ -5,6 +5,8 @@ the links tested, by the Benjamini-Hochberg procedure, which is computed here by
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 from scipy import stats
@@ -38,7 +40,13 @@ METHODS = ("pcmci", "pcmciplus", "granger")
 KNOWLEDGE = Knowledge(required=[(0, 1, 1)], forbidden=[(4, 0), (2, 4)])
 
 
-def fit(method: str, **kwargs):
+@functools.cache
+def fit(method: str, *, knowledge: bool = False, fdr_method: str | None = None):
+    """The fit of ``DATA`` by ``method``, with ``KNOWLEDGE`` when ``knowledge``, and without the
+    ``fdr_method`` argument when it is ``None``; each fit is made once per module."""
+    kwargs = {} if fdr_method is None else {"fdr_method": fdr_method}
+    if knowledge:
+        kwargs["knowledge"] = KNOWLEDGE
     if method == "granger":
         return andrey.granger(DATA, tau_max=TAU_MAX, alpha=ALPHA, **kwargs)
     alpha = {"alpha": ALPHA} if method == "pcmci" else {"alpha": 0.01}
@@ -100,7 +108,7 @@ def test_none_returns_the_p_values_themselves():
 
 
 @pytest.mark.parametrize("method", METHODS)
-@pytest.mark.parametrize("knowledge", [None, KNOWLEDGE])
+@pytest.mark.parametrize("knowledge", [False, True])
 def test_fdr_bh_is_the_call_without_the_argument(method, knowledge):
     plain = fit(method, knowledge=knowledge)
     named = fit(method, knowledge=knowledge, fdr_method="fdr_bh")
@@ -153,8 +161,8 @@ def test_pcmciplus_adjusts_the_lagged_p_values_only_and_keeps_its_links():
 
 @pytest.mark.parametrize("method", METHODS)
 def test_a_forbidden_link_is_not_counted_and_a_required_one_is(method):
-    raw = fit(method, knowledge=KNOWLEDGE, fdr_method="none")
-    adjusted = fit(method, knowledge=KNOWLEDGE)
+    raw = fit(method, knowledge=True, fdr_method="none")
+    adjusted = fit(method, knowledge=True)
     p_raw, p_adjusted = lagged(raw), lagged(adjusted)
     forbidden = np.zeros(p_raw.shape, dtype=bool)
     forbidden[:, 4, 0] = forbidden[:, 2, 4] = True

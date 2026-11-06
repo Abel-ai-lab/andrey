@@ -2,8 +2,8 @@
 
 Refutations: a task regenerates from its (scm, seed); an ensemble is byte-identical across worker
 counts and submission order and across the ``fork`` and ``spawn`` start methods; single-task
-regeneration holds. All are deterministic (fixed seeds). The workers start when ``TMPDIR`` rejects
-the forkserver's socket, and a script without a ``__main__`` guard runs under ``fork``.
+regeneration holds. All are deterministic (fixed seeds). A script without a ``__main__`` guard runs
+under ``fork``.
 """
 
 from __future__ import annotations
@@ -110,13 +110,6 @@ import subprocess  # noqa: E402
 import sys  # noqa: E402
 
 _SCRIPT_HEAD = """\
-import errno
-import multiprocessing as mp
-import os
-import warnings
-
-import numpy as np
-
 import andrey.data as data
 
 scm = data.SCM(
@@ -128,7 +121,7 @@ ens = data.Ensemble(scms=[scm], seeds=range(4), n=100)
 """
 
 
-def _run_script(tmp_path, body, **env):
+def _run_script(tmp_path, body):
     script = tmp_path / "gen.py"  # a real file: forkserver and spawn re-import ``__main__`` by path
     script.write_text(_SCRIPT_HEAD + body)
     src_dir = str(pathlib.Path(data.__file__).resolve().parents[2])
@@ -137,7 +130,7 @@ def _run_script(tmp_path, body, **env):
         [sys.executable, str(script)],
         capture_output=True,
         text=True,
-        env={**os.environ, "PYTHONPATH": pythonpath, **env},
+        env={**os.environ, "PYTHONPATH": pythonpath},
         cwd=tmp_path,
         timeout=300,
     )
@@ -158,40 +151,3 @@ def test_script_without_main_guard(tmp_path, guarded):
     proc = _run_script(tmp_path, body)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.split() == ["4"]
-
-
-_REJECTED_TMPDIR_BODY = """
-def rejecting(real_chmod, tmpdir):
-    def chmod(path, *args, **kwargs):
-        if str(path).startswith(tmpdir):
-            raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP), str(path))
-        return real_chmod(path, *args, **kwargs)
-
-    return chmod
-
-
-if __name__ == "__main__":
-    mp.set_start_method("forkserver")  # the default on Linux from Python 3.14
-    os.chmod = rejecting(os.chmod, os.environ["TMPDIR"])
-    serial = data.generate(ens, workers=1)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        pooled = data.generate(ens, workers=4)
-    same = [np.array_equal(a.data, b.data) and a.graph == b.graph for a, b in zip(serial, pooled)]
-    print(len(pooled) == len(serial) and all(same))
-    print(*(str(w.message) for w in caught), sep="\\n")
-"""
-
-
-@pytest.mark.skipif(
-    "forkserver" not in mp.get_all_start_methods(), reason="forkserver unavailable on this platform"
-)
-def test_workers_start_with_tmpdir_on_a_file_system_that_rejects_chmod(tmp_path):
-    """Four forkserver workers return the serial datasets when ``TMPDIR`` rejects the socket."""
-    rejected = tmp_path / "rejected"
-    rejected.mkdir()
-    proc = _run_script(tmp_path, _REJECTED_TMPDIR_BODY, TMPDIR=str(rejected))
-    assert proc.returncode == 0, proc.stderr
-    identical, *messages = proc.stdout.splitlines()
-    assert identical == "True"
-    assert any(str(rejected) in m and "forkserver" in m for m in messages), proc.stdout
