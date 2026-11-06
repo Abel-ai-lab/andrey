@@ -30,12 +30,14 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import GraphStructure
+from andrey.core._bitset import bitmask
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
 from andrey.core.score import (
     LINEAR_SCORES,
     ZERO_RESIDUAL,
     Score,
+    _solve,
     check_columns,
     ebic_penalty,
     make_score,
@@ -57,14 +59,6 @@ _SCORE_BATCH = 4096
 # ``n_vars * 2**n_vars`` bytes and the per-mask minima ``8 * 2**n_vars``. A fit over it scans the
 # parent graphs instead (:func:`_best_subset`), which gives the same results.
 _LOOKUP_BYTES = 1 << 28
-
-
-def _structure_bits(structure: Sequence[int]) -> int:
-    """Bitmask of a parent set: bit ``v`` set iff ``v`` is in ``structure``."""
-    bits = 0
-    for v in structure:
-        bits |= 1 << int(v)
-    return bits
 
 
 def _best_subset(
@@ -145,7 +139,7 @@ class _GramBICScore:
         """Return the negative local BIC scores for parent sets of one size, in request order.
 
         Solves the sets' normal equations in one stacked call, or each with
-        :func:`_solve_normal_equations` when one is singular; each score equals the one the set
+        :func:`~andrey.core.score._solve` when one is singular; each score equals the one the set
         gets alone.
         """
         size = len(parent_sets[0])
@@ -161,7 +155,7 @@ class _GramBICScore:
                 betas = np.linalg.solve(gram_pa, gram_node_pa[..., None])[..., 0]
             except np.linalg.LinAlgError:  # one singular set fails the whole stacked call
                 pairs = zip(gram_pa, gram_node_pa, strict=True)
-                betas = [_solve_normal_equations(a, b) for a, b in pairs]
+                betas = [_solve(a, b) for a, b in pairs]
             resids = [
                 self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
             ]
@@ -175,14 +169,6 @@ class _GramBICScore:
             else:
                 values.append(float(self._n * np.log(resid / self._n) + penalty))
         return values
-
-
-def _solve_normal_equations(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Solve ``a @ x = b``, falling back to the pseudo-inverse when ``a`` is singular."""
-    try:
-        return np.linalg.solve(a, b)
-    except np.linalg.LinAlgError:
-        return np.linalg.pinv(a) @ b
 
 
 def _generate_parent_graph(
@@ -225,7 +211,7 @@ def _generate_parent_graph(
         legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
     required_value = score.score(node, required)
-    required_bits = _structure_bits(required)
+    required_bits = bitmask(required)
     insert(required, required_value, required_bits)
     # Each enumerated set's bitmask -> the lowest score of a retained set within it.
     lowest = np.full(1 << n_vars if tables else 0, np.inf)
@@ -244,7 +230,7 @@ def _generate_parent_graph(
                 values = [score.score(node, list(combo)) for combo in combos]
             if not tables:
                 for extra, combo, value in zip(extras, combos, values, strict=True):
-                    bits = _structure_bits(combo)
+                    bits = bitmask(combo)
                     maximal = True
                     for v in extra:  # dropping a required parent leaves no legal subset
                         _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))

@@ -231,11 +231,12 @@ def pc(
     ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
     every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
     than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
-    triple whose ends no subset separates is ambiguous under both: the search separated them only
-    given sets holding a node whose edge to that end it removed later. An ambiguous triple is never
-    oriented as a collider, and Meek's rules do not read it as a non-collider, so edges around it
-    can stay undirected. The colliders are then oriented in ``collider_order`` as under
-    ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
+    triple whose ends no subset separates is ambiguous under both, as both rules call a triple
+    unambiguous only when some subset separates its ends [3]_ (Section 4.2): the search separated
+    them only given sets holding a node whose edge to that end it removed later. An ambiguous
+    triple is never oriented as a collider, and Meek's rules do not read it as a non-collider, so
+    edges around it can stay undirected. The colliders are then oriented in ``collider_order`` as
+    under ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
     Conservative PC's orientations are correct under adjacency-faithfulness, a weaker assumption
     than PC's [11]_, at the cost of more undirected edges; the majority rule orients more of them
     [3]_.
@@ -627,14 +628,13 @@ def fci(
     ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
     every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
     than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
-    triple whose ends no subset separates is a collider under both: no kept subset contains ``z``,
-    and the separating set that removed the edge, from a possible-d-separation set or an earlier
-    neighborhood, does not vote. With exact tests this can be wrong where only nodes beyond both
-    ends' neighbors separate them and ``z`` is a non-collider, so on such graphs the voting rules
-    can orient a collider that ``"sepsets"`` does not. An ambiguous triple is never oriented as a
-    collider, and rules R1-R10 do not read it as a non-collider, so endpoints around it can stay
-    circles. A vote reads only the skeleton and the tests, so the rules keep the result independent
-    of the column order wherever ``"sepsets"`` does.
+    triple whose ends no subset separates is ambiguous under both, as both rules call a triple
+    unambiguous only when some subset separates its ends [4]_ (Sections 4.2 and 4.4): the
+    separating set that removed the edge, from a possible-d-separation set or an earlier
+    neighborhood, does not vote. An ambiguous triple is never oriented as a collider, and rules
+    R1-R10 do not read it as a non-collider, so endpoints around it can stay circles. A vote reads
+    only the skeleton and the tests, so the rules keep the result independent of the column order
+    wherever ``"sepsets"`` does.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union

@@ -59,6 +59,7 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core._bitset import nodes
 from andrey.core.ci import MIXED_INDEP_TESTS, make_indep_test
 from andrey.core.invariance import InvarianceTest, make_invariance_test
 from andrey.core.knowledge import Constraints, mpdag
@@ -159,20 +160,10 @@ def _memoized(independent: Independent) -> Callable[[int, int, int], bool]:
     def test(i: int, j: int, mask: int) -> bool:
         key = (i, j, mask) if i < j else (j, i, mask)
         if key not in memo:
-            memo[key] = bool(independent(key[0], key[1], _members(mask)))
+            memo[key] = bool(independent(key[0], key[1], tuple(nodes(mask))))
         return memo[key]
 
     return test
-
-
-def _members(mask: int) -> tuple[int, ...]:
-    """The set bits of ``mask``, ascending."""
-    out = []
-    while mask:
-        low = mask & -mask
-        out.append(low.bit_length() - 1)
-        mask ^= low
-    return tuple(out)
 
 
 def _min_degree_order(
@@ -211,7 +202,7 @@ def _imap(order: Sequence[int], test: Callable[[int, int, int], bool], know: _Kn
     parents = [0] * len(order)
     earlier = 0
     for j in order:
-        for i in _members(earlier):
+        for i in nodes(earlier):
             if know is not None and know[0][i, j]:
                 parents[j] |= 1 << i
             elif know is not None and know[1][i, j]:
@@ -240,7 +231,7 @@ def reverse(
     old = parents[i]
     new_i = old | (1 << j)
     out[i], out[j] = new_i, old
-    for q in _members(old):
+    for q in nodes(old):
         bit = 1 << q
         if (required is None or not required[q, i]) and test(i, q, new_i & ~bit):
             out[i] &= ~bit
@@ -306,7 +297,7 @@ def _moves(
     """
     moves = []
     for j, pa in enumerate(parents):
-        for i in _members(pa):
+        for i in nodes(pa):
             if pa != parents[i] | (1 << i):
                 continue
             if know is not None and (know[0][i, j] or know[1][j, i] or know[2][i, j]):
@@ -347,7 +338,7 @@ def ut_igsp_rules(
 
     def variant(j: int, mask: int, k: int) -> bool:
         if (j, mask, k) not in memo:
-            memo[j, mask, k] = not invariant(j, _members(mask), k)
+            memo[j, mask, k] = not invariant(j, tuple(nodes(mask)), k)
         return memo[j, mask, k]
 
     terms: dict[tuple[int, int], int] = {}
@@ -403,7 +394,7 @@ def igsp_rules(
 
     def variant(j: int, mask: int, k: int) -> bool:
         if (j, mask, k) not in memo:
-            memo[j, mask, k] = not invariant(j, _members(mask), k)
+            memo[j, mask, k] = not invariant(j, tuple(nodes(mask)), k)
         return memo[j, mask, k]
 
     single = all(len(t) <= 1 for t in family)
@@ -442,7 +433,7 @@ def igsp_rules(
         if last[0] != parents:
             adjacent = list(parents)
             for j, pa in enumerate(parents):
-                for i in _members(pa):
+                for i in nodes(pa):
                     adjacent[i] |= 1 << j
             last[:] = [parents, adjacent]
         return last[1]
@@ -458,7 +449,7 @@ def igsp_rules(
         )
 
     def objective(parents: Parents) -> tuple[int, int]:
-        arrows = [(i, j) for j, pa in enumerate(parents) for i in _members(pa)]
+        arrows = [(i, j) for j, pa in enumerate(parents) for i in nodes(pa)]
         return len(arrows), sum(contradicting(parents, i, j) for i, j in arrows)
 
     return Rules(
@@ -545,7 +536,7 @@ def _essential(
     d = len(found)
     dag = np.zeros((d, d), dtype=np.int8)
     for j, pa in enumerate(found):
-        for i in _members(pa):
+        for i in nodes(pa):
             dag[i, j], dag[j, i] = TAIL, ARROW
     dag = dag[np.ix_(ranks, ranks)]
     rows = np.zeros((len(family) + 1, d), dtype=bool)

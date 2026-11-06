@@ -18,11 +18,30 @@ import pytest
 
 import andrey
 from andrey.constraint import _parallel_skeleton
-from andrey.constraint.fci import _fast_adjacency_search
 from andrey.core.ci import FisherZ, SingularCorrelationError, make_indep_test
 from andrey.data import sample_discrete
 
 pc_module = importlib.import_module("andrey.constraint.pc")
+
+
+def _search(
+    x: np.ndarray,
+    indep_test: str = "fisherz",
+    *,
+    workers: int,
+    trace: list[dict] | None = None,
+    warn_expensive: bool = False,
+) -> tuple:
+    """The adjacency search over ``x`` at alpha 0.05, with the p-values recorded."""
+    return pc_module.adjacency_search(
+        make_indep_test(indep_test, x),
+        x.shape[1],
+        0.05,
+        workers=workers,
+        record_pvalues=True,
+        warn_expensive=warn_expensive,
+        trace=trace,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -70,8 +89,8 @@ def _ordered(skeleton: tuple) -> tuple:
 def test_a_pass_below_the_gate_runs_in_process(pools: list[int]) -> None:
     x = _gaussian_dag(0, 500, 15, 0.3)
     trace: list[dict] = []
-    serial = pc_module._discover_skeleton(x, 0.05, "fisherz", workers=1, _trace=trace)
-    gated = pc_module._discover_skeleton(x, 0.05, "fisherz", workers=3)
+    serial = _search(x, workers=1, trace=trace)
+    gated = _search(x, workers=3)
     assert any(record["depth"] >= 2 for record in trace), "no pass of size two or more ran"
     assert pools == []
     assert _ordered(gated) == _ordered(serial)
@@ -81,28 +100,24 @@ def test_a_pass_below_the_gate_runs_in_process(pools: list[int]) -> None:
 @pytest.mark.parametrize("indep_test", ["fisherz", "student_t"])
 def test_pooled_skeletons_keep_the_serial_order(pools: list[int], indep_test: str) -> None:
     x = _gaussian_dag(1, 600, 20, 0.25)
-    serial = pc_module._discover_skeleton(x, 0.05, indep_test, workers=1)
-    pooled = pc_module._discover_skeleton(x, 0.05, indep_test, workers=3)
+    serial = _search(x, indep_test, workers=1)
+    pooled = _search(x, indep_test, workers=3)
     assert _ordered(pooled) == _ordered(serial)
-    test = make_indep_test(indep_test, x)
-    fci_serial = _fast_adjacency_search(x, test, 0.05, workers=1)
-    fci_pooled = _fast_adjacency_search(x, test, 0.05, workers=3)
-    assert _ordered(fci_pooled) == _ordered(fci_serial)
-    assert pools == [3, 3]
+    assert pools == [3]
 
 
 @pytest.mark.usefixtures("open_gate")
 def test_other_tests_scan_in_process(pools: list[int]) -> None:
     data = sample_discrete(d=10, n=300, seed=0, density=3.0, categories=(2, 4))
     x = data.data.astype(np.float64)
-    serial = pc_module._discover_skeleton(x, 0.05, "chisq", workers=1)
-    assert _ordered(pc_module._discover_skeleton(x, 0.05, "chisq", workers=3)) == _ordered(serial)
+    serial = _search(x, "chisq", workers=1)
+    assert _ordered(_search(x, "chisq", workers=3)) == _ordered(serial)
 
     class Wrapped(FisherZ):
         """A FisherZ subclass, which may change any query path."""
 
     y = _gaussian_dag(1, 600, 20, 0.25)
-    _fast_adjacency_search(y, Wrapped(y), 0.05, workers=3)
+    pc_module.adjacency_search(Wrapped(y), y.shape[1], 0.05, workers=3)
     assert pools == []
 
 
@@ -120,9 +135,9 @@ def _singular_data() -> np.ndarray:
 def test_a_singular_query_raises_the_serial_error(pools: list[int], indep_test: str) -> None:
     x = _singular_data()
     with pytest.raises(SingularCorrelationError) as serial:
-        pc_module._discover_skeleton(x, 0.05, indep_test, workers=1)
+        _search(x, indep_test, workers=1)
     with pytest.raises(SingularCorrelationError) as pooled:
-        pc_module._discover_skeleton(x, 0.05, indep_test, workers=3)
+        _search(x, indep_test, workers=3)
     assert type(pooled.value) is type(serial.value)
     assert str(pooled.value) == str(serial.value)
     assert pools == [3]
@@ -188,8 +203,8 @@ def test_a_pass_above_the_gate_runs_on_the_pool(
 
 @pytest.mark.usefixtures("open_gate")
 def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyPatch) -> None:
-    """PC counts a pass's tests once for its warning and the pool's cutoff; FCI's pool counts it."""
-    counted = {"pc": 0, "pool": 0}
+    """The search counts a pass's tests once, for its warning and the pool's cutoff."""
+    counted = {"search": 0, "pool": 0}
     scans: list[tuple[int, list[int] | None]] = []
 
     def counting(module, name):
@@ -201,7 +216,7 @@ def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyP
 
         monkeypatch.setattr(module, "pair_queries", count)
 
-    counting(pc_module, "pc")
+    counting(pc_module, "search")
     counting(_parallel_skeleton, "pool")
     real_scan = _parallel_skeleton.SkeletonWorkerPool.scan
 
@@ -212,16 +227,13 @@ def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(_parallel_skeleton.SkeletonWorkerPool, "scan", scan)
     x = _gaussian_dag(1, 600, 20, 0.25)
 
-    pc_module._discover_skeleton(x, 0.05, "fisherz", workers=3, warn_expensive=True)
-    assert scans and all(weights is not None and len(weights) == n for n, weights in scans)
-    assert counted == {"pc": sum(n for n, _ in scans), "pool": 0}
+    for warn_expensive in (True, False):
+        counted.update(search=0, pool=0)
+        scans.clear()
+        _search(x, workers=3, warn_expensive=warn_expensive)
+        assert scans and all(weights is not None and len(weights) == n for n, weights in scans)
+        assert counted == {"search": sum(n for n, _ in scans), "pool": 0}
 
-    counted.update(pc=0, pool=0)
-    scans.clear()
-    _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=3)
-    assert scans and all(weights is None for _, weights in scans)
-    assert counted == {"pc": 0, "pool": sum(n for n, _ in scans)}
-
-    counted.update(pc=0, pool=0)
-    pc_module._discover_skeleton(x, 0.05, "fisherz", workers=1)
-    assert counted == {"pc": 0, "pool": 0}, "a serial fit that does not warn counts nothing"
+    counted.update(search=0, pool=0)
+    _search(x, workers=1)
+    assert counted == {"search": 0, "pool": 0}, "a serial fit that does not warn counts nothing"

@@ -50,7 +50,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import collider_verdict
+from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
@@ -61,8 +61,6 @@ from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
-
-COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # A triple ``(i, lag, k, j)``: ``X^i_{t-lag} - X^k_t - X^j_t``.
 Triple = tuple[int, int, int, int]
@@ -470,12 +468,10 @@ def pcmciplus(
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
     conditions phases 2 and 3 take beyond the lagged parents. ``categorical`` and ``seed`` reach
     :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
-    Raises :class:`ValueError` when ``collider_rule`` is not in :data:`COLLIDER_RULES`.
+    Raises :class:`ValueError` when ``collider_rule`` is not one of
+    :data:`~andrey.constraint._skeleton.COLLIDER_RULES`.
     """
-    if collider_rule not in COLLIDER_RULES:
-        raise ValueError(
-            f"collider_rule must be one of {list(COLLIDER_RULES)}, got {collider_rule!r}"
-        )
+    check_collider_rule(collider_rule)
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
