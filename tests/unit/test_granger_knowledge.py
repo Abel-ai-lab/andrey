@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from scipy import stats
-from statsmodels.regression.linear_model import OLS
 
 import andrey
 from andrey.temporal.granger import granger_f_test
 from tests.recovery.helpers import datagen
+from tests.unit.test_granger_f_test import least_squares
 
 LAGS = 2
 
@@ -40,11 +39,9 @@ def test_a_forbidden_regressor_is_dropped_from_its_regression(series):
     coeff, p_values = granger_f_test(series, maxlag=LAGS, alpha=1.0, forbidden=forbidden)
     for effect, dropped in ((0, [d * 0 + 1, d * 1 + 2]), (2, [3])):
         keep = np.setdiff1d(np.arange(d * LAGS), dropped)
-        fit = OLS(series[LAGS:, effect], np.column_stack([np.ones(len(design)), design[:, keep]]))
-        fit = fit.fit()
-        np.testing.assert_allclose(coeff[effect, keep], fit.params[1:], rtol=1e-8)
-        reference = 2 * stats.t.sf(np.abs(fit.tvalues[1:]), fit.df_resid)
-        np.testing.assert_allclose(p_values[effect, keep], reference, rtol=1e-6, atol=1e-300)
+        reference, reference_p, _ = least_squares(series[LAGS:, effect], design[:, keep])
+        np.testing.assert_allclose(coeff[effect, keep], reference, rtol=1e-8)
+        np.testing.assert_allclose(p_values[effect, keep], reference_p, rtol=1e-6, atol=1e-300)
         assert not coeff[effect, dropped].any() and (p_values[effect, dropped] == 1).all()
 
 

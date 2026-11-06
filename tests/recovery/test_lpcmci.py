@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 
@@ -46,9 +48,15 @@ def planted() -> np.ndarray:
     return x[:, :5]
 
 
+@pytest.fixture(scope="module")
+def fit(planted):
+    """``lpcmci`` on the planted data with the given settings, fitted once per module."""
+    return functools.cache(lambda **settings: andrey.lpcmci(planted, tau_max=2, **settings))
+
+
 @pytest.mark.parametrize("indep_test", ["student_t", "fisherz"])
-def test_recovers_the_planted_graph_with_its_hidden_cause(planted, indep_test):
-    out = andrey.lpcmci(planted, tau_max=2, indep_test=indep_test)
+def test_recovers_the_planted_graph_with_its_hidden_cause(fit, indep_test):
+    out = fit(indep_test=indep_test)
     assert _links(out) == TRUE_LINKS
     assert out.structure.lag(0).oriented_edges() == [(1, 2, "bidirected"), (2, 3, "directed")]
     assert out.structure.lag(1).oriented_edges() == [
@@ -64,10 +72,10 @@ def test_recovers_the_planted_graph_with_its_hidden_cause(planted, indep_test):
     assert out.metadata["conflicts"] == []
 
 
-def test_the_result_does_not_depend_on_the_variable_order(planted):
+def test_the_result_does_not_depend_on_the_variable_order(planted, fit):
     order = [3, 0, 4, 2, 1]
-    out = andrey.lpcmci(planted, tau_max=2)
-    permuted = andrey.lpcmci(planted[:, order], tau_max=2)
+    out = fit(indep_test="fisherz")
+    permuted = andrey.lpcmci(planted[:, order], tau_max=2, indep_test="fisherz")
     back = set()
     for link in _links(permuted):
         i, marks, rest = int(link[0]), link[1:4], link[4:]

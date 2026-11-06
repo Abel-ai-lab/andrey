@@ -488,10 +488,11 @@ def grasp(
     of its simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP
     does not. The final parent sets form a DAG, which is reduced to its CPDAG.
 
-    Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
-    :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged. Under
-    the linear-Gaussian BIC each comparison is decided as full local scores decide it, as for
-    :func:`~andrey.boss`.
+    Tucks and parent changes must improve the score by more than ``1e-6``, the fixed absolute
+    tolerance used by :func:`~andrey.boss`, and candidate parents within it of the best count as
+    ties, as for :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score
+    unchanged. Under the linear-Gaussian BIC each comparison is decided as full local scores decide
+    it, as for :func:`~andrey.boss`.
 
     **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
