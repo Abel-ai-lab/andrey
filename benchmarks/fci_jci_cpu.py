@@ -292,7 +292,7 @@ def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, in
     returns the largest possible-d-separation set FCI forms on the true graph at the step where it
     forms them, after the colliders.
     """
-    from andrey.constraint.fci_jci import _mark_index
+    from andrey.constraint.fci_jci import mark_index
     from andrey.data import latent
 
     fci = importlib.import_module("andrey.constraint.fci")
@@ -301,7 +301,7 @@ def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, in
     support = latent._ancestral_adjacency(dag, observed, ())
     sepsets = latent._AncestorSepsets(support, observed, anc, set())
     marks = fci.circle_pag(support)
-    _mark_index(marks, p, confounded_index)
+    mark_index(marks, p, confounded_index)
     fci.orient_colliders(marks, sepsets)
     neighbors, reach = fci._neighbor_lists(marks), fci._semidirected_reach(marks)
     largest = max(

@@ -125,7 +125,7 @@ def fci_jci(
 
     marks = circle_pag(skeleton)
     knowledge_marks(marks, padded)
-    _mark_index(marks, d, confounded_index)
+    mark_index(marks, d, confounded_index)
     orient_colliders(marks, sepsets)
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
@@ -142,7 +142,7 @@ def fci_jci(
         max_depth=max_depth,
         constraints=padded,
     )
-    _mark_index(marks, d, confounded_index)
+    mark_index(marks, d, confounded_index)
     ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
@@ -168,7 +168,7 @@ def fci_jci(
     return GraphStructure.from_numpy(marks[:d, :d].copy(), kind="pag"), index_edges
 
 
-def _mark_index(marks: np.ndarray, index: int, confounded: bool) -> None:
+def mark_index(marks: np.ndarray, index: int, confounded: bool) -> None:
     """Set the JCI marks on every edge of node ``index``, in place.
 
     Each edge gets an arrowhead at its other node, and, unless ``confounded``, a tail at ``index``.

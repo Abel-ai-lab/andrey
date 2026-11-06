@@ -274,6 +274,7 @@ def grasp(
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by GRaSP over a linear-Gaussian or mixed-data BIC score.
 
@@ -323,12 +324,18 @@ def grasp(
         :meth:`~andrey.core.knowledge.Constraints.precedence`: the seeded starting order is
         rearranged as little as possible to keep it, and a tuck that breaks it is not taken. The
         CPDAG is then narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: they lead the starting
+        order, a tuck that puts a column before them is not taken
+        (:func:`~andrey.search.boss.sources_ahead`), and their edges are then directed out of them,
+        as for :func:`~andrey.search.boss.boss`. Empty, the default, leaves every variable free.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The learned CPDAG, and the total score of the settled DAG (the sum of its local scores;
-        lower is better).
+        The learned CPDAG, or with ``sources`` the partially directed graph that also directs their
+        edges, and the total score of the settled DAG (the sum of its local scores; lower is
+        better).
     """
 
     def run_start(
@@ -348,4 +355,5 @@ def grasp(
         max_parents=max_parents,
         n_starts=n_starts,
         seed=seed,
+        sources=sources,
     )

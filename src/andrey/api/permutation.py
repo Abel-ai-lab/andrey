@@ -8,7 +8,9 @@ mixed-data BIC. Their search order is drawn from a private RNG seeded by ``seed`
 ``ANDREY_SEED``), so a run is reproducible. ``igsp`` and ``ut_igsp`` search variable orders over
 minimal I-MAPs with interventional data (:mod:`andrey.search.igsp`). ``boss_fci`` and ``grasp_fci``
 run GFCI's test phase (:func:`andrey.search.gfci.fci_from_pattern`) on the CPDAG of a BOSS or GRaSP
-search.
+search. With ``env``, ``boss``, ``grasp``, ``boss_fci``, and ``grasp_fci`` append the environment
+index to the data as a last column that leads every order of the search, and drop it from the
+result again, its edges listed in ``metadata``.
 """
 
 from __future__ import annotations
@@ -24,9 +26,12 @@ from andrey.api._adapt import (
     column_labels,
     column_namer,
     copies_named,
+    env_index,
     fit_inputs,
+    index_column,
     json_safe,
     label_of,
+    split_index,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -34,16 +39,17 @@ from andrey.api.constraint import _ambiguous_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
 
 
 @method_spec("boss")
 def boss(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -63,9 +69,23 @@ def boss(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and three or more environments, the order of the list can change the
+        result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -107,7 +127,8 @@ def boss(
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
         CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
         the same largest number of parents). A cap can stop the search short of the lowest-scoring
-        graph. ``None`` sets no cap.
+        graph. ``None`` sets no cap. With ``env``, the index counts as a parent of each variable it
+        points into.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -121,7 +142,7 @@ def boss(
         forbidden ones and include the required ones, and every causal order the search visits puts
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes.
+        :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -134,8 +155,18 @@ def boss(
         likelihood, and for the multinomial BIC, ``-2`` times the log-likelihood plus the penalty;
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
-        lists the categorical columns it read, by name or 0-based position.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        lists the categorical columns it read, by name or 0-based position. With ``env``, the graph
+        over the data variables is partially directed: the index directs edges that the CPDAG of
+        the pooled rows leaves undirected, so the graph stands for the DAGs that agree on every
+        direction the index identifies, and is tagged ``cpdag``, as :func:`~andrey.cdnod`'s is.
+        ``metadata["index_edges"]`` then lists the index's edges, each ``env -> variable``, as
+        ``[variable, "directed"]`` pairs, and ``metadata["changing_variables"]`` the same
+        variables, by name or 0-based position, in column order: the variables whose causal
+        module, the distribution given their causes, changes across the environments, when the
+        index is only a cause and no hidden common cause acts. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single
+        environment, and ``metadata["score"]`` is the score of the DAG over the data and the
+        index. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
         under their parameter names.
 
@@ -154,7 +185,9 @@ def boss(
         repeats another up to scale and shift given more than two rows or, with more rows than
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or if ``env`` does not hold one
+        label per row, misses a label, or mixes strings and numbers, or, with a categorical or
+        mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -177,7 +210,10 @@ def boss(
     highly connected variables [1]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.boss_fci`, the same search followed by FCI's tests and rules, or
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`.
+    :func:`~andrey.direct_lingam`. With ``env``, it takes rows pooled from several environments,
+    such as sites, batches, or experiments, whose shifts change variables it does not know;
+    :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
+    runs PC with the same index.
 
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
     the order. Different seeds can therefore reach different graphs; comparing a few shows whether
@@ -235,6 +271,18 @@ def boss(
     174 (200 true edges). Its mean errors stayed below the empty graph's in each of the 65 settings,
     where the standard BIC's exceeded it in 22.
 
+    **Several environments.** With ``env``, the environment index joins the data as a last
+    variable that leads every order the search visits, so it can be a parent of a variable and
+    never a child: the background knowledge Joint Causal Inference gives a context variable [6]_,
+    and the index CD-NOD adds to PC [7]_. Pooling makes the environment a common cause of the
+    variables it shifts; with the index among the variables, the score explains two variables the
+    environments shift together without an edge between them. The edges at the index are then
+    directed out of it, and Meek's rules direct the edges that follow, so the graph can direct
+    edges that the CPDAG of the pooled rows leaves undirected. The index is dropped from the graph.
+    ``"bic"`` reads the index as a number; ``"degen_gauss"`` and ``"cond_gauss"``, with
+    ``categorical=[]`` for continuous data, and the categorical scores read each label as a
+    category. It assumes no hidden common cause; :func:`~andrey.boss_fci` allows them.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -260,8 +308,14 @@ def boss(
     multinomial BIC, BOSS stopped at a DAG that scores worse than the optimum on some draws;
     comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
     benchmarked with BOSS yet. The mixed-data scores are experimental and not benchmarked yet; their
-    tests run BOSS on 5 variables with 3,000 rows. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    tests run BOSS on 5 variables with 3,000 rows. With ``env``, BOSS is experimental and not
+    benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two environments,
+    and on Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"``
+    reads a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
+    go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
+    a parent of each variable it points into. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -276,6 +330,11 @@ def boss(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [6] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [7] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
+       Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
+       1-53.
 
     Examples
     --------
@@ -291,30 +350,27 @@ def boss(
     """
     from andrey.search.boss import boss as _boss
 
-    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
-    X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="boss"
+    return _cpdag_search(
+        "boss",
+        _boss,
+        data,
+        env,
+        score_func=score_func,
+        categorical=categorical,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        seed=seed,
+        n_starts=n_starts,
+        max_parents=max_parents,
     )
-    with copies_named(labels):
-        cpdag, score = _boss(
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            seed=seed,
-            n_starts=n_starts,
-            score_func=score_func,
-            categorical=mask,
-            constraints=constraints,
-            max_parents=max_parents,
-        )
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
-    return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
 @method_spec("grasp")
 def grasp(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -337,9 +393,23 @@ def grasp(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and three or more environments, the order of the list can change the
+        result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -386,7 +456,8 @@ def grasp(
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
         CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
         the same largest number of parents). A cap can stop the search short of the lowest-scoring
-        graph. ``None`` sets no cap.
+        graph. ``None`` sets no cap. With ``env``, the index counts as a parent of each variable it
+        points into.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -400,7 +471,7 @@ def grasp(
         forbidden ones and include the required ones, and every causal order the search visits puts
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes.
+        :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -413,8 +484,18 @@ def grasp(
         likelihood, and for the multinomial BIC, ``-2`` times the log-likelihood plus the penalty;
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
-        lists the categorical columns it read, by name or 0-based position.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        lists the categorical columns it read, by name or 0-based position. With ``env``, the graph
+        over the data variables is partially directed: the index directs edges that the CPDAG of
+        the pooled rows leaves undirected, so the graph stands for the DAGs that agree on every
+        direction the index identifies, and is tagged ``cpdag``, as :func:`~andrey.cdnod`'s is.
+        ``metadata["index_edges"]`` then lists the index's edges, each ``env -> variable``, as
+        ``[variable, "directed"]`` pairs, and ``metadata["changing_variables"]`` the same
+        variables, by name or 0-based position, in column order: the variables whose causal
+        module, the distribution given their causes, changes across the environments, when the
+        index is only a cause and no hidden common cause acts. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single
+        environment, and ``metadata["score"]`` is the score of the DAG over the data and the
+        index. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
         under their parameter names.
 
@@ -433,7 +514,9 @@ def grasp(
         repeats another up to scale and shift given more than two rows or, with more rows than
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or if ``env`` does not hold one
+        label per row, misses a label, or mixes strings and numbers, or, with a categorical or
+        mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -456,7 +539,10 @@ def grasp(
     search even on dense graphs [1]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.grasp_fci`, the same search followed by FCI's tests and rules, or
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`.
+    :func:`~andrey.direct_lingam`. With ``env``, it takes rows pooled from several environments,
+    such as sites, batches, or experiments, whose shifts change variables it does not know;
+    :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
+    runs PC with the same index.
 
     **GRaSP or BOSS.** Both search the same space of orders with different moves. Either can reach
     the better score on a given dataset. On the published benchmarks, GRaSP took far longer than
@@ -524,6 +610,18 @@ def grasp(
     errors against 179 (200 true edges). Its mean errors stayed below the empty graph's in each of
     the 65 settings, where the standard BIC's exceeded it in 21.
 
+    **Several environments.** With ``env``, the environment index joins the data as a last
+    variable that leads every order the search visits, so it can be a parent of a variable and
+    never a child: the background knowledge Joint Causal Inference gives a context variable [6]_,
+    and the index CD-NOD adds to PC [7]_. Pooling makes the environment a common cause of the
+    variables it shifts; with the index among the variables, the score explains two variables the
+    environments shift together without an edge between them. The edges at the index are then
+    directed out of it, and Meek's rules direct the edges that follow, so the graph can direct
+    edges that the CPDAG of the pooled rows leaves undirected. The index is dropped from the graph.
+    ``"bic"`` reads the index as a number; ``"degen_gauss"`` and ``"cond_gauss"``, with
+    ``categorical=[]`` for continuous data, and the categorical scores read each label as a
+    category. It assumes no hidden common cause; :func:`~andrey.grasp_fci` allows them.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -548,7 +646,13 @@ def grasp(
     categorical networks, with BDeu or the multinomial BIC, GRaSP stopped at a DAG that scores worse
     than the optimum on some draws; comparing a few seeds shows whether a result depends on the
     seed. Neither categorical score is benchmarked with GRaSP yet. The mixed-data scores are
-    experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000 rows. The
+    experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000 rows. With
+    ``env``, GRaSP is experimental and not benchmarked yet; its tests run it on up to 12 variables
+    with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from nine
+    conditions, with ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three
+    or more environments a shift that does not follow the labels' values, such as one in the middle
+    environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
+    result. ``max_parents`` counts the index as a parent of each variable it points into. The
     numbers are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
@@ -565,6 +669,11 @@ def grasp(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [6] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [7] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
+       Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
+       1-53.
 
     Examples
     --------
@@ -580,26 +689,83 @@ def grasp(
     """
     from andrey.search.grasp import grasp as _grasp
 
-    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
-    X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="grasp"
+    return _cpdag_search(
+        "grasp",
+        _grasp,
+        data,
+        env,
+        score_func=score_func,
+        categorical=categorical,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        depth=grasp_depth,
+        seed=seed,
+        n_starts=n_starts,
+        max_parents=max_parents,
     )
-    with copies_named(labels):
-        cpdag, score = _grasp(
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            depth=grasp_depth,
-            seed=seed,
-            n_starts=n_starts,
+
+
+def _cpdag_search(
+    name: str,
+    engine: Callable[..., tuple[GraphStructure, float]],
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | None,
+    *,
+    score_func: str | None,
+    categorical: Sequence[str | int] | None,
+    knowledge: Knowledge | None,
+    **settings: object,
+) -> StructureOutput:
+    """Run ``name``, ``"boss"`` or ``"grasp"``, whose search ``engine`` returns a CPDAG and a score.
+
+    With ``env``, the environment index joins the data as a last column that the search keeps
+    ahead of every other one (``sources``), and leaves the result again: its edges, and the
+    variables they reach, go in ``metadata``. ``settings`` reach ``engine``.
+    """
+    assert score_func is not None  # method_spec picks it from the column types
+    data, index = env_index(data, env, method=name)
+    X, mask, labels, constraints = fit_inputs(
+        data,
+        "score_func",
+        score_func,
+        categorical,
+        knowledge,
+        method=name,
+        index_categorical=index is not None,
+    )
+    augmented, augmented_mask, augmented_constraints, column = index_column(
+        X, mask, constraints, index, "score_func", score_func
+    )
+    with copies_named(labels, _index_namer(labels, column)):
+        cpdag, score = engine(
+            augmented,
             score_func=score_func,
-            categorical=mask,
-            constraints=constraints,
-            max_parents=max_parents,
+            categorical=augmented_mask,
+            constraints=augmented_constraints,
+            sources=() if column is None else (column,),
+            **settings,
         )
+    cpdag, index_edges = split_index(cpdag, column)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    if env is not None:
+        variable = label_of(labels)
+        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
+        metadata["changing_variables"] = [variable(j) for j, _ in index_edges]
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _index_namer(labels: tuple[str, ...] | None, column: int | None) -> Callable[[int], str] | None:
+    """Name the columns of the data a search reads, for a copies error; ``None`` without ``column``.
+
+    The index ``column`` is ``env``, and the others are named by
+    :func:`~andrey.api._adapt.column_namer`.
+    """
+    if column is None:
+        return None
+    name = column_namer(labels)
+    return lambda j: "env" if j == column else name(j)
 
 
 @method_spec("igsp")
@@ -632,12 +798,11 @@ def igsp(
     data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample, from every environment. Coerced to ``float64``. A
         DataFrame's column names become the structure's ``labels``. A column that ``env`` or
-        ``targets`` names is not a variable: it leaves the data before the fit, and
-        ``categorical``, ``knowledge``, ``targets``, and the result's positions count the other
-        columns.
-        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
-        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
-        order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
+        ``targets`` names is not a variable: it leaves the data before the fit, and ``categorical``,
+        ``knowledge``, ``targets``, and the result's positions count the other columns. A list of
+        DataFrames or 2-D arrays gives each environment's rows apart, labeled by position
+        ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that order,
+        ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name of
         a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
@@ -966,12 +1131,11 @@ def ut_igsp(
     data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample, from every environment. Coerced to ``float64``. A
         DataFrame's column names become the structure's ``labels``. A column that ``env`` or
-        ``targets`` names is not a variable: it leaves the data before the fit, and
-        ``categorical``, ``knowledge``, ``targets``, and the result's positions count the other
-        columns.
-        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
-        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
-        order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
+        ``targets`` names is not a variable: it leaves the data before the fit, and ``categorical``,
+        ``knowledge``, ``targets``, and the result's positions count the other columns. A list of
+        DataFrames or 2-D arrays gives each environment's rows apart, labeled by position
+        ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that order,
+        ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name of
         a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
@@ -1296,6 +1460,7 @@ def ut_igsp(
 def _fci_hybrid(
     name: str,
     data: npt.ArrayLike,
+    env: npt.ArrayLike | None,
     *,
     score_func: str | None,
     indep_test: str | None,
@@ -1308,7 +1473,9 @@ def _fci_hybrid(
     """Run ``name``, ``"boss_fci"`` or ``"grasp_fci"``, as :func:`~andrey.gfci` runs.
 
     The score and the test must read the data alike (:func:`~andrey.api._adapt.check_same_data`);
-    ``settings`` reach the engine in :mod:`andrey.search.gfci`.
+    ``settings`` reach the engine in :mod:`andrey.search.gfci`. With ``env``, the environment
+    index joins the data as a last column, the engine's ``context``, and leaves the PAG again: its
+    edges go in ``metadata``.
     """
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search import gfci as engines
@@ -1316,33 +1483,49 @@ def _fci_hybrid(
     assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
     check_same_data(name, score_func, indep_test)
+    data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
-        data, "indep_test", indep_test, categorical, knowledge, method=name
+        data,
+        "indep_test",
+        indep_test,
+        categorical,
+        knowledge,
+        method=name,
+        index_categorical=index is not None,
+    )
+    augmented, augmented_mask, augmented_constraints, column = index_column(
+        X, mask, constraints, index, "indep_test", indep_test
     )
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels):
+    with copies_named(labels, _index_namer(labels, column)):
         pag = getattr(engines, name)(
-            X,
+            augmented,
             score_func=score_func,
             indep_test=indep_test,
             collider_rule=collider_rule,
-            categorical=mask,
+            categorical=augmented_mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
-            constraints=constraints,
+            constraints=augmented_constraints,
             in_column_order=resolve_in_column_order(),
+            context=column,
             _ambiguous=ambiguous,
             **settings,
         )
+    pag, index_edges = split_index(pag, column)
     metadata = {
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
     }
+    if env is not None:
+        variable = label_of(labels)
+        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
     return structure_output(pag, labels=labels, metadata=metadata)
 
 
 @method_spec("boss_fci")
 def boss_fci(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -1353,6 +1536,7 @@ def boss_fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     possible_dsep: str | None = None,
+    confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
     max_depth: int | None = None,
@@ -1369,9 +1553,23 @@ def boss_fci(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
+        can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score driving the BOSS phase, as for :func:`~andrey.boss`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1426,6 +1624,11 @@ def boss_fci(
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
         ``andrey.config.tie_break``.
+    confounded_index : bool, default=True
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as
+        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
+        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
+        it has no effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
@@ -1445,13 +1648,15 @@ def boss_fci(
         A cap on every node's parents in the BOSS phase, at least ``0``, as :func:`~andrey.boss`
         applies it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node
         of the PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
-        orientation rules put at a node. ``None`` sets no cap.
+        orientation rules put at a node. ``None`` sets no cap. With ``env``, the index counts as a
+        parent in the BOSS phase of each variable it points into.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The BOSS phase honors it as
         :func:`~andrey.boss` does, and the test phase starts from the adjacencies BOSS found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
+        With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -1463,9 +1668,14 @@ def boss_fci(
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
         ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
-        used, under their parameter names.
+        ``x < y``, in ascending order; with ``env``, the index, in a triple through it, is numbered
+        ``n_variables``. With ``env``, the PAG is over the data variables, and
+        ``metadata["index_edges"]`` lists the index's edges as ``[variable, kind]`` pairs, by name
+        or 0-based position, in column order: ``"directed"`` for ``index -> variable``,
+        ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+        ``index <-> variable``; it is empty for a single environment. ``metadata["tie_break"]`` is
+        the tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also
+        records the penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -1484,7 +1694,9 @@ def boss_fci(
         copies and says to keep one column per group. Also if a given ``max_parents`` is below the
         parents some graph of the required edges of ``knowledge`` gives a node, or if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
+        label, or mixes strings and numbers, or, with a categorical or mixed-data setting, holds a
+        number that is not whole.
 
     Warns
     -----
@@ -1503,7 +1715,8 @@ def boss_fci(
     measured variables with 0, 4, or 8 hidden common causes, mean degree 2 to 6, and 200 to 5,000
     rows, and 100 measured variables with 10 hidden ones and 1,000 rows, scored by the BIC with a
     penalty discount of 2 and tested by Fisher's z at an alpha of 0.01. They pick BOSS's search for
-    its accuracy on densely connected graphs. It returns a PAG. When no common cause is hidden, use
+    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes rows pooled
+    from several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
     :func:`~andrey.boss`; :func:`~andrey.grasp_fci` and :func:`~andrey.gfci` run the same pipeline
     with GRaSP's and GES's searches.
 
@@ -1522,6 +1735,16 @@ def boss_fci(
     step, and FCI's adjacency search, which grows the conditioning size over all edges together and
     records the union of the separating subsets of the smallest size, as :func:`~andrey.gfci` does.
 
+    **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
+    the environment index joins the data as a last variable that leads every BOSS order, and before
+    each collider pass every edge the index keeps gets an arrowhead at its data variable, because no
+    data variable causes the index, and, with ``confounded_index=False``, a tail at the index. Joint
+    Causal Inference assumes no selection bias, so the rules leave out R5-R7. The index removes the
+    edges that pooling adds and can orient more, and it is dropped from the PAG; a variable keeps an
+    edge to it when its distribution changes across the environments and no other variable explains
+    the change. ``"bic"`` and ``"fisherz"`` read the index as a number, and the categorical and
+    mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
     its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, which
     suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
@@ -1534,9 +1757,13 @@ def boss_fci(
     :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
+    to 12 variables, 2 of them hidden, with 2,000 rows from two environments, and on Sachs's 11
+    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
+    read a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
+    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1551,6 +1778,8 @@ def boss_fci(
     .. [4] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
        1873-1896.
+    .. [5] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
 
     Examples
     --------
@@ -1568,6 +1797,7 @@ def boss_fci(
     return _fci_hybrid(
         "boss_fci",
         data,
+        env,
         score_func=score_func,
         indep_test=indep_test,
         categorical=categorical,
@@ -1582,12 +1812,14 @@ def boss_fci(
         max_parents=max_parents,
         n_starts=n_starts,
         seed=seed,
+        confounded_index=confounded_index,
     )
 
 
 @method_spec("grasp_fci")
 def grasp_fci(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -1599,6 +1831,7 @@ def grasp_fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     possible_dsep: str | None = None,
+    confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
     max_depth: int | None = None,
@@ -1615,9 +1848,23 @@ def grasp_fci(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
+        can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score driving the GRaSP phase, as for :func:`~andrey.grasp`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1676,6 +1923,11 @@ def grasp_fci(
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
         ``andrey.config.tie_break``.
+    confounded_index : bool, default=True
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as
+        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
+        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
+        it has no effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
@@ -1695,13 +1947,15 @@ def grasp_fci(
         A cap on every node's parents in the GRaSP phase, at least ``0``, as :func:`~andrey.grasp`
         applies it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node
         of the PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
-        orientation rules put at a node. ``None`` sets no cap.
+        orientation rules put at a node. ``None`` sets no cap. With ``env``, the index counts as a
+        parent in the GRaSP phase of each variable it points into.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GRaSP phase honors it as
         :func:`~andrey.grasp` does, and the test phase starts from the adjacencies GRaSP found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
+        With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -1713,9 +1967,14 @@ def grasp_fci(
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
         ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
-        used, under their parameter names.
+        ``x < y``, in ascending order; with ``env``, the index, in a triple through it, is numbered
+        ``n_variables``. With ``env``, the PAG is over the data variables, and
+        ``metadata["index_edges"]`` lists the index's edges as ``[variable, kind]`` pairs, by name
+        or 0-based position, in column order: ``"directed"`` for ``index -> variable``,
+        ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+        ``index <-> variable``; it is empty for a single environment. ``metadata["tie_break"]`` is
+        the tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also
+        records the penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -1734,7 +1993,9 @@ def grasp_fci(
         copies and says to keep one column per group. Also if a given ``max_parents`` is below the
         parents some graph of the required edges of ``knowledge`` gives a node, or if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
+        label, or mixes strings and numbers, or, with a categorical or mixed-data setting, holds a
+        number that is not whole.
 
     Warns
     -----
@@ -1753,7 +2014,9 @@ def grasp_fci(
     setting of :func:`~andrey.boss_fci`: 20 measured variables with 0, 4, or 8 hidden common causes,
     mean degree 2 to 6, and 200 to 5,000 rows, and 100 measured variables with 10 hidden ones and
     1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
-    time beside BOSS's. It returns a PAG. When no common cause is hidden, use :func:`~andrey.grasp`;
+    time beside BOSS's. It returns a PAG, and with ``env`` takes rows pooled from several
+    environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
+    :func:`~andrey.grasp`;
     :func:`~andrey.boss_fci` and :func:`~andrey.gfci` run the same pipeline with BOSS's and GES's
     searches.
 
@@ -1762,6 +2025,16 @@ def grasp_fci(
     possible-d-separation step. No step adds an edge, so the PAG's adjacencies are a subset of the
     GRaSP CPDAG's. Reordering the columns reorders the nodes and changes nothing else, unless two
     columns are identical.
+
+    **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
+    the environment index joins the data as a last variable that leads every GRaSP order, and before
+    each collider pass every edge the index keeps gets an arrowhead at its data variable, because no
+    data variable causes the index, and, with ``confounded_index=False``, a tail at the index. Joint
+    Causal Inference assumes no selection bias, so the rules leave out R5-R7. The index removes the
+    edges that pooling adds and can orient more, and it is dropped from the PAG; a variable keeps an
+    edge to it when its distribution changes across the environments and no other variable explains
+    the change. ``"bic"`` and ``"fisherz"`` read the index as a number, and the categorical and
+    mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
     its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, which
@@ -1775,9 +2048,13 @@ def grasp_fci(
     :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
+    to 12 variables, 2 of them hidden, with 2,000 rows from two environments, and on Sachs's 11
+    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
+    read a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
+    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1788,6 +2065,8 @@ def grasp_fci(
        for latent variable models. PGM, PMLR 52, 368-379.
     .. [3] Lam, W.-Y., Andrews, B., and Ramsey, J. (2022). Greedy Relaxations of the Sparsest
        Permutation Algorithm. UAI, PMLR 180:1052-1062. https://proceedings.mlr.press/v180/lam22a.html
+    .. [4] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
 
     Examples
     --------
@@ -1805,6 +2084,7 @@ def grasp_fci(
     return _fci_hybrid(
         "grasp_fci",
         data,
+        env,
         score_func=score_func,
         indep_test=indep_test,
         categorical=categorical,
@@ -1820,6 +2100,7 @@ def grasp_fci(
         max_parents=max_parents,
         n_starts=n_starts,
         seed=seed,
+        confounded_index=confounded_index,
     )
 
 

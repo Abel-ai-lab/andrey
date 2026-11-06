@@ -1029,7 +1029,7 @@ _CONCEPTS = (
             "edge it keeps points out of it (FCI-JCI123).",
         ),
         fragment="hidden variable may cause both the index and a data variable",
-        suitable=("fci_jci",),
+        suitable=("fci_jci", "boss_fci", "grasp_fci"),
         others_exempt="Not an FCI-JCI search: only those choose between JCI's assumptions on the "
         "index.",
     ),
