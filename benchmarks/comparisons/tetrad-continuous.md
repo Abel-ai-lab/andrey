@@ -82,6 +82,49 @@ The summary prints each pair's speed-up, Tetrad's median search time over Andrey
 datasets on which both packages returned the same graph, of those both finished. Differences are
 reported with their cause; a reference package's graph is a measurement, not a target.
 
+## Knowledge, FCI-JCI, BOSS-FCI, and GRaSP-FCI
+
+The [FCI-JCI](fci-jci.md) lane runs the FCI-JCI adapters; the BOSS-FCI and GRaSP-FCI adapters
+are ready for their lanes.
+Each Tetrad one times its search inside the JVM, as above, through either driver:
+
+| Search | tetrad-lib 7.6.10 (`tetrad_search.py`) | causal-cmd 1.12.0 (`tetrad_pag.py`) |
+|---|---|---|
+| FCI | `tetrad.fci.fisherz` | `tetrad.cmd.fci.fisherz` |
+| FCI-JCI | `tetrad.fci_jci.fisherz` | `tetrad.cmd.fci_jci.fisherz` |
+| BOSS-FCI | `tetrad.boss_fci.bic` (`BossFci`) | `tetrad.cmd.boss_fci.bic` (`bfci`) |
+| GRaSP-FCI | `tetrad.grasp_fci.bic` (`GraspFci`) | `tetrad.cmd.grasp_fci.bic` (`grasp-fci`) |
+
+A fit's `params` name background knowledge by column: `context_vars`, the context variables, and
+`forbidden` and `required`, `[a, b]` pairs for the edges `a -> b`. The adapter writes Tetrad's
+knowledge file, with the context variables in tier 1 and every other column in tier 2, and each
+driver reads it with Tetrad's own reader before the clock (`--knowledge FILE`). Tetrad's tiers
+forbid every edge from a later tier to an earlier one, so the file lists no system -> context edge;
+`TetradDriver.java`'s `knowledge` mode prints the edges a file forbids or requires, and the lane's
+tests check that the tiers forbid exactly the system -> context edges. FCI-JCI is FCI with the
+context tier, which gives JCI assumption 1 only: no system variable causes a context variable. Its
+PAG covers every column, context variables included. pcalg's FCI-JCI (`pcalg.fci_jci`) runs
+`fci(..., jci = "123", contextVars = ..., selectionBias = FALSE)`, which makes JCI assumptions 1-3.
+
+The two releases differ:
+
+- **Possible-d-separation.** causal-cmd's FCI and GRaSP-FCI run it (`--possibleMsepDone`), as
+  GFCI does; its `bfci` has no setting for it. In tetrad-lib 7.6.10, only FCI has one
+  (`doPossibleDsep true`): BOSS-FCI and GRaSP-FCI take their FCI steps from `StarFci`, which has
+  none.
+- **Knowledge and selection bias.** tetrad-lib 7.6.10's FCI steps orient by knowledge only when
+  they leave out the rules for selection bias (`excludeSelectionBias true`), so its adapters refuse
+  knowledge without that setting, and its FCI-JCI sets it, as pcalg's does. causal-cmd 1.12.0's FCI
+  has no such setting and orients by knowledge with the rules in.
+- **Experimental BOSS-FCI.** causal-cmd lists `bfci` only under `--experimental`, which
+  `TetradDriver.java` passes on to causal-cmd's parser.
+- **Starts and depth.** GRaSP-FCI runs one start from the column order. `GraspFci.setDepth` sets
+  GRaSP's tuck depth and the cap on the FCI steps' separating sets alike, and Tetrad's algorithm
+  interface sets it from `depth`, -1 by default, so neither adapter caps either: causal-cmd sets
+  `graspDepth` and then `depth`. tetrad-lib 7.6.10's GRaSP-FCI runs GRaSP's stages in order
+  (`ordered true`), that interface's default. tetrad-lib 7.6.10's `BossFci` has no seed or
+  column-order setting, so its BOSS starts as `PermutationSearch` does by default.
+
 Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapters'
 setup checks for it, and `ANDREY_BENCH_JAVA` names `java` when it is not on `PATH`. The jar is the
 one the [GIN](hidden-confounder-methods.md) lane runs on, named by `ANDREY_BENCH_TETRAD_GIN_JAR`:

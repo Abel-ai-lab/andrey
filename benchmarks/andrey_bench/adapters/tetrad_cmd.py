@@ -28,6 +28,13 @@ causal-cmd                             Andrey
 ``--penaltyDiscount``                  ``lambda_value``
 =====================================  ==========================================================
 
+A fit's ``params`` may name background knowledge, which ``fit`` writes to a Tetrad knowledge file
+(:func:`knowledge_text`) and passes as ``--knowledge``: ``context_vars``, the columns that go in the
+first tier, ahead of every other column; ``forbidden`` and ``required``, ``[a, b]`` pairs of
+columns for the edges ``a -> b``. The driver sets the file on the algorithm as causal-cmd does, and
+reads it before the clock. A solution whose algorithm causal-cmd lists only as experimental sets
+``experimental``, which passes ``--experimental``.
+
 PC runs order-independent (``--stableFAS``) and has no depth cap, as Andrey's PC does. It keeps
 Tetrad's default collider conflict rule (``--conflictRule 1``), under which a later collider
 replaces an earlier one; Andrey's PC keeps the collider whose pair was separated with the larger
@@ -50,7 +57,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 
@@ -67,6 +74,8 @@ _TESTS = {"degen_gauss": "dg-lr-test", "cond_gauss": "cg-lr-test"}
 _SCORES = {"local_score_degen_gauss": "dg-bic-score", "local_score_cond_gauss": "cg-bic-score"}
 #: An edge line of causal-cmd's text graph: ``1. x0 --> x4``.
 _EDGE = re.compile(r"^\d+\.\s+x(\d+)\s+(-->|---|<->|<--)\s+x(\d+)\s*$")
+#: The ``params`` keys of background knowledge (:func:`knowledge_of`).
+KNOWLEDGE = ("context_vars", "forbidden", "required")
 #: The driver's output lines naming the columns it read as categorical and timing the search.
 _CATEGORICAL = "Categorical columns:"
 _SEARCH_S = "Search seconds:"
@@ -147,6 +156,45 @@ def lane_categorical(x: np.ndarray, max_categories: int) -> list[str]:
     ]
 
 
+def knowledge_text(
+    d: int,
+    context_vars: Sequence[int] = (),
+    forbidden: Sequence[Sequence[int]] = (),
+    required: Sequence[Sequence[int]] = (),
+) -> str:
+    """Return Tetrad's knowledge file over ``x0..x{d-1}``.
+
+    With ``context_vars``, tier 1 holds those columns and tier 2 every other column: FCI-JCI's
+    context variables, which no system variable causes. Tetrad's tiers forbid every edge from a
+    later tier to an earlier one, so the file lists no system -> context edge; edges within a tier
+    stay allowed. ``forbidden`` and ``required`` list ``[a, b]`` pairs, each the edge ``a -> b``.
+    Raises ``ValueError`` for a column outside ``0..d-1``, a repeated context column, or context
+    that covers every column.
+    """
+    context = [int(j) for j in context_vars]
+    pairs = [(int(a), int(b)) for a, b in (*forbidden, *required)]
+    if any(not 0 <= j < d for j in context + [j for pair in pairs for j in pair]):
+        raise ValueError(f"knowledge names a column outside x0..x{d - 1}")
+    if len(set(context)) != len(context) or (context and len(context) == d):
+        raise ValueError(f"context_vars {context} must be distinct and leave a system column")
+    system = [j for j in range(d) if j not in context]
+    tiers = (
+        [f"1 {' '.join(f'x{j}' for j in context)}", f"2 {' '.join(f'x{j}' for j in system)}"]
+        if context
+        else []
+    )
+    lines = ["/knowledge", "addtemporal", *tiers, "", "forbiddirect"]
+    lines += [f"x{int(a)} x{int(b)}" for a, b in forbidden]
+    lines += ["", "requiredirect", *(f"x{int(a)} x{int(b)}" for a, b in required)]
+    return "\n".join(lines) + "\n"
+
+
+def knowledge_of(params: Mapping[str, Any], d: int) -> str | None:
+    """The knowledge file the ``params`` name (:data:`KNOWLEDGE`); ``None`` when they name none."""
+    given = {key: params.get(key) or () for key in KNOWLEDGE}
+    return knowledge_text(d, **given) if any(given.values()) else None
+
+
 def read_graph(text: str, d: int) -> np.ndarray:
     """Return the CPDAG adjacency of causal-cmd's text graph over ``x0..x{d-1}``.
 
@@ -189,6 +237,8 @@ class _TetradCmd:
     output_type: str = "cpdag"
     #: causal-cmd's ``--data-type``; only ``mixed`` declares categorical columns.
     data_type: str = "mixed"
+    #: Whether causal-cmd lists the algorithm only under ``--experimental``.
+    experimental: bool = False
     search_s: float | None = None
     warmup: int = 0
 
@@ -216,6 +266,7 @@ class _TetradCmd:
         """Write the CSV, run the driver, and return the text file it writes."""
         x = np.asarray(data, dtype=np.float64)
         d = x.shape[1]
+        knowledge = knowledge_of(params, d)
         with tempfile.TemporaryDirectory(prefix="andrey_bench_tetrad_") as tmp:
             work = Path(tmp)
             csv = work / "data.csv"
@@ -227,6 +278,8 @@ class _TetradCmd:
                 header=",".join(f"x{j}" for j in range(d)),
                 comments="",
             )
+            if knowledge is not None:
+                (work / "knowledge.txt").write_text(knowledge)
             command = [
                 _java(),
                 f"-XX:ActiveProcessorCount={_processors()}",
@@ -252,6 +305,8 @@ class _TetradCmd:
                 str(work),
                 "--prefix",
                 "fit",
+                *(["--knowledge", str(work / "knowledge.txt")] if knowledge is not None else []),
+                *(["--experimental"] if self.experimental else []),
                 *self._arguments(params),
             ]
             # causal-cmd's logger writes causal-cmd.log into the working directory.

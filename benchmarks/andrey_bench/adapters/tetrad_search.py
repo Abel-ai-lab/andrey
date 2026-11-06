@@ -1,4 +1,5 @@
-"""Tetrad's PC, FGES, BOSS, GRaSP, and FCI on continuous data, through one source-run Java driver.
+"""Tetrad's PC, FGES, BOSS, GRaSP, FCI, BOSS-FCI, and GRaSP-FCI on continuous data, through one
+source-run Java driver.
 
 Each solution's ``fit`` writes the data to a CSV file, starts ``java`` once on
 ``TetradContinuousDriver.java`` against tetrad-lib's shaded jar, and reads the graph back from the
@@ -10,6 +11,14 @@ call, with the JVM start, the in-memory compile of the driver, and the CSV round
 sees only the fit's cores (``-XX:ActiveProcessorCount``), and FGES's and BOSS's thread pools use
 all of them; PC's and FCI's skeleton search runs on the JVM's common pool, which has as many
 threads as the JVM sees processors.
+
+FCI, BOSS-FCI, and GRaSP-FCI take background knowledge from the ``params`` keys
+:data:`~andrey_bench.adapters.tetrad_cmd.KNOWLEDGE` (``context_vars`` in the first tier, then
+``forbidden`` and ``required`` edges): ``fit`` writes Tetrad's knowledge file
+(:func:`~andrey_bench.adapters.tetrad_cmd.knowledge_text`) beside the CSV, and the driver reads it
+with Tetrad's own reader before the clock. Tetrad 7.6.10's FCI steps orient by knowledge only when
+they leave out the rules for selection bias (``excludeSelectionBias``), so these solutions refuse
+knowledge without it, and :class:`TetradFCIJCI` sets it, as pcalg's FCI-JCI runs.
 
 A solution's ``params`` use Andrey's names for the settings it shares with Andrey's adapter, and
 Tetrad's setter names for the rest, each written out; :meth:`_TetradSearch.settings` maps them to
@@ -47,7 +56,14 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.bic_penalty import ANDREY_LAMBDA, SEARCH_SEED
-from andrey_bench.adapters.tetrad_cmd import _java, _processors, read_graph, read_search_s
+from andrey_bench.adapters.tetrad_cmd import (
+    KNOWLEDGE,
+    _java,
+    _processors,
+    knowledge_of,
+    read_graph,
+    read_search_s,
+)
 from andrey_bench.adapters.tetrad_gfci import read_pag
 from andrey_bench.adapters.tetrad_gin import JAR_ENV, versions
 
@@ -129,9 +145,11 @@ class _TetradSearch:
     def settings(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """The driver's settings for ``params``, which override :meth:`params` by name.
 
-        Raises ``ValueError`` for a test or a score the solution does not run.
+        The knowledge keys (:data:`~andrey_bench.adapters.tetrad_cmd.KNOWLEDGE`) are not settings;
+        :meth:`run` writes them to the knowledge file. Raises ``ValueError`` for a test or a score
+        the solution does not run.
         """
-        merged = {**self.defaults, **params}
+        merged = {**self.defaults, **{k: v for k, v in params.items() if k not in KNOWLEDGE}}
         for label, value in self.labels.items():
             if merged.pop(label) != value:
                 raise ValueError(f"{self.name} runs {label}={value!r} only")
@@ -144,11 +162,14 @@ class _TetradSearch:
             for key, value in self.settings(params).items()
             for part in (f"--{key}", _flag(value))
         ]
+        knowledge = knowledge_of(params, x.shape[1])
         with tempfile.TemporaryDirectory(prefix="andrey_bench_tetrad_") as tmp:
             work = Path(tmp)
             csv, result = work / "data.csv", work / "fit_out.txt"
             header = ",".join(f"x{j}" for j in range(x.shape[1]))
             np.savetxt(csv, x, delimiter=",", fmt="%.17g", header=header, comments="")
+            if knowledge is not None:
+                (work / "knowledge.txt").write_text(knowledge)
             command = [
                 _java(),
                 f"-XX:ActiveProcessorCount={_processors()}",
@@ -161,6 +182,7 @@ class _TetradSearch:
                 str(csv),
                 str(self.warmup),
                 str(result),
+                *(["--knowledge", str(work / "knowledge.txt")] if knowledge is not None else []),
                 *flags,
             ]
             done = subprocess.run(command, capture_output=True, text=True, cwd=work)
@@ -301,6 +323,16 @@ class TetradFCI(_TetradSearch):
         "excludeSelectionBias": False,
     }
 
+    def settings(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """The driver's settings; raises ``ValueError`` for knowledge that would orient nothing.
+
+        Tetrad 7.6.10's FCI steps orient by knowledge only with ``excludeSelectionBias``.
+        """
+        settings = super().settings(params)
+        if any(params.get(key) for key in KNOWLEDGE) and not settings["excludeSelectionBias"]:
+            raise ValueError(f"{self.name} orients by knowledge only with excludeSelectionBias")
+        return settings
+
     def read(self, text: str, d: int) -> np.ndarray:
         """The driver's PAG text as endpoint marks."""
         return read_pag(text, d)
@@ -310,3 +342,83 @@ class TetradFCI(_TetradSearch):
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class TetradFCIJCI(TetradFCI):
+    """Tetrad's FCI with ``context_vars`` in the first knowledge tier, as FCI-JCI's context.
+
+    No system variable causes a context variable, JCI assumption 1 only, and the rules for
+    selection bias are left out, as pcalg's FCI-JCI runs; Tetrad 7.6.10's FCI orients the tier's
+    edges only then. The PAG covers every column, context variables included.
+    """
+
+    name = "tetrad.fci_jci.fisherz"
+    algorithm = "fci_jci"
+    defaults = {**TetradFCI.defaults, "excludeSelectionBias": True}
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run FCI with the context tier; raises ``ValueError`` without ``context_vars``."""
+        if not params.get("context_vars"):
+            raise ValueError(f"{self.name} needs context_vars, the context variables' columns")
+        return super().fit(data, params)
+
+
+#: The settings BOSS-FCI and GRaSP-FCI share: the test, the score, and the FCI steps of Tetrad's
+#: ``StarFci``, which in 7.6.10 has no setting for possible-d-separation.
+_STAR_FCI = {
+    "alpha": _ALPHA,
+    "indep_test": "fisherz",
+    "score_func": "local_score_BIC",
+    "lambda_value": _BIC_PENALTY,
+    **_SCORE,
+    "numStarts": 1,
+    "useMaxP": False,
+    "completeRuleSetUsed": True,
+    "maxDiscriminatingPathLength": -1,
+    "guaranteePag": False,
+    "excludeSelectionBias": False,
+}
+
+
+class TetradBossFCI(TetradFCI):
+    """Tetrad's BOSS-FCI (``BossFci``) with the Fisher z test and the BIC score, without BES.
+
+    7.6.10's ``BossFci`` has no seed and no column-order setting, so BOSS starts as
+    ``PermutationSearch`` does by default.
+    """
+
+    name = "tetrad.boss_fci.bic"
+    algorithm = "boss_fci"
+    command = "bfci"
+    labels = {"indep_test": "fisherz", "score_func": "local_score_BIC"}
+    defaults = {**_STAR_FCI, "useBes": False, "depth": -1}
+
+    def settings(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """The driver's settings, with BOSS's thread pool at the fit's cores."""
+        return {**super().settings(params), "numThreads": _processors()}
+
+
+class TetradGraspFCI(TetradFCI):
+    """Tetrad's GRaSP-FCI (``GraspFci``) with the Fisher z test and the BIC score.
+
+    GRaSP runs one start from the data's column order, its stages in order (``ordered``), as
+    Tetrad's algorithm interface runs it by default. ``GraspFci.setDepth`` sets GRaSP's tuck depth
+    and the cap on the FCI steps' separating sets alike, and that interface sets it from ``depth``,
+    -1 by default, so neither is capped.
+    """
+
+    name = "tetrad.grasp_fci.bic"
+    algorithm = "grasp_fci"
+    command = "grasp-fci"
+    labels = {"indep_test": "fisherz", "score_func": "local_score_BIC"}
+    defaults = {
+        **_STAR_FCI,
+        "depth": -1,
+        "seed": SEARCH_SEED,
+        "singularDepth": 1,
+        "nonSingularDepth": 1,
+        "ordered": True,
+        "useScore": True,
+        "useRaskuttiUhler": False,
+        "useDataOrder": True,
+    }

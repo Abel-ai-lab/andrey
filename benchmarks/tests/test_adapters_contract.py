@@ -21,11 +21,13 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure
+from andrey_bench.adapters import tetrad_pag
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
 from andrey_bench.adapters.andrey_calm import AndreyCALM
 from andrey_bench.adapters.andrey_direct_lingam import andrey_direct_lingam_adapters
 from andrey_bench.adapters.andrey_exact_search import AndreyExactSearch
 from andrey_bench.adapters.andrey_fci import AndreyFCI
+from andrey_bench.adapters.andrey_fci_jci import AndreyFCIJCI
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
 from andrey_bench.adapters.andrey_gfci import AndreyGFCI
 from andrey_bench.adapters.andrey_gies import AndreyGIES
@@ -50,6 +52,7 @@ from andrey_bench.adapters.causal_learn_ica_lingam import CausalLearnICALiNGAM
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
 from andrey_bench.adapters.lingam_direct import LingamDirect
 from andrey_bench.adapters.pcalg_fci import PcalgFCI
+from andrey_bench.adapters.pcalg_fci_jci import PcalgFCIJCI
 from andrey_bench.adapters.pcalg_ges import PcalgGES
 from andrey_bench.adapters.pcalg_gies import PcalgGIES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
@@ -66,6 +69,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyPC(),
     *[AndreyPC(test) for test in ("kci", "rcot", "cmiknn", "gpdc")],
     AndreyFCI(),
+    AndreyFCIJCI(),
     AndreyFCI("majority"),
     AndreyGFCI(),
     AndreyGFCI("parallel"),
@@ -95,8 +99,13 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     PcalgGIES(),
     PcalgPC(),
     PcalgFCI(),
+    PcalgFCIJCI(),
     PcalgRFCI(),
     TetradGFCI(),
+    tetrad_pag.TetradCmdFCI(),
+    tetrad_pag.TetradCmdFCIJCI(),
+    tetrad_pag.TetradBFCI(),
+    tetrad_pag.TetradCmdGraspFCI(),
     BnlearnHC(),
     BnlearnTabu(),
     BnlearnPCStable(),
@@ -157,6 +166,7 @@ DEFERRED_MODULES = {
     "andrey.pc.gpdc.numpy": "andrey.core.ci_gpdc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
+    "andrey.fci_jci.numpy": "andrey.constraint.fci_jci",
     "andrey.gfci.numpy": "andrey.search.gfci",
     "andrey.gfci.numpy.parallel": "andrey.search.gfci",
     "andrey.calm.torch-cpu": "andrey.search.calm",
