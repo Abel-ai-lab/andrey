@@ -397,15 +397,6 @@ def _given(knowledge: object) -> bool:
     return bool(knowledge.parts())
 
 
-def _check_parts(knowledge: Knowledge, method: str, honors: Sequence[KnowledgePart]) -> None:
-    """Raise ``NotImplementedError`` when ``knowledge`` sets a part not in ``honors``."""
-    unsupported = [part for part in knowledge.parts() if part not in honors]
-    if unsupported:
-        raise NotImplementedError(
-            f"{method} does not honor the knowledge part(s) {unsupported}; it honors {list(honors)}"
-        )
-
-
 def _columns(
     d: int, labels: Sequence[str] | None
 ) -> tuple[Callable[[Node, str], int], Callable[[int], str]]:
@@ -460,18 +451,15 @@ def resolve(
     labels: Sequence[str] | None,
     *,
     method: str,
-    honors: Sequence[KnowledgePart] = KNOWLEDGE_PARTS,
 ) -> Constraints | None:
     """Resolve ``knowledge`` against ``d`` columns named ``labels``; ``None`` when it sets nothing.
 
-    ``method`` names the caller in messages; ``honors`` lists the parts it supports, and a part it
-    does not list raises ``NotImplementedError``. Raises ``TypeError`` when ``knowledge`` is not a
+    ``method`` names the caller in messages. Raises ``TypeError`` when ``knowledge`` is not a
     :class:`Knowledge`, and :class:`KnowledgeError` when it names a missing column or contradicts
     itself.
     """
     if knowledge is None or not _given(knowledge):
         return None
-    _check_parts(knowledge, method, honors)
     lagged = [edge for edge in (*knowledge.required, *knowledge.forbidden) if len(edge) == 3]
     if lagged:
         raise NotImplementedError(
@@ -543,20 +531,18 @@ def resolve_lagged(
     *,
     method: str,
     contemporaneous: bool = True,
-    honors: Sequence[KnowledgePart] = KNOWLEDGE_PARTS,
 ) -> LaggedConstraints | None:
     """Resolve ``knowledge`` against ``d`` series named ``labels`` and lags ``0`` to ``tau_max``.
 
     Returns ``None`` when it sets nothing. An edge without a lag is forbidden at every lag; a
     forbidden link beyond ``tau_max`` constrains nothing the method learns and is dropped. A
     required link needs its lag, at most ``tau_max``, and above ``0`` when ``contemporaneous`` is
-    false (a method that learns no lag-0 links). ``method`` and ``honors`` act as for
-    :func:`resolve`. Raises :class:`KnowledgeError` when the knowledge names a missing column,
-    contradicts itself, or requires a link the method does not learn.
+    false (a method that learns no lag-0 links). ``method`` acts as for :func:`resolve`. Raises
+    :class:`KnowledgeError` when the knowledge names a missing column, contradicts itself, or
+    requires a link the method does not learn.
     """
     if knowledge is None or not _given(knowledge):
         return None
-    _check_parts(knowledge, method, honors)
     position, label = _columns(d, labels)
     lags = tau_max + 1
     forbidden = np.zeros((lags, d, d), dtype=bool)

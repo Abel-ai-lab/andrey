@@ -451,33 +451,7 @@ class BootstrapOutput:
 
     def __repr__(self) -> str:
         """Return the averaged graph and the most frequent edges."""
-        return "\n".join(self._summary())
-
-    def _summary(
-        self, *, name: str | None = None, limit: int | None = 10, more: str = ""
-    ) -> list[str]:
-        """Build the result summary as lines for ``repr`` and ``andrey bootstrap``.
-
-        ``name`` defaults to ``metadata["method"]``. ``limit`` caps the listed edges, and ``more``
-        extends the omitted-edge count.
-        """
-        method = self._metadata.get("method")
-        name = name if name is not None else (str(method) if method else "bootstrap")
-        head = (
-            f"{name}  |  {self._n_resamples} fits  |  averaged graph at threshold {self._threshold}"
-        )
-        lines = [head, "", *self._structure._summary()]
-        rows = self.table()
-        if rows:
-            lines += ["", "  most frequent edges:"]
-        shown = rows if limit is None else rows[:limit]
-        for row in shown:
-            lag = f"lag {row['lag']}  " if "lag" in row else ""
-            edge = f"{row['source']} {EDGE_GLYPHS[row['type']]} {row['target']}"
-            lines.append(f"    {lag}{edge}  {row['frequency']:.2f}")
-        if len(shown) < len(rows):
-            lines.append(f"    ... and {len(rows) - len(shown)} more{more}")
-        return lines
+        return "\n".join(bootstrap_summary_lines(self))
 
     # ---- internals ------------------------------------------------------------------------
 
@@ -492,6 +466,31 @@ class BootstrapOutput:
         if lag is None or lag not in self._lags:
             raise ValueError(f"lag must be one of {self._lags}, got {lag!r}")
         return self._lags.index(lag)
+
+
+def bootstrap_summary_lines(
+    out: BootstrapOutput, *, name: str | None = None, limit: int | None = 10, more: str = ""
+) -> list[str]:
+    """Return the bootstrap's summary as lines, for ``repr`` and ``andrey bootstrap``.
+
+    ``name`` defaults to ``metadata["method"]``. ``limit`` caps the listed edges, and ``more`` ends
+    the line that counts the others.
+    """
+    method = out._metadata.get("method")
+    name = name if name is not None else (str(method) if method else "bootstrap")
+    head = f"{name}  |  {out._n_resamples} fits  |  averaged graph at threshold {out._threshold}"
+    lines = [head, "", *out._structure._summary()]
+    rows = out.table()
+    if rows:
+        lines += ["", "  most frequent edges:"]
+    shown = rows if limit is None else rows[:limit]
+    for row in shown:
+        lag = f"lag {row['lag']}  " if "lag" in row else ""
+        edge = f"{row['source']} {EDGE_GLYPHS[row['type']]} {row['target']}"
+        lines.append(f"    {lag}{edge}  {row['frequency']:.2f}")
+    if len(shown) < len(rows):
+        lines.append(f"    ... and {len(rows) - len(shown)} more{more}")
+    return lines
 
 
 # ---- counting -----------------------------------------------------------------------------------
