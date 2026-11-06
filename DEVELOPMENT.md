@@ -163,8 +163,10 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    `metadata["seed"]`, so the facade holds only the method's own logic. A facade with a test or a
    score reads its data, column labels, and knowledge with `fit_inputs` in
    `src/andrey/api/_adapt.py`, and PCMCI, PCMCI+, and LPCMCI with `series_inputs`; one that checks
-   another setting between those steps, as `tabu` checks `max_tabu` and `igsp` its environments,
-   calls the steps itself in that order.
+   another setting between those steps, as `igsp` checks its environments, calls the steps itself
+   in that order. A score search that takes an optional `env`, the environment index as a variable
+   no data variable causes, runs through `cpdag_search` there, and a score search followed by FCI's
+   tests and rules through `fci_hybrid` in `src/andrey/api/constraint.py`.
    Open the docstring's Notes with a **When to use.** paragraph, as the
    [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
    paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and

@@ -1528,9 +1528,11 @@ def hc(
     ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
     environments a shift that does not follow the labels' values, such as one in the middle
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
-    result. ``max_parents`` counts the index as a parent of each variable it points into. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    result. ``max_parents`` counts the index as a parent of each variable it points into. One climb
+    can direct a chain against the index and keep an edge from the index to each variable on it,
+    which no single move removes; ``n_starts`` above 1 can leave such a DAG, and
+    :func:`~andrey.tabu` takes the moves that do. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
