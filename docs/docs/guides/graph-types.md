@@ -185,16 +185,16 @@ edges, each `env -> variable`, are in `metadata["index_edges"]`, and
 module, the distribution given their causes, changes across the environments; their descendants
 change through them and are not listed.
 
-With `env`, `boss` and `grasp` return the same kind of graph: kind `cpdag`, partially directed by
-the index, with the same `index_edges` and `changing_variables`.
+With `env`, `ges`, `hc`, `tabu`, `boss`, and `grasp` return the same kind of graph: kind `cpdag`,
+partially directed by the index, with the same `index_edges` and `changing_variables`.
 
 `fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
 `metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for
 `index -> variable`, `"partially_directed"` for `index o-> variable`, and `"bidirected"` for
-`index <-> variable`. A variable keeps an edge to the index when its distribution changes across
-the environments and no other variable explains the change; under hidden common causes that does
-not make it a target of the change, so `fci_jci` lists no `changing_variables`. With `env`,
-`boss_fci` and `grasp_fci` return their PAG and `index_edges` the same way.
+`index <-> variable`. A variable keeps an edge to the index when its distribution changes across the
+environments and no other variable explains the change; under hidden common causes that does not
+make it a target of the change, so `fci_jci` lists no `changing_variables`. With `env`, `gfci`,
+`boss_fci`, and `grasp_fci` return their PAG and `index_edges` the same way.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.

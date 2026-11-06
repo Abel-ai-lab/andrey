@@ -79,6 +79,7 @@ def ges(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
+    sources: tuple[int, ...] = (),
     _parent_rule: str = "cap",
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -130,7 +131,12 @@ def ges(
         result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
-        ``andrey.config.n_jobs``.
+        ``andrey.config.n_jobs``. With ``sources``, every pass runs in this process.
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: no Insert adds an edge
+        into one, and after every move the edges at them are directed out of them, with Meek's
+        rules orienting what follows (:func:`~andrey.search._parallel_ges.out_of`), so the search
+        moves over partially directed graphs. Empty, the default, leaves every variable free.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
@@ -140,7 +146,8 @@ def ges(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and its total score.
+        The CPDAG (``kind="cpdag"``) and its total score; with ``sources``, the partially directed
+        graph that also directs their edges.
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
@@ -173,6 +180,7 @@ def ges(
             ranks=ranks,
             constraints=constraints,
             cap=cap,
+            sources=sources,
         )
         total = recompute_objective(adj, score, n)
     if constraints is not None:

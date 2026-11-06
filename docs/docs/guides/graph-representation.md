@@ -98,13 +98,13 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   PCMCI+ and LPCMCI, which also reports every link with all its marks as `links`, plus `p_values`,
   `statistics`, and its preliminary `parents`. An order that is not a total order of the variables
   has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in a list,
-  and GIN's `cluster_order` orders its latent clusters. CD-NOD and GnIES, and BOSS and GRaSP with
-  `env`, list the variables whose mechanism changes across the environments as
-  `changing_variables`, and all but GnIES also the environment index's edges into them as
-  `index_edges`, `[variable, "directed"]` pairs. FCI-JCI, and BOSS-FCI and GRaSP-FCI with `env`,
-  list the index's neighbors as `index_edges`, `[variable, kind]` pairs with `kind` `"directed"`,
-  `"partially_directed"`, or `"bidirected"`, and no `changing_variables`; UT-IGSP reports the
-  targets it learns for each environment as `targets`.
+  and GIN's `cluster_order` orders its latent clusters. CD-NOD and GnIES, and GES, hill climbing,
+  Tabu search, BOSS, and GRaSP with `env`, list the variables whose mechanism changes across the
+  environments as `changing_variables`, and all but GnIES also the environment index's edges into
+  them as `index_edges`, `[variable, "directed"]` pairs. FCI-JCI, and GFCI, BOSS-FCI, and
+  GRaSP-FCI with `env`, list the index's neighbors as `index_edges`, `[variable, kind]` pairs with
+  `kind` `"directed"`, `"partially_directed"`, or `"bidirected"`, and no `changing_variables`;
+  UT-IGSP reports the targets it learns for each environment as `targets`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results

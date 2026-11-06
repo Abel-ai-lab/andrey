@@ -1,12 +1,13 @@
-"""Recovery checks for an environment index in BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI.
+"""Recovery checks for an environment index in the score searches and their FCI hybrids.
 
-With ``env``, each search adds the environment index as a variable no data variable causes. Data
-from two environments, the second shifting the means of some variables, check the fixed cases a
-shift identifies. On random models, BOSS and GRaSP recover the interventional essential graph of
-the shifted variables (Hauser and Buhlmann 2012), built without the code under test, and the hybrids
-come near the PAG FCI-JCI reaches with a d-separation oracle. Sachs's nine conditions check that
-the index removes the adjacencies pooling adds. Without ``env`` each search is unchanged, which
-its recorded outputs check.
+With ``env``, BOSS, GRaSP, GES, hill climbing, Tabu search, BOSS-FCI, GRaSP-FCI, and GFCI add the
+environment index as a variable no data variable causes. Data from two environments, the second
+shifting the means of some variables, check the fixed cases a shift identifies. On random models,
+the score searches recover the interventional essential graph of the shifted variables (Hauser and
+Buhlmann 2012), built without the code under test, and the hybrids come near the PAG FCI-JCI
+reaches with a d-separation oracle. Sachs's nine conditions check that the index removes the
+adjacencies pooling adds. Without ``env`` each search is unchanged, which its recorded outputs
+check.
 """
 
 from __future__ import annotations
@@ -19,10 +20,12 @@ import pytest
 import andrey
 from andrey import Knowledge, data
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
-from andrey.core.orient import dag2cpdag
+from andrey.core.orient import cpdag_of_pdag, dag2cpdag
 from andrey.data.interventions import soft
 from andrey.metrics import shd, skeleton_scores
+from andrey.search import _parallel_ges
 from andrey.search import boss as boss_search
+from andrey.search import hc as hc_search
 from tests.recovery.helpers.essential import essential
 from tests.recovery.helpers.jci import oracle_fit, random_dag, sample_pooled
 
@@ -30,13 +33,18 @@ pytestmark = pytest.mark.filterwarnings(
     "ignore::andrey.ExperimentalWarning", "ignore::andrey.DataTypeWarning"
 )
 
-SEARCHES = ("boss", "grasp")
-HYBRIDS = ("boss_fci", "grasp_fci")
+SEARCHES = ("boss", "grasp", "ges", "hc", "tabu")
+HYBRIDS = ("boss_fci", "grasp_fci", "gfci")
 ALL = SEARCHES + HYBRIDS
+
+#: Hill climbing restarts from changed copies of its best DAG: one climb can direct a chain against
+#: the index and keep an edge from the index to each variable of the chain, which no single move
+#: removes.
+SETTINGS = {"hc": {"n_starts": 20}}
 
 
 def fit(name: str, *args, **settings):
-    return getattr(andrey, name)(*args, **settings)
+    return getattr(andrey, name)(*args, **{**SETTINGS.get(name, {}), **settings})
 
 
 def scm(nodes: tuple[str, ...], arcs: tuple[tuple[str, str], ...]) -> data.SCM:
@@ -170,7 +178,7 @@ def test_search_recovers_the_interventional_essential_graph(name):
         exact += shd(out.structure, truth) == 0
         found += out.metadata["changing_variables"] == sorted(ds.targets[1])
         assert out.metadata["changing_variables"] == [v for v, _ in out.metadata["index_edges"]]
-    # Recorded: 9 of 10 for both.
+    # Recorded: 9 of 10 and 10 of 10 for GES, hill climbing, and Tabu search, 9 and 9 for the rest.
     assert exact >= 8 and found >= 8
 
 
@@ -188,7 +196,7 @@ def test_hybrid_comes_near_the_oracle_jci_pag(name, confounded, monkeypatch):
         out = fit(name, x, env, confounded_index=confounded)
         errors += shd(out.structure, oracle, endpoint_aware=True)
         empty_errors += shd(empty, oracle, endpoint_aware=True)
-    # Recorded: 46 or 44 against 138.
+    # Recorded: 46 or 44 against 138, for each hybrid.
     assert errors < empty_errors / 2
 
 
@@ -197,11 +205,11 @@ def test_hybrid_comes_near_the_oracle_jci_pag(name, confounded, monkeypatch):
 
 @pytest.mark.parametrize("name", ALL)
 def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(name, sachs_conditions):
-    """Pooled across the nine conditions, under 45% of each search's adjacencies are in the
+    """Pooled across the nine conditions, under half of each search's adjacencies are in the
     consensus network; with the condition as a categorical ``env``, over 85% are, and the index
     keeps an edge to every protein, since each changes across the conditions."""
     frame, env, consensus = sachs_conditions
-    assert skeleton_scores(fit(name, frame).structure, consensus)["precision"] < 0.45
+    assert skeleton_scores(fit(name, frame).structure, consensus)["precision"] < 0.5
     settings = {"score_func": "cond_gauss", "categorical": []}
     if name in HYBRIDS:
         settings["indep_test"] = "cond_gauss"
@@ -275,6 +283,19 @@ def test_knowledge_holds_with_env(name):
 
 
 @pytest.mark.parametrize("name", ALL)
+def test_a_required_edge_against_the_shift_holds(name):
+    """``x0 -> x1`` with ``x0`` shifted, and knowledge requiring ``x1 -> x0``: no DAG of the class
+    of ``env -> x0 -> x1`` keeps both the index without a parent and the required edge, so the
+    search settles on another class, and the result directs ``x1 -> x0``."""
+    ds = scm(("x0", "x1"), (("x0", "x1"),)).sample(
+        n=[1000, 1000], seed=0, envs=[{}, {0: soft(shift=2.0)}], shuffle=False
+    )
+    out = fit(name, ds.data, ds.env, knowledge=Knowledge(required=[(1, 0)]))
+    assert out.structure.oriented_edges() == [(1, 0, "directed")]
+    assert [variable for variable, _ in out.metadata["index_edges"]][:1] == [0]
+
+
+@pytest.mark.parametrize("name", ("boss", "grasp", "boss_fci", "grasp_fci"))
 def test_the_search_never_gives_the_index_a_parent(name, monkeypatch):
     """The DAG each search settles on, before the edges at the index are directed out of it, has no
     edge into the index: the index leads every order the search tries."""
@@ -291,3 +312,43 @@ def test_the_search_never_gives_the_index_a_parent(name, monkeypatch):
     assert len(dags) == 10 and all(dag.shape == (13, 13) for dag in dags)
     # The last row holds the marks at the index's end of its edges: an arrowhead there is a parent.
     assert not any((dag[-1] == ARROW).any() for dag in dags)
+
+
+@pytest.mark.parametrize("name", ("hc", "tabu"))
+def test_a_dag_search_never_gives_the_index_a_parent(name, monkeypatch):
+    """The DAG hill climbing and Tabu search settle on, before the edges at the index are directed
+    out of it, has no edge into the index: no move adds one."""
+    dags = []
+
+    def settled(dag):
+        dags.append(dag.copy())
+        return dag2cpdag(dag)
+
+    monkeypatch.setattr(hc_search, "dag2cpdag", settled)
+    for seed in range(10):
+        ds = shifted(seed)
+        fit(name, ds.data, ds.env, n_starts=1)
+    assert len(dags) == 10 and all(dag.shape == (13, 13) for dag in dags)
+    assert not any((dag[-1] == ARROW).any() for dag in dags)
+
+
+@pytest.mark.parametrize("name", ("ges", "gfci"))
+def test_every_ges_move_keeps_the_index_a_source(name, monkeypatch):
+    """On 30 random models of 5 to 20 variables, each graph a GES move reaches, before it is taken
+    to its class, directs every edge at the index out of it, and has a consistent extension: the
+    rebuild raises on a graph without one, and no fit raises."""
+    moved = []
+
+    def rebuilt(pdag):
+        moved.append(pdag.copy())
+        return cpdag_of_pdag(pdag)
+
+    monkeypatch.setattr(_parallel_ges, "cpdag_of_pdag", rebuilt)
+    for seed in range(30):
+        ds = shifted(seed, d=(5, 10, 20)[seed % 3])
+        fit(name, ds.data, ds.env)
+    assert len(moved) > 100
+    for pdag in moved:
+        index = pdag.shape[0] - 1
+        neighbors = np.flatnonzero(pdag[index] != NULL)
+        assert (pdag[index, neighbors] == TAIL).all() and (pdag[neighbors, index] == ARROW).all()

@@ -24,7 +24,10 @@ from andrey.api._adapt import (
     data_kind,
     env_index,
     fit_inputs,
+    index_column,
+    index_namer,
     label_of,
+    split_index,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -738,9 +741,76 @@ def fci(
     return structure_output(pag, labels=labels, metadata=metadata)
 
 
+def fci_hybrid(
+    name: str,
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | None,
+    *,
+    score_func: str | None,
+    indep_test: str | None,
+    categorical: Sequence[str | int] | None,
+    collider_rule: str,
+    possible_dsep: str | None,
+    knowledge: Knowledge | None,
+    **settings: object,
+) -> StructureOutput:
+    """Run ``name``, ``"gfci"``, ``"boss_fci"``, or ``"grasp_fci"``, a search and FCI's rules.
+
+    The score and the test must read the data alike (:func:`~andrey.api._adapt.check_same_data`);
+    ``settings`` reach the engine of the same name in :mod:`andrey.search.gfci`. With ``env``, the
+    environment index joins the data as a last column, the engine's ``context``, and leaves the PAG
+    again: its edges go in ``metadata``.
+    """
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+    from andrey.search import gfci as engines
+
+    assert score_func is not None and indep_test is not None  # method_spec picks them
+    # Both phases read the same data, so the score and the test must agree on its type.
+    check_same_data(name, score_func, indep_test)
+    data, index = env_index(data, env, method=name)
+    X, mask, labels, constraints = fit_inputs(
+        data,
+        "indep_test",
+        indep_test,
+        categorical,
+        knowledge,
+        method=name,
+        # One environment adds no index column (index_column), so it is not a categorical one.
+        index_categorical=index is not None and np.ptp(index) > 0,
+    )
+    augmented, augmented_mask, augmented_constraints, column = index_column(
+        X, mask, constraints, index, "indep_test", indep_test
+    )
+    ambiguous: set[tuple[int, int, int]] = set()
+    with copies_named(labels, index_namer(labels, column)):
+        pag = getattr(engines, name)(
+            augmented,
+            score_func=score_func,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=augmented_mask,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            constraints=augmented_constraints,
+            in_column_order=resolve_in_column_order(),
+            context=column,
+            _ambiguous=ambiguous,
+            **settings,
+        )
+    pag, index_edges = split_index(pag, column)
+    metadata = {
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    if env is not None:
+        variable = label_of(labels)
+        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
+    return structure_output(pag, labels=labels, metadata=metadata)
+
+
 @method_spec("gfci")
 def gfci(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -751,6 +821,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     possible_dsep: str | None = None,
+    confounded_index: bool = True,
     seed: int | None = None,
     max_depth: int | None = None,
     max_parents: int | None = None,
@@ -765,9 +836,23 @@ def gfci(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
+        can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name of
+        a column of the DataFrame ``data`` that holds them. The environment index then joins the
+        search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -833,6 +918,11 @@ def gfci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    confounded_index : bool, default=True
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as for
+        :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
+        randomized experiment, so every edge the index keeps points out of it. Without ``env``, it
+        has no effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -849,15 +939,17 @@ def gfci(
         A cap on every node's parents in the GES phase, at least ``0``: no DAG the GES CPDAG
         represents gives a node more than ``max_parents`` parents, as :func:`~andrey.ges` applies
         it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node of the
-        PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
-        orientation rules put at a node. ``None`` sets no cap; the GES phase then keeps its gate of
-        ``n_variables / 2``.
+        PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the orientation
+        rules put at a node. ``None`` sets no cap; the GES phase then keeps its gate of
+        ``n_variables / 2``. With ``env``, the index counts as a parent in the GES phase of each
+        variable it points into.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
         :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
         removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
-        arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
+        arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``. With
+        ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -869,7 +961,12 @@ def gfci(
         position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
         ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
         ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in ascending
-        order. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        order; with ``env``, the index, in a triple through it, is numbered ``n_variables``. With
+        ``env``, the PAG is over the data variables, and ``metadata["index_edges"]`` lists the
+        index's edges as ``[variable, kind]`` pairs, by name or 0-based position, in column order:
+        ``"directed"`` for ``index -> variable``, ``"partially_directed"`` for
+        ``index o-> variable``, and ``"bidirected"`` for ``index <-> variable``; it is empty for a
+        single environment. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
         under their parameter names.
@@ -890,7 +987,9 @@ def gfci(
         than columns, is a linear function of other columns. One message names every group of copies
         and says to keep one column per group. Also if a given ``max_parents`` is below the parents
         some graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
+        ``env`` does not hold one label per row, misses a label, or mixes strings and numbers, or,
+        with a categorical or mixed-data setting, holds a number that is not whole.
 
     Warns
     -----
@@ -914,10 +1013,11 @@ def gfci(
     search rather than a complete graph, which shrinks the candidate edges, but its
     possible-d-separation round of tests is exponential in the worst case and can make it much
     slower than GES, while its authors report more accurate adjacencies and endpoints than FCI's on
-    simulated data [1]_. It returns a PAG, whose circle marks (``o``) are the endpoints the data
-    cannot determine and whose bidirected edges (``<->``) mark probable latent common causes. When
-    every common cause is measured, use :func:`~andrey.ges`, whose CPDAG the first phase of GFCI
-    already computes.
+    simulated data [1]_. With ``env``, it takes rows pooled from several environments, as
+    :func:`~andrey.fci_jci` does. It returns a PAG, whose circle marks (``o``) are the endpoints the
+    data cannot determine and whose bidirected edges (``<->``) mark probable latent common causes.
+    When every common cause is measured, use :func:`~andrey.ges`, whose CPDAG the first phase of
+    GFCI already computes.
 
     GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
     from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` at the
@@ -965,6 +1065,18 @@ def gfci(
     mean errors stayed below the empty graph's in each of the 65 settings, where the standard BIC's
     exceeded it in 16. Pass ``ebic_gamma=1.0`` to use the extended BIC.
 
+    **Several environments.** With ``env``, GFCI runs as :func:`~andrey.fci_jci` runs FCI [7]_: the
+    environment index joins the data as a last variable that no move of the GES phase gives a
+    parent, as for :func:`~andrey.ges` with ``env``, and before each collider pass every edge the
+    index keeps gets an arrowhead at its data variable, because no data variable causes the index,
+    and, with ``confounded_index=False``, a tail at the index. Joint Causal Inference assumes no
+    selection bias, so the rules leave out R5-R7. The index removes the edges that pooling adds and
+    can orient more, and it is dropped from the PAG; a variable keeps an edge to it when its
+    distribution changes across the environments and no other variable explains the change.
+    ``"bic"`` and ``"fisherz"`` read the index as a number, and the categorical and mixed-data
+    settings each label as a category, as for :func:`~andrey.fci_jci`. The GES phase then runs in
+    this process.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its GES phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
     one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
@@ -1000,8 +1112,13 @@ def gfci(
     variance of at most ``1e-12`` times its variance. Rule R5 has the search bound described under
     :func:`~andrey.fci`. With the mixed-data score and test, it is experimental and not benchmarked
     yet; its tests run it on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and
-    ``"majority"`` are not benchmarked yet; their tests run them on up to 8 variables. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    ``"majority"`` are not benchmarked yet; their tests run them on up to 8 variables. With ``env``,
+    GFCI is experimental and not benchmarked yet; its tests run it on up to 12 measured variables
+    and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466
+    cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric
+    ``env`` as a number, so with three or more environments a shift that does not follow the labels'
+    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -1019,6 +1136,8 @@ def gfci(
        causal inference. UAI, 401-408.
     .. [6] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [7] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
 
     Examples
     --------
@@ -1030,40 +1149,25 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
-    from andrey.search.gfci import gfci as _gfci
-
-    assert score_func is not None and indep_test is not None  # method_spec picks them
-    # Both phases read the same data, so the score and the test must agree on its type.
-    check_same_data("gfci", score_func, indep_test)
-    X, mask, labels, constraints = fit_inputs(
-        data, "indep_test", indep_test, categorical, knowledge, method="gfci"
+    return fci_hybrid(
+        "gfci",
+        data,
+        env,
+        score_func=score_func,
+        indep_test=indep_test,
+        categorical=categorical,
+        collider_rule=collider_rule,
+        possible_dsep=possible_dsep,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        alpha=alpha,
+        max_depth=max_depth,
+        max_parents=max_parents,
+        seed=seed,
+        confounded_index=confounded_index,
     )
-    ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels):
-        pag = _gfci(
-            X,
-            score_func=score_func,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            alpha=alpha,
-            indep_test=indep_test,
-            collider_rule=collider_rule,
-            categorical=mask,
-            possible_dsep=resolve_possible_dsep(possible_dsep),
-            max_depth=max_depth,
-            max_parents=max_parents,
-            constraints=constraints,
-            in_column_order=resolve_in_column_order(),
-            seed=seed,
-            _ambiguous=ambiguous,
-        )
-    metadata = {
-        **categorical_metadata(mask, data),
-        **_ambiguous_metadata(collider_rule, ambiguous),
-    }
-    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 @method_spec("cdnod")
