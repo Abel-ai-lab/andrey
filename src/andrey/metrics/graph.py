@@ -160,7 +160,7 @@ def skeleton_scores(estimated: object, true: object) -> dict[str, float]:
     """Return the precision, recall, and F1 of the estimated skeleton against the true one.
 
     The skeleton is the set of adjacent pairs, whatever their marks. When either graph is a
-    ``digraph``, its self-loops count as well.
+    ``digraph`` and neither is ``undirected``, self-loops count as well.
 
     Parameters
     ----------

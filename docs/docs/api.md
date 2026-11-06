@@ -319,11 +319,11 @@ with another score, named or picked by `None`, raises a `ValueError`;
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the Limits section of every [release card](benchmarks.md), and each method's
-**Limitations.** paragraph, show where a method scores worse than the empty graph or about as well,
-as hill climbing and tabu search do from 50 variables with ten rows per variable, and GES does at
-200 variables with ten rows per variable. The score-based rows of the cards before 0.11.0 use the
-standard BIC, `ebic_gamma=0.0`.
+workload: the limits on every [release card](benchmarks.md), and each method's **Limitations.**
+paragraph, show where a method scores worse than the empty graph or about as well. On the cards
+before 0.11.0, which score with the standard BIC (`ebic_gamma=0.0`), hill climbing and tabu search
+do so from 50 variables with ten rows per variable, and GES at 200 variables with ten rows per
+variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -402,15 +402,16 @@ RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMP
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
 
-FCI, GFCI, BOSS-FCI, and GRaSP-FCI use uncovered paths for their R5, R9, and R10 tail orientations:
-nodes two steps apart on each path must be non-adjacent. R5 considers every circle path, up to a
-fixed search bound. R8 checks each pair of endpoints in both orders, and the rules run in rounds,
-each setting together the marks every rule implies on the graph as it stands and leaving a circle
-where two of them disagree, so neither depends on the node labels. The same rules determine the
-oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`. Their possible-d-separation step
-visits the pairs and nodes by a rank computed from the data, so with `possible_dsep="order_free"`,
-the default, their result does not depend on the column order unless two columns are identical;
-`"fast"` visits them in column order and is the default under `andrey.config(tie_break="position")`.
+FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
+orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
+path, up to a fixed search bound. R8 checks each pair of endpoints in both orders, and the rules run
+in rounds, each setting together the marks every rule implies on the graph as it stands and leaving
+a circle where two of them disagree, so neither depends on the node labels. The same rules determine
+the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`. Their possible-d-separation
+step visits the pairs and nodes by a rank computed from the data, so with
+`possible_dsep="order_free"`, the default, their result does not depend on the column order unless
+two columns are identical; `"fast"` visits them in column order and is the default under
+`andrey.config(tie_break="position")`.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,

@@ -35,7 +35,7 @@ def direction_accuracy(pred: object, truth: object, *, weights: object | None = 
     -------
     float
         The weighted share of the decided pairs whose direction matches, or 0.0 when no pair is
-        decided.
+        decided or the decided pairs' weights sum to 0.
 
     Examples
     --------
@@ -68,8 +68,8 @@ def decision_rate(pred: object, *, weights: object | None = None) -> float:
     Returns
     -------
     float
-        The weighted share of the decided pairs: 1.0 when every pair is decided, and 0.0 when the
-        weights sum to 0.
+        The weighted share of all pairs that are decided: 1.0 when every pair is decided, and 0.0
+        when the weights sum to 0.
 
     Examples
     --------

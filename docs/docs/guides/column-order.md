@@ -26,14 +26,14 @@ By default, each column gets a rank computed from the data: a hash of how the co
 the others, through the rank correlations of continuous columns and through which rows share a
 category in categorical ones. A tie goes to the candidate whose columns rank first. The rank stays
 the same when you shuffle the rows, change a column's units, or flip its sign, and it moves with
-its column, so reordering the columns relabels the result and changes nothing else. The rank is
-arbitrary with respect to the causal structure.
+its column, so reordering the columns relabels the result and changes nothing else. In rare cases a
+change of units rounds two values of a column to one, which changes its rank. The rank is arbitrary
+with respect to the causal structure.
 
 Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
 column in the other sign, or two columns whose rows also appear with the two swapped. These rank by
 their values in row order instead, so for them a row shuffle can change which ranks first, while
-reordering the columns still relabels the result. In rare cases a change of units rounds two
-values of a column to one, which changes its rank.
+reordering the columns still relabels the result.
 
 Scores are compared at a fixed precision, so candidates whose scores differ only in their last
 bits count as tied and go to the rank.

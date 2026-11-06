@@ -63,8 +63,9 @@ def temporal_scores(estimated: object, true: object) -> dict[str, object]:
         ``"per_lag"`` maps each scored lag to its ``"precision"``, ``"recall"``, ``"f1"``, and
         ``"shd"``, the Hamming distance of the directed edges, where a reversal costs 2. Lag 0 is
         scored when the estimate carries it, and its scores are also ``"contemporaneous"``.
-        ``"lagged"`` scores the edges of every lag from 1 together, and ``"summary"`` gives the
-        precision, recall, and F1 of the graph that merges every scored lag, self-loops left out.
+        ``"lagged"``, present when either structure has a lag from 1, scores the edges of every
+        such lag together, and ``"summary"`` gives the precision, recall, and F1 of the graph that
+        merges every scored lag, self-loops left out.
         ``"coefficient_mae_per_lag"`` maps each scored lag that both structures carry to its
         weight error, when both carry lag weights.
 

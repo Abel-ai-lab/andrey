@@ -437,7 +437,7 @@ def _facts() -> list[str]:
     ]
 
 
-# Each method's name in prose. A method missing here stops the build.
+# Each method's name in prose. A method missing here, or a name no method has, stops the build.
 PROSE_NAMES = {
     "pc": "PC",
     "fci": "FCI",
@@ -504,7 +504,9 @@ METHOD_LISTS = {
 
 
 def _listed(items: list[str]) -> str:
-    """``a``, ``a and b``, or ``a, b, and c``."""
+    """``a``, ``a and b``, or ``a, b, and c``; an empty list stops the build."""
+    if not items:
+        raise ConfigError("a method list selects no method")
     if len(items) < 3:
         return " and ".join(items)
     return ", ".join(items[:-1]) + f", and {items[-1]}"
@@ -513,6 +515,9 @@ def _listed(items: list[str]) -> str:
 def _methods_text() -> dict[str, str]:
     """The method count and tiers, for the FAQ, and the method lists of `METHOD_LISTS`."""
     specs = list_specs()
+    stale = set(PROSE_NAMES) - {s.name for s in specs}
+    if stale:
+        raise ConfigError(f"PROSE_NAMES has names no method has: {sorted(stale)}")
     supported = [f"`{s.name}`" for s in specs if s.status == "supported"]
     text = {
         "method_count": f"{len(specs)} methods",
