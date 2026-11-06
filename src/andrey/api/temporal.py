@@ -783,10 +783,10 @@ def pcmciplus(
         collider ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one
         separating set the skeleton search found. ``"majority"`` and ``"conservative"`` test ``a``
         and ``c`` again given every subset of their same-step neighbors and look at the subsets
-        that separate them: ``"majority"`` calls the triple a collider when fewer than half hold
-        ``b``, and ``"conservative"`` when none does; a triple neither rule can decide is ambiguous
-        and orients nothing. The default, ``"majority"``, gives orientations that do not depend
-        on the order of the variables [1]_.
+        that separate them: if there is at least one, ``"majority"`` calls the triple a collider
+        when fewer than half hold ``b``, and ``"conservative"`` when none does; a triple neither
+        rule can decide is ambiguous and orients nothing. The default, ``"majority"``, gives
+        orientations that do not depend on the order of the variables [1]_.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies

@@ -16,6 +16,7 @@ from operator import ne
 import numpy as np
 
 from andrey.core import GraphStructure, backend
+from andrey.core._bitset import nodes
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import MIXED_SCORES, LocalScore, make_score
@@ -194,8 +195,8 @@ class MoveScanner:
         gained: list[tuple[int, int]] = []
         lost: list[tuple[int, int]] = []
         for u in range(d) if first else compress(range(d), map(ne, adj_int, old)):
-            gained += [(u, v) for v in _bits(adj_int[u] & ~old[u])]
-            lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
+            gained += [(u, v) for v in nodes(adj_int[u] & ~old[u])]
+            lost += [(u, v) for v in nodes(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
             self._add[v], self._rem[v] = self._deltas(v, pa)
@@ -270,9 +271,9 @@ class MoveScanner:
         reach, parent = self._reach, self._parent
         hit = np.logical_or.reduce(reach[:, tails], axis=1)
         hit[tails] = True
-        nodes = np.flatnonzero(hit)
+        stale = np.flatnonzero(hit)
         changed = []
-        for x in nodes[np.argsort(reach[nodes].sum(axis=1), kind="stable")].tolist():
+        for x in stale[np.argsort(reach[stale].sum(axis=1), kind="stable")].tolist():
             kids = parent[:, x]
             row = reach[kids].any(axis=0) | kids
             if not np.array_equal(row, reach[x]):
@@ -345,16 +346,6 @@ class MoveScanner:
         return best
 
 
-def _bits(row: int) -> list[int]:
-    """The positions of the set bits of ``row``, lowest first."""
-    out = []
-    while row:
-        lsb = row & -row
-        out.append(lsb.bit_length() - 1)
-        row ^= lsb
-    return out
-
-
 def start_dag(
     d: int, constraints: Constraints | None, max_parents: int | None = None
 ) -> tuple[list[int], dict[int, list[int]]]:
@@ -405,7 +396,7 @@ def _reaches(adj_int: list[int], a: int, b: int) -> bool:
         if row >> b & 1:
             return True
         seen |= row
-        frontier += _bits(row)
+        frontier += nodes(row)
     return False
 
 

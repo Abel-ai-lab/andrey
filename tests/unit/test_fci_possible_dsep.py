@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.constraint.pc import adjacency_search
 from andrey.core import NULL, ci
 from andrey.core.ci import make_indep_test
 from andrey.data import sample_discrete, sample_mixed, sample_scm
@@ -99,7 +100,7 @@ def test_the_lists_are_built_once_per_version_of_the_marks(monkeypatch, draw):
     alpha = 0.05
     x = sample_scm(graph="erdos_renyi", scale="standardize", **draw).data
     test = make_indep_test("fisherz", x)
-    support, sepsets = fci._fast_adjacency_search(x, test, alpha)
+    support, sepsets, _ = adjacency_search(test, x.shape[1], alpha)
     marks = fci._circle_pag(support)
     fci._orient_colliders(marks, sepsets)
 

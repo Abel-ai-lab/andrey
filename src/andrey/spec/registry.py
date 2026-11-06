@@ -2113,9 +2113,9 @@ _add(
                 "collider_rule",
                 default="majority",
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
-                "separating set found; majority = fewer than half of the separating subsets hold "
-                "the middle; conservative = none does. The default majority does not depend on the "
-                "order of the variables.",
+                "separating set found; majority and conservative = at least one subset separates "
+                "the ends and fewer than half (majority) or none (conservative) of them hold the "
+                "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
             _CATEGORICAL,

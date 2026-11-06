@@ -2,8 +2,9 @@
 
 ``meek`` completes a PDAG to a CPDAG with Meek's rules R1-R3, ``pdag2dag`` returns a consistent
 DAG extension of a PDAG, ``dag2cpdag`` returns a DAG's CPDAG, and ``orient_colliders`` orients a
-skeleton's unshielded colliders as PC does. :func:`to_structure` and :func:`from_structure` convert
-to and from a :class:`~andrey.core.structure.GraphStructure`.
+skeleton's unshielded colliders as PC does, reading each pair's separating set with
+:func:`separating_set`. :func:`to_structure` and :func:`from_structure` convert to and from a
+:class:`~andrey.core.structure.GraphStructure`.
 
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.structure`: ``adj[i, j]`` is the mark at ``i`` on edge ``i-j``, one of ``NULL``
@@ -41,6 +42,7 @@ __all__ = [
     "pdag2dag",
     "dag2cpdag",
     "orient_colliders",
+    "separating_set",
     "to_structure",
     "from_structure",
 ]
@@ -812,7 +814,7 @@ def orient_colliders(
                 x, y = nbrs[a], nbrs[b]
                 if _is_adjacent(adj, x, y):
                     continue
-                if z not in _lookup_sepset(sepsets, x, y):
+                if z not in (separating_set(sepsets, x, y) or ()):
                     pdag[z, x] = ARROW
                     pdag[x, z] = TAIL
                     pdag[z, y] = ARROW
@@ -820,13 +822,17 @@ def orient_colliders(
     return pdag
 
 
-def _lookup_sepset(
-    sepsets: Mapping[tuple[int, int], Iterable[int] | None], x: int, y: int
-) -> frozenset[int]:
-    """The separating set for the pair, in either key order; empty when absent or ``None``."""
-    value = sepsets.get((x, y))
+def separating_set(
+    sepsets: Mapping[tuple[int, int], Iterable[int] | None], a: int, c: int
+) -> frozenset[int] | None:
+    """The separating set ``sepsets`` records for the pair ``(a, c)``, under either key order.
+
+    The key ``(a, c)`` is read first, then ``(c, a)``. An empty set is a recorded set; ``None``
+    means neither key holds a set, the value ``None`` included.
+    """
+    value = sepsets.get((a, c))
     if value is None:
-        value = sepsets.get((y, x))
+        value = sepsets.get((c, a))
     if value is None:
-        return frozenset()
+        return None
     return frozenset(int(v) for v in value)

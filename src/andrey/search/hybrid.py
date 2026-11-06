@@ -12,8 +12,9 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.constraint.blanket import local_structure
-from andrey.constraint.pc import _discover_skeleton
+from andrey.constraint.pc import adjacency_search
 from andrey.core import NULL, GraphStructure, backend
+from andrey.core.ci import make_indep_test
 from andrey.core.knowledge import Constraints
 from andrey.search.hc import hc
 from andrey.search.tabu import tabu
@@ -40,24 +41,21 @@ def candidate_graph(
     :func:`~andrey.constraint.blanket.local_structure` returns for them: the pairs each in the
     other's MMPC set, or each in the other's Markov blanket and not separated by a subset of the
     smaller blanket (:mod:`andrey.constraint.blanket`). ``"pc"``
-    keeps PC's skeleton (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the
+    keeps PC's skeleton (:func:`~andrey.constraint.pc.adjacency_search`). Each runs the
     ``indep_test`` test at level ``alpha``; ``categorical`` marks the categorical columns for a
     mixed-data test; ``seed`` fixes the draws of a stochastic test (``None`` uses
     ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning set.
     """
     if restrict == "pc":
-        adj, _, _ = _discover_skeleton(
-            X,
+        skeleton, _, _ = adjacency_search(
+            make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+            X.shape[1],
             alpha,
-            indep_test,
-            categorical=categorical,
-            record_pvalues=False,
-            workers=backend.worker_count(None),
             max_depth=max_depth,
+            workers=backend.worker_count(None),
             warn_expensive=True,
-            seed=seed,
         )
-        return adj != NULL
+        return skeleton != NULL
     marks = local_structure(
         X,
         restrict,
