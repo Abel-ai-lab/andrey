@@ -29,12 +29,12 @@ from .interventions import (
     record,
 )
 from .scm import (
-    _GRAPH,
-    _INTERVENTION,
-    _NOISE,
-    _WEIGHTS,
-    _column_order,
-    _component_rng,
+    GRAPH,
+    INTERVENTION,
+    NOISE,
+    WEIGHTS,
+    column_order,
+    component_rng,
     dataset_provenance,
     named_graph,
 )
@@ -125,8 +125,8 @@ def sample_discrete(
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
     model = root if model_seed is None else np.random.SeedSequence(model_seed)
-    _, draw = spec.materialize(_component_rng(model, _GRAPH))
-    table_rng = _component_rng(model, _WEIGHTS)
+    _, draw = spec.materialize(component_rng(model, GRAPH))
+    table_rng = component_rng(model, WEIGHTS)
     cards = table_rng.integers(low, high + 1, size=draw.d)
     parents = _parents_of(draw)
     tables = [
@@ -136,16 +136,16 @@ def sample_discrete(
         )
         for c in range(draw.d)
     ]
-    order = _column_order(model, draw.d, shuffle)  # the drawn node of each column
+    order = column_order(model, draw.d, shuffle)  # the drawn node of each column
     if pooled is None:
-        values = _forward_sample(
-            draw.topo_order.tolist(), parents, cards, tables, rows, _component_rng(root, _NOISE)
+        values = forward_sample(
+            draw.topo_order.tolist(), parents, cards, tables, rows, component_rng(root, NOISE)
         )
     else:
         check_columns(pooled, draw.d)
         values = np.concatenate(
             [
-                _forward_sample(
+                forward_sample(
                     draw.topo_order.tolist(),
                     parents,
                     cards,
@@ -154,10 +154,10 @@ def sample_discrete(
                         interventions,
                         order,
                         concentration,
-                        _component_rng(model, _INTERVENTION, k),
+                        component_rng(model, INTERVENTION, k),
                     ),
                     size,
-                    _component_rng(root, _NOISE) if k == 0 else _component_rng(root, _NOISE, k),
+                    component_rng(root, NOISE) if k == 0 else component_rng(root, NOISE, k),
                 )
                 for k, (interventions, size) in enumerate(pooled)
             ]
@@ -280,7 +280,7 @@ def _parents_of(draw: DAGDraw) -> list[np.ndarray]:
     return [np.sort(draw.parents[draw.children == c]) for c in range(draw.d)]
 
 
-def _forward_sample(
+def forward_sample(
     order: list[int],
     parents: list[np.ndarray],
     cards: np.ndarray,

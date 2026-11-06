@@ -20,7 +20,7 @@ import andrey
 from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
-from andrey.search.hc import MoveScanner, _apply_move, _key_after, hc
+from andrey.search.hc import MoveScanner, _key_after, apply_move, hc
 from andrey.search.tabu import tabu
 from qa import identity
 
@@ -114,9 +114,9 @@ def test_scanner_picks_as_full_rescan(seed: int) -> None:
         edges = [(u, v) for v in range(d) for u in parents_of[v]]
         if step % 3 == 2 and edges:
             u, v = edges[rng.integers(len(edges))]
-            _apply_move(adj_int, parents_of, ("remove", u, v))
+            apply_move(adj_int, parents_of, ("remove", u, v))
         elif move is not None:
-            _apply_move(adj_int, parents_of, move[4])
+            apply_move(adj_int, parents_of, move[4])
     assert sum(len(p) for p in parents_of.values()) > 0
 
 

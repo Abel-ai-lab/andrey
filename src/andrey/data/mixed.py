@@ -35,12 +35,12 @@ from .interventions import (
     record,
 )
 from .scm import (
-    _GRAPH,
-    _INTERVENTION,
-    _NOISE,
-    _WEIGHTS,
-    _column_order,
-    _component_rng,
+    GRAPH,
+    INTERVENTION,
+    NOISE,
+    WEIGHTS,
+    column_order,
+    component_rng,
     dataset_provenance,
     named_graph,
 )
@@ -162,11 +162,11 @@ def sample_mixed(
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
     model = root if model_seed is None else np.random.SeedSequence(model_seed)
-    _, draw = spec.materialize(_component_rng(model, _GRAPH))
+    _, draw = spec.materialize(component_rng(model, GRAPH))
     is_categorical = np.zeros(draw.d, dtype=bool)
     is_categorical[draw.topo_order[: round(categorical_share * draw.d)]] = True
 
-    rng = _component_rng(model, _WEIGHTS)
+    rng = component_rng(model, WEIGHTS)
     cards = np.where(is_categorical, rng.integers(low, high + 1, size=draw.d), 0)
     parents = _parents_of(draw)
     tables: dict[int, np.ndarray] = {}
@@ -184,10 +184,10 @@ def sample_mixed(
             if shift is not None:
                 shifts[e] = shift
     network = _Network(draw, parents, is_categorical, cards, tables, weights, shifts)
-    order = _column_order(model, draw.d, shuffle)  # the drawn node of each column
+    order = column_order(model, draw.d, shuffle)  # the drawn node of each column
 
     if pooled is None:
-        values = network.sample(rows, _component_rng(root, _NOISE))
+        values = network.sample(rows, component_rng(root, NOISE))
     else:
         check_columns(pooled, draw.d)
         values = np.concatenate(
@@ -197,11 +197,11 @@ def sample_mixed(
                     size,
                     order=order,
                     concentration=concentration,
-                    draws=_component_rng(root, _INTERVENTION, k),
-                    redraws=_component_rng(model, _WEIGHTS, k),
+                    draws=component_rng(root, INTERVENTION, k),
+                    redraws=component_rng(model, WEIGHTS, k),
                 ).sample(
                     size,
-                    _component_rng(root, _NOISE) if k == 0 else _component_rng(root, _NOISE, k),
+                    component_rng(root, NOISE) if k == 0 else component_rng(root, NOISE, k),
                 )
                 for k, (environment, size) in enumerate(pooled)
             ]

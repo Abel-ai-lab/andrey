@@ -36,9 +36,9 @@ from andrey.core import GraphStructure, env
 from andrey.core.structure import topological_order
 
 from . import functional, noise
-from .discrete import _forward_sample
+from .discrete import forward_sample
 from .graphs import FixedDAG
-from .scm import _NOISE, SCM, _column_order, _component_rng
+from .scm import NOISE, SCM, column_order, component_rng
 
 __all__ = ["RealDataset", "list_datasets", "load_dataset"]
 
@@ -285,7 +285,7 @@ class Tables:
         order = _causal_order(self.parents)
         cards = np.array([len(s) for s in self.states], dtype=np.int64)
         parents = [np.array(p, dtype=np.int64) for p in self.parents]
-        return _forward_sample(order, parents, cards, list(self.tables), n, rng)
+        return forward_sample(order, parents, cards, list(self.tables), n, rng)
 
 
 def read_bif_tables(text: str) -> Tables:
@@ -683,9 +683,9 @@ def load_dataset(
         # the seed's column stream, the same permutation for both kinds of rows.
         root = np.random.SeedSequence(seed)
         if discrete:
-            columns = _column_order(root, len(contents.nodes), shuffle).tolist()
+            columns = column_order(root, len(contents.nodes), shuffle).tolist()
             tables = read_bif_tables(gzip.decompress(raw).decode("utf-8"))
-            values = tables.sample(n, _component_rng(root, _NOISE))[:, columns]
+            values = tables.sample(n, component_rng(root, NOISE))[:, columns]
             states = tuple(tables.states[j] for j in columns)
             simulation = (
                 "The rows are sampled from the network's own conditional probability tables "

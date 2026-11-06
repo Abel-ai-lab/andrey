@@ -789,7 +789,7 @@ def test_skeleton_pins_blas_as_the_test_sets(method, pin_blas, monkeypatch):
 
 
 def test_kci_uses_every_blas_thread_from_its_cutoff():
-    x = np.random.default_rng(0).standard_normal((ci_kernel._KCI_BLAS_THREADS_FROM, 3))
+    x = np.random.default_rng(0).standard_normal((ci_kernel.KCI_BLAS_THREADS_FROM, 3))
     assert (ci.pins_blas(KCI(x[:-1])), ci.pins_blas(KCI(x))) == (True, False)
 
 

@@ -1,16 +1,8 @@
 """Pairwise and latent-confounder causal methods.
 
-:func:`anm` runs the additive-noise-model direction test on a single cause/effect pair.
-:func:`pnl` runs the post-nonlinear direction test on a single cause/effect pair.
-:func:`fit_rcd` recovers a confounder-aware adjacency by repetitive causal discovery (RCD).
-:func:`bottom_up_parce_lingam` estimates a confounder-robust causal order (ParceLiNGAM).
+:mod:`~andrey.irregular.anm` runs the additive-noise-model direction test on a single cause/effect
+pair. :mod:`~andrey.irregular.pnl` runs the post-nonlinear direction test on a single cause/effect
+pair. :mod:`~andrey.irregular.rcd` recovers a confounder-aware adjacency by repetitive causal
+discovery (RCD). :mod:`~andrey.irregular.bottom_up_parce` estimates a confounder-robust causal
+order (ParceLiNGAM).
 """
-
-from __future__ import annotations
-
-from andrey.irregular.anm import anm
-from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam
-from andrey.irregular.pnl import pnl
-from andrey.irregular.rcd import fit_rcd
-
-__all__ = ["anm", "pnl", "fit_rcd", "bottom_up_parce_lingam"]

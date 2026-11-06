@@ -13,11 +13,11 @@ import numpy as np
 
 from andrey.core import NULL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
-from andrey.core.orient import to_structure
+from andrey.core.orient import cpdag_of_pdag, to_structure
 from andrey.core.score import BICScore
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
 from andrey.search import operators as ops
-from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag, required_dag
+from andrey.search.ges import reachability, recompute_objective, required_dag
 from andrey.search.xges import (
     _ACCEPT_PER_SAMPLE,
     _extension_scores,
@@ -156,14 +156,14 @@ def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndar
     _, ne_y, _ = _sets(adj, y)
     H = (ne_y & set(ops.adjacent(adj, x).tolist())) - C
     ops.apply_delete(adj, x, y, H)
-    return _reform_cpdag(adj)
+    return cpdag_of_pdag(adj)
 
 
 def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndarray:
     """Apply Insert ``x -> y`` with ``T`` to a copy of a mark matrix and re-form the CPDAG."""
     adj = adj.copy()
     ops.apply_insert(adj, x, y, T)
-    return _reform_cpdag(adj)
+    return cpdag_of_pdag(adj)
 
 
 def _rescan_moves(
@@ -181,7 +181,7 @@ def _rescan_moves(
         cut = adj.copy()
         cut[x, y] = cut[y, x] = NULL
         yield _insert_marks(cut, x, y, T)
-    inserts = _all_inserts(adj, score, forbidden, _reachable(adj), constraints)
+    inserts = _all_inserts(adj, score, forbidden, reachability(adj), constraints)
     for _, x, y, T in _improving(inserts, score.n, ranks):
         yield _insert_marks(adj, x, y, T)
 
@@ -227,7 +227,7 @@ def _rescan_search(
     """XGES with every operator rescanned and the CPDAG re-formed globally after each move."""
     start = np.zeros((d, d), dtype=np.int8)
     if constraints is not None and constraints.required.any():
-        start = _reform_cpdag(required_dag(constraints))
+        start = cpdag_of_pdag(required_dag(constraints))
     adj = _rescan_base_search(start, score, set(), ranks, constraints)
     if not extended:
         return adj
@@ -277,7 +277,7 @@ def xges_rescan(
     ranks = tie_ranks(X).tolist()
     with backend.one_blas_thread():
         adj = _rescan_search(score, d, extended_search, ranks, constraints)
-        total = _recompute_objective(adj, score, d)
+        total = recompute_objective(adj, score, d)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

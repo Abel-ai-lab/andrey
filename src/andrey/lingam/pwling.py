@@ -32,7 +32,7 @@ _TIE_TOL = 1e-10
 # entropy differs by CPU. Copies, exact or perturbed by 1e-12, measure < 2e-15 at every step;
 # rank-transformed near-copies with |corr| up to 0.999999 measure > 7e-6, and scoring both columns
 # of a pair gave orders that differed between CPUs only below 1e-14.
-_COPY_TOL = 1e-12
+COPY_TOL = 1e-12
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -168,7 +168,7 @@ def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
 def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> dict[int, list[int]]:
     """Each candidate in ``U`` that represents its copies, mapped to those copies.
 
-    Two columns are copies when, in any of ``groups``, one leaves at most ``_COPY_TOL`` of the
+    Two columns are copies when, in any of ``groups``, one leaves at most ``COPY_TOL`` of the
     other's variance unexplained; a copy group is a connected set of such pairs. Its
     representative is the column that ranks first by ``ranks`` (as :func:`pick` uses), and its
     copies follow in ``ranks`` order. Representatives keep their order in ``U``; a column without
@@ -179,7 +179,7 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
     for X in groups:
         cov = np.cov(X[:, U], rowvar=False, ddof=0).reshape(k, k)
         var = np.diag(cov)
-        linked |= cov * cov.T >= (1.0 - _COPY_TOL) * np.outer(var, var)
+        linked |= cov * cov.T >= (1.0 - COPY_TOL) * np.outer(var, var)
     np.fill_diagonal(linked, False)
     if not linked.any():
         return {u: [] for u in U}

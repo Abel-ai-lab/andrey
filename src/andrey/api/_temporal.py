@@ -58,7 +58,7 @@ def _lag_graphs(
     return tuple(graphs)
 
 
-def _adapt_varma_lingam(
+def adapt_varma_lingam(
     causal_order: Sequence[int],
     psis: np.ndarray,
     omegas: np.ndarray,
@@ -81,7 +81,7 @@ def _adapt_varma_lingam(
     return structure_output(temporal, ordering=causal_order)
 
 
-def _adapt_longitudinal_lingam(
+def adapt_longitudinal_lingam(
     adjacency: np.ndarray,
     causal_orders: Sequence[Sequence[int]],
     required: np.ndarray | None = None,
@@ -108,7 +108,7 @@ def _adapt_longitudinal_lingam(
     return structure_output(temporal, metadata={"causal_orders": causal_orders})
 
 
-def _adapt_dynotears(result: DynotearsResult) -> StructureOutput:
+def adapt_dynotears(result: DynotearsResult) -> StructureOutput:
     """DYNOTEARS fit -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
 
     ``result.support[k, i, j]`` marks the edge ``i -> j`` at lag ``k`` (row = cause), transposed
@@ -124,7 +124,7 @@ def _adapt_dynotears(result: DynotearsResult) -> StructureOutput:
     return structure_output(temporal, metadata=metadata)
 
 
-def _adapt_granger(
+def adapt_granger(
     coeff: np.ndarray,
     maxlag: int,
     required: np.ndarray | None = None,
@@ -171,7 +171,7 @@ def _test_metadata(result: PCMCIResult | PCMCIPlusResult | LPCMCIResult) -> dict
     }
 
 
-def _adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) -> StructureOutput:
+def adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) -> StructureOutput:
     """PCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure` of lags ``1..tau_max``.
 
     ``result.graph[k, i, j]`` marks the link ``i -> j`` at lag ``k + 1`` (row = cause), so each
@@ -186,7 +186,7 @@ def _adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None)
     return structure_output(temporal, metadata={**_test_metadata(result), **(extra or {})})
 
 
-def _adapt_pcmciplus(
+def adapt_pcmciplus(
     result: PCMCIPlusResult, extra: Mapping[str, object] | None = None
 ) -> StructureOutput:
     """PCMCI+ result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
@@ -215,7 +215,7 @@ def _adapt_pcmciplus(
     return structure_output(temporal, metadata=metadata)
 
 
-def _adapt_lpcmci(
+def adapt_lpcmci(
     result: LPCMCIResult, extra: Mapping[str, object] | None = None
 ) -> StructureOutput:
     """LPCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.

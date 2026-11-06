@@ -73,35 +73,35 @@ _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
 # selection, the temporal lag matrices, the column shuffle, and the intervention draws each get an
 # independent stream, so a change to one component's draws never shifts another's. Environment
-# ``k >= 1`` draws its noise from ``(_NOISE, k)`` and environment ``k`` its intervention values from
-# ``(_INTERVENTION, k)`` and its redrawn weights from ``(_WEIGHTS, k)``; environment 0 draws from
-# ``_NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
+# ``k >= 1`` draws its noise from ``(NOISE, k)`` and environment ``k`` its intervention values from
+# ``(INTERVENTION, k)`` and its redrawn weights from ``(WEIGHTS, k)``; environment 0 draws from
+# ``NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
 # latents, lags, columns) come off the model seed's root, the rows' streams off the seed's root;
 # without a model seed the two are one root.
-_GRAPH, _WEIGHTS, _NOISE, _LATENT, _LAG, _COLUMNS, _INTERVENTION = 0, 1, 2, 3, 4, 5, 6
+GRAPH, WEIGHTS, NOISE, _LATENT, _LAG, _COLUMNS, INTERVENTION = 0, 1, 2, 3, 4, 5, 6
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
 
-def _component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Generator:
+def component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Generator:
     """Derive an independent ``Generator`` for one pipeline component, statelessly from ``root``.
 
     Uses ``spawn_key`` extension rather than ``root.spawn()`` (which mutates a counter), so the
     stream for task ``i`` component ``c`` is a pure function of ``(root.entropy, (*root.spawn_key,
     c))`` -- reproducible regardless of submission order or worker count. A component of several
-    keys, such as ``(_NOISE, k)``, names a stream of its own.
+    keys, such as ``(NOISE, k)``, names a stream of its own.
     """
     seq = np.random.SeedSequence(entropy=root.entropy, spawn_key=(*root.spawn_key, *component))
     return np.random.default_rng(seq)
 
 
-def _column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
+def column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
     """Return the drawn index of each output column; the identity unless ``shuffle``.
 
     The permutation comes from the column stream of ``root``, so no other draw depends on it.
     """
     if not shuffle:
         return np.arange(n_observed)
-    return _component_rng(root, _COLUMNS).permutation(n_observed)
+    return component_rng(root, _COLUMNS).permutation(n_observed)
 
 
 def dataset_provenance(
@@ -425,22 +425,22 @@ class SCM:
         envs: list[Environment] | None = None,
     ) -> CausalDataset:
         """Draw one dataset: the model from the streams of ``model``, the rows from ``root``'s."""
-        _, draw = self.graph.materialize(_component_rng(model, _GRAPH))
-        noise_rng = _component_rng(root, _NOISE)
+        _, draw = self.graph.materialize(component_rng(model, GRAPH))
+        noise_rng = component_rng(root, NOISE)
         scale_weights = np.empty(0)
         if scale == "unitless":
             weights, scales = self.functional.draw_unitless(  # ty: ignore[unresolved-attribute]  # checked in sample: Linear only
-                draw, _component_rng(model, _WEIGHTS)
+                draw, component_rng(model, WEIGHTS)
             )
         else:
-            weight_rng = _component_rng(model, _WEIGHTS)
+            weight_rng = component_rng(model, WEIGHTS)
             weights = self.functional.draw_weights(draw, weight_rng)
             # The scale weights follow the location weights in their stream, so they leave the
             # location weights and every other stream as they are.
             scale_weights = self.functional.draw_scale_weights(draw, weight_rng)
             scales = self.noise.draw_scales(draw.d, noise_rng)
             if model is not root:  # the rows' stream moves past its own scales, as without a model
-                scales = self.noise.draw_scales(draw.d, _component_rng(model, _NOISE))
+                scales = self.noise.draw_scales(draw.d, component_rng(model, NOISE))
         if self.functional.is_temporal:
             return self._sample_temporal(
                 n, draw, weights, scales, noise_rng, root, model, scale, dtype, shuffle
@@ -452,10 +452,10 @@ class SCM:
         order = np.arange(draw.d)
         node_types = None
         if self.latents > 0:
-            order = latent_order(edges, draw.d, self.latents, _component_rng(model, _LATENT))
+            order = latent_order(edges, draw.d, self.latents, component_rng(model, _LATENT))
             node_types = np.full(draw.d, OBSERVED, dtype=np.int8)
             node_types[n_obs:] = LATENT
-        columns = _column_order(model, n_obs, shuffle)
+        columns = column_order(model, n_obs, shuffle)
         order[:n_obs] = order[columns]
         if envs is None:
             innovations = self.noise.draw(n, scales, noise_rng)
@@ -547,7 +547,7 @@ class SCM:
         noise = np.concatenate(
             [
                 self.noise.draw(
-                    size, scales, noise_rng if k == 0 else _component_rng(root, _NOISE, k)
+                    size, scales, noise_rng if k == 0 else component_rng(root, NOISE, k)
                 )
                 for k, (_, size) in enumerate(envs)
             ]
@@ -568,8 +568,8 @@ class SCM:
                 continue  # its rows are the reference's
             env_weights, env_scale_weights = weights.copy(), scale_weights.copy()
             env_noise, fixed = noise[rows].copy(), {}
-            draws = _component_rng(root, _INTERVENTION, k)
-            redraws = _component_rng(model, _WEIGHTS, k)
+            draws = component_rng(root, INTERVENTION, k)
+            redraws = component_rng(model, WEIGHTS, k)
             for column, intervention in spec.items():
                 c = int(order[column])
                 if isinstance(intervention, HardIntervention):
@@ -624,7 +624,7 @@ class SCM:
             )
         innovations = self.noise.draw(n + _TEMPORAL_BURN_IN, scales, noise_rng)
         series, temporal_truth = self.functional.generate_temporal(  # ty: ignore[unresolved-attribute]  # gated by is_temporal (VAR/VARMA only)
-            draw, weights, innovations, _component_rng(model, _LAG), burn_in=_TEMPORAL_BURN_IN
+            draw, weights, innovations, component_rng(model, _LAG), burn_in=_TEMPORAL_BURN_IN
         )
         if scale == "standardize":
             series = standardize(series)
@@ -635,7 +635,7 @@ class SCM:
                 "reduce lag_density or the weight range"
             )
         # The shuffle relabels the lag-0 DAG and every lag block on both axes.
-        order = _column_order(model, draw.d, shuffle)
+        order = column_order(model, draw.d, shuffle)
         data = np.take(data, order, axis=1)
         temporal_truth = relabel_truth(temporal_truth, order)
         edges = np.stack([draw.parents, draw.children], axis=1)  # the instantaneous (lag-0) DAG

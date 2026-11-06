@@ -27,13 +27,13 @@ from andrey.constraint._skeleton import (
 )
 from andrey.constraint.fci import (
     _adjacent,
-    _circle_pag,
-    _fci_orient,
-    _knowledge_marks,
     _largest_size,
-    _orient_colliders,
-    _validate_possible_dsep,
+    circle_pag,
+    fci_orient,
+    knowledge_marks,
+    orient_colliders,
     possible_dsep_step,
+    validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import NULL, GraphStructure, backend
@@ -73,7 +73,7 @@ def gfci(
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
+    of in order-free rounds (:func:`~andrey.constraint.fci.fci_orient`).
     ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
@@ -94,7 +94,7 @@ def gfci(
     workers = backend.worker_count(workers)
 
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     cpdag_structure, _score = ges(
         X,
         score_func=score_func,
@@ -146,19 +146,18 @@ def boss_fci(
 ) -> GraphStructure:
     """Discover a PAG with BOSS adjacency and FCI orientation.
 
-    The score settings, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS search
-    (:func:`~andrey.search.boss.boss`), with ``seed`` as its ``random_state``, and the rest act as
-    for :func:`gfci`.
+    The score settings, ``seed``, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS
+    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`.
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     pattern, _score = boss(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
-        random_state=0 if seed is None else seed,
+        seed=0 if seed is None else seed,
         n_starts=n_starts,
         score_func=score_func,
         max_parents=max_parents,
@@ -206,20 +205,20 @@ def grasp_fci(
 ) -> GraphStructure:
     """Discover a PAG with GRaSP adjacency and FCI orientation.
 
-    The score settings, ``grasp_depth``, ``max_parents``, ``n_starts``, and ``constraints`` reach
-    the GRaSP search (:func:`~andrey.search.grasp.grasp`), with ``seed`` as its ``random_state``,
-    and the rest act as for :func:`gfci`.
+    The score settings, ``grasp_depth``, ``seed``, ``max_parents``, ``n_starts``, and
+    ``constraints`` reach the GRaSP search (:func:`~andrey.search.grasp.grasp`), and the rest act
+    as for :func:`gfci`.
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     pattern, _score = grasp(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
         depth=grasp_depth,
-        random_state=0 if seed is None else seed,
+        seed=0 if seed is None else seed,
         n_starts=n_starts,
         score_func=score_func,
         max_parents=max_parents,
@@ -283,9 +282,9 @@ def fci_from_pattern(
         _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
     )
 
-    marks = _circle_pag(skeleton)
-    _knowledge_marks(marks, constraints)
-    _orient_colliders(marks, sepsets, pattern=pattern)
+    marks = circle_pag(skeleton)
+    knowledge_marks(marks, constraints)
+    orient_colliders(marks, sepsets, pattern=pattern)
     marks = possible_dsep_step(
         marks,
         X,
@@ -312,8 +311,8 @@ def fci_from_pattern(
     )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
-    _fci_orient(
+    orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
+    fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
     )
 

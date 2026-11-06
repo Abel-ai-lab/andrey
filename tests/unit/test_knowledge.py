@@ -13,7 +13,7 @@ import pytest
 import andrey
 from andrey import Knowledge
 from andrey.cli import main
-from andrey.constraint.fci import _fci_orient, _remove_by_possible_dsep
+from andrey.constraint.fci import _remove_by_possible_dsep, fci_orient
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError, admits, resolve, resolve_lagged
 from andrey.core.orient import dag2cpdag, from_structure, meek
@@ -368,7 +368,7 @@ def test_max_depth_caps_the_conditioning_sets_of_rule_r4(in_column_order):
 
     for max_depth, largest in [(None, 2), (1, 1), (0, 0)]:
         sizes.clear()
-        _fci_orient(
+        fci_orient(
             marks.copy(), test, 0.05, {}, max_depth=max_depth, in_column_order=in_column_order
         )
         assert max(sizes, default=0) == largest

@@ -202,9 +202,9 @@ def _repeat_marks(marks: np.ndarray, groups: list[list[tuple[int, int]]]) -> boo
 
 def _orient(nodes, mag: np.ndarray, anc, tau_max: int) -> np.ndarray:
     """The PAG of the window MAG under time order and repeating orientations."""
-    from andrey.constraint.fci import _circle_pag, _fci_orient, _orient_colliders
+    from andrey.constraint.fci import circle_pag, fci_orient, orient_colliders
 
-    marks = _circle_pag(mag != NULL)
+    marks = circle_pag(mag != NULL)
     for a, b in zip(*np.nonzero(mag), strict=True):
         if nodes[a][1] < nodes[b][1]:  # a is later, so it cannot be an ancestor of b
             marks[a, b] = ARROW
@@ -219,10 +219,10 @@ def _orient(nodes, mag: np.ndarray, anc, tau_max: int) -> np.ndarray:
             sepsets[(a, c)] = sepsets[(c, a)] = tuple(x for x in sep if x not in (a, c))
     oracle = _MagOracle(mag)
     groups = _copies(nodes, tau_max)
-    _orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets)
     while True:
         before = marks.copy()
-        _fci_orient(marks, oracle, 0.5, sepsets)
+        fci_orient(marks, oracle, 0.5, sepsets)
         _repeat_marks(marks, groups)
         if np.array_equal(before, marks):
             break

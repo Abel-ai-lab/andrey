@@ -64,7 +64,7 @@ def pc(
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
-    the order of :func:`_orient_colliders`, ``collider_rule`` how an unshielded triple is decided
+    the order of :func:`orient_colliders`, ``collider_rule`` how an unshielded triple is decided
     (:func:`~andrey.constraint._skeleton.vote_triples`), and ``categorical``, a boolean mask of the
     categorical columns, reaches a mixed-data test. ``max_depth`` caps the conditioning-set size of
     the skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow,
@@ -84,9 +84,9 @@ def pc(
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`adjacency_search`), each unshielded triple
-    (``step="collider"``, from :func:`_orient_colliders`), each Meek rule firing (``step="meek"``,
+    (``step="collider"``, from :func:`orient_colliders`), each Meek rule firing (``step="meek"``,
     with the fields :func:`~andrey.core.orient.meek` records), and, when colliders of equal rank
-    conflict, the edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
+    conflict, the edges left undirected (``step="conflict"``, from :func:`undirect_conflicts`).
     The tests of a collider vote are not recorded. The private ``_ambiguous`` sink receives the
     triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``, and
     the private ``_conflicts`` sink the edges colliders ask to orient both ways
@@ -123,18 +123,18 @@ def pc(
     if constraints is not None:
         skeleton = orient(skeleton, constraints)
         check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
-    pdag = _orient_colliders(
+    pdag = orient_colliders(
         skeleton, sepsets, pvalues, order=collider_order, ambiguous=ambiguous, _trace=_trace
     )
     if _trace is None:
         cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
-        return to_structure(_undirect_conflicts(cpdag), kind="cpdag")
+        return to_structure(undirect_conflicts(cpdag), kind="cpdag")
     firings: list[dict] = []
     cpdag = meek(
         pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order, _trace=firings
     )
     _trace.extend(dict(step="meek", **firing) for firing in firings)
-    return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
+    return to_structure(undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
 
 def check_collider_order(collider_order: str) -> None:
@@ -186,7 +186,7 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
                     queue.append(z)
 
 
-def _orient_colliders(
+def orient_colliders(
     pdag: np.ndarray,
     sepsets: Mapping[tuple[int, int], Iterable[int] | None],
     pvalues: Mapping[tuple[int, int], float],
@@ -213,7 +213,7 @@ def _orient_colliders(
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
     are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``KEY_DP``
     decimals are each checked against the marks set before their rank, then all set: an edge two of
-    them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
+    them dispute ends bidirected, and :func:`undirect_conflicts` leaves it undirected after Meek's
     rules. The result depends on the ranks, not on the column order. With ``ranks``, keyed like
     ``ambiguous``, each triple's rank is its own entry in place of its pair's p-value, and
     ``pvalues`` is not read. With ``order="column"``, ``pvalues`` and ``ranks`` are not read
@@ -302,7 +302,7 @@ def collider_conflicts(
     return {(int(x), int(y)) for x, y in np.argwhere(np.triu(asked & asked.T))}
 
 
-def _undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
+def undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
     """Make every bidirected edge, where two colliders of equal rank conflict, undirected.
 
     It runs after Meek's rules, which neither use nor orient a bidirected edge, so a conflicting

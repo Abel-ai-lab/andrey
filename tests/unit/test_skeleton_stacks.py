@@ -79,7 +79,7 @@ def test_stacks_match_the_per_pair_scan(
     if cap is not None:
         monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
     if chunk is not None:
-        monkeypatch.setattr(_skeleton, "_CHUNK", chunk)
+        monkeypatch.setattr(_skeleton, "CHUNK", chunk)
     X, pairs, neighbors = _case(seed)
     for record_pvalues in (True, False):
         got = _scan(stacked(X), pairs, neighbors, size, record_pvalues)

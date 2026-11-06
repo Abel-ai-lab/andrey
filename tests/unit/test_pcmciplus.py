@@ -12,7 +12,7 @@ import pytest
 from scipy.linalg import solve_discrete_lyapunov
 
 import andrey.temporal.pcmciplus as pcmciplus_module
-from andrey.api._temporal import _adapt_pcmciplus
+from andrey.api._temporal import adapt_pcmciplus
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.temporal.pcmciplus import (
@@ -177,7 +177,7 @@ def test_a_conflict_is_an_undirected_lag_0_link_listed_in_the_metadata():
     result = PCMCIPlusResult(
         ((), (), ((2, 1),)), adjacency, marks, np.ones((2, 3, 3)), np.zeros((2, 3, 3)), {}, ()
     )
-    out = _adapt_pcmciplus(result)
+    out = adapt_pcmciplus(result)
     assert out.structure.lags == (0, 1)
     assert out.structure.lag(0).kind == "cpdag"
     assert out.structure.lag(0).oriented_edges() == [(0, 1, "undirected"), (1, 2, "directed")]

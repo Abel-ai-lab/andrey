@@ -181,7 +181,7 @@ def _add_middle(current: str, letter: str) -> str:
     return current
 
 
-class _Search:
+class LPCMCISearch:
     """The state of one LPCMCI run: the graph, the test memories, and the separating sets.
 
     ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`. The search keeps what it
@@ -1375,7 +1375,7 @@ def run(
     the knowledge sets. Every re-initialization applies the knowledge again. ``max_p_global`` caps
     the searched subset size (see :func:`lpcmci`).
     """
-    search = _Search(test, n_vars, tau_max, alpha, ranks, constraints, max_p_global)
+    search = LPCMCISearch(test, n_vars, tau_max, alpha, ranks, constraints, max_p_global)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):
@@ -1387,7 +1387,7 @@ def run(
     return _result(search, kept)
 
 
-def _result(search: _Search, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
+def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
     n, tau_max = search.n, search.tau_max
     shape = (tau_max + 1, n, n)
     start_marks = np.zeros(shape, dtype=np.int8)

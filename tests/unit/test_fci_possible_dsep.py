@@ -101,8 +101,8 @@ def test_the_lists_are_built_once_per_version_of_the_marks(monkeypatch, draw):
     x = sample_scm(graph="erdos_renyi", scale="standardize", **draw).data
     test = make_indep_test("fisherz", x)
     support, sepsets, _ = adjacency_search(test, x.shape[1], alpha)
-    marks = fci._circle_pag(support)
-    fci._orient_colliders(marks, sepsets)
+    marks = fci.circle_pag(support)
+    fci.orient_colliders(marks, sepsets)
 
     reference, reference_sepsets = marks.copy(), dict(sepsets)
     _rebuilt_per_call(reference, test, alpha, reference_sepsets)

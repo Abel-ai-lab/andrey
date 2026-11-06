@@ -31,10 +31,10 @@ from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
-from andrey.core.orient import _cpdag_of_pdag
+from andrey.core.orient import cpdag_of_pdag
 from andrey.core.structure import (
-    _EDGE_TYPES,
     EDGE_GLYPHS,
+    EDGE_TYPES,
     Kind,
     Structure,
     TemporalStructure,
@@ -431,7 +431,7 @@ class BootstrapOutput:
                 i, j, near, far = _decode(s.codes, n)
                 pairs = []
                 for a, c, m, f in zip(i.tolist(), j.tolist(), near.tolist(), far.tolist()):
-                    kind, forward = ("directed", True) if a == c else _EDGE_TYPES[(m, f)]
+                    kind, forward = ("directed", True) if a == c else EDGE_TYPES[(m, f)]
                     pairs.append((a, c, kind) if forward else (c, a, kind))
             for (source, target, kind), count in zip(pairs, s.counts.tolist()):
                 if count / b < min_frequency:
@@ -605,16 +605,16 @@ def _valid_graph(
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
     MPDAG, and a ``pag`` is oriented as ``fci`` orients one under knowledge: the vote and the PAG
-    get the knowledge's endpoints (``_knowledge_marks``) before the MAG step and before the
+    get the knowledge's endpoints (``knowledge_marks``) before the MAG step and before the
     orientation rules, which then run to a fixed point.
     Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
         if constraints is not None:
-            from andrey.constraint.fci import _knowledge_marks
+            from andrey.constraint.fci import knowledge_marks
 
             vote = vote.copy()
-            _knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
+            knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
         return pag_of(mag, None, (), constraints)
     if ((vote == ARROW) & (vote.T == ARROW)).any():
@@ -624,7 +624,7 @@ def _valid_graph(
     if kind == "dag" and (ranks is not None or not ((vote == TAIL) & (vote.T == TAIL)).any()):
         order = np.arange(len(vote)) if ranks is None else np.argsort(ranks, kind="stable")
         return GraphStructure.from_numpy(extend_in_order(vote, order), kind="dag", labels=labels)
-    cpdag = _cpdag_of_pdag(vote)
+    cpdag = cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
@@ -871,7 +871,7 @@ def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return _run_one(_JOB, b)
 
 
-def _fit_all(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
+def fit_resamples(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
         with _backend.one_blas_thread(), _backend.config(n_jobs=1):
@@ -1169,9 +1169,9 @@ def bootstrap(
     root = resolve_seed(seed)
     if root < 0:
         raise ValueError(f"seed must be a non-negative integer, got {root}")
-    job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
+    job = build_job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
     workers = min(_backend.worker_count(None), n_resamples)
-    results = _fit_all(job, n_resamples, workers)
+    results = fit_resamples(job, n_resamples, workers)
     ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
@@ -1266,7 +1266,7 @@ def _default_block_length(spec: MethodSpec, kwargs: dict[str, Any], n: int) -> i
     return min(length, n)
 
 
-def _job(
+def build_job(
     spec: MethodSpec,
     data: Any,
     kwargs: dict[str, Any],

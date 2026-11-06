@@ -102,7 +102,7 @@ def _entropy_probe(metric: int) -> np.ndarray:
 
 def _available_accelerator() -> str | None:
     """The first available device ``auto`` may select, or ``None``."""
-    for dev in backend._TORCH_AUTO:
+    for dev in backend.TORCH_AUTO:
         if dev != "numpy" and backend._is_available(dev):
             return dev
     return None
@@ -110,7 +110,7 @@ def _available_accelerator() -> str | None:
 
 def _live_accelerator() -> str | None:
     """The ``auto`` device already running in this process, without importing torch to find out."""
-    for dev in backend._TORCH_AUTO:
+    for dev in backend.TORCH_AUTO:
         if dev != "numpy" and backend._is_live(dev):
             return dev
     return None
@@ -210,11 +210,12 @@ def _store_calibration(fingerprint: str, cutoff: int | dict) -> None:
 
 
 @contextlib.contextmanager
-def _calibration_gate(fingerprint: str):
-    """Hold an exclusive lock while measuring, so only one process probes a given ``fingerprint``.
+def _calibration_gate():
+    """Hold an exclusive lock while measuring, so only one process measures at a time.
 
-    This prevents fresh pool workers from measuring against one another. Waiters re-read the cache
-    after acquiring the lock. Filesystems without lock support continue without cross-process
+    The lock is one file beside the calibration cache, shared by every device fingerprint. This
+    prevents fresh pool workers from measuring against one another. Waiters re-read the cache after
+    acquiring the lock. Filesystems without lock support continue without cross-process
     serialization.
     """
     path = _calibration_file().with_suffix(".lock")
@@ -321,7 +322,7 @@ def _calibrate(op: str, device: str, make, call, start: int, default: int | None
                 "andrey: %s on %s: reusing the cached calibration (%s)", op, device, fingerprint
             )
             return cached
-        with _calibration_gate(fingerprint):
+        with _calibration_gate():
             # Re-read after acquiring the cross-process lock.
             cached = _load_calibration(fingerprint)
             if cached is not None:

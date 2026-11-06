@@ -3,7 +3,7 @@
 ``_GSTNode.trace`` takes the first branch allowed by the prefix. Branch order therefore determines
 the search path. The grow and shrink steps of the tree BOSS and GRaSP share break score ties by
 variable index; BOSS's order move takes the leftmost tied position. Each step requires an
-improvement larger than ``_SCORE_EPS``.
+improvement larger than ``SCORE_EPS``.
 BOSS and GRaSP search the columns sorted by tie rank, so a variable's index, the seeded starting
 order, and the visiting order follow the columns' data, and reordering the columns relabels the
 graph.
@@ -58,17 +58,17 @@ def _leaf(score: float) -> SimpleNamespace:
 
 
 def test_boss_grows_best_scoring_branch_first() -> None:
-    """BOSS's tree orders a node's improving additions best-first, up to ``_SCORE_EPS`` ties."""
+    """BOSS's tree orders a node's improving additions best-first, up to ``SCORE_EPS`` ties."""
     x = _sample()
     score = BICScore(x, penalty_discount=1.0)
-    tree = boss_mod._GrowShrinkTree(0, score, DeltaBICScore(score), D_NODES)
+    tree = boss_mod.GrowShrinkTree(0, score, DeltaBICScore(score), D_NODES)
 
     node = tree.root
     node._grow([v for v in range(D_NODES) if v != 0], [])
 
     # Require two branches so `_descending` cannot pass vacuously.
     assert len(node.branches) >= 2, "fixture yields too few improving additions to order"
-    assert _descending([b.grow_score for b in node.branches], boss_mod._SCORE_EPS)
+    assert _descending([b.grow_score for b in node.branches], boss_mod.SCORE_EPS)
 
 
 @pytest.mark.parametrize(
@@ -88,7 +88,7 @@ def test_boss_grow_ties_use_variable_index_and_require_an_improvement(gains, exp
 
 
 def test_boss_shrink_ties_use_variable_index_and_require_an_improvement() -> None:
-    eps = boss_mod._SCORE_EPS
+    eps = boss_mod.SCORE_EPS
     gains = {0: 10.0, 1: 10.0 + eps / 2}
     tree = SimpleNamespace(vertex=2, empty_score=0.0, delta=_exact_batch(gains), leaves={})
     node = boss_mod._GSTNode(tree)
@@ -136,13 +136,13 @@ def _pair_gaining(gain: float) -> tuple[np.ndarray, float]:
 
 
 @pytest.mark.parametrize("search", [boss, grasp])
-@pytest.mark.parametrize("gain", [0.5 * boss_mod._SCORE_EPS, 2 * boss_mod._SCORE_EPS])
+@pytest.mark.parametrize("gain", [0.5 * boss_mod.SCORE_EPS, 2 * boss_mod.SCORE_EPS])
 def test_an_edge_must_gain_more_than_the_tolerance(search, gain) -> None:
     """BOSS and GRaSP grow the same trees: a parent joins only when it gains more than
-    ``_SCORE_EPS``."""
+    ``SCORE_EPS``."""
     x, penalty = _pair_gaining(gain)
     graph, _ = search(x, penalty_discount=penalty, ebic_gamma=0.0)
-    assert (graph.to_numpy() != 0).any() == (gain > boss_mod._SCORE_EPS)
+    assert (graph.to_numpy() != 0).any() == (gain > boss_mod.SCORE_EPS)
 
 
 def _linear(seed: int, n: int = 400, d: int = 10) -> np.ndarray:
@@ -233,7 +233,5 @@ def test_ranks_move_with_the_columns_and_the_score_is_the_same(case) -> None:
 def test_the_seed_still_matters(search) -> None:
     """Different seeds shuffle the sorted columns differently and can reach different graphs."""
     x = _linear(5)
-    graphs = {
-        search(x, random_state=seed, ebic_gamma=0.0)[0].to_numpy().tobytes() for seed in range(4)
-    }
+    graphs = {search(x, seed=seed, ebic_gamma=0.0)[0].to_numpy().tobytes() for seed in range(4)}
     assert len(graphs) > 1

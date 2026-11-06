@@ -564,7 +564,7 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     return out
 
 
-def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
+def cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     """``dag2cpdag(pdag2dag(pdag))`` for a valid ``int8`` mark matrix, over per-node bitmasks.
 
     Builds the same consistent extension as :func:`pdag2dag` and labels its edges by Chickering's
@@ -675,8 +675,8 @@ class _Masks:
         self.lines.update(zip(new, row_masks((rows == TAIL) & (columns == TAIL))))
 
 
-def _cpdag_of_pdag_near(pdag: np.ndarray, seeds: Iterable[int], limit: int) -> np.ndarray | None:
-    """``_cpdag_of_pdag(pdag)`` for a CPDAG changed by one valid move, rewritten in place.
+def cpdag_of_pdag_near(pdag: np.ndarray, seeds: Iterable[int], limit: int) -> np.ndarray | None:
+    """``cpdag_of_pdag(pdag)`` for a CPDAG changed by one valid move, rewritten in place.
 
     A CPDAG is the skeleton with its unshielded colliders oriented, closed under Meek's rules
     R1-R3. A move changes the skeleton and the colliders only at ``seeds``: the ends of the edges

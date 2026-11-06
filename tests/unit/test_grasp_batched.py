@@ -71,7 +71,7 @@ def test_grasp_matches_per_candidate_order_and_graph(
 
     monkeypatch.setattr(grasp_mod._Order, "__init__", capture_order)
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", capture_batch)
-    batched_graph, batched_score = grasp_mod.grasp(x, penalty_discount=lam, random_state=seed)
+    batched_graph, batched_score = grasp_mod.grasp(x, penalty_discount=lam, seed=seed)
     batched_requests = batches.copy()
     batches.clear()
 
@@ -86,7 +86,7 @@ def test_grasp_matches_per_candidate_order_and_graph(
         ]
 
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", per_candidate)
-    scalar_graph, scalar_score = grasp_mod.grasp(x, penalty_discount=lam, random_state=seed)
+    scalar_graph, scalar_score = grasp_mod.grasp(x, penalty_discount=lam, seed=seed)
 
     assert any(len(deltas) > 1 for _, _, deltas in batched_requests)
     if x.shape[1] == 4:

@@ -105,20 +105,20 @@ __all__ = [
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
-_ONE_MINUS_EPS = 1.0 - np.finfo(np.float64).eps
+ONE_MINUS_EPS = 1.0 - np.finfo(np.float64).eps
 
 # A correlation submatrix is singular when its smallest eigenvalue is at most this fraction of its
 # largest.
-_SINGULAR_RTOL = 1e-12
+SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
-_BOUND_MARGIN = 1e4
+BOUND_MARGIN = 1e4
 
 
 class SingularCorrelationError(ValueError):
     """A ``[x, y, *S]`` correlation submatrix is singular to working precision.
 
-    Its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its largest, so its inverse cannot
+    Its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its largest, so its inverse cannot
     give the partial correlation. :meth:`PartialCorrelationTest.residual_statistic_pvalues` gives it
     from the data instead. When the data hold columns that repeat others up to scale and shift,
     ``groups`` holds them as :func:`~andrey.core.score.copy_groups` returns them, and the message
@@ -223,9 +223,7 @@ class PartialCorrelationTest:
             var = (x_int, y_int, *cond)
             inv = self._invert(corr[np.ix_(var, var)][None])[0]
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
-        return (
-            -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
-        )
+        return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of data columns that repeat one another up to scale and shift.
@@ -354,7 +352,7 @@ class PartialCorrelationTest:
             var[:, 2:] = conds
             inv = self._invert(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
-        r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
     def residual_statistic_pvalues(
@@ -398,7 +396,7 @@ class PartialCorrelationTest:
                     "partial-correlation test"
                 )
             r[k] = (residual[:, 0] @ residual[:, 1]) / math.sqrt(spread[0] * spread[1])
-        r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
     def marginal_pvalues(self) -> np.ndarray:
@@ -410,7 +408,7 @@ class PartialCorrelationTest:
         correlation matrix. The diagonal is self-correlation and is not meaningful.
         """
         df = self._degrees_of_freedom(0)
-        r = np.clip(self._corr, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(self._corr, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return np.asarray(self._pvalue(r, df))
 
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
@@ -1533,7 +1531,7 @@ class DGTest:
         wx_t = np.ascontiguousarray(np.swapaxes(wx, 1, 2))
         wy = np.swapaxes(np.ascontiguousarray(np.swapaxes(wy, 1, 2)), 1, 2)
         rho = np.linalg.svd(wx_t @ block[full][:, :px, px:] @ wy, compute_uv=False)
-        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * np.sum(np.log1p(-(rho * rho)), axis=1)
         out[full] = chdtrc(px * py, np.maximum(statistic, 0.0))
         return out
@@ -1566,7 +1564,7 @@ class DGTest:
         if dof == 0:
             return 0.0, 1.0
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
-        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
@@ -1715,13 +1713,13 @@ class CGTest:
 
 # The module and class of each nonlinear test. Building one imports only its own module: GPDC's
 # loads scikit-learn, which takes a second or more.
-_NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
+NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "kci": ("ci_kernel", "KCI"),
     "rcot": ("ci_kernel", "RCoT"),
     "cmiknn": ("ci_cmiknn", "CMIknn"),
     "gpdc": ("ci_gpdc", "GPDC"),
 }
-NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
+NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(NONLINEAR_CLASSES)
 #: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
 #: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
 STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
@@ -1729,7 +1727,7 @@ STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
     """Build the nonlinear test ``name`` over ``data`` with ``options``."""
-    module, cls = _NONLINEAR_CLASSES[name]
+    module, cls = NONLINEAR_CLASSES[name]
     test = getattr(importlib.import_module(f"{__package__}.{module}"), cls)
     return test(data, **options)
 
@@ -1859,7 +1857,7 @@ def pins_blas(test: CITest) -> bool:
 def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
     """Invert a ``(N, k, k)`` stack of correlation submatrices; raise if any is singular.
 
-    A submatrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    A submatrix is singular when its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its
     largest; :class:`ValueError` reports it. ``np.linalg.inv`` alone does not decide this: it raises
     only on an exactly zero pivot, which OpenBLAS reaches on a duplicated column while Apple
     Accelerate can return a finite inverse instead. The eigenvalues decide on every backend.
@@ -1868,12 +1866,12 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
     submatrix of a sample correlation matrix: unit diagonal, positive semidefinite up to rounding.
     So ``lambda_max(A) <= trace(A) <= k``. The eigenvalue of smallest magnitude is
     ``1 / ||A^-1||_2 >= 1 / (k * max |A^-1_ij|)``, and when that is far above the rounding it is
-    positive, so it is ``lambda_min(A)``. With ``c = _BOUND_MARGIN * _SINGULAR_RTOL``, a row whose
+    positive, so it is ``lambda_min(A)``. With ``c = BOUND_MARGIN * SINGULAR_RTOL``, a row whose
     inverse has every entry below ``1 / (c * k**2)`` thus has ``lambda_min > c * lambda_max`` and
     passes the eigenvalue test. The bound reads every entry of the computed inverse, not only its
     trace or diagonal, so a NaN, an infinity, or a single huge entry fails it. The LU inverse is
     backward stable on every LAPACK, so the computed inverse of a nearly singular matrix has
-    entries of order ``1 / lambda_min`` and fails the bound. ``_BOUND_MARGIN`` absorbs the rounding
+    entries of order ``1 / lambda_min`` and fails the bound. ``BOUND_MARGIN`` absorbs the rounding
     of the inverse and the eigenvalues.
 
     The rows that fail the bound take the eigenvalue test. When ``np.linalg.inv`` raises, the
@@ -1887,7 +1885,7 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
         _raise_if_singular(stack)
         return np.linalg.inv(stack)
     size = stack.shape[-1]
-    limit = 1.0 / (_BOUND_MARGIN * _SINGULAR_RTOL * size * size)
+    limit = 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size)
     unsettled = ~(np.abs(inv).max(axis=(1, 2)) < limit)  # NaN fails the comparison too
     if unsettled.any():
         _raise_if_singular(stack[unsettled])
@@ -1897,11 +1895,11 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
 def _raise_if_singular(stack: np.ndarray) -> None:
     """Raise :class:`ValueError` if a matrix of the ``(N, k, k)`` stack is singular.
 
-    A matrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    A matrix is singular when its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its
     largest.
     """
     w = np.linalg.eigvalsh(stack)  # (N, k), ascending per row
-    if (w[:, 0] <= w[:, -1] * _SINGULAR_RTOL).any():
+    if (w[:, 0] <= w[:, -1] * SINGULAR_RTOL).any():
         raise SingularCorrelationError(
             "correlation matrix is singular; cannot run a partial-correlation test"
         )

@@ -111,7 +111,7 @@ def test_random_changes_keep_every_rule_of_a_move(max_parents):
     adj_int = [0] * d
     parents_of: dict[int, list[int]] = {v: [] for v in range(d)}
     for v, u in zip(*np.nonzero(required)):
-        hc_engine._apply_move(adj_int, parents_of, ("add", int(u), int(v)))
+        hc_engine.apply_move(adj_int, parents_of, ("add", int(u), int(v)))
     draws = random.Random(0)
     seen = set()
     for _ in range(300):

@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
-def _fit(
+def fit_hybrid(
     name: str,
     data: npt.ArrayLike,
     *,
@@ -279,7 +279,7 @@ def mmhc(
     >>> out.structure.kind
     'cpdag'
     """
-    return _fit(
+    return fit_hybrid(
         "mmhc",
         data,
         restrict="mmpc",
@@ -526,7 +526,7 @@ def rsmax2(
     >>> out.structure.kind
     'cpdag'
     """
-    return _fit(
+    return fit_hybrid(
         "rsmax2",
         data,
         restrict=restrict,

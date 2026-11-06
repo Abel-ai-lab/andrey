@@ -291,7 +291,7 @@ def boss(
     """
     from andrey.search.boss import boss as _boss
 
-    assert score_func is not None  # method_spec picks it from the column types
+    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
     X, mask, labels, constraints = fit_inputs(
         data, "score_func", score_func, categorical, knowledge, method="boss"
     )
@@ -301,7 +301,7 @@ def boss(
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
-            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            seed=seed,
             n_starts=n_starts,
             score_func=score_func,
             categorical=mask,
@@ -580,7 +580,7 @@ def grasp(
     """
     from andrey.search.grasp import grasp as _grasp
 
-    assert score_func is not None  # method_spec picks it from the column types
+    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
     X, mask, labels, constraints = fit_inputs(
         data, "score_func", score_func, categorical, knowledge, method="grasp"
     )
@@ -591,7 +591,7 @@ def grasp(
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
             depth=grasp_depth,
-            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            seed=seed,
             n_starts=n_starts,
             score_func=score_func,
             categorical=mask,

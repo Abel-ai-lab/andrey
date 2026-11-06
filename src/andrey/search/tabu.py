@@ -16,7 +16,7 @@ import numpy as np
 from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints
 from andrey.core.ties import EPS_IMPROVE
-from andrey.search.hc import MoveScanner, StructureKey, _apply_move, greedy_search
+from andrey.search.hc import MoveScanner, StructureKey, apply_move, greedy_search
 
 __all__ = ["tabu"]
 
@@ -61,7 +61,7 @@ def _search(
             if found is None:  # every legal move leads into the tabu list
                 break
         move = found[4]
-        _apply_move(adj_int, parents_of, move)
+        apply_move(adj_int, parents_of, move)
         moves += 1
         op, u, v = move
         for node in (u, v) if op == "reverse" else (v,):
@@ -90,7 +90,7 @@ def tabu(
     max_parents: int | None = None,
     n_starts: int = 1,
     n_perturbations: int = 1,
-    random_state: int = 0,
+    seed: int = 0,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over a linear-Gaussian, categorical, or mixed-data score.
 
@@ -140,7 +140,7 @@ def tabu(
         Number of searches, at least ``1``.
     n_perturbations : int
         Random changes to the best DAG so far before each start after the first, at least ``1``.
-    random_state : int
+    seed : int
         Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
 
     Returns
@@ -166,5 +166,5 @@ def tabu(
         max_parents=max_parents,
         n_starts=n_starts,
         n_perturbations=n_perturbations,
-        random_state=random_state,
+        seed=seed,
     )

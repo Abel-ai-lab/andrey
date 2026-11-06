@@ -39,11 +39,11 @@ import numpy as np
 
 from andrey.constraint._skeleton import (
     Removal,
-    _stacked_scan,
     canonical_capable,
     is_rcot,
     pair_queries,
     scan_pairs,
+    stacked_scan,
 )
 from andrey.core import env
 from andrey.core.ci import CITest, PartialCorrelationTest
@@ -285,7 +285,7 @@ class RCoTWorkerPool:
             return None
         if size:
             self._test._warn_few_rows()  # a worker's warning would not reach the caller
-        return _stacked_scan(self._pvalues, pairs, neighbors, size, alpha, None, record_pvalues)
+        return stacked_scan(self._pvalues, pairs, neighbors, size, alpha, None, record_pvalues)
 
     def _pvalues(self, xs: np.ndarray, ys: np.ndarray, conditions: np.ndarray) -> np.ndarray:
         """The p-values of a stack's queries, in order, each conditioning set's in one worker."""

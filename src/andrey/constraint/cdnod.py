@@ -50,13 +50,13 @@ import numpy as np
 
 from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
 from andrey.constraint.pc import (
-    _orient_colliders,
-    _undirect_conflicts,
     adjacency_search,
     check_collider_order,
     check_knowledge_cycle,
     collider_conflicts,
     knowledge_masks,
+    orient_colliders,
+    undirect_conflicts,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
@@ -227,7 +227,7 @@ def cdnod(
     if _conflicts is not None:
         found = collider_conflicts(skeleton, sepsets, ambiguous)
         _conflicts.update((a, b) for a, b in found if b < d)
-    completed = _undirect_conflicts(
+    completed = undirect_conflicts(
         meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
     )
     return to_structure(completed[:d, :d], kind="cpdag")
@@ -250,7 +250,7 @@ def _orient_with_context(
     decided edges that close a directed cycle raise ``ValueError``
     (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     Colliders are then oriented as PC orients them, in ``order``
-    (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge it would
+    (:func:`~andrey.constraint.pc.orient_colliders`), which skips a collider when an edge it would
     orient already has an arrowhead at the other end; so none puts an arrowhead at the context or
     reverses a decided edge; a triple in ``ambiguous`` is never a collider. With ``context=None``,
     for a skeleton without a context node, only the decided edges and the colliders are oriented.
@@ -263,7 +263,7 @@ def _orient_with_context(
     if constraints is not None:
         pdag = orient(pdag, constraints)
         check_knowledge_cycle((pdag == TAIL) & (pdag.T == ARROW))
-    return _orient_colliders(pdag, sepsets, pvalues, order=order, ambiguous=ambiguous)
+    return orient_colliders(pdag, sepsets, pvalues, order=order, ambiguous=ambiguous)
 
 
 def _orient_by_independent_changes(

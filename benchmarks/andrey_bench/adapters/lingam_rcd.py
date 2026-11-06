@@ -51,7 +51,7 @@ class LingamRCD:
         """Import lingam and the shared conversion before timing; see `contracts.SetupAdapter`."""
         import lingam  # noqa: F401
 
-        from andrey.api._irregular import _adapt_rcd  # noqa: F401
+        from andrey.api._irregular import adapt_rcd  # noqa: F401
 
     def params(self) -> dict[str, Any]:
         """Return the search settings: ancestor-set size and the three significance levels."""
@@ -66,11 +66,11 @@ class LingamRCD:
         """
         import lingam
 
-        from andrey.api._irregular import _adapt_rcd
+        from andrey.api._irregular import adapt_rcd
 
         X = np.asarray(data, dtype=np.float64)
         model = lingam.RCD(**{**_DEFAULTS, **params}).fit(X)
-        return np.asarray(_adapt_rcd(model).structure.to_numpy())
+        return np.asarray(adapt_rcd(model).structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:
         """Rebuild the PAG from its endpoint marks outside the timed region."""

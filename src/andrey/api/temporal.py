@@ -33,13 +33,13 @@ from ._adapt import (
     with_labels,
 )
 from ._temporal import (
-    _adapt_dynotears,
-    _adapt_granger,
-    _adapt_longitudinal_lingam,
-    _adapt_lpcmci,
-    _adapt_pcmci,
-    _adapt_pcmciplus,
-    _adapt_varma_lingam,
+    adapt_dynotears,
+    adapt_granger,
+    adapt_longitudinal_lingam,
+    adapt_lpcmci,
+    adapt_pcmci,
+    adapt_pcmciplus,
+    adapt_varma_lingam,
 )
 
 if TYPE_CHECKING:
@@ -268,7 +268,7 @@ def varma_lingam(
         name=column_namer(labels),
     )
     required = None if constraints is None else constraints.required
-    return with_labels(_adapt_varma_lingam(causal_order, psis, omegas, required), labels)
+    return with_labels(adapt_varma_lingam(causal_order, psis, omegas, required), labels)
 
 
 @method_spec("longitudinal_lingam")
@@ -426,7 +426,7 @@ def longitudinal_lingam(
     )
     model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
     required = None if constraints is None else constraints.required
-    out = _adapt_longitudinal_lingam(model.adjacency_matrices_, model.causal_orders_, required)
+    out = adapt_longitudinal_lingam(model.adjacency_matrices_, model.causal_orders_, required)
     return with_labels(out, labels)
 
 
@@ -721,7 +721,7 @@ def pcmci(
             seed=seed,
         )
     metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
-    return with_labels(_adapt_pcmci(result, metadata), labels)
+    return with_labels(adapt_pcmci(result, metadata), labels)
 
 
 @method_spec("pcmciplus")
@@ -1037,7 +1037,7 @@ def pcmciplus(
             seed=seed,
         )
     metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
-    return with_labels(_adapt_pcmciplus(result, metadata), labels)
+    return with_labels(adapt_pcmciplus(result, metadata), labels)
 
 
 @method_spec("lpcmci")
@@ -1331,7 +1331,7 @@ def lpcmci(
             seed=seed,
         )
     metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
-    return with_labels(_adapt_lpcmci(result, metadata), labels)
+    return with_labels(adapt_lpcmci(result, metadata), labels)
 
 
 @method_spec("granger")
@@ -1533,7 +1533,7 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, tau_max, required, p_values), labels)
+    return with_labels(adapt_granger(coeff, tau_max, required, p_values), labels)
 
 
 @method_spec("dynotears")
@@ -1778,7 +1778,7 @@ def dynotears(
             standardize=standardize,
             constraints=constraints,
         )
-    return with_labels(_adapt_dynotears(result), labels)
+    return with_labels(adapt_dynotears(result), labels)
 
 
 def series_inputs(

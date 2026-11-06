@@ -414,10 +414,11 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
+    assert seed is not None  # method_spec resolves it
     X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
-    order, B = _native(X, random_state=seed, max_iter=max_iter, constraints=constraints)
+    order, B = _native(X, seed=seed, max_iter=max_iter, constraints=constraints)
     return lingam_output(order, B, constraints, labels)
 
 

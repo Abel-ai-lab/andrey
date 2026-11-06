@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 _SETS = {"iamb": "markov_blanket", "inter_iamb": "markov_blanket", "mmpc": "parents_and_children"}
 
 
-def _fit(
+def fit_blanket(
     method: str,
     data: npt.ArrayLike,
     *,
@@ -302,7 +302,7 @@ def iamb(
     >>> graph.structure.oriented_edges()
     [(0, 2, 'directed'), (1, 2, 'directed')]
     """
-    return _fit(
+    return fit_blanket(
         "iamb",
         data,
         target=target,
@@ -528,7 +528,7 @@ def inter_iamb(
     >>> sorted(out.metadata["markov_blanket"])
     [1, 2]
     """
-    return _fit(
+    return fit_blanket(
         "inter_iamb",
         data,
         target=target,
@@ -765,7 +765,7 @@ def mmpc(
     >>> out.metadata["parents_and_children"]
     [2]
     """
-    return _fit(
+    return fit_blanket(
         "mmpc",
         data,
         target=target,

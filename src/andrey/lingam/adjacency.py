@@ -13,7 +13,7 @@ import numpy as np
 
 from andrey.core.units import least_squares
 from andrey.core.warning_policy import convergence_as_search_limit
-from andrey.lingam.pwling import _COPY_TOL
+from andrey.lingam.pwling import COPY_TOL
 
 #: Above this standard deviation of the target, LARS's float32 tiny number (``2**-126``), which
 #: it adds to its step denominators, can reach the steps' size, so the first fit is skipped.
@@ -167,7 +167,7 @@ def estimate(
     """Weighted adjacency ``B`` from a fixed order: each vertex regressed on its predecessors.
 
     A vertex that its kept predecessors determine, so that a least-squares fit leaves at most
-    ``_COPY_TOL`` of its variance (a copy of another column, up to scale), takes the
+    ``COPY_TOL`` of its variance (a copy of another column, up to scale), takes the
     least-squares weights, without the ones whose contribution is rounding-sized, and is left out
     of later regressions, where it would split its effect with the column it copies by rounding.
     Every other vertex is kept and takes :func:`predict_adaptive_lasso` weights, with ``refit``.
@@ -197,14 +197,14 @@ def estimate(
         y, P = X[:, target], X[:, columns]
         ols_coef, intercept = least_squares(P, y)
         residual = y - intercept - P @ ols_coef
-        if np.var(residual) > _COPY_TOL * np.var(y):
+        if np.var(residual) > COPY_TOL * np.var(y):
             B[target, forced], B[target, free] = fit_target(
                 X, forced, free, target, refit=refit, ols_coef=ols_coef
             )
             kept.append(target)
         else:
             coef = ols_coef
-            small = np.abs(coef) * P.std(axis=0) <= _COPY_TOL**0.5 * y.std()
+            small = np.abs(coef) * P.std(axis=0) <= COPY_TOL**0.5 * y.std()
             small[: len(forced)] = False
             coef[small] = 0.0
             B[target, columns] = coef

@@ -47,7 +47,7 @@ class CausalLearnANM:
         """Import causal-learn and the shared decision before timing; see `contracts.SetupAdapter`."""
         from causallearn.search.FCMBased.ANM.ANM import ANM  # noqa: F401
 
-        from andrey.api._irregular import _pairwise_output  # noqa: F401
+        from andrey.api._irregular import pairwise_output  # noqa: F401
 
     def params(self) -> dict[str, Any]:
         """Return the decision rule applied to the p-values; causal-learn takes no setting."""
@@ -57,12 +57,12 @@ class CausalLearnANM:
         """Run causal-learn ANM; return the two-node DAG's endpoint marks. The only timed region."""
         from causallearn.search.FCMBased.ANM.ANM import ANM
 
-        from andrey.api._irregular import _pairwise_output
+        from andrey.api._irregular import pairwise_output
 
         X = np.asarray(data, dtype=np.float64)
         forward, backward = ANM().cause_or_effect(X[:, [0]], X[:, [1]])
         alpha = {**_DEFAULTS, **params}["alpha"]
-        return np.asarray(_pairwise_output(forward, backward, alpha=alpha).structure.to_numpy())
+        return np.asarray(pairwise_output(forward, backward, alpha=alpha).structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:
         """Rebuild the two-node DAG from its endpoint marks outside the timed region."""

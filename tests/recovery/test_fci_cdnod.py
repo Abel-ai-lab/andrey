@@ -8,7 +8,7 @@ import pytest
 
 import andrey
 from andrey import data
-from andrey.constraint.pc import _orient_colliders, adjacency_search
+from andrey.constraint.pc import adjacency_search, orient_colliders
 from andrey.core import TAIL, GraphStructure
 from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, pdag2dag
@@ -323,7 +323,7 @@ def test_cdnod_is_invariant_to_column_order():
         make_indep_test("fisherz", augmented), augmented.shape[1], 0.05, record_pvalues=True
     )
     trace: list[dict] = []
-    _orient_colliders(skeleton, sepsets, pvalues, _trace=trace)
+    orient_colliders(skeleton, sepsets, pvalues, _trace=trace)
     assert any(
         r["step"] == "collider" and not r["oriented"] and r["triple"][1] not in r["sepset"]
         for r in trace
