@@ -131,6 +131,31 @@ def predict_with_required(
     return weights[: len(required)], coef
 
 
+def fit_target(
+    X: np.ndarray,
+    forced: list[int],
+    free: list[int],
+    target: int,
+    *,
+    refit: bool = False,
+    ols_coef: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Weights on ``target`` of the ``forced`` columns, which knowledge requires, and of ``free``.
+
+    With ``forced``, :func:`predict_with_required` fits both; otherwise the adaptive Lasso of
+    :func:`predict_adaptive_lasso` selects among ``free``, with ``refit``. ``ols_coef``, the
+    least-squares weights of ``[*forced, *free]`` when the caller has them, saves that fit; only
+    the Lasso without ``forced`` reads them. Returns the two weight arrays, empty for an empty list.
+    """
+    if forced:
+        return predict_with_required(X, forced, free, target)
+    if not free:
+        return np.zeros(0), np.zeros(0)
+    if ols_coef is None:
+        ols_coef, _ = least_squares(X[:, free], X[:, target])
+    return np.zeros(0), _adaptive_lasso(X, free, target, ols_coef, refit=refit)
+
+
 def estimate(
     X: np.ndarray,
     order: list[int],
@@ -173,10 +198,9 @@ def estimate(
         ols_coef, intercept = least_squares(P, y)
         residual = y - intercept - P @ ols_coef
         if np.var(residual) > _COPY_TOL * np.var(y):
-            if forced:
-                B[target, forced], B[target, free] = predict_with_required(X, forced, free, target)
-            else:
-                B[target, free] = _adaptive_lasso(X, free, target, ols_coef, refit=refit)
+            B[target, forced], B[target, free] = fit_target(
+                X, forced, free, target, refit=refit, ols_coef=ols_coef
+            )
             kept.append(target)
         else:
             coef = ols_coef

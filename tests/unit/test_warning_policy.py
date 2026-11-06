@@ -16,7 +16,7 @@ import pytest
 import andrey
 import andrey.data
 from andrey.api import _boundary
-from andrey.api._experimental import warn_experimental
+from andrey.api._method import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 from andrey.core.ci_kernel import RCoT
@@ -67,7 +67,7 @@ def _default_pool_cutoff(monkeypatch):
 
 
 def _experimental(monkeypatch):
-    return lambda: warn_experimental("new_method")  # an experimental facade's first line
+    return lambda: warn_experimental("new_method")  # method_spec, before an experimental facade
 
 
 def _past_the_boundary(monkeypatch):

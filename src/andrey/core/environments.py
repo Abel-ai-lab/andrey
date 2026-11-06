@@ -24,7 +24,7 @@ The module is a building block for the methods; ``andrey`` does not export it.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -35,7 +35,14 @@ from andrey.core.structure import column_labels
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-__all__ = ["env_codes", "normalize_env_targets", "pool_environments", "take_columns"]
+__all__ = [
+    "check_constant_columns",
+    "check_environment_rows",
+    "env_codes",
+    "normalize_env_targets",
+    "pool_environments",
+    "take_columns",
+]
 
 
 def normalize_env_targets(
@@ -338,6 +345,41 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
         raise ValueError(f"{prefix}env mixes strings and numbers; give its labels one type")
     codes, labels = pd.factorize(values, sort=True)
     return codes.astype(np.intp), list(labels)
+
+
+def check_environment_rows(
+    codes: np.ndarray, names: Sequence[object], method: str, min_rows: int
+) -> None:
+    """Raise ``ValueError`` unless every environment has at least ``min_rows`` rows.
+
+    ``codes`` gives each row's environment as a code ``0..K-1``, and ``names[k]`` names
+    environment ``k`` in the message, which lists every environment with fewer rows.
+    """
+    sizes = np.bincount(codes, minlength=len(names))
+    small = [names[k] for k in np.flatnonzero(sizes < min_rows)]
+    if small:
+        raise ValueError(
+            f"{method} needs at least {min_rows} rows in every environment; {small} have fewer"
+        )
+
+
+def check_constant_columns(
+    X: np.ndarray, name: Callable[[int], str], method: str, where: str
+) -> None:
+    """Raise ``ValueError`` when a column of ``X``, the rows ``where`` names, is constant on them.
+
+    ``name`` names a column by its position in the message, which names every constant column.
+    """
+    constant = [name(int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if not constant:
+        return
+    if len(constant) == 1:
+        columns, verb, pronoun = f"column {constant[0]}", "is", "it"
+    else:
+        columns, verb, pronoun = f"columns {', '.join(constant)}", "are", "them"
+    raise ValueError(
+        f"{method}: data {columns} {verb} constant on {where}; drop {pronoun} before the fit"
+    )
 
 
 def take_columns(

@@ -150,7 +150,7 @@ def test_a_missing_value_or_a_column_constant_on_the_observational_rows_raises()
     with pytest.raises(ValueError, match="NaN|missing"):
         andrey.igsp(gap, env, targets=targets)
     frame.loc[env == "observed", "x2"] = 1.0
-    with pytest.raises(ValueError, match=r"columns \['x2'\] are constant on the observational"):
+    with pytest.raises(ValueError, match=r"column 'x2' is constant on the observational"):
         andrey.igsp(frame, env, targets=targets)
 
 
@@ -311,7 +311,7 @@ def test_without_env_two_environments_with_one_key_raise():
 def test_a_column_constant_on_the_observational_rows_raises():
     frame, env, targets, _ = sample("ut_igsp", n=100)
     frame.loc[env == "observed", "x2"] = 1.0
-    with pytest.raises(ValueError, match=r"columns \['x2'\] are constant on the observational"):
+    with pytest.raises(ValueError, match=r"column 'x2' is constant on the observational"):
         andrey.ut_igsp(frame, env, targets=targets)
 
 
