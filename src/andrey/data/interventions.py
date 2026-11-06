@@ -268,6 +268,30 @@ def check_columns(envs: Sequence[Environment], n_columns: int) -> None:
         as_interventions(spec, n_columns)
 
 
+def continuous_hard_values(
+    intervention: HardIntervention, column: int, size: int, draws: np.random.Generator
+) -> np.ndarray:
+    """Return the ``size`` values ``hard`` sets a continuous variable to, with ``draws`` for ``sd``.
+
+    Raise when it has no value: a continuous variable takes one.
+    """
+    if intervention.value is None:
+        raise ValueError(f"column {column}: hard() on a continuous variable takes a value")
+    values = np.full(size, intervention.value)
+    if intervention.sd > 0:
+        values += intervention.sd * draws.standard_normal(size)
+    return values
+
+
+def check_continuous_soft(intervention: SoftIntervention, column: int) -> None:
+    """Raise when ``soft`` changes nothing on a continuous variable."""
+    if intervention == SoftIntervention():
+        raise ValueError(
+            f"column {column}: soft() changes nothing on a continuous variable; give shift, "
+            "weight_scale, noise_scale, or weights"
+        )
+
+
 def env_labels(envs: Sequence[Environment]) -> np.ndarray:
     """Return the environment of each pooled row, ``0`` to ``K - 1``, in order."""
     return np.repeat(np.arange(len(envs), dtype=np.int64), [rows for _, rows in envs])

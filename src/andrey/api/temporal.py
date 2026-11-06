@@ -1578,11 +1578,10 @@ def dynotears(
         ``structure.lag(k)``, ``k >= 1``, a ``digraph`` with the edge ``i -> j`` from ``x_i(t - k)``
         to ``x_j(t)``, self-loops included. ``structure.lag_weights[k][i, j]`` is the coefficient
         of that edge in the data's units, or the scaled columns' with ``standardize=True``, and
-        ``0`` where there is no edge. ``ordering`` is
-        ``None``. ``metadata`` holds ``"algorithm"`` (``"dynotears"``), ``"h_final"`` (the
-        acyclicity function of the same-step weights before the threshold), and
-        ``"edges_removed"`` (same-step edges the threshold kept that the cycle repair dropped), and
-        ``"tie_break"`` (the rule ties followed).
+        ``0`` where there is no edge. ``ordering`` is ``None``. ``metadata`` holds ``"algorithm"``
+        (``"dynotears"``), ``"h_final"`` (the acyclicity function of the same-step weights before
+        the threshold), ``"edges_removed"`` (same-step edges the threshold kept that the cycle
+        repair dropped), and ``"tie_break"`` (the rule ties followed).
 
     Raises
     ------
@@ -1616,11 +1615,10 @@ def dynotears(
     an acyclicity function that takes a matrix exponential, so it suits a moderate number of
     variables, a few lags, and a long series. It returns a temporal structure with a DAG at lag
     ``0`` and the graphs at lags ``1`` to ``tau_max``, self-lags included, with the weight of each
-    edge. For nonlinear effects,
-    use :func:`~andrey.pcmciplus` with a nonlinear test such as ``"gpdc"`` or ``"rcot"``, and for
-    many lags, :func:`~andrey.pcmciplus` with its default test; when unmeasured common causes are
-    plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows rather than a series,
-    :func:`~andrey.notears`.
+    edge. For nonlinear effects, use :func:`~andrey.pcmciplus` with a nonlinear test such as
+    ``"gpdc"`` or ``"rcot"``, and for many lags, :func:`~andrey.pcmciplus` with its default test;
+    when unmeasured common causes are plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows
+    rather than a series, :func:`~andrey.notears`.
 
     The model is ``x_t = x_t W + x_{t-1} A_1 + ... + x_{t-p} A_p + z_t`` for the row vector
     ``x_t`` of the variables at step ``t`` and ``p = tau_max``, where ``W`` is acyclic and the

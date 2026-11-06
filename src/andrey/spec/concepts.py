@@ -469,7 +469,7 @@ _CONCEPTS = (
         ),
         fragment="unit variance",
         suitable=(*_CONTINUOUS, "calm", "dynotears"),
-        others_exempt="Not a continuous-optimization fit; the units concept covers its scale.",
+        others_exempt="Not a continuous-optimization fit.",
     ),
     Concept(
         key="fdr_method",

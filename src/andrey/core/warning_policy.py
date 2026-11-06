@@ -20,6 +20,7 @@ from typing import TypeVar
 _T = TypeVar("_T")
 
 _PACKAGE_DIR = os.path.dirname(os.path.dirname(__file__)) + os.sep
+_PACKAGE = __name__.partition(".")[0]
 
 _warned: set[tuple[type[Warning], str]] = set()
 # Reentrant: a warning handler that warns again from the same thread must not deadlock.
@@ -81,7 +82,7 @@ class BoundaryWarning(AndreyWarning):
 
 class DeprecatedArgumentWarning(AndreyWarning):
     """A former argument name or value, which works for one more release as the current one, or a
-    deprecated function, which also works for one more release.
+    deprecated function or class, which also works for one more release.
     """
 
 
@@ -142,10 +143,17 @@ if hasattr(os, "register_at_fork"):
 
 
 def _caller_stacklevel() -> int:
-    """The ``stacklevel``, counted from ``warn_once``, of the first frame outside the package."""
+    """The ``stacklevel``, counted from ``warn_once``, of the first frame outside the package.
+
+    A frame is inside when its file is, or, for generated code such as a dataclass's ``__init__``,
+    when its module is.
+    """
     frame = sys._getframe(2)
     level = 2
-    while frame is not None and frame.f_code.co_filename.startswith(_PACKAGE_DIR):
+    while frame is not None and (
+        frame.f_code.co_filename.startswith(_PACKAGE_DIR)
+        or frame.f_globals.get("__name__", "").partition(".")[0] == _PACKAGE
+    ):
         frame = frame.f_back
         level += 1
     return level

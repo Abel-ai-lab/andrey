@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import andrey
+import andrey.data
 from andrey.api import _boundary
 from andrey.api._experimental import warn_experimental
 from andrey.cli import main
@@ -99,6 +100,15 @@ def _category_code_hint(monkeypatch):
     return lambda: andrey.pc(data)
 
 
+def _deprecated_class(monkeypatch):
+    scm = andrey.data.SCM(
+        graph=andrey.data.graphs.erdos_renyi(4, 1.0),
+        functional=andrey.data.functional.linear(),
+        noise=andrey.data.noise.gaussian(),
+    )
+    return lambda: andrey.data.Ensemble(scms=[scm], seeds=[0], n=10)  # a dataclass's __init__
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
@@ -109,6 +119,7 @@ TRIGGERS = {
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
     "no categorical column": (_no_categorical_column, andrey.DataTypeWarning),
     "category code hint": (_category_code_hint, andrey.DataTypeWarning),
+    "deprecated class": (_deprecated_class, andrey.DeprecatedArgumentWarning),
 }
 
 

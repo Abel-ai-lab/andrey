@@ -49,9 +49,10 @@ from .interventions import (
     Environment,
     HardIntervention,
     Intervention,
-    SoftIntervention,
     as_interventions,
     check_columns,
+    check_continuous_soft,
+    continuous_hard_values,
     env_labels,
     env_targets,
     pooled_rows,
@@ -572,21 +573,11 @@ class SCM:
             for column, intervention in spec.items():
                 c = int(order[column])
                 if isinstance(intervention, HardIntervention):
-                    if intervention.value is None:
-                        raise ValueError(
-                            f"column {column}: hard() on a continuous variable takes a value"
-                        )
-                    target = np.full(size, intervention.value)
-                    if intervention.sd > 0:
-                        target += intervention.sd * draws.standard_normal(size)
+                    target = continuous_hard_values(intervention, column, size, draws)
                     set_values.append((rows, c, target))
                     fixed[c] = loc[c] + unit[c] * target
                     continue
-                if intervention == SoftIntervention():
-                    raise ValueError(
-                        f"column {column}: soft() changes nothing on a continuous variable; give "
-                        "shift, weight_scale, noise_scale, or weights"
-                    )
+                check_continuous_soft(intervention, column)
                 into = draw.children == c
                 if intervention.weights == "redraw":
                     if scale == "unitless":

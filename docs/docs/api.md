@@ -737,7 +737,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
-| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function, which also works for one more release. |
+| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function or class, which also works for one more release. |
 | {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and

@@ -26,8 +26,9 @@ from .graphs import DAGDraw, dag_truth
 from .interventions import (
     HardIntervention,
     Intervention,
-    SoftIntervention,
     check_columns,
+    check_continuous_soft,
+    continuous_hard_values,
     env_labels,
     env_targets,
     pooled_rows,
@@ -337,20 +338,9 @@ class _Network:
                 )
                 continue
             if isinstance(intervention, HardIntervention):
-                if intervention.value is None:
-                    raise ValueError(
-                        f"column {column}: hard() on a continuous variable takes a value"
-                    )
-                target = np.full(n, intervention.value)
-                if intervention.sd > 0:
-                    target += intervention.sd * draws.standard_normal(n)
-                fixed[c] = target
+                fixed[c] = continuous_hard_values(intervention, column, n, draws)
                 continue
-            if intervention == SoftIntervention():
-                raise ValueError(
-                    f"column {column}: soft() changes nothing on a continuous variable; give "
-                    "shift, weight_scale, noise_scale, or weights"
-                )
+            check_continuous_soft(intervention, column)
             for e in np.flatnonzero(self.draw.children == c).tolist():
                 if intervention.weights == "redraw":
                     weights[e], shift = _draw_effect(redraws, int(self.cards[self.draw.parents[e]]))
