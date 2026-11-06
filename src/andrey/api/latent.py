@@ -53,6 +53,8 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
         ``metadata["algorithm"]`` is ``"gin"``, ``metadata["clusters"]`` lists the clusters as lists
         of column indices, by smallest member, ``metadata["cluster_order"]`` lists the ordered ones
         earliest latent first, and ``metadata["unordered"]`` lists the rest by smallest member.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -61,8 +63,19 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
         method, the argument, what it accepts, and the value.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if two of
-        ``data``'s column names are equal as text.
+        method, the argument, what it accepts, and the value. Also if two of ``data``'s column names
+        are equal as text.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----

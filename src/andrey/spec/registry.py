@@ -323,6 +323,68 @@ _add(
 )
 _add(
     MethodSpec(
+        name="fci_jci",
+        family="constraint",
+        summary="FCI for data pooled from several domains or regimes, allowing hidden common "
+        "causes: adds the environment index as a variable no data variable causes (Joint Causal "
+        "Inference), which removes edges pooling adds and can orient more. Returns a PAG over the "
+        "data variables and lists the index's edges.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers are read as numbers; text labels are coded 0, 1, ... in sorted order.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+            notes="env becomes a trailing context node, then projected out of the result; its "
+            "edges go in metadata['index_edges'].",
+            missing=True,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['index_edges'] lists the index's edges as [variable, kind] pairs, kind "
+            "directed, partially_directed, or bidirected, in column order; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position, the index numbered "
+            "n_variables",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
+        seeded=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _POSSIBLE_DSEP,
+            concept_param("confounded_index"),
+            _TEST_SEED,
+        ),
+        references=(
+            "Mooij, Magliacane & Claassen 2020",
+            "Spirtes, Glymour & Scheines 2000",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
+        ),
+    )
+)
+_add(
+    MethodSpec(
         name="icp",
         family="constraint",
         summary="Invariant causal prediction: the causal parents of one target from continuous "
@@ -2614,6 +2676,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
+    "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
     "and never removes a required pair. " + _PAG_MARKS,
     "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
@@ -2740,6 +2803,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
     "cdnod": ("conflicts", "index_edges", "changing_variables"),
+    "fci_jci": ("index_edges",),
     "icp": (
         "target",
         "parents",

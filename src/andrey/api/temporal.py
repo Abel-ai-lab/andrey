@@ -127,9 +127,10 @@ def varma_lingam(
         Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure`.
         ``structure.lag_weights[k][i, j]`` is the autoregressive weight of edge ``i -> j`` at lag
         ``k``, lag 0 being instantaneous; ``structure.lag_weights_ma[k]`` holds the moving-average
-        weights at lag ``k + 1``, in the same orientation. The lag graphs follow the
-        autoregressive weights. ``ordering`` is the instantaneous causal order, and
-        ``metadata["algorithm"]`` is ``"varma_lingam"``.
+        weights at lag ``k + 1``, in the same orientation. The lag graphs follow the autoregressive
+        weights. ``ordering`` is the instantaneous causal order, and ``metadata["algorithm"]`` is
+        ``"varma_lingam"``. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -139,11 +140,25 @@ def varma_lingam(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``order`` is
-        ``(0, 0)``, or if ``data`` has fewer than 2 columns. Also if ``knowledge`` names a column
-        ``data`` lacks, contradicts itself, requires a link without a lag or beyond ``order[0]``,
-        forbids a lagged link while ``prune=False``, or requires a link at a lag beyond the ``p``
-        that ``criterion`` selected.
+        method, the argument, what it accepts, and the value. Also if ``order`` is ``(0, 0)``, or if
+        ``data`` has fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks,
+        contradicts itself, requires a link without a lag or beyond ``order[0]``, forbids a lagged
+        link while ``prune=False``, or requires a link at a lag beyond the ``p`` that ``criterion``
+        selected.
+
+    Warns
+    -----
+    SearchLimitWarning
+        When a fit takes ``max_iter`` iterations, or the function evaluations they allow, without
+        converging; raise ``max_iter`` to let it run on.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -307,14 +322,15 @@ def longitudinal_lingam(
     -------
     StructureOutput
         Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure`. The first time point has no
-        past, so it is not estimated. ``structure.times`` lists the estimated time points, ``1``
-        to ``T - 1``; ``structure.time_weights[t][k][i, j]`` is the weight of edge ``i -> j`` at
-        lag ``k`` for the t-th of them (lag 0 is instantaneous), and ``structure.lag_weights``
-        repeats the last time point's. A lag that reaches before the first time point is ``NaN``.
-        Lagged weights are not pruned, so every lagged graph links every pair of variables,
-        self-loops included; judge lagged effects by weight size. ``metadata["causal_orders"]``
-        holds one causal order per time point, the first one empty; they need not agree, so
-        ``ordering`` is ``None``. ``metadata["algorithm"]`` is ``"longitudinal_lingam"``.
+        past, so it is not estimated. ``structure.times`` lists the estimated time points, ``1`` to
+        ``T - 1``; ``structure.time_weights[t][k][i, j]`` is the weight of edge ``i -> j`` at lag
+        ``k`` for the t-th of them (lag 0 is instantaneous), and ``structure.lag_weights`` repeats
+        the last time point's. A lag that reaches before the first time point is ``NaN``. Lagged
+        weights are not pruned, so every lagged graph links every pair of variables, self-loops
+        included; judge lagged effects by weight size. ``metadata["causal_orders"]`` holds one
+        causal order per time point, the first one empty; they need not agree, so ``ordering`` is
+        ``None``. ``metadata["algorithm"]`` is ``"longitudinal_lingam"``. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -324,11 +340,17 @@ def longitudinal_lingam(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if
-        ``data`` has fewer than two time points, if ``tau_max`` is at least the number of time
-        points, if the per-time arrays differ in shape, or if the DataFrames' column names differ.
-        Also if ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
-        without a lag or beyond ``tau_max``.
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than two
+        time points, if ``tau_max`` is at least the number of time points, if the per-time arrays
+        differ in shape, or if the DataFrames' column names differ. Also if ``knowledge`` names a
+        column the data lacks, contradicts itself, or requires a link without a lag or beyond
+        ``tau_max``.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -475,7 +497,7 @@ def pcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -506,20 +528,21 @@ def pcmci(
     Returns
     -------
     StructureOutput
-        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to
-        ``tau_max`` and no lag 0. ``structure.lag(k)`` is a ``digraph`` whose edge ``i -> j`` is
-        the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop
-        is a variable's dependence on its own past. The structure has no ``lag_weights``.
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to ``tau_max``
+        and no lag 0. ``structure.lag(k)`` is a ``digraph`` whose edge ``i -> j`` is the link from
+        variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop is a
+        variable's dependence on its own past. The structure has no ``lag_weights``.
         ``metadata["p_values"][k - 1][i][j]`` and ``metadata["statistics"][k - 1][i][j]`` hold the
         MCI p-value, adjusted under ``fdr_method="fdr_bh"``, and test statistic of that link (the
         partial correlation under ``"fisherz"`` and ``"student_t"``; see Notes), for every pair,
         significant or not; a link the knowledge forbids reads p-value 1 and statistic 0, and a
-        required one reads 0 and 1.
-        ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) that
-        PC1 selected for variable ``j``, strongest first. Under a mixed-data test,
-        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position; with a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
-        ``ordering`` is ``None``, and ``metadata["algorithm"]`` is ``"pcmci"``.
+        required one reads 0 and 1. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable
+        ``i`` at lag ``k``) that PC1 selected for variable ``j``, strongest first. Under a
+        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read, by name
+        or 0-based position; with a randomized ``indep_test``, ``metadata["seed"]`` is the seed
+        used. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is ``"pcmci"``.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -529,17 +552,24 @@ def pcmci(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the
-        length at which every test keeps a degree of freedom. With ``"fisherz"`` or ``"student_t"``,
-        also if a variable repeats another up to scale and shift, at the same step or up to ``2 *
-        tau_max`` steps apart, before any test runs; one message names every group of copies, a
-        lagged value as ``'x' at lag k``, and says to keep one column per group. With ``"chisq"`` or
-        ``"gsq"``, also if ``data`` holds a value that is not a whole number; with ``"degen_gauss"``
-        or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and, with a
-        continuous test, if a column is declared categorical, by ``categorical`` or by its type.
-        Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires a link
-        without a lag or outside lags ``1`` to ``tau_max``.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which every
+        test keeps a degree of freedom. With ``"fisherz"`` or ``"student_t"``, also if a variable
+        repeats another up to scale and shift, at the same step or up to ``2 * tau_max`` steps
+        apart, before any test runs; one message names every group of copies, a lagged value as
+        ``'x' at lag k``, and says to keep one column per group. With ``"chisq"`` or ``"gsq"``, also
+        if ``data`` holds a value that is not a whole number; with ``"degen_gauss"`` or
+        ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and, with a continuous
+        test, if a column is declared categorical, by ``categorical`` or by its type. Also if
+        ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires a link without
+        a lag or outside lags ``1`` to ``tau_max``.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -776,7 +806,7 @@ def pcmciplus(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -822,28 +852,28 @@ def pcmciplus(
     Returns
     -------
     StructureOutput
-        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
-        ``tau_max``. ``structure.lag(0)`` is a ``cpdag`` of the same-step links: ``i -> j`` is
-        oriented, and ``i -- j`` is a link whose direction the data cannot tell or whose
-        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, 0, j]`` links
-        (variable ``i`` at lag ``0`` and ``j``), ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a
-        ``digraph`` whose edge ``i -> j`` is the link from variable ``i`` at time ``t - k`` to
-        variable ``j`` at time ``t``; a self-loop is a variable's dependence on its own past. The
-        structure has no ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value
-        among the skeleton-phase tests of the link between variable ``i`` at ``t - k`` and
-        variable ``j`` at ``t`` (the first step's tests for a lagged link that step removed; for
-        ``k >= 1`` its Benjamini-Hochberg adjusted value under ``fdr_method="fdr_bh"``), and
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to ``tau_max``.
+        ``structure.lag(0)`` is a ``cpdag`` of the same-step links: ``i -> j`` is oriented, and
+        ``i -- j`` is a link whose direction the data cannot tell or whose orientations conflict;
+        ``metadata["conflicts"]`` lists the latter as ``[i, 0, j]`` links (variable ``i`` at lag
+        ``0`` and ``j``), ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a ``digraph`` whose edge
+        ``i -> j`` is the link from variable ``i`` at time ``t - k`` to variable ``j`` at time
+        ``t``; a self-loop is a variable's dependence on its own past. The structure has no
+        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the
+        skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j`` at
+        ``t`` (the first step's tests for a lagged link that step removed; for ``k >= 1`` its
+        Benjamini-Hochberg adjusted value under ``fdr_method="fdr_bh"``), and
         ``metadata["statistics"][k][i][j]`` the statistic of that test (see Notes); lag ``0`` is
-        symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
-        tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1. Under a
-        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read; with a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
-        ``metadata["parents"][j]`` lists the
-        ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable
-        ``j``, strongest first, and ``metadata["ambiguous_triples"]`` the ``[i, k, m, j]``
-        triples (variable ``i`` at lag ``k``, then ``m`` and ``j`` at lag ``0``) the collider rule
-        left undecided. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is
-        ``"pcmciplus"``.
+        symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never tested,
+        reads p-value 1 and statistic 0, and a required one reads 0 and 1. Under a mixed-data test,
+        ``metadata["categorical"]`` lists the categorical columns it read; with a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["parents"][j]`` lists the
+        ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable ``j``,
+        strongest first, and ``metadata["ambiguous_triples"]`` the ``[i, k, m, j]`` triples
+        (variable ``i`` at lag ``k``, then ``m`` and ``j`` at lag ``0``) the collider rule left
+        undecided. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is ``"pcmciplus"``.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -853,18 +883,25 @@ def pcmciplus(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + n_variables + 1``
-        rows, the length at which every test keeps a degree of freedom. With ``"fisherz"`` or
-        ``"student_t"``, also if a variable repeats another up to scale and shift, at the same step
-        or up to ``2 * tau_max`` steps apart, before any test runs; one message names every group of
-        copies, a lagged value as ``'x' at lag k``, and says to keep one column per group. With
-        ``"chisq"`` or ``"gsq"``, also if ``data`` holds a value that is not a whole number; with
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix with at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length
+        at which every test keeps a degree of freedom. With ``"fisherz"`` or ``"student_t"``, also
+        if a variable repeats another up to scale and shift, at the same step or up to
+        ``2 * tau_max`` steps apart, before any test runs; one message names every group of copies,
+        a lagged value as ``'x' at lag k``, and says to keep one column per group. With ``"chisq"``
+        or ``"gsq"``, also if ``data`` holds a value that is not a whole number; with
         ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks;
         and, with a continuous test, if a column is declared categorical, by ``categorical`` or by
         its type. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, requires
         a link without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle
         over the links the skeleton phase kept.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -1074,7 +1111,7 @@ def lpcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -1112,27 +1149,28 @@ def lpcmci(
     Returns
     -------
     StructureOutput
-        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
-        ``tau_max``. ``structure.lag(0)`` is a ``pag`` of the same-step links: ``i -> j``,
-        ``i o-> j``, ``i <-> j`` (a hidden common cause), and ``i o-o j``. ``structure.lag(k)``,
-        ``k >= 1``, is a ``digraph`` of the lagged links whose earlier end is a tail, the definite
-        causes: its edge ``i -> j`` says variable ``i`` at time ``t - k`` causes variable ``j`` at
-        time ``t``, and a self-loop is a variable's effect on its own future. The structure has no
-        ``lag_weights``. ``metadata["links"][k][i][j]`` holds every link between variable ``i``
-        at ``t - k`` and variable ``j`` at ``t`` as three characters, ``""`` when there is none:
-        the mark at ``i`` (``-`` tail, ``<`` arrowhead, ``o`` circle, ``x`` conflict), ``-``, and
-        the mark at ``j`` (``>``, ``-``, ``o``, or ``x``), such as ``"o->"``, ``"<->"``, or
-        ``"-->"``; lag ``0`` lists both orders. ``metadata["conflicts"]`` lists the ``[i, k, j]``
-        links with a conflict mark, which ``structure.lag(0)`` shows as a circle and
-        ``structure.lag(k)`` leaves out. ``metadata["p_values"][k][i][j]`` is the largest p-value of
-        the final round's tests of that pair, and ``metadata["statistics"][k][i][j]`` the statistic
-        of that test (see Notes); lag ``0`` is symmetric with ``1`` and ``0`` on the diagonal and on
-        pairs no test ran on, and a required link, never tested, reads ``0`` and ``1``. Under a
-        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read; with a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["parents"][j]``
-        lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) the last preliminary round found to
-        be parents of variable ``j``. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is
-        ``"lpcmci"``.
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to ``tau_max``.
+        ``structure.lag(0)`` is a ``pag`` of the same-step links: ``i -> j``, ``i o-> j``,
+        ``i <-> j`` (a hidden common cause), and ``i o-o j``. ``structure.lag(k)``, ``k >= 1``, is a
+        ``digraph`` of the lagged links whose earlier end is a tail, the definite causes: its edge
+        ``i -> j`` says variable ``i`` at time ``t - k`` causes variable ``j`` at time ``t``, and a
+        self-loop is a variable's effect on its own future. The structure has no ``lag_weights``.
+        ``metadata["links"][k][i][j]`` holds every link between variable ``i`` at ``t - k`` and
+        variable ``j`` at ``t`` as three characters, ``""`` when there is none: the mark at ``i``
+        (``-`` tail, ``<`` arrowhead, ``o`` circle, ``x`` conflict), ``-``, and the mark at ``j``
+        (``>``, ``-``, ``o``, or ``x``), such as ``"o->"``, ``"<->"``, or ``"-->"``; lag ``0`` lists
+        both orders. ``metadata["conflicts"]`` lists the ``[i, k, j]`` links with a conflict mark,
+        which ``structure.lag(0)`` shows as a circle and ``structure.lag(k)`` leaves out.
+        ``metadata["p_values"][k][i][j]`` is the largest p-value of the final round's tests of that
+        pair, and ``metadata["statistics"][k][i][j]`` the statistic of that test (see Notes); lag
+        ``0`` is symmetric with ``1`` and ``0`` on the diagonal and on pairs no test ran on, and a
+        required link, never tested, reads ``0`` and ``1``. Under a mixed-data test,
+        ``metadata["categorical"]`` lists the categorical columns it read; with a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["parents"][j]`` lists the
+        ``[i, k]`` pairs (variable ``i`` at lag ``k``) the last preliminary round found to be
+        parents of variable ``j``. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is
+        ``"lpcmci"``. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1142,17 +1180,29 @@ def lpcmci(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
-        rows, the length at which every test keeps a degree of freedom. With ``"fisherz"`` or
-        ``"student_t"``, also if a variable repeats another up to scale and shift, at the same step
-        or up to ``2 * tau_max`` steps apart, before any test runs; one message names every group of
-        copies, a lagged value as ``'x' at lag k``, and says to keep one column per group. With
-        ``"chisq"`` or ``"gsq"``, also if ``data`` holds a value that is not a whole number; with
-        ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks;
-        and, with a continuous test, if a column is declared categorical, by ``categorical`` or by
-        its type. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or
-        requires a link without a lag or beyond ``tau_max``.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1`` rows, the length at
+        which every test keeps a degree of freedom. With ``"fisherz"`` or ``"student_t"``, also if a
+        variable repeats another up to scale and shift, at the same step or up to ``2 * tau_max``
+        steps apart, before any test runs; one message names every group of copies, a lagged value
+        as ``'x' at lag k``, and says to keep one column per group. With ``"chisq"`` or ``"gsq"``,
+        also if ``data`` holds a value that is not a whole number; with ``"degen_gauss"`` or
+        ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and, with a continuous
+        test, if a column is declared categorical, by ``categorical`` or by its type. Also if
+        ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires a link without
+        a lag or beyond ``tau_max``.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -1229,14 +1279,14 @@ def lpcmci(
     series five times as long. With a partial-correlation test it assumes linear effects;
     ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are not
     benchmarked yet. It assumes a stationary series and no selection bias; hidden common causes are
-    allowed. The graph covers ``tau_max + 1`` time steps, and a
-    hidden cause that acts through earlier steps can add links within that window. The removal and
-    rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
-    the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) - 2``
-    values, so the series needs many more time steps than that. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine. Missing values are not benchmarked yet; the tests run them on up to 5 variables with up
-    to a fifth of the values missing completely at random.
+    allowed. The graph covers ``tau_max + 1`` time steps, and a hidden cause that acts through
+    earlier steps can add links within that window. The removal and rule steps test subsets of a
+    node's neighbors, so the number of tests grows exponentially with the number of links at one
+    node. A test conditions on up to ``n_variables * (tau_max + 1) - 2`` values, so the series needs
+    many more time steps than that. Missing values are not benchmarked yet; the tests run them on up
+    to 5 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1334,8 +1384,8 @@ def granger(
     tau_max : int, default=1
         The largest lag: each regression uses the past ``tau_max`` time steps, at least ``1``.
     alpha : float, default=0.05
-        Significance level of the test of each lagged coefficient, in the open interval (0, 1): a
-        larger value returns more edges.
+        Significance level of the test of each lagged coefficient, in ``(0, 1)``: a larger value
+        returns more edges.
     fdr_method : {"none", "fdr_bh"}, default="fdr_bh"
         How the p-values are corrected for the number of links tested. ``"fdr_bh"`` replaces them
         with their Benjamini-Hochberg adjusted values [3]_ over all the links together, every lag
@@ -1381,11 +1431,17 @@ def granger(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than ``(n_variables + 1) * tau_max + 2`` rows, so that the regression has no degree of
-        freedom left, or fewer than 2 columns, or if a regression is singular, as when one variable
-        is a linear combination of others. Also if ``knowledge`` names a column ``data`` lacks,
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than
+        ``(n_variables + 1) * tau_max + 2`` rows, so that the regression has no degree of freedom
+        left, or fewer than 2 columns, or if a regression is singular, as when one variable is a
+        linear combination of others. Also if ``knowledge`` names a column ``data`` lacks,
         contradicts itself, or requires a link without a lag or beyond ``tau_max``.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -1568,15 +1624,16 @@ def dynotears(
     Returns
     -------
     StructureOutput
-        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
-        ``tau_max``. ``structure.lag(0)`` is a ``dag`` of the same-step edges and
-        ``structure.lag(k)``, ``k >= 1``, a ``digraph`` with the edge ``i -> j`` from ``x_i(t - k)``
-        to ``x_j(t)``, self-loops included. ``structure.lag_weights[k][i, j]`` is the coefficient
-        of that edge in the data's units, and ``0`` where there is no edge. ``ordering`` is
-        ``None``. ``metadata`` holds ``"algorithm"`` (``"dynotears"``), ``"h_final"`` (the
-        acyclicity function of the same-step weights before the threshold), and
-        ``"edges_removed"`` (same-step edges the threshold kept that the cycle repair dropped), and
-        ``"tie_break"`` (the rule ties followed).
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to ``tau_max``.
+        ``structure.lag(0)`` is a ``dag`` of the same-step edges and ``structure.lag(k)``,
+        ``k >= 1``, a ``digraph`` with the edge ``i -> j`` from ``x_i(t - k)`` to ``x_j(t)``,
+        self-loops included. ``structure.lag_weights[k][i, j]`` is the coefficient of that edge in
+        the data's units, and ``0`` where there is no edge. ``ordering`` is ``None``.
+        ``metadata["algorithm"]`` is ``"dynotears"``, ``metadata["h_final"]`` the acyclicity
+        function of the same-step weights before the threshold, and ``metadata["edges_removed"]``
+        the same-step edges the threshold kept that the cycle repair dropped.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1586,14 +1643,21 @@ def dynotears(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a finite numeric matrix without a constant column, or has fewer than ``tau_max + 2``
-        rows, so that fewer than 2 steps have ``tau_max`` steps before them. Also if a column
-        repeats another up to scale and shift, as the direction between copies cannot be told
-        apart; one message names every group of copies and says to keep one column per group.
-        Also if ``knowledge``
-        names a column ``data`` lacks, contradicts itself, or requires a link without a lag or
-        beyond ``tau_max``.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a finite
+        numeric matrix without a constant column, or has fewer than ``tau_max + 2`` rows, so that
+        fewer than 2 steps have ``tau_max`` steps before them. Also if a column repeats another up
+        to scale and shift, as the direction between copies cannot be told apart; one message names
+        every group of copies and says to keep one column per group. Also if ``knowledge`` names a
+        column ``data`` lacks, contradicts itself, or requires a link without a lag or beyond
+        ``tau_max``.
+
+    Warns
+    -----
+    SearchLimitWarning
+        When the fit stops on ``max_iter`` rather than on ``h_tol`` or ``rho_max``.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -1700,15 +1764,12 @@ def dynotears(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import dynotears
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = dynotears(np.column_stack([x, y]))
+    >>> out = dynotears(np.column_stack([x, y]))
     >>> out.structure.lag(1).oriented_edges()
     [(0, 1, 'directed')]
     """

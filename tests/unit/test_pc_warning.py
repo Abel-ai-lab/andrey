@@ -81,11 +81,11 @@ def test_many_variables_pruned_early_do_not_warn(monkeypatch, oracle):
     assert not np.any(result.structure.to_numpy())
 
 
-@pytest.mark.parametrize("method", ["fci", "cdnod"])
+@pytest.mark.parametrize("method", ["fci", "cdnod", "fci_jci"])
 def test_warning_is_specific_to_pc(monkeypatch, oracle, method):
     monkeypatch.setattr(pc_module, "_EXPENSIVE_PASS_TESTS", 1)
     data = np.random.default_rng(0).standard_normal((20, 6))
-    kwargs = {"env": np.arange(20)} if method == "cdnod" else {}
+    kwargs = {"env": np.arange(20)} if method in ("cdnod", "fci_jci") else {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         getattr(andrey, method)(data, indep_test="warning-test", **kwargs)

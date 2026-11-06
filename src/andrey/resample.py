@@ -921,13 +921,13 @@ def bootstrap(
     ``ut_igsp``, and ``icp``), a resample is drawn within each environment of ``env``: of an
     environment's ``m`` rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a
     bootstrap resample draws ``m`` with replacement, so every resample keeps every environment. A
-    numeric ``env`` of ``cdnod``, which reads it as numbers, such as a domain number or a time step,
-    resamples the rows as a whole. For a method that takes ``targets`` and returns a CPDAG
-    (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a CPDAG without the
-    targets, so an edge that only the interventions orient is undirected there; the edge frequencies
-    keep its direction. A time-series method on one series subsamples one stretch of consecutive
-    rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units,
-    and ``multi_group_direct_lingam`` resamples each dataset on its own.
+    numeric ``env`` of ``cdnod`` or ``fci_jci``, which read it as numbers, such as a domain number
+    or a time step, resamples the rows as a whole. For a method that takes ``targets`` and returns
+    a CPDAG (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a CPDAG
+    without the targets, so an edge that only the interventions orient is undirected there; the
+    edge frequencies keep its direction. A time-series method on one series subsamples one stretch
+    of consecutive rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam``
+    resamples whole units, and ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
     ----------
@@ -937,7 +937,8 @@ def bootstrap(
         The data, as the method takes it. ``multi_group_direct_lingam`` and
         ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
         each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
-        and resampled within each environment, ``cdnod``'s domains included.
+        and resampled within each environment, the domains of ``cdnod`` and ``fci_jci``
+        included.
     n_resamples : int, default=100
         The number of resamples and fits.
     seed : int or None, default=None
@@ -1082,13 +1083,12 @@ def bootstrap(
 
     On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
     ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
-    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the rule of 0.11.0
-    (a pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24
-    cells, by an interval below 0, and more in none. It had fewer errors than the fit on all the
-    rows in 14 cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a
-    valid graph of the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all
-    of ``ges`` and ``direct_lingam``; the rule of 0.11.0 gave a valid CPDAG or PAG in 0 to 13 of
-    the 20 datasets of a cell.
+    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the majority rule (a
+    pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24 cells, by
+    an interval below 0, and more in none. It had fewer errors than the fit on all the rows in 14
+    cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a valid graph of
+    the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all of ``ges`` and
+    ``direct_lingam``; that rule gave a valid CPDAG or PAG in 0 to 13 of the 20 datasets of a cell.
 
     A frequency is a ranking of the edges, not a probability, and no error bound comes with the
     averaged graph. Resampling can also make a column constant; a fit that raises stops the run,

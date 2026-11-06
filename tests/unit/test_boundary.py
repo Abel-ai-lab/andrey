@@ -138,9 +138,9 @@ class _Checked(Exception):
 
 
 def _call(method: str, data: np.ndarray) -> object:
-    """Fit ``method`` on ``data``: two environments for cdnod, gnies, and icp, two or three copies
-    for a panel."""
-    if method in ("cdnod", "gnies"):
+    """Fit ``method`` on ``data``: two environments for cdnod, fci_jci, gnies, and icp, two or three
+    copies for a panel."""
+    if method in ("cdnod", "fci_jci", "gnies"):
         return getattr(andrey, method)(data, env=np.arange(len(data)) % 2)
     if method == "icp":
         return andrey.icp(data, env=np.arange(len(data)) % 2, target=0)
