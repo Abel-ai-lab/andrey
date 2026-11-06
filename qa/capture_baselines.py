@@ -122,7 +122,7 @@ ALGORITHMS = {
     "CAM": (_facade("cam"), "nonmonotone_4v"),
     "VARMALiNGAM": (_facade("varma_lingam", order=(1, 1), prune=False), "varma_3v"),
     "VARMALiNGAMPruned": (_facade("varma_lingam", order=(1, 1), prune=True), "varma_3v"),
-    "Granger": (_facade("granger", tau_max=2), "var_4v_stable"),
+    "Granger": (_facade("granger", tau_max=2, fdr_method="none"), "var_4v_stable"),
     "DYNOTEARS": (_facade("dynotears"), "svar_4v_gauss"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),

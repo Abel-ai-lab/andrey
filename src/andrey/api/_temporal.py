@@ -142,12 +142,11 @@ def _adapt_granger(
     layout PCMCI's p-values take.
     """
     coeff = np.asarray(coeff, dtype=np.float64)
-    d = coeff.shape[0]
-    if coeff.shape[1] != d * maxlag:
+    if coeff.ndim != 2 or coeff.shape[1] != coeff.shape[0] * maxlag:
         raise ValueError(
-            f"granger coeff must have shape ({d}, {d * maxlag}) for maxlag={maxlag}, "
-            f"got {coeff.shape}"
+            f"granger coeff must have shape (d, d * maxlag) for maxlag={maxlag}, got {coeff.shape}"
         )
+    d = coeff.shape[0]
     ar = np.stack([coeff[:, d * k : d * (k + 1)] for k in range(maxlag)])
     graphs = _lag_graphs(ar, instantaneous=False, required=required)
     temporal = TemporalStructure.from_lag_graphs(

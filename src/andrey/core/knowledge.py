@@ -421,9 +421,11 @@ def _check_parts(knowledge: Knowledge, method: str, honors: Sequence[KnowledgePa
 def _columns(
     d: int, labels: Sequence[str] | None
 ) -> tuple[Callable[[Node, str], int], Callable[[int], str]]:
-    """The ``position`` of the column a knowledge part names among ``d`` columns named ``labels``,
-    raising :class:`KnowledgeError` when it is missing, and the ``label`` a message gives column
-    ``i``."""
+    """The column lookup of a knowledge part over ``d`` columns named ``labels``.
+
+    ``position`` gives the column a knowledge part names and raises :class:`KnowledgeError` when it
+    is missing; ``label`` gives the name a message uses for column ``i``.
+    """
     names = list(labels) if labels is not None else None
 
     def position(node: Node, what: str) -> int:
@@ -441,9 +443,11 @@ def _tiers_and_allowed(
     position: Callable[[Node, str], int],
     label: Callable[[int], str],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Each column's tier, ``-1`` for none, and the ``(d, d)`` links the tiers and ``allowed``
-    forbid: from a later tier into an earlier one, and both directions of every pair of distinct
-    columns ``allowed`` leaves out."""
+    """Each column's tier, ``-1`` for none, and the links the tiers and ``allowed`` forbid.
+
+    The links form a ``(d, d)`` mask: the tiers forbid a link from a later tier into an earlier
+    one, and ``allowed`` forbids both directions of every pair of distinct columns it leaves out.
+    """
     tier = np.full(d, -1, dtype=np.intp)
     for k, nodes in enumerate(knowledge.tiers):
         for v in nodes:

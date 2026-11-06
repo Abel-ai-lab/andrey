@@ -84,9 +84,10 @@ def test_granger_json_roundtrip(tmp_path):
     assert StructureOutput.load(p) == out
 
 
-def test_granger_rejects_bad_shape():
+@pytest.mark.parametrize("shape", [(3, 5), (6,), (3, 6, 1)])
+def test_granger_rejects_bad_shape(shape):
     with pytest.raises(ValueError, match="shape"):
-        _adapt_granger(np.zeros((3, 5)), maxlag=2)  # 5 != d*maxlag = 6
+        _adapt_granger(np.zeros(shape), maxlag=2)
 
 
 def test_orientation_invariant_weights_match_edges():

@@ -159,7 +159,7 @@ def test_longitudinal_lingam_matches_the_recorded_output():
 def test_granger_recovery():
     from andrey.api.temporal import granger
 
-    out = granger(datagen.generate("var_4v_stable"), tau_max=2)
+    out = granger(datagen.generate("var_4v_stable"), tau_max=2, fdr_method="none")
     assert_recorded_output(out, "Granger", case="var_4v_stable")
 
 

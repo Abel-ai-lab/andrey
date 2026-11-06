@@ -54,8 +54,11 @@ class DynotearsResult:
 
 
 def lagged_covariance(series: np.ndarray, tau_max: int) -> np.ndarray:
-    """The covariance of the columns of the lagged design over lags ``0`` to ``tau_max``
-    (:func:`~andrey.temporal.pcmci.lagged_design`), each centered on its own mean."""
+    """The covariance of the lagged design's columns over lags ``0`` to ``tau_max``.
+
+    The design is :func:`~andrey.temporal.pcmci.lagged_design`'s; each column is centered on its
+    own mean.
+    """
     design = lagged_design(series, tau_max)
     centered = design - design.mean(axis=0, keepdims=True)
     return centered.T @ centered / design.shape[0]
