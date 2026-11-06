@@ -323,6 +323,68 @@ _add(
 )
 _add(
     MethodSpec(
+        name="fci_jci",
+        family="constraint",
+        summary="FCI for data pooled from several domains or regimes, allowing hidden common "
+        "causes: adds the environment index as a variable no data variable causes (Joint Causal "
+        "Inference), which removes edges pooling adds and can orient more. Returns a PAG over the "
+        "data variables and lists the index's edges.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers are read as numbers; text labels are coded 0, 1, ... in sorted order.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+            notes="env becomes a trailing context node, then projected out of the result; its "
+            "edges go in metadata['index_edges'].",
+            missing=True,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['index_edges'] lists the index's edges as [variable, kind] pairs, kind "
+            "directed, partially_directed, or bidirected, in column order; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position, the index numbered "
+            "n_variables",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
+        seeded=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _POSSIBLE_DSEP,
+            concept_param("confounded_index"),
+            _TEST_SEED,
+        ),
+        references=(
+            "Mooij, Magliacane & Claassen 2020",
+            "Spirtes, Glymour & Scheines 2000",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
+        ),
+    )
+)
+_add(
+    MethodSpec(
         name="icp",
         family="constraint",
         summary="Invariant causal prediction: the causal parents of one target from continuous "
@@ -1353,6 +1415,98 @@ _add(
         references=("Lam, Andrews & Ramsey 2022",),
     )
 )
+#: The parent cap of the BOSS or GRaSP phase of boss_fci and grasp_fci.
+_PERMUTATION_FCI_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents in the BOSS or GRaSP phase, at least 0. The test phase only "
+    "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of the PAG. "
+    "null sets no cap.",
+)
+#: The seed of boss_fci and grasp_fci: the order search's and a randomized test's.
+_PERMUTATION_FCI_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
+    "gpdc.",
+)
+for _name, _summary, _own, _refs in (
+    (
+        "boss_fci",
+        "GFCI with BOSS in place of GES: BOSS adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI, with BOSS's search for "
+        "highly connected variables. Returns a PAG.",
+        (),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",
+            "Zhang 2008",
+        ),
+    ),
+    (
+        "grasp_fci",
+        "GFCI with GRaSP in place of GES: GRaSP adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI. Returns a PAG.",
+        (
+            ParamSpec(
+                name="grasp_depth",
+                minimum=1,
+                type="int",
+                default=3,
+                doc="Maximum number of tucks in one chain of moves of the GRaSP phase, at least 1; "
+                "larger depths search more chains and run longer.",
+            ),
+        ),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Lam, Andrews & Ramsey 2022",
+        ),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="permutation",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="pag",
+                doc="metadata['categorical'] lists the categorical columns a mixed-data setting "
+                "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
+                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position",
+            ),
+            determinism="stochastic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            order_note=(
+                '`tie_break="position"` fires the orientation rules one at a time in column order '
+                "and records the first separating subset found, and it or "
+                '`possible_dsep="fast"` visits the possible-d-separation step in column order.'
+            ),
+            seeded=True,
+            params=(
+                _SCORE_FUNC,
+                _PENALTY_DISCOUNT,
+                _EBIC_GAMMA_STANDARD,
+                _EQUIVALENT_SAMPLE_SIZE,
+                *_own,
+                _INDEP_TEST,
+                _ALPHA,
+                _COLLIDER_RULE,
+                _CATEGORICAL,
+                _POSSIBLE_DSEP,
+                _PERMUTATION_FCI_SEED,
+                _N_STARTS,
+                _PERMUTATION_FCI_MAX_PARENTS,
+            ),
+            references=_refs,
+        )
+    )
 _add(
     MethodSpec(
         name="igsp",
@@ -2520,8 +2674,13 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
+    "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
     "and never removes a required pair. " + _PAG_MARKS,
+    "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
+    "BOSS found and never removes a required pair. " + _PAG_MARKS,
+    "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
+    "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
@@ -2642,6 +2801,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
     "cdnod": ("conflicts", "index_edges", "changing_variables"),
+    "fci_jci": ("index_edges",),
     "icp": (
         "target",
         "parents",

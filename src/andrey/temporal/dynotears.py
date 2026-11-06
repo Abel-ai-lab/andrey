@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ties import tie_ranks
 from andrey.search.continuous import (
     Canonical,
     augmented_lagrangian,
@@ -30,7 +31,6 @@ from andrey.search.continuous import (
     threshold_dag,
     trace_exponential,
 )
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -85,7 +85,7 @@ def dynotears(
 ) -> DynotearsResult:
     """Fit DYNOTEARS (Pamfil et al. 2020) to ``series``, one row per time step.
 
-    The columns are fit in the order of their :func:`~andrey.search.hc.tie_ranks`, so the result
+    The columns are fit in the order of their :func:`~andrey.core.ties.tie_ranks`, so the result
     does not depend on the order they come in. ``standardize`` scales each column of the series to
     unit variance first (:func:`~andrey.search.continuous.center`). ``constraints`` holds the
     knowledge over lags ``0`` to ``tau_max``: a forbidden link stays at zero, and a required one

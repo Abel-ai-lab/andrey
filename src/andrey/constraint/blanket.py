@@ -8,7 +8,8 @@ moral graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and
 :func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`, and
 background knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of a required edge
 is a member of the other's set from the start and never leaves it, and a pair the knowledge makes
-non-adjacent is never in a returned set.
+non-adjacent is never in a returned set. :func:`local_structure` and :func:`local_set` build the
+named CI test over the data and run the learners for every variable or for one target.
 
 The structure learner of Margaritis (2003) turns the sets into a CPDAG: :func:`prune_spouses`
 removes from the moral graph each pair that a subset of the smaller of the two blankets separates,
@@ -19,24 +20,31 @@ completes the result by Meek's rules.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
-agree to ``_KEY_DP`` decimals go to the candidate with the lower rank, from
-:func:`~andrey.search.hc.tie_ranks`, so the sets do not depend on the column order.
+agree to ``KEY_DP`` decimals go to the candidate with the lower rank, from
+:func:`~andrey.core.ties.tie_ranks`, so the sets do not depend on the column order.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
+from contextlib import nullcontext
 from itertools import combinations, islice
 
 import numpy as np
 
 from andrey.constraint._skeleton import _CHUNK, adjacent_pairs, scan_conditioning_sets
-from andrey.core import ARROW, NULL, TAIL
-from andrey.core.ci import CITest
+from andrey.core import ARROW, NULL, TAIL, backend
+from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import TestwiseDeletion
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
-from andrey.search._parallel import _KEY_DP
+from andrey.core.ties import (
+    KEY_DP,
+    resolve_collider_order,
+    resolve_in_column_order,
+    tie_mask,
+    tie_ranks,
+)
 
 # The sets of one size a collider test asks first; each later chunk is twice as large.
 _FIRST_CHUNK = 32
@@ -59,13 +67,13 @@ def _dependence(test: CITest) -> _Dependence:
 
         def by_statistic(target: int, x: int, cond: Sequence[int]) -> tuple[float, float]:
             r, p = statistic_pvalue(target, x, cond)
-            return p, -round(abs(r), _KEY_DP)
+            return p, -round(abs(r), KEY_DP)
 
         return by_statistic
 
     def by_pvalue(target: int, x: int, cond: Sequence[int]) -> tuple[float, float]:
         p = test(target, x, cond)
-        return p, round(p, _KEY_DP)
+        return p, round(p, KEY_DP)
 
     return by_pvalue
 
@@ -84,7 +92,7 @@ def _dependences(
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
         ) -> list[tuple[float, float]]:
-            return [(p, round(p, _KEY_DP)) for p in scan(target, xs, cond).tolist()]
+            return [(p, round(p, KEY_DP)) for p in scan(target, xs, cond).tolist()]
 
         return by_scan
     dependence = _dependence(test)
@@ -260,7 +268,7 @@ def parents_children(
 
     A candidate's association with ``target`` is its weakest over the conditioning sets drawn from
     the current set (:func:`_weakest`): the largest p-value among them, then, where two candidates'
-    largest p-values agree to ``_KEY_DP`` decimals, the smallest strength, then the rank. Forward:
+    largest p-values agree to ``KEY_DP`` decimals, the smallest strength, then the rank. Forward:
     add the candidate whose weakest association is the strongest, until every candidate has a
     conditioning set with a p-value above ``alpha``; such a candidate is dropped for good, since
     adding members only weakens an association. Each addition tests every remaining candidate
@@ -312,7 +320,7 @@ def parents_children(
             break
         best = min(
             open_,
-            key=lambda x: (round(open_[x][0], _KEY_DP), -round(open_[x][1], _KEY_DP), ranks[x]),
+            key=lambda x: (round(open_[x][0], KEY_DP), -round(open_[x][1], KEY_DP), ranks[x]),
         )
         del open_[best]
         admit(best, open_)
@@ -514,13 +522,7 @@ def blanket_cpdag(
     colliders of equal rank dispute is left undirected.
     """
     # pc imports this module through andrey.search, so its import waits for the call.
-    from andrey.constraint.pc import (
-        _orient_colliders,
-        _undirect_conflicts,
-        check_knowledge_cycle,
-        resolve_collider_order,
-        resolve_in_column_order,
-    )
+    from andrey.constraint.pc import _orient_colliders, _undirect_conflicts, check_knowledge_cycle
 
     sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
     marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
@@ -542,3 +544,104 @@ def blanket_cpdag(
         in_column_order=resolve_in_column_order(),
     )
     return _undirect_conflicts(cpdag)
+
+
+def _ranked_test(
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
+) -> tuple[CITest, list[int]]:
+    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
+    :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories ranked as
+    categories (:func:`~andrey.core.ties.tie_mask`)."""
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
+
+
+def local_structure(
+    X: np.ndarray,
+    method: str,
+    structure: str,
+    *,
+    alpha: float,
+    indep_test: str,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> np.ndarray:
+    """Every variable's MMPC, IAMB, or Inter-IAMB set joined into the graph ``structure`` names, as
+    an endpoint-mark matrix.
+
+    ``"moral"`` (IAMB, Inter-IAMB) joins a pair when each variable is in the other's Markov
+    blanket, undirected. ``"skeleton"`` is MMPC's skeleton under the AND rule, or the moral graph
+    less the pairs :func:`prune_spouses` separates. ``"cpdag"`` orients that skeleton
+    (:func:`blanket_cpdag`) against the blankets: the moral graph, or for MMPC each variable's set
+    together with its members' sets before the symmetry check (:func:`reach`). ``seed`` fixes the
+    draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's
+    conditioning set; ``constraints`` set the members as this module describes.
+    """
+    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    d = X.shape[1]
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        if method == "mmpc":
+            sets = mmpc_sets(test, d, alpha, ranks, max_depth, constraints)
+            skeleton, blankets = sets & sets.T, reach(sets)
+        else:
+            blankets = blanket_graph(
+                test,
+                d,
+                alpha,
+                ranks,
+                interleaved=method == "inter_iamb",
+                max_depth=max_depth,
+                constraints=constraints,
+            )
+            skeleton = (
+                blankets
+                if structure == "moral"
+                else prune_spouses(test, blankets, alpha, max_depth, constraints)
+            )
+        if structure != "cpdag":
+            return np.where(skeleton, TAIL, NULL).astype(np.int8)
+        return blanket_cpdag(test, skeleton, blankets, alpha, max_depth, constraints)
+
+
+def local_set(
+    X: np.ndarray,
+    method: str,
+    target: int,
+    *,
+    alpha: float,
+    indep_test: str,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> list[int]:
+    """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
+    or Inter-IAMB (``"inter_iamb"``).
+
+    MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
+    (the symmetry check); IAMB and Inter-IAMB return the Markov blanket. ``seed`` fixes the draws of
+    a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning
+    set; ``constraints`` set the members as this module describes.
+    """
+    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    d = X.shape[1]
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        if method == "mmpc":
+            found = parents_children(test, target, d, alpha, ranks, max_depth, constraints)
+            return [
+                x
+                for x in found
+                if target in parents_children(test, x, d, alpha, ranks, max_depth, constraints)
+            ]
+        return markov_blanket(
+            test,
+            target,
+            d,
+            alpha,
+            ranks,
+            interleaved=method == "inter_iamb",
+            max_depth=max_depth,
+            constraints=constraints,
+        )

@@ -129,8 +129,8 @@ def mmhc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give sparser
-        skeletons, so the score search considers fewer pairs.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        sparser skeletons, so the score search considers fewer pairs.
     indep_test : str or None, default=None
         Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``,
         ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
@@ -160,8 +160,8 @@ def mmhc(
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
-        Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
-    categorical : sequence of str or int, optional
+        Most hill-climbing moves, at least ``1``; ``None`` sets no limit.
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test and score, as for
         :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
@@ -191,8 +191,10 @@ def mmhc(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"mmhc"``, ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges` (lower is better). Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records
+        the penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -203,12 +205,11 @@ def mmhc(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if
-        ``score_func`` and ``indep_test`` read different kinds of data, or if ``data`` or
-        ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
-        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
-        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``score_func`` and
+        ``indep_test`` read different kinds of data, or if ``data`` or ``categorical`` does not suit
+        the test or score, as for :func:`~andrey.pc` and :func:`~andrey.hc`. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents, or if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -217,11 +218,6 @@ def mmhc(
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
         a setting reads columns that look like category codes as numbers; once per process.
-
-    See Also
-    --------
-    andrey.rsmax2 : Other restrict and maximize phases.
-    andrey.mmpc : The MMPC phase alone, for one variable or all.
 
     Notes
     -----
@@ -267,14 +263,15 @@ def mmhc(
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
-    on one core. In every setting the mean CPDAG errors stay below the empty graph's; the closest
-    is at 20 variables and mean degree 4, with 29 to 31 pairs wrong against 40 for the empty
-    graph. A fit took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4.
-    An edge the MMPC phase misses is never added, and the
-    hill-climbing phase stops at a local optimum. MMPC tests each candidate against every subset
-    of the current members, so its cost grows exponentially with the size of a variable's
-    parents-and-children set.
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
+    one core. In every setting the mean CPDAG errors stay below the empty graph's; the closest is at
+    20 variables and mean degree 4, with 29 to 31 pairs wrong against 40 for the empty graph. A fit
+    took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the
+    MMPC phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC
+    tests each candidate against every subset of the current members, so its cost grows
+    exponentially with the size of a variable's parents-and-children set. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -285,15 +282,12 @@ def mmhc(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import mmhc
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = x + 0.1 * rng.standard_normal(500)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = mmhc(np.column_stack([x, y]))
+    >>> out = mmhc(np.column_stack([x, y]))
     >>> out.structure.kind
     'cpdag'
     """
@@ -361,7 +355,8 @@ def rsmax2(
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
-        Significance level of the restrict phase's tests. Smaller values keep fewer pairs.
+        Significance level of the restrict phase's tests, in ``(0, 1)``. Smaller values keep fewer
+        pairs.
     indep_test : str or None, default=None
         Conditional-independence test of the restrict phase, any of :func:`~andrey.pc`'s. It must
         read the same kind of data as ``score_func``. ``None`` picks from the declared column types,
@@ -387,14 +382,14 @@ def rsmax2(
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
-        Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
+        Most moves of the maximize phase, at least ``1``; ``None`` sets no limit.
     tabu_length : int, default=10
         With ``maximize="tabu"``, the number of most recently visited DAGs a move may not return
         to, at least ``1``, as for :func:`~andrey.tabu`; hill climbing ignores it.
     max_tabu : int or None, default=None
         With ``maximize="tabu"``, the non-improving moves allowed without a better DAG, from ``1``
         to ``tabu_length``; ``None`` uses ``tabu_length``. Hill climbing ignores it.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test and score, as for
         :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
@@ -424,8 +419,10 @@ def rsmax2(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"rsmax2"``, ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges` (lower is better). Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records
+        the penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -436,13 +433,13 @@ def rsmax2(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if
-        ``score_func`` is not a score ``maximize`` takes, if ``score_func`` and ``indep_test`` read
-        different kinds of data, if ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or
-        ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
-        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
-        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``score_func`` is not a score
+        ``maximize`` takes, if ``score_func`` and ``indep_test`` read different kinds of data, if
+        ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or ``categorical`` does not
+        suit the test or score, as for :func:`~andrey.pc` and :func:`~andrey.hc`. Also if the
+        required edges of ``knowledge`` give a node more than ``max_parents`` parents, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -454,10 +451,6 @@ def rsmax2(
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
         a setting reads columns that look like category codes as numbers; once per process.
-
-    See Also
-    --------
-    andrey.mmhc : ``restrict="mmpc"`` with ``maximize="hc"``.
 
     Notes
     -----
@@ -506,17 +499,18 @@ def rsmax2(
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
-    on one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting
-    the mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean
-    degree 4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for
-    the empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``,
-    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
-    is never added, and the
-    maximize phase stops at a local optimum. MMPC tests each candidate against every subset of
-    the current members, so its cost grows exponentially with the size of a variable's
-    parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket, so each
-    of their tests needs more rows as the blankets grow.
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
+    one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting the
+    mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean degree
+    4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for the
+    empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``, the
+    longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses is
+    never added, and the maximize phase stops at a local optimum. MMPC tests each candidate against
+    every subset of the current members, so its cost grows exponentially with the size of a
+    variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
+    so each of their tests needs more rows as the blankets grow. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -535,15 +529,12 @@ def rsmax2(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import rsmax2
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = x + 0.1 * rng.standard_normal(500)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = rsmax2(np.column_stack([x, y]), restrict="pc", maximize="tabu")
+    >>> out = rsmax2(np.column_stack([x, y]), restrict="pc", maximize="tabu")
     >>> out.structure.kind
     'cpdag'
     """

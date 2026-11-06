@@ -3,7 +3,8 @@
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.orient`. An Insert is valid when ``NA union T`` is a clique and every
 semi-directed path from ``y`` to ``x`` meets it; a Delete is valid when ``NA`` without ``H`` is a
-clique.
+clique. :func:`check_parent_cap` checks the required edges of every score search against its
+``max_parents``.
 
 References
 ----------
@@ -102,6 +103,30 @@ def exceeds_parent_cap(adj: np.ndarray, cap: float) -> bool:
         if _undirected_clique(lines, node, int(room) + 1) > room:
             return True
     return False
+
+
+def check_parent_cap(
+    graph: np.ndarray | None, max_parents: float | None, *, in_class: bool
+) -> None:
+    """Raise ``ValueError`` when the required edges give a node more than ``max_parents`` parents.
+
+    ``graph`` holds the required edges as a boolean matrix, ``graph[u, v]`` for ``u -> v``; with
+    ``in_class`` it is the mark matrix of the class a search starts from, and the check covers
+    every DAG of that class (:func:`exceeds_parent_cap`). ``None`` for either argument checks
+    nothing.
+    """
+    if graph is None or max_parents is None:
+        return
+    if not in_class:
+        if (graph.sum(axis=0) > max_parents).any():
+            raise ValueError(
+                f"the required edges give a node more than max_parents={max_parents} parents"
+            )
+    elif exceeds_parent_cap(graph, max_parents):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
 
 
 def subsets(elements: Sequence[int]) -> Iterable[tuple[int, ...]]:

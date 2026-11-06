@@ -13,21 +13,13 @@ import numpy as np
 
 from andrey.core import GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
-)
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.score import MIXED_SCORES, LocalScore, make_score
+from andrey.core.score_delta import make_delta
 from andrey.core.seeding import start_rng
 from andrey.core.structure import endpoint_marks
+from andrey.core.ties import EPS_IMPROVE, tie_mask, tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.hc import (
     START_EPS,
     MoveScanner,
@@ -35,13 +27,9 @@ from andrey.search.hc import (
     _apply_move,
     perturb,
     start_dag,
-    tie_ranks,
 )
 
 __all__ = ["tabu"]
-
-#: The local scores :func:`tabu` accepts.
-TABU_SCORES: tuple[str, ...] = SCORES
 
 
 def _search(
@@ -61,9 +49,9 @@ def _search(
     Each step adds the current DAG to the tabu list and takes the best improving move outside it.
     Without one, the search stops after ``max_tabu`` non-improving moves since the last new best;
     otherwise it counts one more and takes the best non-improving move outside the list, leaving the
-    score unchanged or worse. A new best score lower by more than ``_EPS_IMPROVE`` resets the count.
+    score unchanged or worse. A new best score lower by more than ``EPS_IMPROVE`` resets the count.
     The search also stops when every legal move leads into the list, or after ``max_iter`` moves
-    unless it is ``None``. ``ranks`` orders tied moves, :func:`~andrey.search.hc.tie_ranks` of the
+    unless it is ``None``. ``ranks`` orders tied moves, :func:`~andrey.core.ties.tie_ranks` of the
     data. ``adj_int`` and ``parents_of``, the bitset rows and sorted parent sets of the start DAG,
     change in place. No move adds an edge ``u -> v`` that ``forbidden[v, u]`` bars, removes or
     reverses one that ``required[v, u]`` holds, or, with ``max_parents``, gives a node more parents.
@@ -75,14 +63,14 @@ def _search(
     recent: deque[StructureKey] = deque(maxlen=tabu_length)
     losses = 0
     moves = 0
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    delta = make_delta(score)
     scanner = MoveScanner(
         delta, d, ranks=ranks, forbidden=forbidden, required=required, max_parents=max_parents
     )
     while max_iter is None or moves < max_iter:
         recent.append(tuple(adj_int))
         tabu = frozenset(recent)
-        found = scanner.best(adj_int, parents_of, floor=-_EPS_IMPROVE, tabu=tabu)
+        found = scanner.best(adj_int, parents_of, floor=-EPS_IMPROVE, tabu=tabu)
         if found is None:
             if losses >= max_tabu:
                 break
@@ -97,7 +85,7 @@ def _search(
         for node in (u, v) if op == "reverse" else (v,):
             local[node] = score.score(node, parents_of[node])
         total = math.fsum(local)
-        if total < best_total - _EPS_IMPROVE:
+        if total < best_total - EPS_IMPROVE:
             best_key, best_total, losses = tuple(adj_int), total, 0
     return best_key, moves
 
@@ -131,11 +119,11 @@ def tabu(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score, one of :data:`TABU_SCORES`: ``"bic"`` (linear-Gaussian BIC), ``"bdeu"``
-        (:class:`~andrey.core.score.BDeuScore` with its default structure prior) or
+        Local score, one of :data:`~andrey.core.score.SCORES`: ``"bic"`` (linear-Gaussian BIC),
+        ``"bdeu"`` (:class:`~andrey.core.score.BDeuScore` with its default structure prior) or
         ``"discrete_bic"`` (:class:`~andrey.core.score.CategoricalBICScore`), both on category
-        codes, or
-        ``"degen_gauss"`` or ``"cond_gauss"``, the mixed-data scores over ``categorical``.
+        codes, or ``"degen_gauss"`` or ``"cond_gauss"``, the mixed-data scores over
+        ``categorical``.
     penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
@@ -175,10 +163,6 @@ def tabu(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total score.
     """
-    if score_func not in TABU_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {TABU_SCORES}"
-        )
     if max_tabu is None:
         max_tabu = tabu_length
     if not 1 <= max_tabu <= tabu_length:
@@ -197,10 +181,9 @@ def tabu(
         )
 
     score = new_score()
-    mask = np.full(d, score_func in DISCRETE_SCORES)
+    mask = tie_mask(score_func, categorical, d)
     forbidden = None
     if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
-        mask = column_mask(categorical, d)
         forbidden = mask[:, None] & ~mask[None, :]
         if constraints is not None and (constraints.required & forbidden.T).any():
             raise ValueError(

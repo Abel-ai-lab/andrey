@@ -30,9 +30,9 @@ from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import to_structure
 from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import warn_search_limit
 from andrey.search.continuous import break_cycles, center, residual_variances
-from andrey.search.hc import tie_ranks
 
 
 def _require_torch():
@@ -224,7 +224,7 @@ def calm(
     ``rho`` reaches ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
     ``seed`` makes the run reproducible. The fit runs on the columns in order of their
-    :func:`~andrey.search.hc.tie_ranks`, so each column keeps its initial weights and gate noise
+    :func:`~andrey.core.ties.tie_ranks`, so each column keeps its initial weights and gate noise
     when the columns are reordered. ``constraints``, in the data's column order, edit the
     candidate edges and hold the required gates on, as the module describes. Returns a
     :class:`CalmResult`.

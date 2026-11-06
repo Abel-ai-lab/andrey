@@ -15,7 +15,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 from . import stats
 from .ci import _canonical_ranked, per_query
@@ -77,7 +77,7 @@ class GPDC:
     The residuals are replaced by their ranks, which gives them uniform marginals; tied values
     are ordered by a random key per row and variable, drawn once from ``seed``, so that every
     ranking stays equally likely under the null. Each variable takes its keys, and its place among
-    the regressors of a conditioning set, by its :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    the regressors of a conditioning set, by its :func:`~andrey.core.ties.tie_ranks` rank, a rank
     computed from the data, so a p-value does not depend on the column order. The
     statistic is their squared distance correlation, from the doubly centered matrices of their
     pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and a

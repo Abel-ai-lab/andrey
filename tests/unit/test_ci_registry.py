@@ -1,9 +1,10 @@
 """The pluggable CI registry: any registered ``CITest`` is selectable end-to-end via ``indep_test``.
 
 The constraint facades (pc / fci / cdnod / gfci) resolve ``indep_test`` through
-:mod:`andrey.core.ci`'s registry. These tests pin the falsifiable claims: a registered stub is
-dispatched, the bare ``__call__`` Protocol is the guaranteed floor, an unregistered name still
-raises, and the default Fisher-Z path is unchanged. CALM is out of scope (internal Markov-blanket
+:mod:`andrey.core.ci`'s registry. These tests pin its surface: every shipped name builds, an
+unregistered name still raises, the default Fisher-Z path is unchanged, and each constraint facade
+takes the partial-correlation tests by name. ``test_concepts.py`` checks that every search asks a
+registered test with the bare ``__call__`` Protocol. CALM is out of scope (internal Markov-blanket
 pruning, no facade ``indep_test``).
 """
 
@@ -15,6 +16,7 @@ import pytest
 import andrey
 from andrey.core import ci
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import domains
 
 
 @pytest.fixture
@@ -35,56 +37,6 @@ def _chain_data(seed: int = 0, n: int = 500, d: int = 6) -> np.ndarray:
     for j in range(1, d):
         x[:, j] += 0.6 * x[:, j - 1]
     return x
-
-
-class _RecordingTest:
-    """A minimal ``CITest`` (only ``__call__``) recording its queries, delegating the p-value."""
-
-    def __init__(self, data: np.ndarray) -> None:
-        self.calls: list[tuple] = []
-        self._fisherz = ci.FisherZ(data)  # delegate the answer so the search still converges
-
-    def __call__(self, x: int, y: int, condition_set=()) -> float:
-        self.calls.append((x, y, tuple(condition_set)))
-        return self._fisherz(x, y, condition_set)
-
-
-@pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
-)
-def test_registered_test_is_dispatched_end_to_end(facade, clean_registry):
-    """Every constraint facade routes its CI queries to the registered test, not FisherZ."""
-    recorders: list[_RecordingTest] = []
-
-    def factory(data):
-        rec = _RecordingTest(data)
-        recorders.append(rec)
-        return rec
-
-    ci.register_indep_test("recording", factory)
-    x = _chain_data(d=6)
-    if facade == "cdnod":
-        c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        andrey.cdnod(x, c, indep_test="recording")
-    else:
-        getattr(andrey, facade)(x, indep_test="recording")
-    assert recorders, f"{facade} never constructed the registered test"
-    assert any(rec.calls for rec in recorders), f"{facade} issued no CI query to the stub"
-
-
-def test_minimal_protocol_is_the_guaranteed_floor(clean_registry):
-    """A ``CITest`` defining only ``__call__`` (no batch, no extras) is fully usable by PC."""
-
-    class OnlyCall:
-        def __init__(self, data):
-            self._fisherz = ci.FisherZ(data)
-
-        def __call__(self, x, y, condition_set=()):
-            return self._fisherz(x, y, condition_set)
-
-    ci.register_indep_test("only_call", OnlyCall)
-    out = andrey.pc(_chain_data(), indep_test="only_call")
-    assert out.structure.kind == "cpdag"
 
 
 def test_the_statistic_of_a_p_value_grows_as_it_shrinks():
@@ -136,14 +88,17 @@ def test_registry_surface(clean_registry):
 
 @pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+    "facade",
+    [
+        *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+        *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+    ],
 )
 def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):
     """Each constraint facade accepts the test by name and returns a valid graph."""
     x = _chain_data()
-    if facade == "cdnod":
-        c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        out = andrey.cdnod(x, c, indep_test=indep_test)
+    if facade in ("cdnod", "fci_jci"):
+        out = getattr(andrey, facade)(x, domains(len(x)), indep_test=indep_test)
     else:
         out = getattr(andrey, facade)(x, indep_test=indep_test)
     out.structure.validate()

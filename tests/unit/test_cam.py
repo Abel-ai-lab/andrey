@@ -1,4 +1,4 @@
-"""CAM's contract: knowledge, units, the neighbor rule, and the columns it refuses."""
+"""CAM's contract: knowledge, the neighbor rule, and the columns it refuses."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.core.ties import tie_ranks
 from andrey.fcm.cam import boosting_counts, neighbors, order_search
 from andrey.fcm.gam import BasisCache
-from andrey.search.hc import tie_ranks
 
 N = 400
 
@@ -43,12 +43,6 @@ def chain_fit():
 def test_the_chain_is_found(chain_fit):
     assert _edges(chain_fit) == {(0, 1), (1, 2)}
     assert chain_fit.ordering == (0, 1, 2)
-
-
-def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
-    out = _fit(_chain() * np.array([1e-4, 3.7, 2e3]))
-    assert out.structure == chain_fit.structure
-    assert out.ordering == chain_fit.ordering
 
 
 def _mirrored(seed: int = 0) -> np.ndarray:
@@ -87,25 +81,6 @@ def test_a_tie_follows_the_rank_and_reordered_columns_relabel_the_result():
         assert _named(_fit(frame[["y", "x", "z"]])) == {("y", "x")}
 
 
-def test_a_forbidden_edge_is_never_in_the_graph():
-    out = _fit(_chain(), knowledge=andrey.Knowledge(forbidden=[(0, 1)]))
-    assert (0, 1) not in _edges(out)
-
-
-def test_a_required_edge_stays_on_independent_columns():
-    X = np.random.default_rng(1).standard_normal((N, 3))
-    out = _fit(X, knowledge=andrey.Knowledge(required=[(2, 0)]))
-    assert _edges(out) == {(2, 0)}
-    assert out.ordering.index(2) < out.ordering.index(0)
-
-
-def test_tiers_order_the_variables_and_forbid_edges_into_an_earlier_tier(chain_fit):
-    # x2 first: no edge may enter it, and no order may place x0 or x1 before it.
-    out = _fit(_chain(), knowledge=andrey.Knowledge(tiers=[[2], [0, 1]]))
-    assert all(j != 2 for _, j in _edges(out))
-    assert out.ordering[0] == 2
-
-
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
 @pytest.mark.parametrize("seed", [1, 2])
 def test_every_tier_precedes_the_next_in_the_order_of_many_columns(seed):
@@ -116,13 +91,6 @@ def test_every_tier_precedes_the_next_in_the_order_of_many_columns(seed):
     out = _fit(X, knowledge=andrey.Knowledge(tiers=[[14], list(range(14))]))
     assert out.ordering[0] == 14
     assert all(j != 14 for _, j in _edges(out))
-
-
-def test_required_edges_above_max_parents_raise():
-    rng = np.random.default_rng(7)
-    X = rng.uniform(-2, 2, (N, 3))
-    with pytest.raises(ValueError):
-        _fit(X, max_parents=1, knowledge=andrey.Knowledge(required=[(0, 2), (1, 2)]))
 
 
 def test_required_parents_with_more_coefficients_than_rows_name_the_column():

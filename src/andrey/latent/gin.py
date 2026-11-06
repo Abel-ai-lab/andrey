@@ -12,7 +12,7 @@ when its ``e``, built with each other remaining cluster in turn and given the cl
 ordered, passes the pooled test at ``alpha`` for every one of them. Each of those tests runs once
 per member, so that every member of every cluster involved enters ``e``, and pools the runs by
 Fisher's method. When several candidates pass, the one whose lowest pooled p-value is highest is
-taken, and of lowest p-values equal to ``_KEY_DP`` decimals, the one holding the lowest-ranked
+taken, and of lowest p-values equal to ``KEY_DP`` decimals, the one holding the lowest-ranked
 column. When none passes, the ordering stops and the remaining clusters stay unordered: the paper
 adds a latent to the order only when the condition holds.
 
@@ -21,7 +21,7 @@ Sec. 2), so that no step reads where a column's zero lies. The covariance is tak
 columns, so ``omega`` comes from the correlation block and does not depend on the columns' units
 (:func:`_surrogate`).
 
-The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
+The search runs on the columns sorted by :func:`~andrey.core.ties.tie_ranks`, a rank computed from
 the data, so every column order of the same data gives the same clusters and order.
 
 Each column's HSIC kernel matrix is built once per fit and reused by every test, so a fit holds one
@@ -39,9 +39,8 @@ from scipy.special import gammaincc
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
+from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.core.units import unit_factors
-from andrey.search._parallel import _KEY_DP
-from andrey.search.hc import tie_ranks
 
 _Gram = tuple[np.ndarray, float]  # a column's centered HSIC kernel matrix and its mean
 
@@ -185,8 +184,8 @@ def _find_root(
 
     A candidate passes when :func:`_root_pvalue` is at least ``alpha`` against every other cluster;
     of the passing candidates, the one with the highest lowest p-value is the root. Lowest p-values
-    equal to ``_KEY_DP`` decimals go to the cluster with the smallest member: :func:`gin` passes the
-    columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's index is its rank. A single
+    equal to ``KEY_DP`` decimals go to the cluster with the smallest member: :func:`gin` passes the
+    columns sorted by :func:`~andrey.core.ties.tie_ranks`, so a column's index is its rank. A single
     remaining cluster is the root.
     """
     if len(clusters) == 1:
@@ -198,7 +197,7 @@ def _find_root(
             for other in clusters
             if other is not candidate
         )
-        key = (-round(lowest, _KEY_DP), min(candidate))
+        key = (-round(lowest, KEY_DP), min(candidate))
         if lowest >= alpha and (best_key is None or key < best_key):
             best, best_key = candidate, key
     return best
@@ -232,7 +231,7 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     clusters from the earliest latent, and whose ``unordered`` lists the clusters left when no root
     passed.
 
-    The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, so it orders its
+    The search runs on the columns sorted by :func:`~andrey.core.ties.tie_ranks`, so it orders its
     groups and members, and breaks its ties, by each column's data rather than its position. The
     sorted data are the same bytes for every column order, so reordering the columns of ``data``
     relabels the result and changes nothing else, unless two columns are identical. The columns are

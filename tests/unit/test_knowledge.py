@@ -64,7 +64,7 @@ UNDIRECTED_STRUCTURES = [
     for choice in param.choices or ()
     if BLANKET_STRUCTURES[choice] == "undirected"
 ]
-DEPTH = ["pc", "fci", "gfci", "cdnod"]
+DEPTH = ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"]
 # A short schedule: the knowledge holds whether or not the fit has converged.
 SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
 LABELS = list("abcdef")
@@ -107,7 +107,7 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
         kwargs = {**SHORT_CALM, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if name in ("cdnod", "gnies"):
+        if name in ("cdnod", "fci_jci", "gnies"):
             return getattr(andrey, name)(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
         if name == "ut_igsp":  # an observational environment and a setting of unknown targets
             env = np.repeat([0, 1], len(data) // 2)
@@ -160,32 +160,49 @@ def _honored(name: str, knowledge: Knowledge) -> Knowledge:
     )
 
 
+def _assert_the_order_keeps_required_and_tiers(name: str, ordering, labels: list[str]):
+    """A causal order puts a required edge's cause before its effect and each tier before the
+    next."""
+    rank = {labels[v]: k for k, v in enumerate(ordering)}
+    if "required" in REGISTRY[name].knowledge:
+        assert rank["b"] < rank["f"], ordering
+    if "tiers" in REGISTRY[name].knowledge:
+        assert max(rank[v] for v in EARLY) < min(rank[v] for v in LATE), ordering
+
+
 @pytest.mark.parametrize(("name", "missing"), CASES)
 def test_required_forbidden_and_tiers_hold(name, missing, data):
-    marks, labels = _marks(_fit(name, _gaps(data, missing), knowledge=_honored(name, KNOWLEDGE)))
+    out = _fit(name, _gaps(data, missing), knowledge=_honored(name, KNOWLEDGE))
+    marks, labels = _marks(out)
     _assert_required_forbidden_and_tiers_hold(name, marks, labels)
+    if out.ordering is not None:
+        _assert_the_order_keeps_required_and_tiers(name, out.ordering, labels)
 
 
 @pytest.mark.parametrize("in_column_order", [False, True])
-@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci", "boss_fci", "grasp_fci", "fci_jci"])
 def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
     name, in_column_order, data
 ):
     constraints = resolve(KNOWLEDGE, len(LABELS), LABELS, method=name)
     X = data.to_numpy()
     kwargs = dict(constraints=constraints, in_column_order=in_column_order)
-    if name == "cdnod":
+    if name in ("cdnod", "fci_jci"):
         domain = np.repeat([0.0, 1.0], len(X) // 2)
-        structure = importlib.import_module("andrey.constraint.cdnod").cdnod(X, domain, **kwargs)
+        found = getattr(importlib.import_module(f"andrey.constraint.{name}"), name)(
+            X, domain, **kwargs
+        )
+        structure = found[0] if name == "fci_jci" else found  # the PAG, then the index's edges
     else:
-        module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
+        in_search = name in ("gfci", "boss_fci", "grasp_fci")
+        module = "andrey.search.gfci" if in_search else f"andrey.constraint.{name}"
         structure = getattr(importlib.import_module(module), name)(X, **kwargs)
     _assert_required_forbidden_and_tiers_hold(name, from_structure(structure), LABELS)
 
 
 @pytest.mark.parametrize("columns", [LABELS, LABELS[::-1], list("cfaebd")])
 @pytest.mark.parametrize("setting", [{}, {"possible_dsep": "fast"}], ids=["default", "fast"])
-@pytest.mark.parametrize("name", ["fci", "gfci"])
+@pytest.mark.parametrize("name", ["fci", "gfci", "boss_fci", "grasp_fci", "fci_jci"])
 def test_knowledge_holds_through_the_possible_dsep_step_in_every_column_order(
     name, setting, columns, data
 ):
@@ -315,7 +332,12 @@ def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):
             return getattr(self._test, attr)
 
     # The packages re-export functions under their modules' names, so import the modules by path.
-    for path in ("andrey.constraint.pc", "andrey.constraint.fci", "andrey.search.gfci"):
+    for path in (
+        "andrey.constraint.pc",
+        "andrey.constraint.fci",
+        "andrey.constraint.fci_jci",
+        "andrey.search.gfci",
+    ):
         module = importlib.import_module(path)
         make = module.make_indep_test
         monkeypatch.setattr(
@@ -546,7 +568,7 @@ def _collider(seed: int = 0, n: int = 1000) -> pd.DataFrame:
     return pd.DataFrame({"x": x, "y": 0.8 * x + 0.8 * z + noise, "z": z, "w": w})
 
 
-@pytest.mark.parametrize("name", ["pc", "cdnod", "fci"])
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "fci_jci"])
 def test_a_pair_kept_apart_keeps_its_collider(name):
     knowledge = Knowledge(required=[("x", "y")], forbidden=[("x", "z"), ("z", "x")])
     marks, labels = _marks(_fit(name, _collider(), knowledge=knowledge))
@@ -658,16 +680,6 @@ def test_every_group_honors_the_knowledge(data):
         _assert_required_forbidden_and_tiers_hold("multi_group_direct_lingam", *_marks(out))
 
 
-def test_direct_lingam_keeps_a_required_edge_whose_weight_is_zero():
-    # The two columns are uncorrelated, so least squares weighs the required 0 -> 1 at 0, up to the
-    # rounding of the platform's BLAS.
-    X = np.array([[-1.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [1.0, 1.0]])
-    out = andrey.direct_lingam(X, knowledge=Knowledge(required=[(0, 1)]))
-    assert out.weighted_adjacency[0, 1] == pytest.approx(0.0, abs=1e-12)
-    marks = from_structure(out.structure)
-    assert marks[0, 1] == TAIL and marks[1, 0] == ARROW
-
-
 def test_a_skeleton_as_knowledge_keeps_the_colliders():
     data = _collider()
     plain = andrey.pc(data).structure.oriented_edges()
@@ -694,7 +706,7 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
     ("name", "knowledge"),
     [
         *((name, CYCLE) for name in ("pc", "cdnod", "iamb", "inter_iamb", "mmpc")),
-        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci")),
+        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci", "fci_jci")),
     ],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):

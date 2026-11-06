@@ -22,10 +22,9 @@ import numpy as np
 from scipy.special import gammainc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.core.units import unit_factors
 from andrey.lingam import adjacency
-from andrey.search._parallel import _KEY_DP
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -62,7 +61,7 @@ def _fisher_hsic_test(
     ``2 * n_predictors`` degrees of freedom (a zero HSIC p-value sends ``fisher_stat`` to infinity).
 
     ``bound`` is the smallest Fisher statistic seen so far in the current sink search, rounded to
-    ``_KEY_DP`` decimals. Because the running sum only grows (each ``-2 log(p_k) >= 0``), once it
+    ``KEY_DP`` decimals. Because the running sum only grows (each ``-2 log(p_k) >= 0``), once it
     rounds above ``bound`` this candidate can neither be the most-sink one nor tie with it, so the
     remaining predictor tests are skipped. The partial ``fisher_stat`` and its ``fisher_p`` then
     miss the incumbent and never win the comparison in :func:`_find_sink`, leaving the selected
@@ -77,7 +76,7 @@ def _fisher_hsic_test(
     for gram in predictor_grams:
         _, p_value = hsic_gamma_from_grams(gram, residual_gram, n)
         fisher_stat += np.inf if p_value == 0 else -2 * np.log(p_value)
-        if round(fisher_stat, _KEY_DP) > bound:
+        if round(fisher_stat, KEY_DP) > bound:
             break
     fisher_p = 1 - gammainc(len(predictor_grams), 0.5 * fisher_stat)
     return float(fisher_p), float(fisher_stat)
@@ -114,8 +113,8 @@ def _find_sink(
 
     Each candidate is regressed on the others; the candidate whose residual is most independent of
     the others (smallest Fisher statistic, so largest p-value under the monotone gamma /
-    chi-squared tail) is the sink. Statistics equal to ``_KEY_DP`` decimals go to the lower of
-    ``ranks``, each variable's :func:`~andrey.search.hc.tie_ranks`. ``col_grams`` holds each
+    chi-squared tail) is the sink. Statistics equal to ``KEY_DP`` decimals go to the lower of
+    ``ranks``, each variable's :func:`~andrey.core.ties.tie_ranks`. ``col_grams`` holds each
     variable's cached HSIC gram (keyed by variable index). ``candidates``, a subset of ``U``,
     limits the sinks considered; each is still regressed on all the others in ``U``.
     """
@@ -129,7 +128,7 @@ def _find_sink(
         fisher_p, fisher_stat = _fisher_hsic_test(
             [col_grams[p] for p in predictors], residual, n, bound
         )
-        key = (round(fisher_stat, _KEY_DP), ranks[int(pool[j])])
+        key = (round(fisher_stat, KEY_DP), ranks[int(pool[j])])
         if best is None or key < best:
             best, sink, best_p = key, int(pool[j]), fisher_p
     return sink, best_p
@@ -199,7 +198,7 @@ def estimate_adjacency(
 
     ``B[i, j]`` weights edge ``j -> i``, fitted by adaptive Lasso; an order-unknown block adds no
     directed edges and every pair inside it is set to ``NaN`` at both ``B[i, j]`` and ``B[j, i]``.
-    Each fit lists its predictors by :func:`~andrey.search.hc.tie_ranks`, so the weights follow the
+    Each fit lists its predictors by :func:`~andrey.core.ties.tie_ranks`, so the weights follow the
     columns when they are reordered. ``forbidden[j, i]`` drops predictor ``j`` of ``i``, and a pair
     of the block forbidden both ways stays ``0``. ``required[j, i]`` keeps predictor ``j`` of ``i``
     unpenalized (:func:`~andrey.lingam.adjacency.predict_with_required`); a required pair inside

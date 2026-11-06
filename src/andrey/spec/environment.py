@@ -51,7 +51,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default="1",
         effect=(
             "Worker processes for GES, GFCI (its GES phase), the fits of `andrey.bootstrap`, and "
-            "the skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2 "
+            "the skeleton searches of PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 "
             '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and worker '
             "threads for the two directions of `pnl`; `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
@@ -77,14 +77,14 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer (CI tests per conditioning-size pass)",
         default=str(MIN_POOL_QUERIES),
         effect=(
-            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, CD-NOD, "
-            'and RSMAX2 (`restrict="pc"`) with `fisherz`, `student_t`, or `normal_scores`: a '
-            "conditioning-size pass fans out to the worker pool only when it holds at least this "
-            "many CI tests, else in-process. `0` sends every pass to the pool. The default was "
-            "measured on an AMD EPYC 9534 server running Linux. No effect unless the worker count "
-            "(`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once "
-            "on the default when a pass reaches a tenth of it; `andrey calibrate --method "
-            "skeleton` measures a value for your machine."
+            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, BOSS-FCI, "
+            'GRaSP-FCI, CD-NOD, and RSMAX2 (`restrict="pc"`) with `fisherz`, `student_t`, or '
+            "`normal_scores`: a conditioning-size pass fans out to the worker pool only when it "
+            "holds at least this many CI tests, else in-process. `0` sends every pass to the pool. "
+            "The default was measured on an AMD EPYC 9534 server running Linux. No effect unless "
+            "the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
+            "worker warns once on the default when a pass reaches a tenth of it; `andrey "
+            "calibrate --method skeleton` measures a value for your machine."
         ),
         group="backend",
     ),
@@ -93,14 +93,14 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer (RCoT tests times rows per conditioning-size pass)",
         default=str(MIN_POOL_RCOT_WORK),
         effect=(
-            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, CD-NOD, "
-            'and RSMAX2 (`restrict="pc"`) with `rcot`: a conditioning-size pass fans out to the '
-            "worker pool only when its RCoT tests times the data's rows reach this value, else "
-            "in-process. `0` sends every pass to the pool. The default was measured on an Intel "
-            "Core i7-7820X running Linux with 4 workers. No effect unless the worker count "
-            "(`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once "
-            "on the default when a pass reaches a tenth of it; `andrey calibrate --method rcot` "
-            "measures a value for your machine."
+            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, BOSS-FCI, "
+            'GRaSP-FCI, CD-NOD, and RSMAX2 (`restrict="pc"`) with `rcot`: a conditioning-size '
+            "pass fans out to the worker pool only when its RCoT tests times the data's rows reach "
+            "this value, else in-process. `0` sends every pass to the pool. The default was "
+            "measured on an Intel Core i7-7820X running Linux with 4 workers. No effect unless the "
+            "worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
+            "worker warns once on the default when a pass reaches a tenth of it; `andrey "
+            "calibrate --method rcot` measures a value for your machine."
         ),
         group="backend",
     ),
@@ -194,9 +194,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "the data, which a row shuffle, a change of units, or a sign flip leaves in place, so "
             "reordering the columns relabels the result. `position` "
             "orders them by column position, which skips computing the ranks, fires the "
-            "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, "
-            "and visits the possible-d-separation step of `fci` and `gfci` in column order; "
-            "the result can then depend on the column order. Also `andrey.config(tie_break=...)`."
+            "orientation rules of `pc`, `cdnod`, `fci`, `gfci`, and `fci_jci` one at a time in "
+            "column order, and visits the possible-d-separation step of `fci`, `gfci`, and "
+            "`fci_jci` in column order; the result can then depend on the column order. Also "
+            "`andrey.config(tie_break=...)`."
         ),
         group="reproducibility",
     ),

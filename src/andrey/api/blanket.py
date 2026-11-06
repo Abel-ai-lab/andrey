@@ -51,7 +51,7 @@ def _fit(
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap the graph ``structure`` names or the set."""
-    from andrey.search.hybrid import local_set, local_structure
+    from andrey.constraint.blanket import local_set, local_structure
     from andrey.spec.concepts import BLANKET_STRUCTURES
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
@@ -104,7 +104,7 @@ def iamb(
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a variable's Markov blanket with incremental association (IAMB).
+    """Learn a CPDAG, or one variable's Markov blanket, with incremental association (IAMB).
 
     A variable's Markov blanket is the smallest set of other variables given which it is
     independent of all the rest: in a causal graph, its parents, its children, and its children's
@@ -130,7 +130,8 @@ def iamb(
         an edge there does not say that the two variables are adjacent. With ``target``, the result
         is the target's Markov blanket, whatever ``structure`` is.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give smaller sets.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        smaller sets.
     indep_test : str or None, default=None
         Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
         ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
@@ -138,7 +139,7 @@ def iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
@@ -178,8 +179,9 @@ def iamb(
         other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position.
         ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -190,23 +192,18 @@ def iamb(
         ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``target``
-        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
-        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
-        orients the edges the search kept into a directed cycle.
+        method, the argument, what it accepts, and the value. Also if ``target`` names a column
+        ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
+        edges the search kept into a directed cycle.
 
     Warns
     -----
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
-
-    See Also
-    --------
-    andrey.inter_iamb : Shrinks after each addition.
-    andrey.mmpc : The parents and children alone.
 
     Notes
     -----
@@ -220,10 +217,11 @@ def iamb(
     or the undirected skeleton or moral graph. For the parents and children alone, use
     :func:`~andrey.mmpc`; when unmeasured common causes are plausible, use :func:`~andrey.fci`.
 
-    **How it works.** Grow: add the candidate most dependent on the target given the current
-    blanket, among those whose p-value is at or below ``alpha``, until none is. Shrink: visit the
-    members in the order they joined and drop each one the test finds independent of the target
-    given the other current members. With exact tests, the result is the true Markov blanket [1]_.
+    **How it works.** The grow phase adds the candidate most dependent on the target given the
+    current blanket, among those whose p-value is at or below ``alpha``, until none is; the shrink
+    phase visits the members in the order they joined and drops each one the test finds independent
+    of the target given the other current members. With exact tests, the result is the true Markov
+    blanket [1]_.
 
     Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
     data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
@@ -279,7 +277,8 @@ def iamb(
     smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
     datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
     tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random.
+    random. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -300,16 +299,13 @@ def iamb(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import iamb
     >>> rng = np.random.default_rng(0)
     >>> a, b = rng.standard_normal((2, 1000))
     >>> c = a + b + 0.5 * rng.standard_normal(1000)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = iamb(np.column_stack([a, b, c]), target=0)
-    ...     graph = iamb(np.column_stack([a, b, c]))
+    >>> out = iamb(np.column_stack([a, b, c]), target=0)
+    >>> graph = iamb(np.column_stack([a, b, c]))
     >>> sorted(out.metadata["markov_blanket"])
     [1, 2]
     >>> graph.structure.oriented_edges()
@@ -342,7 +338,7 @@ def inter_iamb(
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a variable's Markov blanket with interleaved IAMB (Inter-IAMB).
+    """Learn a CPDAG, or one variable's Markov blanket, with interleaved IAMB (Inter-IAMB).
 
     Inter-IAMB [1]_ is IAMB with its shrink step after every addition, so a member that becomes
     independent leaves before it enlarges the later conditioning sets. Without a target, every
@@ -367,7 +363,8 @@ def inter_iamb(
         an edge there does not say that the two variables are adjacent. With ``target``, the result
         is the target's Markov blanket, whatever ``structure`` is.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give smaller sets.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        smaller sets.
     indep_test : str or None, default=None
         Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
         ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
@@ -375,7 +372,7 @@ def inter_iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
@@ -415,8 +412,9 @@ def inter_iamb(
         other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position.
         ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -427,22 +425,18 @@ def inter_iamb(
         ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``target``
-        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
-        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
-        orients the edges the search kept into a directed cycle.
+        method, the argument, what it accepts, and the value. Also if ``target`` names a column
+        ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
+        edges the search kept into a directed cycle.
 
     Warns
     -----
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
-
-    See Also
-    --------
-    andrey.iamb : Shrinks once, after the blanket stops growing.
 
     Notes
     -----
@@ -501,18 +495,19 @@ def inter_iamb(
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
-    In every setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below
-    the empty graph's; the CPDAG is closest at 20 variables, 1,000 rows, and mean degree 4, with
-    24 pairs wrong against 40 for the empty graph. A fit took 0.06 to 8.9 s, the longest at 100
+    In every setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the
+    empty graph's; the CPDAG is closest at 20 variables, 1,000 rows, and mean degree 4, with 24
+    pairs wrong against 40 for the empty graph. A fit took 0.06 to 8.9 s, the longest at 100
     variables, 5,000 rows, and mean degree 4. Tested with exact d-separation on 15 variables. It
-    conditions on the whole current blanket, so each test needs more rows as the blanket grows.
-    The skeleton and the CPDAG test every subset of the smaller blanket for each pair of the moral
-    graph and each unshielded triple, and a collider takes all of them, so a triple whose smaller
-    blanket holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data
-    with 50 variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16
-    variables, the collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets
-    0.9 to 1.3 s. Missing values are not benchmarked yet; the tests run them on up to 20 variables
-    with up to a fifth of the values missing completely at random.
+    conditions on the whole current blanket, so each test needs more rows as the blanket grows. The
+    skeleton and the CPDAG test every subset of the smaller blanket for each pair of the moral graph
+    and each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
+    holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
+    variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
+    collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets 0.9 to 1.3 s.
+    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
+    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -533,15 +528,12 @@ def inter_iamb(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import inter_iamb
     >>> rng = np.random.default_rng(0)
     >>> a, b = rng.standard_normal((2, 1000))
     >>> c = a + b + 0.5 * rng.standard_normal(1000)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = inter_iamb(np.column_stack([a, b, c]), target=0)
+    >>> out = inter_iamb(np.column_stack([a, b, c]), target=0)
     >>> sorted(out.metadata["markov_blanket"])
     [1, 2]
     """
@@ -572,12 +564,13 @@ def mmpc(
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a variable's parents and children with max-min parents and children (MMPC).
+    """Learn a skeleton, or one variable's parents and children, with MMPC.
 
-    MMPC [1]_ finds the variables adjacent to a target in the causal graph, its parents and
-    children, without telling them apart, by conditional-independence tests. Every variable's
-    set together gives the skeleton :func:`~andrey.mmhc` searches, which ``structure="cpdag"``
-    orients into a CPDAG by the collider tests of the Grow-Shrink structure learner [2]_ [3]_.
+    Max-min parents and children (MMPC) [1]_ finds the variables adjacent to a target in the causal
+    graph, its parents and children, without telling them apart, by conditional-independence tests.
+    Every variable's set together gives the skeleton :func:`~andrey.mmhc` searches, which
+    ``structure="cpdag"`` orients into a CPDAG by the collider tests of the Grow-Shrink structure
+    learner [2]_ [3]_.
 
     Parameters
     ----------
@@ -596,7 +589,8 @@ def mmpc(
         variable's parents and children hold no child's other parents, so there is no moral graph.
         With ``target``, the result is the target's parents and children, whatever ``structure`` is.
     alpha : float, default=0.05
-        Significance level of the conditional-independence test. Smaller values give smaller sets.
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        smaller sets.
     indep_test : str or None, default=None
         Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
         ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
@@ -604,7 +598,7 @@ def mmpc(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
@@ -637,12 +631,13 @@ def mmpc(
         Without ``target``, wraps the graph ``structure`` names: an ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
-        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges
-        join ``target`` to each of its parents and children; ``metadata["target"]`` names it and
+        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
+        ``target`` to each of its parents and children; ``metadata["target"]`` names it and
         ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
         label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read.
-        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -653,23 +648,18 @@ def mmpc(
         ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``target``
-        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
-        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
-        orients the edges the search kept into a directed cycle.
+        method, the argument, what it accepts, and the value. Also if ``target`` names a column
+        ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
+        edges the search kept into a directed cycle.
 
     Warns
     -----
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
-
-    See Also
-    --------
-    andrey.mmhc : Orients the skeleton by hill climbing.
-    andrey.iamb : The Markov blanket, which adds the children's other parents.
 
     Notes
     -----
@@ -753,7 +743,8 @@ def mmpc(
     mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose
     smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
     Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random.
+    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -774,15 +765,12 @@ def mmpc(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import mmpc
     >>> rng = np.random.default_rng(0)
     >>> a, b = rng.standard_normal((2, 1000))
     >>> c = a + b + 0.5 * rng.standard_normal(1000)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = mmpc(np.column_stack([a, b, c]), target=0)
+    >>> out = mmpc(np.column_stack([a, b, c]), target=0)
     >>> out.metadata["parents_and_children"]
     [2]
     """

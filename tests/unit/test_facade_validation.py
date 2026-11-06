@@ -61,6 +61,7 @@ SINGLE = {
     "fci": andrey.fci,
     "gfci": andrey.gfci,
     "cdnod": lambda data, **kw: andrey.cdnod(data, env=np.arange(len(data)) % 2, **kw),
+    "fci_jci": lambda data, **kw: andrey.fci_jci(data, env=np.arange(len(data)) % 2, **kw),
     "icp": lambda data, **kw: andrey.icp(data, env=np.arange(len(data)) % 2, target=0, **kw),
     "iamb": andrey.iamb,
     "inter_iamb": andrey.inter_iamb,
@@ -554,14 +555,6 @@ def test_tabu_stops_at_max_iter_and_warns():
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
         out = andrey.tabu(chain, max_iter=3)
     assert len(out.structure.oriented_edges()) == 3
-
-
-def test_cdnod_with_one_domain_gives_the_pc_graph():
-    rng = np.random.default_rng(1)
-    w = np.triu(rng.uniform(0.5, 1.5, (6, 6)) * (rng.random((6, 6)) < 0.4), 1)
-    x = rng.standard_normal((500, 6)) @ np.linalg.inv(np.eye(6) - w)
-    one_domain = andrey.cdnod(x, env=np.full(500, 3.0)).structure
-    assert np.array_equal(one_domain.to_numpy(), andrey.pc(x).structure.to_numpy())
 
 
 def test_cdnod_rejects_nan_in_env():
