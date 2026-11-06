@@ -3,9 +3,9 @@
 The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z and
 Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
 conditional Gaussian likelihood ratios on mixed data, and the nonlinear tests) and orientation.
-``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a
-BIC, BDeu, or mixed-data score. ``icp`` tests the invariance of one target's regressions across
-environments and returns its estimated parents.
+``pc`` and ``cdnod`` produce CPDAGs; ``fci``, ``gfci``, and ``fci_jci`` produce PAGs. GFCI also
+uses GES with a BIC, BDeu, or mixed-data score. ``icp`` tests the invariance of one target's
+regressions across environments and returns its estimated parents.
 """
 
 from __future__ import annotations
@@ -1449,6 +1449,327 @@ def cdnod(
         **rows_metadata(rows),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+@method_spec("fci_jci")
+def fci_jci(
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
+    *,
+    alpha: float = 0.05,
+    indep_test: str | None = None,
+    collider_rule: str = "sepsets",
+    categorical: Sequence[str | int] | None = None,
+    possible_dsep: str | None = None,
+    confounded_index: bool = True,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a PAG from multi-domain data with FCI and the environment index as a context variable.
+
+    FCI-JCI [1]_ runs FCI [2]_ [3]_ on data pooled from several domains, regimes, or experiments,
+    with the environment index as one more variable that no data variable causes. It allows hidden
+    common causes, as :func:`~andrey.fci` does, and uses the index, as :func:`~andrey.cdnod` does,
+    to remove the edges that pooling adds and to orient more edges. The index is removed from the
+    result, and its edges are listed in ``metadata``: they mark the variables whose distribution the
+    domains change and no other variable explains.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample, pooled across the domains. Coerced to ``float64``. A
+        DataFrame's column names become the structure's ``labels``. A column that ``env`` names is
+        not a variable: it leaves the data before the fit, and ``categorical``, ``knowledge``, and
+        the result's positions count the other columns. A list of DataFrames or 2-D arrays gives
+        each domain's rows apart, labeled by position ``0, 1, ...``, and a mapping labels each by
+        its key: the rows are stacked in that order, and ``env`` stays ``None``. A position is the
+        domain's number, so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the
+        order of the list can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
+        or the name of a column of the DataFrame ``data`` that holds them. Numbers are coerced to
+        ``float64`` and read as numbers; whole numbers with ``"chisq"``, ``"gsq"``,
+        ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted
+        order, whatever the row order; a label is a string or a number, not both. When every row
+        has the same value, the data come from one domain, and the result equals
+        :func:`~andrey.fci`'s. ``None`` needs ``data`` as each domain's rows apart.
+    alpha : float, default=0.05
+        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+    indep_test : str or None, default=None
+        Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
+        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
+        column's normal scores. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
+        likelihood ratio) test categorical data, coded by whole numbers, and ``"degen_gauss"`` and
+        ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. Each as for
+        :func:`~andrey.fci`. The index is one more column of the data it tests: the continuous
+        tests read it as a number, and the categorical and mixed-data tests as a category; see
+        Notes. ``None`` picks from the declared column types: ``"gsq"`` when every column is
+        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
+        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
+        never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
+        from the declared column types when this is ``None``.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
+        as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
+        (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
+        separate them, with the index among the variables, which makes ``z`` a collider when none
+        of them contains it and a non-collider when all do (``"conservative"`` [4]_ [5]_), or when
+        fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
+        ambiguous, and no rule orients through it.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. The environment index is categorical too,
+        so ``data`` may have no categorical column. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    possible_dsep : {"order_free", "fast"} or None, default=None
+        The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
+        visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
+        order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
+        ``"fast"`` under ``"position"``.
+    confounded_index : bool, default=True
+        Whether a hidden variable may cause both the index and a data variable, such as a patient's
+        health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
+        is set from outside, as in a randomized experiment, so every edge the index keeps points out
+        of it, which can orient more edges: FCI-JCI123, which with one context variable is
+        FCI-JCI12. See Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the possible-d-separation step, the conservative and majority
+        rules, and the discriminating-path rule.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored, as for :func:`~andrey.fci`. The
+        adjacency search starts from the allowed pairs and never removes a required pair; the tests
+        can remove any other allowed pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair
+        puts an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is
+        ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge ``a - b`` while its
+        required edges lead from ``a`` to ``b`` raises ``ValueError``. The environment index is
+        unconstrained.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``pag`` :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
+        ``metadata["algorithm"]`` is ``"fci_jci"``. Endpoints carry arrowheads, tails, or circle
+        marks (``o``); a bidirected edge (``<->``) marks a probable hidden common cause.
+        ``metadata["index_edges"]`` lists the index's edges as ``[variable, kind]`` pairs, by name
+        or 0-based position, in column order: ``"directed"`` for ``index -> variable``,
+        ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+        ``index <-> variable``; it is empty for a single environment. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
+        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order; the index, in a triple through it, is numbered
+        ``n_variables``. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``env`` is given with each
+        domain's rows apart; if those rows' tables differ in kind or columns, or one has no rows or
+        holds ``inf``; if ``env`` does not hold one value per row of ``data``, holds ``NaN`` /
+        ``inf`` or a missing label, mixes strings and numbers, or names a column ``data`` lacks; if
+        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the
+        test, as for :func:`~andrey.fci`, or, with a categorical or mixed-data test, if a numeric
+        ``env`` holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``,
+        also if a column of ``data``, or ``env`` with more than one domain, repeats another up to
+        scale and shift, before any test runs; one message names every group of copies and says to
+        keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** FCI-JCI suits independent rows pooled from several domains, sites, batches,
+    or experiments, with each row's domain known, where hidden common causes may act on the data
+    variables and on the domain itself [1]_. It assumes no selection bias and a distribution
+    faithful to the graph over the data and the domain. Its authors simulate linear-Gaussian models
+    of 4, 10, and 100 variables with hidden common causes, and binary context variables that each
+    shift one variable, with 100 or 500 rows per context, tested by partial correlation at an alpha
+    of 0.01; with one context variable, as here, that is two domains. It returns a PAG over the data
+    variables and the domain's edges. When no hidden common cause acts, use :func:`~andrey.cdnod`;
+    when the rows come from one domain, :func:`~andrey.fci`.
+
+    The index is appended to the data as a last column, the context variable of Joint Causal
+    Inference [1]_, and FCI's adjacency search and possible-d-separation step run over the data and
+    the index, as for :func:`~andrey.fci`. Pooling makes the domain a common cause of every variable
+    it shifts; with the index among the variables, a test can condition on it, so two variables the
+    domain shifts together keep no edge unless they depend within the domains.
+
+    Before each collider pass, every edge the index keeps gets an arrowhead at its data variable,
+    because no data variable causes the index (JCI Assumption 1). With ``confounded_index=False``,
+    the edge also gets a tail at the index, because no hidden variable causes both (JCI Assumption
+    2), so the edge is ``index -> variable`` and the index is never a collider; otherwise the end at
+    the index stays a circle until a rule orients it. JCI assumes no selection bias, so Zhang's
+    rules R1-R4 and R8-R10 [3]_ orient the rest, without R5-R7; they change only circles, so the
+    index's marks stay. An index edge then orients edges between data variables: from
+    ``index *-> x o-o y`` with ``y`` not adjacent to the index, rule R1 gives ``x -> y``. Mooij et
+    al. prove the procedure sound under Assumption 1, and sound and complete under Assumptions 1
+    and 2 with one context variable, where their Assumption 3, on how several context variables
+    relate, does not apply [1]_.
+
+    A variable keeps an edge to the index when its distribution changes across the domains and no
+    other variable explains the change: the domains change its causal module, the distribution given
+    its causes; or a path through hidden variables joins it to the index, as when the domains change
+    a hidden cause of it; or, with ``confounded_index=True``, a hidden variable causes both.
+    ``metadata["index_edges"]`` lists those variables, the index's neighbors; their descendants
+    change in distribution too, through them, and are not listed. An edge ``index -> x`` alone does
+    not make ``x`` a direct target of the change; Mooij et al. give the condition that does [1]_.
+
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values, as for
+    :func:`~andrey.cdnod`: with three or more domains coded ``0, 1, 2``, a shift in domain ``1``
+    alone can go undetected. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take
+    each index value as a category, so they find a shift in any domain, whatever the coding. A
+    change in a variable's noise variance alone, or in the size of an effect whose cause has mean
+    zero, leaves the means unchanged, so the tests other than the nonlinear ones do not find it.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value; ``env`` must be complete. Each
+    test reads only the rows where all of its variables are observed (test-wise deletion) [6]_
+    [7]_, the index among them, as for :func:`~andrey.fci`; ``metadata["rows_tested"]`` gives the
+    fewest and the median rows a test read. When values are missing completely at random, the rows
+    a test keeps are a random sample, so each test keeps its level [7]_. When whether a value is
+    missing depends on the variables, the rows a test keeps are a selected sample, which FCI-JCI,
+    assuming no selection bias, does not allow for. A test raises ``ValueError`` when it has fewer
+    rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the other
+    tests, or when a continuous column is constant on its rows. With missing values, the skeleton
+    search runs in one process.
+
+    **Limitations.** Not benchmarked yet; its tests run it on simulated linear-Gaussian data of up
+    to 10 variables with 1,000 to 3,000 rows from two or three domains, and on Sachs's 11 proteins,
+    7,466 cells from nine conditions, with ``"cond_gauss"``. It takes one environment variable: the
+    several context variables of the authors' designs, one per intervention, are not implemented, so
+    domains that change different variables share one index. Its possible-d-separation step tests
+    subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"``,
+    ``"student_t"``, and ``"normal_scores"`` can miss a shift in a middle domain of three or more,
+    as above. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random.
+
+    References
+    ----------
+    .. [1] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [2] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
+    .. [3] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+       1873-1896.
+    .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [6] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [7] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import fci_jci
+    >>> rng = np.random.default_rng(1)
+    >>> env = np.repeat([0.0, 1.0], 500)
+    >>> x = 2.0 * env + rng.standard_normal(1000)
+    >>> y = x + rng.standard_normal(1000)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = fci_jci(np.column_stack([x, y]), env)
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    >>> out.metadata["index_edges"]
+    [[0, 'partially_directed']]
+    """
+    from andrey.constraint.fci_jci import fci_jci as _fci_jci
+    from andrey.core.environments import normalize_env_targets
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+
+    if env is None:
+        raise TypeError(
+            "fci_jci needs env, the environment of each row, or data as each environment's rows "
+            "apart"
+        )
+    data, codes, env_labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method="fci_jci"
+    )
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    # A mixed-data test takes the index as categorical, so every data column may be continuous.
+    X, mask = checked_data(
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        index_categorical=True,
+        method="fci_jci",
+        missing=True,
+    )
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="fci_jci")
+    # Numbers reach the search as given; text labels as their codes.
+    text = any(isinstance(label, str) for label in env_labels)
+    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
+    if data_kind(indep_test) != "continuous":
+        check_categories(c, None, f"indep_test={indep_test!r}", name="env")
+    # The search appends the index as column d, so a copy of it is named as the index.
+    d, column = X.shape[1], column_namer(labels)
+    ambiguous: set[tuple[int, int, int]] = set()
+    with (
+        copies_named(labels, lambda j: "env" if j == d else column(j)),
+        rows_tested() as rows,
+    ):
+        pag, index_edges = _fci_jci(
+            X,
+            c,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            confounded_index=confounded_index,
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
+            seed=seed,
+            _ambiguous=ambiguous,
+        )
+    variable = label_of(labels)
+    metadata = {
+        "index_edges": [[variable(j), kind] for j, kind in index_edges],
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 @method_spec("icp")

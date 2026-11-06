@@ -633,12 +633,17 @@ def sachs_conditions(tmp_path_factory):
     return logged, pooled.env, pooled.graph
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(sachs_conditions):
     """Pooled across the nine conditions, under half of PC's adjacencies are in the consensus
-    network; with the condition as a categorical ``env``, over 85% of CD-NOD's are."""
+    network; with the condition as a categorical ``env``, over 85% of CD-NOD's and FCI-JCI's are.
+    On these data FCI-JCI's index keeps an edge to every protein."""
     from andrey.metrics import skeleton_scores
 
     data, env, consensus = sachs_conditions
     assert skeleton_scores(andrey.pc(data).structure, consensus)["precision"] < 0.5
-    out = andrey.cdnod(data, env=env, indep_test="cond_gauss", categorical=[])
-    assert skeleton_scores(out.structure, consensus)["precision"] > 0.85
+    settings = {"env": env, "indep_test": "cond_gauss", "categorical": []}
+    for method in (andrey.cdnod, andrey.fci_jci):
+        out = method(data, **settings)
+        assert skeleton_scores(out.structure, consensus)["precision"] > 0.85
+    assert {variable for variable, _ in out.metadata["index_edges"]} == set(data.columns)

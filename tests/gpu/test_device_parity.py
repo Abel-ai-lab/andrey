@@ -1,12 +1,13 @@
 """GPU device parity: the CUDA and MPS paths match the NumPy float64 result and run on the device.
 
 The one check the free hosted runners cannot run. NumPy float64 is the reference. The kernels
-(``cov``, ``corrcoef``, ``entropy``) and the methods that read them (PC with Fisher-Z, GES with BIC,
-BOSS-FCI and GRaSP-FCI with both, DirectLiNGAM) run on ``cuda`` or ``mps``; KCI, CMIknn, and PNL run
-on ``cuda`` only. Tolerance is per device: ``cuda`` computes in float64 (tight, ~1e-9), ``mps`` in
-float32 (the GPU tier, ``atol 1e-3``). The device is pinned via ``andrey.config`` (higher precedence
-than any env), each test reads the dispatch counts of its device calls, and a hardware canary checks
-the device, so a silent numpy fallback fails.
+(``cov``, ``corrcoef``, ``entropy``) and the methods that read them (PC and FCI-JCI with
+Fisher-Z, GES with BIC, BOSS-FCI and GRaSP-FCI with both, DirectLiNGAM) run on ``cuda`` or
+``mps``; KCI, CMIknn, and PNL run on ``cuda`` only. Tolerance is per device: ``cuda`` computes
+in float64 (tight, ~1e-9), ``mps`` in float32 (the GPU tier, ``atol 1e-3``). The device is
+pinned via ``andrey.config`` (higher precedence than any env), each test reads the dispatch
+counts of its device calls, and a hardware canary checks the device, so a silent numpy
+fallback fails.
 """
 
 from __future__ import annotations
@@ -129,6 +130,24 @@ def test_a_method_finds_the_same_graph_and_order_on_the_device(device, linear, m
     assert {key for key in backend.dispatch_stats() if key[0] == op} == {(op, device)}
     assert got.structure.oriented_edges() == cpu.structure.oriented_edges()
     assert got.ordering == cpu.ordering
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("confounded_index", [True, False])
+def test_fci_jci_matches_the_cpu(device, confounded_index):
+    """A domain shift gives the same PAG and index marks on NumPy and the device."""
+    x, index = datagen.domain_shift("gauss_5v", (0,))
+    with andrey.config(backend="numpy", n_jobs=1):
+        expected = andrey.fci_jci(x, index, confounded_index=confounded_index)
+    assert expected.metadata["index_edges"]
+
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device, n_jobs=1):
+        actual = andrey.fci_jci(x, index, confounded_index=confounded_index)
+
+    assert backend.dispatch_stats().get(("corrcoef", device), 0) > 0
+    assert actual.structure == expected.structure
+    assert actual.metadata["index_edges"] == expected.metadata["index_edges"]
 
 
 @pytest.fixture

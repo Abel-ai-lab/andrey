@@ -194,9 +194,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "the data, which a row shuffle, a change of units, or a sign flip leaves in place, so "
             "reordering the columns relabels the result. `position` "
             "orders them by column position, which skips computing the ranks, fires the "
-            "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, "
-            "and visits the possible-d-separation step of `fci` and `gfci` in column order; "
-            "the result can then depend on the column order. Also `andrey.config(tie_break=...)`."
+            "orientation rules of `pc`, `cdnod`, `fci`, `gfci`, and `fci_jci` one at a time in "
+            "column order, and visits the possible-d-separation step of `fci`, `gfci`, and "
+            "`fci_jci` in column order; the result can then depend on the column order. Also "
+            "`andrey.config(tie_break=...)`."
         ),
         group="reproducibility",
     ),

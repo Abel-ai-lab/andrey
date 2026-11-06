@@ -587,10 +587,10 @@ def load_dataset(
         With ``"sachs"``, load all nine conditions, 7,466 cells, instead of the 853 observational
         ones, with each cell's condition in ``env``, the reagents' declared targets in
         ``targets``, and the conditions' names in ``conditions``: data from several environments,
-        for :func:`~andrey.cdnod`, :func:`~andrey.gnies`, :func:`~andrey.icp`, and
-        :func:`~andrey.ut_igsp`, and, on the rows of the seven conditions whose targets are known,
-        for :func:`~andrey.gies` and :func:`~andrey.igsp`, which need every condition's targets.
-        The other datasets take no ``conditions``.
+        for :func:`~andrey.cdnod`, :func:`~andrey.fci_jci`, :func:`~andrey.gnies`,
+        :func:`~andrey.icp`, and :func:`~andrey.ut_igsp`, and, on the rows of the seven conditions
+        whose targets are known, for :func:`~andrey.gies` and :func:`~andrey.igsp`, which need
+        every condition's targets. The other datasets take no ``conditions``.
     shuffle : bool, default=True
         List a published network's variables in an order drawn from the seed, with
         ``feature_names`` and the graph's labels in the same order. A network file lists its

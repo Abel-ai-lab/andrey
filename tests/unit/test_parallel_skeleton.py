@@ -139,6 +139,7 @@ _FACADES = {
     "boss_fci": andrey.boss_fci,
     "grasp_fci": andrey.grasp_fci,
     "cdnod": lambda x: andrey.cdnod(x, _domain_index(len(x))),
+    "fci_jci": lambda x: andrey.fci_jci(x, _domain_index(len(x))),
 }
 
 
