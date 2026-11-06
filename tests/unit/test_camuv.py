@@ -10,9 +10,9 @@ import pytest
 
 import andrey
 from andrey.core import ARROW, CIRCLE
+from andrey.core.ties import tie_ranks
 from andrey.data import sample_scm
 from andrey.fcm.camuv import drop_cycles
-from andrey.search.hc import tie_ranks
 
 N = 600
 

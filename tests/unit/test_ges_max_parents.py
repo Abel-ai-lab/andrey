@@ -19,10 +19,10 @@ from andrey.core import ARROW, TAIL
 from andrey.core.orient import dag2cpdag, pdag2dag
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.core.ties import tie_ranks
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
 from andrey.search.ges import ges
-from andrey.search.hc import tie_ranks
 
 
 def _sem(seed: int, n: int, d: int, p: float) -> np.ndarray:

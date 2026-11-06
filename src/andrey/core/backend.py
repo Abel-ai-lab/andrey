@@ -177,7 +177,7 @@ class _Config:
 
     ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
     equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from the
-    data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the result.
+    data (:func:`andrey.core.ties.tie_ranks`), so reordering the columns relabels the result.
     ``"position"`` orders them by column position instead, which skips computing the ranks, and the
     result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
     ``collider_order``, and ``fci`` and ``gfci`` their ``possible_dsep``, from it when the call

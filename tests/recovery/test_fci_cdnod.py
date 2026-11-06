@@ -11,8 +11,8 @@ from andrey import data
 from andrey.constraint.pc import _discover_skeleton, _orient_colliders
 from andrey.core import TAIL, GraphStructure
 from andrey.core.orient import meek, pdag2dag
+from andrey.core.ties import tie_ranks
 from andrey.data.interventions import soft
-from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 

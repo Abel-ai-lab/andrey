@@ -70,7 +70,7 @@ def gfci(
 
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
-    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.

@@ -15,11 +15,11 @@ import andrey
 from andrey.core import ARROW, TAIL
 from andrey.core.knowledge import resolve
 from andrey.core.score import BICScore
+from andrey.core.ties import tie_ranks
 from andrey.search import gnies as engine
 from andrey.search.ges import required_dag
 from andrey.search.gies import replace_unprotected, search_class
 from andrey.search.gnies import NoiseInterventionScore, alternating_fit, singleton_cut
-from andrey.search.hc import tie_ranks
 
 D = 5
 

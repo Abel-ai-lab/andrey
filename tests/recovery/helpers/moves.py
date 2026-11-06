@@ -19,16 +19,16 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.score import LocalScore
 from andrey.core.seeding import start_rng
+from andrey.core.ties import KEY_DP
 from andrey.metrics import to_cpdag
 from andrey.search import boss as boss_search
 from andrey.search import grasp as grasp_search
-from andrey.search._parallel import _KEY_DP
 
 
 def grid(n_samples: int) -> float:
     """One step of the grid hill climbing and tabu search round ``delta / n_samples`` to, in score
     units: a smaller gain is rounding."""
-    return n_samples * 10.0**-_KEY_DP
+    return n_samples * 10.0**-KEY_DP
 
 
 def _dag(adj: np.ndarray) -> GraphStructure:
