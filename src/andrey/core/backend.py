@@ -180,15 +180,14 @@ class _Config:
     data (:func:`andrey.core.ties.tie_ranks`), so reordering the columns relabels the result.
     ``"position"`` orders them by column position instead, which skips computing the ranks, and the
     result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
-    ``collider_order``, and ``fci``, ``gfci``, ``boss_fci``, ``grasp_fci``, and ``fci_jci`` their
-    ``possible_dsep``, from it when the call gives none: ``"p_value"`` and ``"order_free"`` under
-    ``"rank"``, ``"column"`` and ``"fast"`` under ``"position"``. ``pc``, ``cdnod``, ``fci``,
-    ``gfci``, ``boss_fci``, ``grasp_fci``, and ``fci_jci`` also fire their orientation rules one at
-    a time in column order under ``"position"``, where ``"rank"`` runs them in order-free rounds.
-    The speed difference is small, except for ``fci`` and ``gfci`` on large dense graphs.
-    Each fit reads the setting once, when it starts. The
-    :doc:`column-order guide </docs/guides/column-order>` gives the numbers and lists the methods
-    it reaches.
+    ``collider_order``, and ``fci``, ``gfci``, and ``fci_jci`` their ``possible_dsep``, from it when
+    the call gives none: ``"p_value"`` and ``"order_free"`` under ``"rank"``, ``"column"`` and
+    ``"fast"`` under ``"position"``. ``pc``, ``cdnod``, ``fci``, ``gfci``, ``boss_fci``,
+    ``grasp_fci``, and ``fci_jci`` also fire their orientation rules one at a time in column order
+    under ``"position"``, where ``"rank"`` runs them in order-free rounds. The speed difference is
+    small, except for ``fci`` and ``gfci`` on large dense graphs. Each fit reads the setting once,
+    when it starts. The :doc:`column-order guide </docs/guides/column-order>` gives the numbers and
+    lists the methods it reaches.
     """
 
     __slots__ = ("_backend", "_n_jobs", "_tie_break")

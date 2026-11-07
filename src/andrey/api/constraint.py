@@ -750,18 +750,17 @@ def fci_hybrid(
     indep_test: str | None,
     categorical: Sequence[str | int] | None,
     collider_rule: str,
-    possible_dsep: str | None,
     knowledge: Knowledge | None,
     **settings: object,
 ) -> StructureOutput:
     """Run ``name``, ``"gfci"``, ``"boss_fci"``, or ``"grasp_fci"``, a search and FCI's rules.
 
     The score and the test must read the data alike (:func:`~andrey.api._adapt.check_same_data`);
-    ``settings`` reach the engine of the same name in :mod:`andrey.search.gfci`. With ``env``, the
-    environment index joins the data as a last column, the engine's ``context``, and leaves the PAG
-    again: its edges go in ``metadata``.
+    ``settings`` reach the engine of the same name in :mod:`andrey.search.gfci`, ``possible_dsep``
+    among them for ``"gfci"`` alone. With ``env``, the environment index joins the data as a last
+    column, the engine's ``context``, and leaves the PAG again: its edges go in ``metadata``.
     """
-    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order
     from andrey.search import gfci as engines
 
     assert score_func is not None and indep_test is not None  # method_spec picks them
@@ -789,7 +788,6 @@ def fci_hybrid(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=augmented_mask,
-            possible_dsep=resolve_possible_dsep(possible_dsep),
             constraints=augmented_constraints,
             in_column_order=resolve_in_column_order(),
             context=column,
@@ -1149,6 +1147,8 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
+    from andrey.core.ties import resolve_possible_dsep
+
     return fci_hybrid(
         "gfci",
         data,
@@ -1157,7 +1157,7 @@ def gfci(
         indep_test=indep_test,
         categorical=categorical,
         collider_rule=collider_rule,
-        possible_dsep=possible_dsep,
+        possible_dsep=resolve_possible_dsep(possible_dsep),
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,

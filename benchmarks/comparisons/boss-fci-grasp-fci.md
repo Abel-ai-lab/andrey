@@ -8,9 +8,10 @@ than Tetrad's at its documented defaults.
 ## The model
 
 BOSS-FCI and GRaSP-FCI (Ramsey, Andrews, and Spirtes 2025) are GFCI with BOSS's or GRaSP's CPDAG in
-place of FGES's: conditional-independence tests remove the adjacencies hidden common causes
-explain, the CPDAG decides the colliders, and FCI's rules orient the PAG. The paper proves them
-correct with GFCI's possible-d-separation step and conjectures the step unneeded. Its simulation
+place of FGES's: conditional-independence tests remove the adjacencies hidden common causes explain,
+the CPDAG decides the colliders, and FCI's rules orient the PAG. The paper proves them correct with
+GFCI's possible-d-separation step and conjectures the step unneeded, and its Algorithm 5 leaves the
+step out; Andrey's hybrids follow Algorithm 5 there, as both Tetrad releases do. Its simulation
 (Sec. 8.1.1) draws linear-Gaussian SEMs on random forward DAGs over 20 measured variables plus 0, 4,
 or 8 hidden ones, at mean degree 2, 4, or 6 and 200 to 5,000 rows, with coefficients uniform on
 [-1, 1], noise variances uniform on [1, 3], no standardization, and the columns shuffled; 20 runs
@@ -74,16 +75,13 @@ The implementations differ in parts each adapter names and the lane measures rat
 
 | part | Andrey | Tetrad |
 |---|---|---|
-| possible-d-separation | kept: GFCI's step, under which the paper proves the method correct | none, in both releases |
 | removing adjacencies | FCI's adjacency search from the CPDAG's adjacencies, level by level | one pass of greedy separating sets over the CPDAG's edges (7.6.3); one pass in a shuffled order (7.6.10) |
 | BOSS's or GRaSP's start | one start from the columns' ranks | one start from the column order |
 | GRaSP's tuck depth | 3, independent of `max_depth` | `depth`, -1 (none) by default, the FCI cap too |
 
-Context arms at the paper's settings measure each part: Andrey's hybrids with the
-possible-d-separation step's removals skipped (`no_possible_dsep`) on P20, P100, O1, and O2,
-Andrey's GRaSP-FCI at a tuck depth of 7 on P20, P100, and O1, and GFCI and FCI from both packages
-on P20. A tuck depth of `d`,
-nearer Tetrad's, runs past minutes at 200 rows, where many scores tie, so the lane stops at 7.
+Context arms at the paper's settings measure each part: Andrey's GRaSP-FCI at a tuck depth of 7 on
+P20, P100, and O1, and GFCI and FCI from both packages on P20. A tuck depth of `d`, nearer Tetrad's,
+runs past minutes at 200 rows, where many scores tie, so the lane stops at 7.
 
 ## Scores
 
@@ -99,7 +97,7 @@ Every estimate is a PAG over the measured variables, scored against the true PAG
 | `arrow_path_precision` | the estimated `x *-> y` with no directed path from `y` to `x` in the DAG |
 | `tail_path_precision` | the estimated `x -> y` with a directed path from `x` to `y` |
 | `bidirected_latent_precision` | the estimated `x <-> y` with a hidden parent of both |
-| `possible_dsep_max` | the most candidates any pair's possible-d-separation search had (Andrey) |
+| `possible_dsep_max` | the most candidates any pair's possible-d-separation search had (Andrey's GFCI and FCI) |
 
 A pair is one dataset fitted by both packages. D is Andrey's SHD minus the mean of Tetrad's five
 runs, and its interval the percentile bootstrap 95% interval of the mean D over the pairs (10,000
@@ -134,7 +132,7 @@ time is its search inside the JVM (`wall_s`); the whole call, with the JVM's sta
 ## References
 
 - Ramsey, J., Andrews, B., Spirtes, P. (2025). Efficient latent variable causal discovery:
-  combining score search and targeted testing. arXiv:2510.04263.
+  combining score search and targeted testing. arXiv:2510.04263v3.
 - Ogarrio, J. M., Spirtes, P., Ramsey, J. (2016). A hybrid causal search algorithm for latent
   variable models. PGM, PMLR 52, 368-379.
 - Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence

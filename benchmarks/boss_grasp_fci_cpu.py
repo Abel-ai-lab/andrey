@@ -24,18 +24,17 @@ against the gated reference, causal-cmd 1.12.0's ``bfci`` and ``grasp-fci`` (tet
 Tetrad's documented defaults (:mod:`~andrey_bench.adapters.tetrad_pag`), run :data:`DRAWS` times
 per dataset with no seed. At the paper's settings, P20 adds context arms: tetrad-lib 7.6.10's
 ``BossFci`` and ``GraspFci``, the paper's code, once (also on P100); causal-cmd's GFCI and FCI and
-Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, O1, and O2 add Andrey's hybrids
-with the possible-d-separation step's removals skipped (``no_possible_dsep``, the step neither
-Tetrad hybrid has), and P20, P100, and O1 ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP,
-which has no cap; a tuck depth of ``d`` runs past minutes at 200 rows, where ties between scores
-are many.
+Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, and O1 add Andrey's ``grasp_fci``
+at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a tuck depth of ``d`` runs past minutes at
+200 rows, where ties between scores are many.
 
 The truth is the PAG of the measured variables (``andrey.data.latent.marginal``); ``check-truth``
 compares it with pcalg's ``dag2pag`` on the DAG numbered in a topological order. Every estimate is
 scored against it (:func:`pag_scores`): the endpoint SHD (``shd``, the verdict), the adjacency,
 arrowhead, and tail precision and recall (arrowhead and tail F1 too, and the arrowheads on the
 adjacencies both graphs share), the precision of the paper's path metrics, and the empty graph's
-SHD. Each Andrey fit also records the largest possible-d-separation candidate set its step searched.
+SHD. Each Andrey GFCI and FCI fit also records the largest possible-d-separation candidate set its
+step searched.
 
 Per dataset, each package runs in one child process pinned to one core with one BLAS thread:
 Andrey's in :mod:`~andrey_bench.adapters.andrey_boss_fci`, Tetrad's in this file
@@ -345,21 +344,15 @@ def andrey_fits(cell: Cell) -> list[dict]:
     """Andrey's fits on each dataset of ``cell``, one draw each (seed 0)."""
     params = _params(cell)
 
-    def fit(algorithm, config=cell.setting, trace=None, **extra):
+    def fit(algorithm, config=cell.setting, **extra):
         return {
             "algorithm": algorithm,
             "config": config,
             "params": {**params, **extra},
-            "trace": trace,
             "draws": [0],
         }
 
     fits = [fit("boss_fci"), fit("grasp_fci")]
-    if cell.setting == "paper" and cell.block in ("P20", "P100", "O1", "O2"):
-        fits += [
-            fit("boss_fci", "paper-no-possible-dsep", "no_possible_dsep"),
-            fit("grasp_fci", "paper-no-possible-dsep", "no_possible_dsep"),
-        ]
     if cell.block == "P20" and cell.setting == "paper":
         fits += [fit("gfci"), fit("fci")]
     if cell.block in ("P20", "P100", "O1") and cell.setting == "paper":
@@ -782,30 +775,6 @@ COMPARISONS = (
         ("tetrad-7.6.10", "grasp_fci", ""),
         "tetrad-lib-7.6.10.GraspFci",
         "context",
-    ),
-    (
-        ("boss_fci", "-no-possible-dsep"),
-        ("tetrad-7.6.3", "boss_fci", ""),
-        "tetrad-cmd-1.12.0.bfci@andrey-no-possible-dsep",
-        "trace",
-    ),
-    (
-        ("grasp_fci", "-no-possible-dsep"),
-        ("tetrad-7.6.3", "grasp_fci", ""),
-        "tetrad-cmd-1.12.0.grasp-fci@andrey-no-possible-dsep",
-        "trace",
-    ),
-    (
-        ("boss_fci", "-no-possible-dsep"),
-        ("andrey", "boss_fci", ""),
-        "andrey.boss_fci@no-possible-dsep",
-        "trace",
-    ),
-    (
-        ("grasp_fci", "-no-possible-dsep"),
-        ("andrey", "grasp_fci", ""),
-        "andrey.grasp_fci@no-possible-dsep",
-        "trace",
     ),
     (("gfci", ""), ("tetrad-7.6.3", "gfci", ""), "tetrad-cmd-1.12.0.gfci", "context"),
     (("fci", ""), ("tetrad-7.6.3", "fci", ""), "tetrad-cmd-1.12.0.fci", "context"),

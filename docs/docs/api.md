@@ -424,8 +424,8 @@ orientations: nodes two steps apart on each path must be non-adjacent. R5 consid
 path, up to a fixed search bound. R8 checks each pair of endpoints in both orders, and the rules run
 in rounds, each setting together the marks every rule implies on the graph as it stands and leaving
 a circle where two of them disagree, so neither depends on the node labels. The same rules determine
-the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`. Their possible-d-separation
-step visits the pairs and nodes by a rank computed from the data, so with
+the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`. The possible-d-separation
+step of FCI, GFCI, and FCI-JCI visits the pairs and nodes by a rank computed from the data, so with
 `possible_dsep="order_free"`, the default, their result does not depend on the column order unless
 two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
@@ -532,10 +532,11 @@ with a refit under the Gaussian likelihood, which does not depend on the scale o
 BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
 BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
 conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
-rules orient the rest into a PAG. With `env`, the index leads every order of their search, and their
-tests and rules treat it as FCI-JCI, below, does. `boss` and `grasp` take `env` as well, and so do
-`ges`, `hc`, `tabu`, and `gfci`: the index joins the search as a variable that no data variable
-causes, as in `cdnod`.
+rules orient the rest into a PAG. They follow the paper's Algorithm 5, which leaves out GFCI's
+possible-d-separation step: the authors conjecture that the step is not needed. With `env`, the
+index leads every order of their search, and their tests and rules treat it as FCI-JCI, below, does.
+`boss` and `grasp` take `env` as well, and so do `ges`, `hc`, `tabu`, and `gfci`: the index joins
+the search as a variable that no data variable causes, as in `cdnod`.
 
 A method becomes supported once it has:
 

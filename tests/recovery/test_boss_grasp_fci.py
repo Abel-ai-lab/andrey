@@ -1,23 +1,27 @@
 """Recovery checks for BOSS-FCI and GRaSP-FCI: GFCI's FCI phase on a BOSS or GRaSP CPDAG.
 
-Each hybrid is checked to equal FCI's phase applied to its own search's CPDAG. Fixed cases are a
-planted hidden common cause and independent columns. Ground truth comes from simulated
-linear-Gaussian data with hidden variables at the paper's sizes, from data simulated on the
-published ASIA network with one node hidden, and from the Sachs measurements against their
-consensus network. Mixed data, determinism, column-order invariance, the recorded outputs, and
-input validation complete them.
+Each hybrid is checked to equal FCI's phase applied to its own search's CPDAG, without GFCI's
+possible-d-separation step. Fixed cases are a planted hidden common cause, independent columns, and
+a pair only a possible-d-separation set separates, decided by a d-separation oracle. Ground truth
+comes from simulated linear-Gaussian data with hidden variables at the paper's sizes, from data
+simulated on the published ASIA network with one node hidden, and from the Sachs measurements
+against their consensus network. Mixed data, determinism, column-order invariance, the recorded
+outputs, and input validation complete them.
 """
 
 from __future__ import annotations
 
+from itertools import combinations
+
+import networkx as nx
 import numpy as np
 import pytest
 
 import andrey
 from andrey import data
-from andrey.core import LATENT, OBSERVED, GraphStructure
+from andrey.core import ARROW, LATENT, NULL, OBSERVED, TAIL, GraphStructure, ci
 from andrey.data import load_dataset
-from andrey.data.latent import marginal
+from andrey.data.latent import DSepOracle, marginal
 from andrey.metrics import shd, skeleton_scores
 from andrey.search import gfci as engines
 from andrey.search.boss import boss
@@ -41,7 +45,7 @@ _FCI_PHASE = dict(
     indep_test="fisherz",
     collider_rule="sepsets",
     categorical=None,
-    possible_dsep="order_free",
+    possible_dsep=None,
     in_column_order=False,
 )
 
@@ -78,7 +82,8 @@ def test_each_hybrid_is_the_fci_phase_on_its_search(seed):
         expected = engines.fci_from_pattern(x, pattern, **_FCI_PHASE)
         assert FIT[name](x).structure == expected
     pattern, _ = ges(x, ebic_gamma=0.0)
-    assert andrey.gfci(x).structure == engines.fci_from_pattern(x, pattern, **_FCI_PHASE)
+    gfci_phase = _FCI_PHASE | dict(possible_dsep="order_free")
+    assert andrey.gfci(x).structure == engines.fci_from_pattern(x, pattern, **gfci_phase)
 
 
 # --- fixed cases ----------------------------------------------------------------------------------
@@ -109,6 +114,65 @@ def test_hybrid_finds_no_edges_between_independent_columns(name):
     out = FIT[name](x)
     assert out.structure.oriented_edges() == []
     assert out.structure.kind == "pag"
+
+
+# Observed nodes 0-6 and hidden 7-11; 1 and 8 join nothing. Every set of observed nodes that
+# separates 4 and 5 holds 2, 3, and 6.
+_PDSEP_DAG = [(2, 3), (2, 6), (3, 5), (6, 4), (7, 0), (7, 5), (9, 0), (9, 4), (10, 5), (10, 6)]
+_PDSEP_DAG += [(11, 3), (11, 4)]
+
+
+def _pdsep_cpdag() -> GraphStructure:
+    """A CPDAG over 0-6 that joins 4 and 5 and gives both the parents 0, 2, 3, and 6."""
+    marks = np.zeros((7, 7), dtype=np.int8)
+    for a, b in [(0, 4), (0, 5), (2, 4), (2, 5), (3, 4), (3, 5), (6, 4), (6, 5)]:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    for a, b in [(4, 5), (2, 3), (2, 6)]:
+        marks[a, b] = marks[b, a] = TAIL
+    return GraphStructure.from_numpy(marks, kind="cpdag")
+
+
+def test_only_gfci_removes_a_pair_by_possible_dsep(monkeypatch):
+    """Every search returns :func:`_pdsep_cpdag` and the tests answer by d-separation in the DAG.
+
+    The adjacency search removes 2 - 4 given {6} and 2 - 5 given {3} before it tries sets of three,
+    so no subset of the remaining neighbors of 4 or of 5 separates them: the hybrids, which run no
+    possible-d-separation step, keep the pair 4 - 5 that the true PAG lacks. GFCI's step finds
+    {2, 3, 6} among the possible-d-separation set and returns the true PAG.
+    """
+    dag = nx.DiGraph(_PDSEP_DAG)
+    dag.add_nodes_from(range(12))
+    x = np.random.default_rng(0).standard_normal((50, 7))
+
+    def oracle(columns):
+        """The d-separation test over ``columns``, ``x``'s columns in some order."""
+        return DSepOracle(
+            dag, nodes=[next(j for j in range(7) if np.array_equal(c, x[:, j])) for c in columns.T]
+        )
+
+    monkeypatch.setitem(ci._CI_REGISTRY, "dsep_oracle", oracle)
+    for search in ("boss", "grasp", "ges"):
+        monkeypatch.setattr(engines, search, lambda *args, **kwargs: (_pdsep_cpdag(), 0.0))
+    marks = np.zeros((12, 12), dtype=np.int8)
+    for a, b in _PDSEP_DAG:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    types = np.array([OBSERVED] * 7 + [LATENT] * 5, dtype=np.int8)
+    truth = marginal(GraphStructure.from_numpy(marks, kind="dag", node_types=types), "pag")
+    separated = DSepOracle(dag)
+    assert truth.to_numpy()[4, 5] == NULL and separated(4, 5, (2, 3, 6)) == 1.0
+
+    found = {name: getattr(engines, name)(x, indep_test="dsep_oracle") for name in HYBRIDS}
+    for pag in found.values():
+        adjacent = pag.to_numpy() != NULL
+        assert adjacent[4, 5] and not adjacent[2, [4, 5]].any()
+        for end, other in ((4, 5), (5, 4)):
+            neighbors = [v for v in np.flatnonzero(adjacent[end]).tolist() if v != other]
+            for size in range(len(neighbors) + 1):
+                assert not any(separated(4, 5, s) for s in combinations(neighbors, size))
+        expected = truth.to_numpy() != NULL
+        expected[4, 5] = expected[5, 4] = True
+        np.testing.assert_array_equal(adjacent, expected)
+    assert engines.gfci(x, indep_test="dsep_oracle") == truth
 
 
 # --- ground truth ---------------------------------------------------------------------------------

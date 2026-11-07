@@ -1478,8 +1478,7 @@ for _name, _summary, _own, _refs in (
             tie_break=True,
             order_note=(
                 '`tie_break="position"` fires the orientation rules one at a time in column order '
-                "and records the first separating subset found, and it or "
-                '`possible_dsep="fast"` visits the possible-d-separation step in column order.'
+                "and records the first separating subset found."
             ),
             params=(
                 _SCORE_FUNC,
@@ -1491,7 +1490,6 @@ for _name, _summary, _own, _refs in (
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
-                _POSSIBLE_DSEP,
                 concept_param("confounded_index"),
                 _PERMUTATION_FCI_SEED,
                 _N_STARTS,
