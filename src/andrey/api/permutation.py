@@ -1626,7 +1626,7 @@ def boss_fci(
     the PAG stays wrong on these data, whose hidden nodes leave many pairs joined only through them:
     at 20 measured variables and mean degree 6 its errors were about three quarters of the empty
     graph's, and at mean degree 2 with 8 hidden and 200 rows at the defaults, 34.35 against 37.8.
-    Every fit at 20 measured variables took under 1 s, and at 100 under 2.5 s at mean degree 6 and
+    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and
     under 8 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
     with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with the
     mixed-data score and test, on 5 variables with 3,000 rows. It runs a full :func:`~andrey.boss`
@@ -1916,7 +1916,7 @@ def grasp_fci(
     the PAG stays wrong on these data, whose hidden nodes leave many pairs joined only through them:
     at 20 measured variables and mean degree 6 its errors were about three quarters of the empty
     graph's, and at mean degree 2 with 8 hidden and 200 rows at the defaults, 33.3 against 37.8.
-    Every fit at 20 measured variables took under 1 s, and at 100 under 2.5 s at mean degree 6 and
+    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and
     up to 46 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
     with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with the
     mixed-data score and test, on 5 variables with 3,000 rows. It runs a full :func:`~andrey.grasp`

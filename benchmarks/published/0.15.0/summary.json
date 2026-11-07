@@ -25699,20 +25699,20 @@
      },
      "replication": {
       "seeds": "100-119",
-      "paired": 19,
-      "andrey_shd_mean": 620.2631578947369,
-      "comparator_shd_mean": 625.6315789473683,
-      "mean_D": -5.368421052631576,
+      "paired": 20,
+      "andrey_shd_mean": 609.65,
+      "comparator_shd_mean": 614.6599999999999,
+      "mean_D": -5.009999999999996,
       "bootstrap_95": [
-       -8.0,
-       -2.694473684210521
+       -7.679999999999995,
+       -2.3594999999999904
       ],
       "above_zero": false,
       "verdict": "better",
       "coverage": {
-       "datasets": 19,
-       "andrey_complete": 19,
-       "comparator_complete": 19,
+       "datasets": 20,
+       "andrey_complete": 20,
+       "comparator_complete": 20,
        "andrey_short": 0
       }
      },
@@ -25809,20 +25809,20 @@
      },
      "replication": {
       "seeds": "100-119",
-      "paired": 19,
-      "andrey_shd_mean": 621.8421052631579,
-      "comparator_shd_mean": 626.1157894736841,
-      "mean_D": -4.273684210526318,
+      "paired": 20,
+      "andrey_shd_mean": 611.4,
+      "comparator_shd_mean": 614.9999999999999,
+      "mean_D": -3.6000000000000028,
       "bootstrap_95": [
-       -6.49473684210525,
-       -2.168421052631578
+       -5.990000000000004,
+       -1.1197500000000027
       ],
       "above_zero": false,
       "verdict": "better",
       "coverage": {
-       "datasets": 19,
-       "andrey_complete": 19,
-       "comparator_complete": 19,
+       "datasets": 20,
+       "andrey_complete": 20,
+       "comparator_complete": 20,
        "andrey_short": 0
       }
      },

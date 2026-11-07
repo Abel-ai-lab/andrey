@@ -220,7 +220,7 @@ BOSS-FCI at 100 variables. The card counts 2 better, 144 ties, and none worse.
 | GRaSP-FCI | paper's | 20 | 6 | 0 | 5,000 | -2.06 [-3.88, -0.49], better | +0.15 [-1.95, +2.07] | tie |
 | GRaSP-FCI | paper's | 20 | 6 | 4 | 1,000 | +1.86 [+0.13, +3.56], worse | +1.05 [-0.89, +3.01] | tie |
 | GRaSP-FCI | paper's | 20 | 6 | 8 | 1,000 | -1.59 [-2.97, -0.21], better | -0.53 [-2.7, +1.31] | tie |
-| BOSS-FCI | paper's | 100 | 6 | 10 | 1,000 | -4.3 [-8.32, -0.57], better | -5.37 [-8, -2.69] | better |
+| BOSS-FCI | paper's | 100 | 6 | 10 | 1,000 | -4.3 [-8.32, -0.57], better | -5.01 [-7.68, -2.36] | better |
 | GRaSP-FCI | defaults | 20 | 2 | 0 | 1,000 | +1.66 [+0.06, +3.76], worse | +0.45 [-0.45, +1.55] | tie |
 | BOSS-FCI | defaults | 20 | 2 | 4 | 5,000 | +1.4 [+0.15, +2.75], worse | +0.21 [-0.58, +1.31] | tie |
 | BOSS-FCI | defaults | 20 | 4 | 8 | 500 | +1.81 [+0.75, +2.92], worse | -0.77 [-2.47, +1.05] | tie |
@@ -280,8 +280,8 @@ tetrad-lib 7.6.10's rules R5 and R9 read a covered path as uncovered, so they ca
 no Markov-equivalent MAG has one, a defect of that release that 7.6.3 does not have. On these data
 it did not show in the averages: 7.6.10's tail precision over the P20 rows was 0.57 for BOSS-FCI and
 0.56 for GRaSP-FCI at the paper's settings, against Andrey's 0.54 and 0.56, and 0.51 and 0.50 at the
-defaults, against 0.48 and 0.48. Its five runs per dataset returned different PAGs on 1,638 of its
-3,378 datasets, from the unseeded order of its edge tests; causal-cmd's five runs never differed.
+defaults, against 0.48 and 0.48. Its five runs per dataset returned different PAGs on 1,640 of its
+3,380 datasets, from the unseeded order of its edge tests; causal-cmd's five runs never differed.
 
 ### Out of the claim
 

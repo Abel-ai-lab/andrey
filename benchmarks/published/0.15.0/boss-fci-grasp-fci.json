@@ -46,7 +46,7 @@
   "bgf_o3_deg4_l4": "O3: sample_scm(d=24, latents=4, density=4, n=1,000), standardized, the setting of Andrey's recovery test for both hybrids; out of claim"
  },
  "fit_status": {
-  "ok": 39183
+  "ok": 39196
  },
  "replicated_cells": [
   "P100|deg=6|L=10|setting=paper|n=1000",
@@ -27641,20 +27641,20 @@
      "speed_ratio_median": 0.5413170685265002,
      "replication": {
       "seeds": "100-119",
-      "paired": 19,
+      "paired": 20,
       "coverage": {
-       "datasets": 19,
-       "andrey_complete": 19,
-       "comparator_complete": 19,
+       "datasets": 20,
+       "andrey_complete": 20,
+       "comparator_complete": 20,
        "andrey_short": 0
       },
       "draws": 1,
-      "andrey_shd_mean": 620.2631578947369,
-      "comparator_shd_mean": 625.6315789473683,
-      "mean_D": -5.368421052631576,
+      "andrey_shd_mean": 609.65,
+      "comparator_shd_mean": 614.6599999999999,
+      "mean_D": -5.009999999999996,
       "bootstrap_95": [
-       -8.0,
-       -2.694473684210521
+       -7.679999999999995,
+       -2.3594999999999904
       ],
       "above_zero": false,
       "verdict": "better"
@@ -27744,20 +27744,20 @@
      "speed_ratio_median": 0.13153840671705555,
      "replication": {
       "seeds": "100-119",
-      "paired": 19,
+      "paired": 20,
       "coverage": {
-       "datasets": 19,
-       "andrey_complete": 19,
-       "comparator_complete": 19,
+       "datasets": 20,
+       "andrey_complete": 20,
+       "comparator_complete": 20,
        "andrey_short": 0
       },
       "draws": 1,
-      "andrey_shd_mean": 621.8421052631579,
-      "comparator_shd_mean": 626.1157894736841,
-      "mean_D": -4.273684210526318,
+      "andrey_shd_mean": 611.4,
+      "comparator_shd_mean": 614.9999999999999,
+      "mean_D": -3.6000000000000028,
       "bootstrap_95": [
-       -6.49473684210525,
-       -2.168421052631578
+       -5.990000000000004,
+       -1.1197500000000027
       ],
       "above_zero": false,
       "verdict": "better"
@@ -29389,14 +29389,14 @@
    "datasets_with_distinct_draws": 0
   },
   "P100|deg=6|L=10|setting=paper|n=1000|tetrad-7.6.10|boss_fci": {
-   "datasets": 39,
+   "datasets": 40,
    "draws": 5,
-   "datasets_with_distinct_draws": 38
+   "datasets_with_distinct_draws": 39
   },
   "P100|deg=6|L=10|setting=paper|n=1000|tetrad-7.6.10|grasp_fci": {
-   "datasets": 39,
+   "datasets": 40,
    "draws": 5,
-   "datasets_with_distinct_draws": 38
+   "datasets_with_distinct_draws": 39
   },
   "P100|deg=6|L=10|setting=paper|n=1000|tetrad-7.6.3|boss_fci": {
    "datasets": 20,
@@ -31256,17 +31256,17 @@
    "median": null
   },
   "P100|deg=6|L=10|setting=paper|n=1000|boss_fci|paper": {
-   "datasets": 39,
+   "datasets": 40,
    "max": null,
    "median": null
   },
   "P100|deg=6|L=10|setting=paper|n=1000|grasp_fci|paper": {
-   "datasets": 39,
+   "datasets": 40,
    "max": null,
    "median": null
   },
   "P100|deg=6|L=10|setting=paper|n=1000|grasp_fci|paper-grasp-depth-7": {
-   "datasets": 39,
+   "datasets": 40,
    "max": null,
    "median": null
   },
