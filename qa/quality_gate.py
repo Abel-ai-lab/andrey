@@ -52,6 +52,7 @@ from qa import reference_parity
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 import camuv_cpu  # noqa: E402
+import fci_jci_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
@@ -67,6 +68,7 @@ from andrey_bench import (  # noqa: E402
 )
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
 from andrey_bench.adapters.andrey_dynotears import AndreyDYNOTEARS  # noqa: E402
+from andrey_bench.adapters.andrey_fci_jci import AndreyFCIJCI  # noqa: E402
 from andrey_bench.adapters.andrey_gies import stack, unstack  # noqa: E402
 from andrey_bench.adapters.andrey_lingam_ts import (  # noqa: E402
     AndreyLongitudinalLiNGAM,
@@ -231,6 +233,12 @@ HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
     "latent_anm_er_tenth_d22_n1000": ("latent_anm_er_tenth", 22, 1000),
 }
 
+#: FCI-JCI's published regimes, drawn by its benchmark driver (``benchmarks/fci_jci_cpu.py``) at
+#: the two in-claim cells of mechanism changes: the paper's small setting, 4 variables, and its
+#: larger one, 10, each with one context variable and 500 rows per regime. The environment is the
+#: last column of the data.
+INDEX_PAG_CELLS: dict[str, str] = {"fci_jci_s4": "S4", "fci_jci_l10": "L10"}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -385,6 +393,17 @@ def hidden_cause_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
         x, marks, kind, _ = datasets.generate_one(key)
         types = datasets.latent_node_types(len(marks), key.latents)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind, node_types=types)))
+    return tuple(out)
+
+
+def index_pag_draws(cell: str) -> tuple[Draw, ...]:
+    """The data with the environment as the last column, and FCI-JCI's PAG at the true
+    distribution over the variables and the environment, under ``confounded_index=True``."""
+    out = []
+    for seed in SEEDS:
+        ds = fci_jci_cpu.draw(fci_jci_cpu.CELLS[cell], seed)
+        marks = fci_jci_cpu.truth(ds)["1"]
+        out.append(Draw(ds.full, GraphStructure.from_numpy(marks, kind="pag")))
     return tuple(out)
 
 
@@ -596,6 +615,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         name: functools.partial(hidden_cause_draws, *cell)
         for name, cell in HIDDEN_CAUSE_CELLS.items()
     },
+    **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
     "sachs": sachs_draws,
@@ -634,8 +654,9 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
 #: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
 #: ``direct`` scores the directed edges against those between observed variables that no hidden
-#: path joins (:func:`direct`). A time-series estimate is scored in its published summary's unit
-#: (:func:`series_error`).
+#: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
+#: index by its endpoints against the one the draw records. A time-series estimate is scored in its
+#: published summary's unit (:func:`series_error`).
 Target = Literal[
     "cpdag",
     "dag",
@@ -645,6 +666,7 @@ Target = Literal[
     "clusters",
     "parents",
     "direct",
+    "index_pag",
     "lagged",
     "window",
     "window_edges",
@@ -685,6 +707,8 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
+#: FCI-JCI needs data pooled from an observational and an interventional regime.
+INDEX_PAG_DATA = tuple(INDEX_PAG_CELLS)
 KNOWN_TARGET_DATA = tuple(KNOWN_TARGET_CELLS)
 
 
@@ -725,6 +749,15 @@ def igsp_fit(x: np.ndarray) -> Any:
     return andrey.igsp(samples, env, targets={0: [], **dict(enumerate(targets, start=1))})
 
 
+FCI_JCI = AndreyFCIJCI()
+
+
+def fci_jci_fit(x: np.ndarray) -> Any:
+    """``andrey.fci_jci`` at its defaults on an FCI-JCI draw, its last column as ``env``: the PAG
+    over the variables and the environment, as the benchmark driver scores it."""
+    return FCI_JCI.to_structure(FCI_JCI.fit(x, {"context_vars": [x.shape[1] - 1]}))
+
+
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
     """The benchmark adapter's fit with the published settings, as the harness scores it."""
     return lambda x: adapter.to_structure(adapter.fit(x, adapter.params()))
@@ -762,6 +795,7 @@ SUPPORTED: dict[str, Method] = {
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
     "GFCI": Method(lambda x: andrey.gfci(x), "pag", PAG_DATA),
     "CDNOD": Method(_adapted(AndreyCDNOD()), "essential", _models("domain_shift_er")),
+    "FCI-JCI": Method(fci_jci_fit, "index_pag", INDEX_PAG_DATA),
     "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
@@ -928,7 +962,7 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
         return set_errors(parents_of(estimate, last), parents_of(truth, last))
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
-    return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection"))
+    return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
 
 
 def set_errors(estimate: set[int], truth: set[int]) -> int:
@@ -950,7 +984,7 @@ def latents_missed(estimate: Any, truth: GraphStructure) -> int:
 
 
 def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
-    kind = "pag" if target == "projection" else target
+    kind = "pag" if target in ("projection", "index_pag") else target
     return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 

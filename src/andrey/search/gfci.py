@@ -66,6 +66,8 @@ def gfci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
@@ -88,8 +90,11 @@ def gfci(
     the triples the pattern shields by the vote of
     :func:`~andrey.constraint._skeleton.vote_triples` after the possible-d-sep step. ``seed`` fixes
     the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
-    ``None`` uses ``ANDREY_SEED``. The private ``_ambiguous`` sink receives the triples no
-    orientation rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    ``None`` uses ``ANDREY_SEED``. ``context``, the column of an environment index, is a source of
+    the GES phase (:func:`~andrey.search.ges.ges`), whose passes then run in this process, and the
+    test phase gives its edges the marks of Joint Causal Inference (:func:`fci_from_pattern`, with
+    ``confounded_index``). The private ``_ambiguous`` sink receives the triples no orientation rule
+    reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
@@ -106,6 +111,7 @@ def gfci(
         categorical=categorical,
         constraints=constraints,
         workers=workers,
+        sources=() if context is None else (context,),
     )
     return fci_from_pattern(
         X,
@@ -120,6 +126,8 @@ def gfci(
         in_column_order=in_column_order,
         workers=workers,
         seed=seed,
+        context=context,
+        confounded_index=confounded_index,
         _ambiguous=_ambiguous,
     )
 

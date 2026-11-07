@@ -18,10 +18,10 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's and IGSP's (:class:`Fit`) on ``K`` seeded column
-orders and maps each answer back to the original columns before hashing it; ``--workers N`` refits
-the methods that run worker processes or threads (:data:`WORKER_METHODS`) on ``N`` workers, with
-every GES pass and every skeleton pass of conditioning size two or more sent to the pool. Both
+``--shuffle K`` refits each draw but ICP's, IGSP's, and FCI-JCI's (:class:`Fit`) on ``K`` seeded
+column orders and maps each answer back to the original columns before hashing it; ``--workers N``
+refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on ``N`` workers,
+with every GES pass and every skeleton pass of conditioning size two or more sent to the pool. Both
 report each refit whose answer differs from the first fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
@@ -76,8 +76,9 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP and IGSP, whose draws a column order does not
-    apply to: each row's environment is a column of the draw, and ICP's target is the last variable.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, and FCI-JCI, whose draws a column order
+    does not apply to: each row's environment is a column of the draw, and ICP's target is the last
+    variable.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -108,6 +109,11 @@ def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
     _, first, inverse = np.unique(mask, axis=0, return_index=True, return_inverse=True)
     env = np.argsort(np.argsort(first))[inverse.reshape(-1)]
     return samples, env, int(env[np.flatnonzero(~mask.any(axis=1))[0]])
+
+
+def _fci_jci(x: np.ndarray) -> StructureOutput:
+    """FCI-JCI with the draw's last column as the environment, as the gate fits it."""
+    return andrey.fci_jci(x[:, :-1], x[:, -1], alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -144,6 +150,7 @@ FITS: dict[str, Fit] = {
     "FCI": Fit(functools.partial(andrey.fci, alpha=ALPHA), alpha=ALPHA),
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
+    "FCI-JCI": Fit(_fci_jci, shuffled=False, alpha=ALPHA),
     "GES": Fit(andrey.ges),
     "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
@@ -214,6 +221,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
+    "fci_jci_x100": functools.partial(qg.index_pag_draws, "X100"),
     "multi_group_er_d30": functools.partial(qg.model_draws, "multi_group_er", 30, 1000),
     "latent_measurement_d16": functools.partial(qg.model_draws, "latent_measurement", 16, 1000),
     "anm_pair_n1500": functools.partial(qg.pair_draws, "anm_pair", 1500),
@@ -261,6 +269,7 @@ LARGER: dict[str, str] = {
     "RESIT": "anm_er_n1000_d12",
     "CALM": "linear_gauss_er_d15",
     "CDNOD": "domain_shift_er_d70",
+    "FCI-JCI": "fci_jci_x100",
     "GIES": "interventional_gauss_er_d100",
     "MultiGroupDirectLiNGAM": "multi_group_er_d30",
     "GIN": "latent_measurement_d16",

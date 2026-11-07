@@ -30,7 +30,7 @@ whose Reproduce table lists the driver.
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | |
-| [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | |
+| [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
@@ -72,8 +72,11 @@ DYNOTEARS with CausalNex; their comparison pages, [GnIES](comparisons/gnies.md),
 [CAM-UV](comparisons/camuv.md), and [DYNOTEARS](comparisons/dynotears.md), present them. Some
 summary fields come from the runs behind a lane file rather than from the file itself: ICP's rows
 split by size (`icp.json` holds each setting's sizes pooled), GnIES's intervals outside its claim,
-the speed context (ratio quartiles, per-row fit times, median errors), and the regime, coverage,
-and seed notes of GnIES, UT-IGSP, and IGSP.
+the speed context (ratio quartiles, per-row fit times, median errors), and the regime, coverage, and
+seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows from
+[`published/0.15.0/fci-jci.json`](published/0.15.0/fci-jci.json), FCI-JCI with pcalg, which its
+[comparison page](comparisons/fci-jci.md) presents; its median errors, fit times, and the counts and
+means of its floor intervals come from the runs behind the file.
 
 | Release | Release card | Summary |
 |---|---|---|

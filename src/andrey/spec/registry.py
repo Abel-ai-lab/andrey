@@ -104,6 +104,32 @@ _TEST_SEED = concept_param(
     "make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
+#: The environment index the score searches and their FCI hybrids take for data pooled across
+#: environments.
+_ENV_INDEX = InputSpec(
+    name="env",
+    kind="context",
+    doc="The environment of each row, for data pooled across environments: one label per row, "
+    "(n_samples,) or (n_samples, 1), or a column of the data file, which is then not a variable. "
+    "The index joins the search as a variable no data variable causes. Numbers are read as "
+    "numbers; text labels are coded 0, 1, ... in sorted order. Leave it out for one environment.",
+    required=False,
+)
+_ENV_NOTES = (
+    "With env, the index becomes a trailing node no data variable causes, then is projected out of "
+    "the result; its edges go in metadata['index_edges']."
+)
+_ENV_DATA = DataSpec(inputs=(_DATA_MATRIX, _ENV_INDEX), layout=_MATRIX_LAYOUT, notes=_ENV_NOTES)
+#: The ``metadata`` a CPDAG search and a PAG search add with ``env``.
+_ENV_CPDAG_DOC = (
+    "; with env, metadata['index_edges'] lists the index's edges as [variable, 'directed'] pairs "
+    "and metadata['changing_variables'] the same variables, whose causal module changes across "
+    "the environments, in column order"
+)
+_ENV_PAG_DOC = (
+    ", the index numbered n_variables; with env, metadata['index_edges'] lists the index's edges "
+    "as [variable, kind] pairs, kind directed, partially_directed, or bidirected, in column order"
+)
 
 REGISTRY: dict[str, MethodSpec] = {}
 
@@ -203,13 +229,13 @@ _add(
         summary="Score-then-FCI hybrid: GES adjacencies, pruned by independence tests and oriented "
         "with FCI's rules. Latent-aware like FCI but usually more accurate on the skeleton. "
         "Returns a PAG.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
             doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
-            "[x, z, y] triples the rule left ambiguous, by 0-based position",
+            "[x, z, y] triples the rule left ambiguous, by 0-based position" + _ENV_PAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -230,6 +256,7 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
+            concept_param("confounded_index"),
             _TEST_SEED,
             concept_param(
                 "max_parents",
@@ -348,7 +375,7 @@ _add(
             "n_variables",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         order_note=(
@@ -543,12 +570,12 @@ _add(
         "column is categorical, or discrete_bic for categorical data, "
         "cond_gauss, the default when some columns are, or degen_gauss for "
         "mixed data. The score is in metadata['score'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -744,12 +771,12 @@ _add(
         "cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
         "when set; n_starts above 1 climbs again from the best DAG after random edge changes. "
         "Returns the CPDAG of the best DAG and its score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read" + _RESTART_DOC,
+            "a mixed-data setting read" + _RESTART_DOC + _ENV_CPDAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -790,12 +817,12 @@ _add(
         "score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for "
         "mixed data; n_starts above 1 searches again from the best DAG after random edge changes. "
         "Returns the CPDAG of the best DAG and its score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read" + _RESTART_DOC,
+            "a mixed-data setting read" + _RESTART_DOC + _ENV_CPDAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -1309,22 +1336,6 @@ _add(
 
 # --- permutation-based ----------------------------------------------------------------------------
 
-#: The environment index boss, grasp, boss_fci, and grasp_fci take for data pooled across
-#: environments.
-_ENV_INDEX = InputSpec(
-    name="env",
-    kind="context",
-    doc="The environment of each row, for data pooled across environments: one label per row, "
-    "(n_samples,) or (n_samples, 1), or a column of the data file, which is then not a variable. "
-    "The index joins the search as a variable no data variable causes. Numbers are read as "
-    "numbers; text labels are coded 0, 1, ... in sorted order. Leave it out for one environment.",
-    required=False,
-)
-_ENV_NOTES = (
-    "With env, the index becomes a trailing node the search keeps first, then is projected out of "
-    "the result; its edges go in metadata['index_edges']."
-)
-
 _add(
     MethodSpec(
         name="boss",
@@ -1334,14 +1345,12 @@ _add(
         "categorical, or discrete_bic for categorical data, cond_gauss, "
         "the default when some columns are, or degen_gauss for mixed data. Returns a "
         "CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX, _ENV_INDEX), layout=_MATRIX_LAYOUT, notes=_ENV_NOTES),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read; with env, metadata['index_edges'] lists the index's edges "
-            "as [variable, 'directed'] pairs and metadata['changing_variables'] the same "
-            "variables, whose causal module changes across the environments, in column order",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -1368,14 +1377,12 @@ _add(
         "default when every column is categorical, or discrete_bic for categorical "
         "data, cond_gauss, the default when some columns are, or "
         "degen_gauss for mixed data. Returns a CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX, _ENV_INDEX), layout=_MATRIX_LAYOUT, notes=_ENV_NOTES),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read; with env, metadata['index_edges'] lists the index's edges "
-            "as [variable, 'directed'] pairs and metadata['changing_variables'] the same "
-            "variables, whose causal module changes across the environments, in column order",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
         accel="numpy",
         status="supported",
@@ -1456,18 +1463,14 @@ for _name, _summary, _own, _refs in (
             name=_name,
             family="permutation",
             summary=_summary,
-            data=DataSpec(
-                inputs=(_DATA_MATRIX, _ENV_INDEX), layout=_MATRIX_LAYOUT, notes=_ENV_NOTES
-            ),
+            data=_ENV_DATA,
             output=OutputSpec(
                 structure_type="graph",
                 graph_kind="pag",
                 doc="metadata['categorical'] lists the categorical columns a mixed-data setting "
                 "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
-                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position, the "
-                "index numbered n_variables; with env, metadata['index_edges'] lists the index's "
-                "edges as [variable, kind] pairs, kind directed, partially_directed, or "
-                "bidirected, in column order",
+                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position"
+                + _ENV_PAG_DOC,
             ),
             accel="numpy",
             status="experimental",
@@ -2641,17 +2644,17 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "fci": _SKELETON_RULE + _PAG_MARKS,
     "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
-    "and never removes a required pair. " + _PAG_MARKS,
+    "and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
     "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
     "BOSS found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
     "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
     "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
-    "ges": _MOVE_RULE + _CLASS_RULE,
+    "ges": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
-    "hc": _MOVE_RULE + _CLASS_RULE,
-    "tabu": _MOVE_RULE + _CLASS_RULE,
+    "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
+    "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
@@ -2773,9 +2776,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("ges", "gies", "xges", "hc", "tabu", "mmhc", "rsmax2"), ("score",)),
-    **dict.fromkeys(("boss", "grasp"), ("score", "index_edges", "changing_variables")),
-    **dict.fromkeys(("boss_fci", "grasp_fci"), ("index_edges",)),
+    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(
+        ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
+    ),
+    **dict.fromkeys(("gfci", "boss_fci", "grasp_fci"), ("index_edges",)),
     "gnies": ("score", "changing_variables", "environments"),
     "exact_search": ("dag",),
     "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
