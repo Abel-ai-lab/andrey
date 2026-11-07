@@ -227,6 +227,7 @@ def test_summary_pairs_andrey_with_the_reference_mean() -> None:
     row = lane.summarize(rerun, [])["methods"][0]["rows"][0]
     assert row["paired"] == 20 and row["verdict"] == "worse"
     assert row["replication"]["seeds"] == "100-119" and row["replication"]["mean_D"] == 0
+    assert row["replication"]["verdict"] == "tie"
     few = lane.summarize(_records(cell, 2.0, seeds=range(lane.MIN_PAIRS - 1)), [])
     row = few["methods"][0]["rows"][0]
     assert row["paired"] == lane.MIN_PAIRS - 1 and row["verdict"] is None

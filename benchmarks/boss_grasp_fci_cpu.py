@@ -828,9 +828,12 @@ def summarize(records: list[dict], truths: list[dict]) -> dict:
             if row["paired"] < MIN_PAIRS:
                 row.update(verdict=None, reason=f"fewer than {MIN_PAIRS} paired datasets")
             if fresh and rerun is not None:
-                row["replication"] = rerun
-            andrey_floor = floor_interval(mine, "shd", "empty_shd")
-            other_floor = floor_interval(theirs, "shd", "empty_shd")
+                low, high = rerun["bootstrap_95"]
+                judged = rerun["paired"] >= MIN_PAIRS
+                side = "worse" if low > 0 else "better" if high < 0 else "tie"
+                row["replication"] = {**rerun, "verdict": side if judged else None}
+            andrey_floor = floor_interval(dict(sorted(mine.items())), "shd", "empty_shd")
+            other_floor = floor_interval(dict(sorted(theirs.items())), "shd", "empty_shd")
             if andrey_floor is not None and other_floor is not None:
                 row["floor"] = {
                     "applies": other_floor[1] < 0,

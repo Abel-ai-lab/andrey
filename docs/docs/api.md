@@ -369,6 +369,8 @@ variable.
    rsmax2
    boss
    grasp
+   boss_fci
+   grasp_fci
    igsp
    ut_igsp
    direct_lingam
@@ -437,6 +439,17 @@ data variables and lists the index's edges in `metadata["index_edges"]`; `confou
 assumes no hidden variable causes both the index and a data variable, as when the environment is
 set from outside. The [0.15.0](benchmarks/0.15.0.md#fci-jci) release card measures it against its
 authors' implementation.
+
+BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
+BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
+conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
+rules orient the rest into a PAG. They follow the paper's Algorithm 5, which leaves out GFCI's
+possible-d-separation step: the authors conjecture that the step is not needed. The
+[0.15.0](benchmarks/0.15.0.md#boss-fci) release card measures them against their authors'
+implementation. With `env`, the index leads every order of their search, and their tests and rules
+treat it as FCI-JCI, above, does. `boss` and `grasp` take `env` as well, and so do `ges`, `hc`,
+`tabu`, and `gfci`: the index joins the search as a variable that no data variable causes, as in
+`cdnod`.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
@@ -520,23 +533,12 @@ its first call in a process.
 
    notears
    dagma
-   boss_fci
-   grasp_fci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
-BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
-conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
-rules orient the rest into a PAG. They follow the paper's Algorithm 5, which leaves out GFCI's
-possible-d-separation step: the authors conjecture that the step is not needed. With `env`, the
-index leads every order of their search, and their tests and rules treat it as FCI-JCI, below, does.
-`boss` and `grasp` take `env` as well, and so do `ges`, `hc`, `tabu`, and `gfci`: the index joins
-the search as a variable that no data variable causes, as in `cdnod`.
 
 A method becomes supported once it has:
 

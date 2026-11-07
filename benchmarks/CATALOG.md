@@ -29,7 +29,7 @@ whose Reproduce table lists the driver.
 | R packages | `r_packages.py` | PC, FCI, GES, hill climbing, Tabu search | pcalg, bnlearn | 0.2.0 |
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
-| [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | |
+| [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | 0.15.0 |
 | [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
@@ -76,7 +76,10 @@ the speed context (ratio quartiles, per-row fit times, median errors), and the r
 seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows from
 [`published/0.15.0/fci-jci.json`](published/0.15.0/fci-jci.json), FCI-JCI with pcalg, which its
 [comparison page](comparisons/fci-jci.md) presents; its median errors, fit times, and the counts and
-means of its floor intervals come from the runs behind the file.
+means of its floor intervals come from the runs behind the file. BOSS-FCI's and GRaSP-FCI's rows
+come from [`published/0.15.0/boss-fci-grasp-fci.json`](published/0.15.0/boss-fci-grasp-fci.json),
+both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md)
+presents, with the median errors and fit times from the runs behind the file.
 
 | Release | Release card | Summary |
 |---|---|---|

@@ -32,7 +32,11 @@ DRAWS = {
     },
     "ges_quickstart": {"sample": "CHAIN"},
     "lingam": {"sample_groups": "CHAIN", "sample_indicators": "INDICATORS"},
-    "permutation_based": {"sample_shift": "CHAIN", "sample_cut": "CHAIN"},
+    "permutation_based": {
+        "sample_hidden": "HIDDEN",
+        "sample_shift": "CHAIN",
+        "sample_cut": "CHAIN",
+    },
     "rcd": {"sample": "EDGES"},
     "score_search": {"sample_intervened": "CHAIN", "sample_noise_shift": "CHAIN"},
     "time_series": {"sample_panel": "CHAIN"},
