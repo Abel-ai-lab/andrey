@@ -10,6 +10,127 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `fci_jci` is supported and joins the quality gate. Against pcalg 2.7-12's FCI-JCI, the authors'
+  implementation, on the JCI paper's simulation, it ties in all 12 comparisons and fits 4.0 to 4.6
+  times faster at 4 variables and 72 to 79 times faster at 10 on one core (median); at 100
+  variables, where pcalg finished no fit within 30 minutes, each of its fits took under half a
+  second. The [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) gives the
+  numbers. ([#739], [#759], [#768])
+- `boss_fci` is supported and joins the quality gate. Against Tetrad 7.6.10's BOSS-FCI, the
+  authors' implementation, on the BOSS-FCI paper's simulation at 20 and 100 measured variables, it
+  ties in 72 of 73 comparisons and is better in one, and fits 1.05 to 5.8 times faster at 20
+  variables and 1.85 times faster at 100 on one core (median), as the
+  [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) shows. ([#737], [#761],
+  [#775])
+- `grasp_fci` is supported and joins the quality gate. Against Tetrad 7.6.10's GRaSP-FCI on the
+  same data, it ties in 72 of 73 comparisons and is better in one, and fits 1.16 to 5.8 times
+  faster at 20 measured variables and 7.6 times faster at 100 on one core (median), as the
+  [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) shows. ([#737], [#761],
+  [#775])
+- `ges`, `hc`, `tabu`, `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take `env`, each row's
+  environment, for data pooled from several environments (experimental): the environment index
+  joins the search as a variable that no data variable causes, which removes the edges that pooling
+  adds and can orient more. They list the index's edges in `metadata["index_edges"]`; `ges`, `hc`,
+  `tabu`, `boss`, and `grasp` also list the variables the environments change in
+  `metadata["changing_variables"]`, as `cdnod` does, and `gfci`, `boss_fci`, and `grasp_fci` take
+  `confounded_index`, as `fci_jci` does. Without `env`, every result is unchanged. ([#765], [#766])
+- `andrey.data.load_dataset("sachs", conditions=True)` loads all nine of Sachs's conditions, 7,466
+  cells, with `env`, each cell's condition, `conditions`, their names, and `targets`, the measured
+  variables each reagent acts on (`None` for PMA and b2cAMP, whose targets are unknown), the inputs
+  of every method that takes `env`; `gies` and `igsp`, which need every condition's targets, take
+  the rows of the seven conditions whose targets are known. ([#719])
+- `cdnod` reports what the environments change: `metadata["changing_variables"]` lists the
+  variables whose causal module, the distribution given their causes, changes across them, and
+  `metadata["index_edges"]` the environment index's edges into them. Their descendants change
+  through them and are not listed. ([#720])
+
+### Breaking
+
+- The former names that 0.12.0 and 0.14.0 kept with an `andrey.DeprecatedArgumentWarning` no longer
+  work, as those releases announced. A call that passes one raises `TypeError`, as for any argument
+  a method does not take, and `pcmciplus(collider_rule="none")` raises `ValueError`, which lists the
+  rules it takes; each message adds what the name or value is called now and the release that
+  renamed it. `andrey run` and `andrey bootstrap` refuse the `key=value` names and the
+  `--domain-index` and `--interventions` flags the same way, with what replaces each. `gies` raises
+  `ValueError` for a 0/1 matrix as its second argument, `andrey.bootstrap` and `andrey.config` raise
+  `TypeError` for `n_boot` and `num_workers`, and `andrey bootstrap` refuses `--n-boot`, each with
+  the current name. `BootstrapOutput` no longer has `n_boot`, `andrey.config` no longer has a
+  `num_workers` setting, and assigning a setting it does not have raises `AttributeError`; Andrey no
+  longer reads `ANDREY_NUM_WORKERS`. The
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) gives the current calls.
+  ([#723])
+
+  | Method | Removed name or value | Name now |
+  | --- | --- | --- |
+  | `cdnod` | `domain_index`, `--domain-index` | `env`, `--env` |
+  | `gies` | `interventions`, `--interventions`, or the 0/1 matrix as the second argument | `targets`, with `env` and `--env` on the command line |
+  | `grasp` | `depth` | `grasp_depth` |
+  | `pcmci` | `pc_alpha` | `pc1_alpha` |
+  | `pcmciplus` | `collider_rule="none"` | `collider_rule="sepsets"` |
+  | `granger` | `cv` | none: `alpha` sets the level of the test of each link |
+  | `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `pcmci`, `pcmciplus`, `lpcmci` | `max_categories` | none: declare the categorical columns with `categorical` or a column type |
+  | `andrey.bootstrap`, `andrey bootstrap` | `n_boot`, `--n-boot` | `n_resamples`, `--n-resamples` |
+  | `andrey.config` | `num_workers` | `n_jobs` |
+  | environment | `ANDREY_NUM_WORKERS` | `ANDREY_N_JOBS` |
+
+- `andrey.data.generate` and `andrey.data.Ensemble` are deprecated: they still work in this
+  release but give an `andrey.DeprecatedArgumentWarning`, and they stop working in 0.16.0. A loop
+  over `SCM.sample` draws the same datasets, as the
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows. ([#738])
+
+### Added
+
+- `andrey.fci_jci` learns a PAG from data pooled from several environments while allowing hidden
+  common causes, running FCI with the environment as a variable that no data variable causes (Joint
+  Causal Inference, Mooij, Magliacane, and Claassen 2020): it takes `env` as `cdnod` does,
+  `confounded_index=False` when the environment is set from outside, and lists the environment's
+  edges in `metadata["index_edges"]`. ([#739])
+- `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
+  or GRaSP search, removing with tests the edges that hidden causes explain and orienting the rest
+  with FCI's rules, without GFCI's possible-d-separation step, as Algorithm 5 of their paper does
+  (Ramsey, Andrews, and Spirtes 2025). ([#737], [#771])
+- `gfci`, `boss_fci`, and `grasp_fci` take `edge_removal="triangles"`, which tests for removal only
+  the edges of the score search's CPDAG that lie in a triangle of it, as Section 5 of the GFCI
+  paper does (Ogarrio, Spirtes, and Ramsey 2016), while the default, `"all"`, tests every edge, as
+  before. ([#774])
+- `notears`, `dagma`, and `dynotears` take `standardize=True`, as `calm` does, which scales each
+  column to unit variance before the fit, so that the fit does not read the columns' units.
+  ([#738])
+- `andrey.data.sample_mixed` takes `envs` and `model_seed`, as `SCM.sample` and `sample_discrete`
+  do, and applies the interventions of a discrete variable to a categorical column and those of a
+  continuous variable to a continuous one. ([#738])
+
+### Changed
+
+- `gies`, `gnies`, `icp`, `igsp`, and `ut_igsp` raise `ValueError` for an `inf` or `-inf` label in
+  `env`, naming the first row that holds it, as `cdnod` does, instead of reading it as one more
+  label. ([#764])
+- `grasp` adds or removes a parent only when it changes the score by more than the `1e-6`
+  tolerance, as `boss` does, so its graph can differ on data whose scores tie within it. ([#749])
+- The `andrey` command needs Typer 0.12.4 or later. ([#755])
+
+### Fixed
+
+- `andrey.bootstrap` no longer raises `IndexError` when a row-aligned argument names a column, such
+  as `env="env"`; `andrey run` exits 2 with `invalid_params` for a parameter value the method
+  rejects, such as `alpha=nan`; two first loads of one dataset at the same time both succeed;
+  `grasp` on one variable reports its score; and `andrey.metrics.markov_equivalent` raises
+  `ValueError` for a `digraph` instead of returning `True`. ([#711])
+- `fci` and `gfci` with `indep_test="chisq"` or `"gsq"` return the same PAG when a column's
+  categories are relabeled. ([#732])
+- `fci` and `gfci` with `collider_rule="conservative"` or `"majority"` leave a triple ambiguous
+  when no subset of either end's neighbors separates its ends, as `pc` and `cdnod` do and as
+  Colombo and Maathuis (2014) define both rules, instead of making it a collider. ([#752])
+- `calm`'s `metadata["h_final"]` is the acyclicity residual of the gates before the thresholds,
+  the value its penalty rounds compare with `h_tol`, instead of that of the returned DAG, which was
+  always `0`. ([#738])
+
+### New contributors
+
+- [@HouZhu2001](https://github.com/HouZhu2001) made their first contribution in [#719].
+
 ## [0.14.0] - 2026-11-05
 
 ### Highlights
@@ -1844,3 +1965,23 @@ First alpha release.
 [#694]: https://github.com/Abel-ai-lab/andrey/pull/694
 [#702]: https://github.com/Abel-ai-lab/andrey/pull/702
 [#707]: https://github.com/Abel-ai-lab/andrey/pull/707
+[#711]: https://github.com/Abel-ai-lab/andrey/pull/711
+[#719]: https://github.com/Abel-ai-lab/andrey/pull/719
+[#720]: https://github.com/Abel-ai-lab/andrey/pull/720
+[#723]: https://github.com/Abel-ai-lab/andrey/pull/723
+[#732]: https://github.com/Abel-ai-lab/andrey/pull/732
+[#737]: https://github.com/Abel-ai-lab/andrey/pull/737
+[#738]: https://github.com/Abel-ai-lab/andrey/pull/738
+[#739]: https://github.com/Abel-ai-lab/andrey/pull/739
+[#749]: https://github.com/Abel-ai-lab/andrey/pull/749
+[#752]: https://github.com/Abel-ai-lab/andrey/pull/752
+[#755]: https://github.com/Abel-ai-lab/andrey/pull/755
+[#759]: https://github.com/Abel-ai-lab/andrey/pull/759
+[#761]: https://github.com/Abel-ai-lab/andrey/pull/761
+[#764]: https://github.com/Abel-ai-lab/andrey/pull/764
+[#765]: https://github.com/Abel-ai-lab/andrey/pull/765
+[#766]: https://github.com/Abel-ai-lab/andrey/pull/766
+[#768]: https://github.com/Abel-ai-lab/andrey/pull/768
+[#771]: https://github.com/Abel-ai-lab/andrey/pull/771
+[#774]: https://github.com/Abel-ai-lab/andrey/pull/774
+[#775]: https://github.com/Abel-ai-lab/andrey/pull/775
