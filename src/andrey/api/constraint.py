@@ -1689,9 +1689,6 @@ def fci_jci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a mixed-data test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
@@ -1754,17 +1751,22 @@ def fci_jci(
     tests, or when a continuous column is constant on its rows. With missing values, the skeleton
     search runs in one process.
 
-    **Limitations.** Not benchmarked yet; its tests run it on simulated linear-Gaussian data of up
-    to 10 variables with 1,000 to 3,000 rows from two or three domains, and on Sachs's 11 proteins,
-    7,466 cells from nine conditions, with ``"cond_gauss"``. It takes one environment variable: the
+    **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
+    common causes and one context variable that changes one variable: 4, 10, and 100 variables with
+    100 to 2,000 rows per domain, and 20 and 50 variables at the density of the 10-variable setting,
+    at alpha 0.01 and 0.05, under both values of ``confounded_index``, on one core. Its errors
+    (endpoint SHD over the data variables and the index) were below the empty graph's on every
+    dataset; at 100 variables with 100 rows per domain, its median at the defaults was 345.5 against
+    the empty graph's 410. Every fit took under 0.5 s. It takes one environment variable: the
     several context variables of the authors' designs, one per intervention, are not implemented, so
-    domains that change different variables share one index. Its possible-d-separation step tests
-    subsets of each set, so its cost grows fast with the number of variables. ``"fisherz"``,
-    ``"student_t"``, and ``"normal_scores"`` can miss a shift in a middle domain of three or more,
-    as above. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
-    up to a fifth of the values missing completely at random. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    domains that change different variables share one index; with 2 or 10 context variables merged
+    into one index numbered by domain, its errors were still below the empty graph's on every
+    dataset. Its possible-d-separation step tests subsets of each set, so its cost grows fast with
+    the number of variables. ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` can miss a
+    shift in a middle domain of three or more, as above. Missing values are not benchmarked yet; the
+    tests run them on up to 20 variables with up to a fifth of the values missing completely at
+    random. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -1788,16 +1790,13 @@ def fci_jci(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import fci_jci
     >>> rng = np.random.default_rng(1)
     >>> env = np.repeat([0.0, 1.0], 500)
     >>> x = 2.0 * env + rng.standard_normal(1000)
     >>> y = x + rng.standard_normal(1000)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = fci_jci(np.column_stack([x, y]), env)
+    >>> out = fci_jci(np.column_stack([x, y]), env)
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
     >>> out.metadata["index_edges"]

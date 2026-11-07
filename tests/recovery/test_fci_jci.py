@@ -23,8 +23,6 @@ from andrey.data.latent import marginal
 from andrey.metrics import shd, skeleton_scores
 from tests.recovery.helpers.jci import oracle_fit, random_dag, sample_pooled
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 _INDEX_MARK = {"directed": TAIL, "partially_directed": CIRCLE, "bidirected": ARROW}
 
 

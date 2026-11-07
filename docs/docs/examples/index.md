@@ -50,8 +50,8 @@ Recover a three-variable chain with GES.
 :img-alt: The graph PC or FCI recovers in this notebook
 
 PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
-MMPC, which join each variable's local structure into a graph; CD-NOD on data from several domains;
-and ICP's parents of one variable from several environments.
+MMPC, which join each variable's local structure into a graph; CD-NOD and FCI-JCI on data from
+several domains; and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

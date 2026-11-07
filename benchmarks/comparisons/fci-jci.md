@@ -135,6 +135,123 @@ interval lies above 0 and better when below, and either counts only if a rerun o
 agrees. A row also fails when Andrey timed out on a dataset pcalg finished, or when Andrey does not
 beat the empty graph where pcalg does. A timeout is never scored as an empty graph.
 
+## Results
+
+Andrey's pre-release build of 6 November 2026 against pcalg 2.7-12 on R 4.6.1, one fit at a time on
+one core of an AMD EPYC 7713 processor with one BLAS thread. Every number below is in
+[`published/0.15.0/fci-jci.json`](../published/0.15.0/fci-jci.json), with the context arms and the
+coverage of every row. All 200 truths passed their checks, the 140 in the cells of 4 and 10
+variables against pcalg's too, and every Andrey fit finished. Refitted on the 0.15.0 release branch
+of the same day, Andrey's two gated arms returned the same PAG on all 720 fits.
+
+### In the claim
+
+Means over the 20 datasets of each cell, seeds 0 to 19, of the endpoint SHD over the data variables
+and the environment. JCI names the assumption sets, `confounded_index=True` with pcalg's `jci =
+"1"` and `False` with `"123"`. D is Andrey's SHD minus pcalg's, with its 95% interval, and Same PAG
+counts the datasets where the two returned the same PAG.
+
+| Cell | JCI | alpha | Andrey | pcalg | Empty | D [95%] | Same PAG | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| S4 | 1 | 0.01 | 5.95 | 5.9 | 12.5 | 0.05 [-0.3, 0.45] | 18 | tie |
+| S4 | 123 | 0.01 | 5.9 | 5.8 | 12.5 | 0.1 [0, 0.3] | 19 | tie |
+| S4 | 1 | 0.05 | 5.05 | 5.05 | 12.5 | 0 [-0.15, 0.15] | 18 | tie |
+| S4 | 123 | 0.05 | 5 | 5.05 | 12.5 | -0.05 [-0.15, 0] | 18 | tie |
+| S4p | 1 | 0.01 | 6.05 | 6.15 | 12.5 | -0.1 [-0.25, 0] | 18 | tie |
+| S4p | 123 | 0.01 | 6.05 | 6.15 | 12.5 | -0.1 [-0.25, 0] | 18 | tie |
+| S4p | 1 | 0.05 | 5.45 | 5.4 | 12.5 | 0.05 [-0.15, 0.3] | 18 | tie |
+| S4p | 123 | 0.05 | 5.45 | 5.4 | 12.5 | 0.05 [-0.15, 0.3] | 18 | tie |
+| L10 | 1 | 0.01 | 37.85 | 37.8 | 54.8 | 0.05 [-0.9, 0.95] | 4 | tie |
+| L10 | 123 | 0.01 | 37.85 | 37.8 | 54.8 | 0.05 [-0.9, 0.95] | 4 | tie |
+| L10 | 1 | 0.05 | 36.25 | 36.55 | 54.8 | -0.3 [-1.2, 0.65] | 6 | tie |
+| L10 | 123 | 0.05 | 36.05 | 36.45 | 54.8 | -0.4 [-1.3, 0.6] | 6 | tie |
+
+All 12 rows tie, so no row needed a rerun. X100, in the claim where pcalg finishes, has no row: on
+the dry run's two datasets there, seeds 0 and 1, every pcalg fit, at both assumption sets and both
+levels, ran past the 1,800 s cap, so the campaign did not run pcalg on X100. Andrey's X100 rows are
+below, against the empty graph.
+
+### Floors
+
+pcalg's SHD was below the empty graph's in all 12 rows in the claim, so the floor applies in each,
+and Andrey's was below it too: the upper end of its interval of SHD minus the empty graph's was
+-5.35 or lower at 4 variables and -15.75 or lower at 10. Out of the claim the floor applied in the
+18 rows where pcalg finished, and Andrey passed each. The 8 rows where pcalg did not run have no
+floor; there Andrey's SHD was below the empty graph's on every dataset.
+
+### Out of the claim
+
+The merged cells, the other row counts, and P20, with pcalg:
+
+| Cell | JCI | alpha | Paired | Andrey | pcalg | Empty | D [95%] | Same PAG |
+|---|---|---|---|---|---|---|---|---|
+| S4m | 1 | 0.01 | 20 | 7.75 | 8.05 | 14.6 | -0.3 [-0.7, 0.05] | 15 |
+| S4m | 123 | 0.01 | 20 | 7.75 | 8.05 | 14.6 | -0.3 [-0.7, 0.05] | 15 |
+| S4m | 1 | 0.05 | 20 | 7.95 | 8.1 | 14.6 | -0.15 [-0.3, 0] | 17 |
+| S4m | 123 | 0.05 | 20 | 7.95 | 8 | 14.6 | -0.05 [-0.2, 0.1] | 17 |
+| L10m | 1 | 0.01 | 20 | 49.1 | 49.3 | 71.5 | -0.2 [-1.55, 0.9] | 2 |
+| L10m | 123 | 0.01 | 20 | 46.1 | 46.65 | 71.5 | -0.55 [-1.95, 0.6] | 2 |
+| L10m | 1 | 0.05 | 20 | 48.85 | 49.1 | 71.5 | -0.25 [-1.2, 0.7] | 0 |
+| L10m | 123 | 0.05 | 20 | 45.1 | 45.85 | 71.5 | -0.75 [-1.75, 0.25] | 0 |
+| L10n100 | 1 | 0.01 | 20 | 44.65 | 45.1 | 54.8 | -0.45 [-1.2, 0.25] | 4 |
+| L10n100 | 123 | 0.01 | 20 | 44.6 | 45.1 | 54.8 | -0.5 [-1.25, 0.15] | 4 |
+| L10n100 | 1 | 0.05 | 20 | 43.1 | 43.35 | 54.8 | -0.25 [-1.2, 0.8] | 2 |
+| L10n100 | 123 | 0.05 | 20 | 43.05 | 43.3 | 54.8 | -0.25 [-1.2, 0.8] | 2 |
+| L10n2000 | 1 | 0.01 | 20 | 33.9 | 33.95 | 54.8 | -0.05 [-0.9, 0.75] | 5 |
+| L10n2000 | 123 | 0.01 | 20 | 33.75 | 33.8 | 54.8 | -0.05 [-0.9, 0.75] | 5 |
+| L10n2000 | 1 | 0.05 | 20 | 32.95 | 32.55 | 54.8 | 0.4 [-0.45, 1.25] | 4 |
+| L10n2000 | 123 | 0.05 | 20 | 32.7 | 32.35 | 54.8 | 0.35 [-0.45, 1.15] | 4 |
+| P20 | 1 | 0.01 | 4 | 54.75 | 59.25 | 87.5 | -4.5 [-8, -1] | 1 |
+| P20 | 123 | 0.01 | 6 | 60.83 | 65.33 | 95.67 | -4.5 [-7, -2] | 1 |
+
+No row with 20 paired datasets lies above or below 0. In P20, pcalg finished 4 and 6 of the 10
+datasets within the cap, and Andrey all 10; on the datasets both finished, Andrey had fewer errors,
+on too few pairs to judge.
+
+Where pcalg did not run, Andrey's mean SHD against the empty graph's:
+
+| Cell | JCI | alpha | Andrey | Empty | Andrey minus empty [95%] |
+|---|---|---|---|---|---|
+| X100 | 1 | 0.01 | 328.15 | 412.4 | -84.25 [-88.6, -79.85] |
+| X100 | 123 | 0.01 | 328.1 | 412.4 | -84.3 [-88.65, -79.9] |
+| X100 | 1 | 0.05 | 348.15 | 412.4 | -64.25 [-69.8, -58.25] |
+| X100 | 123 | 0.05 | 347.7 | 412.4 | -64.7 [-70.3, -58.7] |
+| X100m | 1 | 0.01 | 230.25 | 431 | -200.75 [-206.8, -195.05] |
+| X100m | 123 | 0.01 | 228.45 | 431 | -202.55 [-208.65, -196.75] |
+| P50 | 1 | 0.01 | 146.6 | 246.2 | -99.6 [-105.6, -94] |
+| P50 | 123 | 0.01 | 146.5 | 246.2 | -99.7 [-105.7, -94.1] |
+
+### Context
+
+The arms that are not judged, as mean SHD over the data variables (`shd_data`) minus that of Andrey's
+default arm on the same datasets, with its 95% interval, at alpha 0.01:
+
+| Arm | S4 | L10 |
+|---|---|---|
+| Tetrad 7.6.10, the environment in the first tier | 0 [0, 0] | -0.1 [-0.9, 0.65] |
+| causal-cmd 1.12.0, the same tier | 0 [0, 0] | -0.5 [-1.2, 0.15] |
+| Andrey `fci` on the pooled rows | 0.45 [0, 0.85] | 0.75 [0.1, 1.4] |
+| Andrey `fci` on the observational rows | 0.55 [-0.1, 1.25] | 3.4 [2.4, 4.35] |
+| Andrey `cdnod`, the regimes as domains | 3.25 [2.25, 4.3] | 4.35 [2.9, 5.85] |
+| Andrey `fci_jci`, the columns in reverse order | | 0 [0, 0] |
+
+At L10, FCI on the pooled rows or on the observational rows alone made more errors over the data
+variables than FCI-JCI, and so did CD-NOD, which assumes no hidden common cause. Reversing the
+column order returned the same PAG on every dataset of L10, at both levels. In the merged cells at
+alpha 0.01, reading the regime number as a category (`indep_test="cond_gauss"`) made fewer errors
+over the data and the environment, 6.8 against 7.75 at S4m and 44.5 against 49.1 at L10m, while over
+the data variables alone the difference's interval contains 0 (D 0.05 [-0.65, 0.85] and 1.05 [-0.15,
+2.1]).
+
+### Speed
+
+pcalg's time is the transfer into R, `cor(X)`, and the call; Andrey's runs from the array in memory
+to the returned graph. In the claim, Andrey's median fit took 0.004 to 0.005 s at 4 variables and
+0.011 to 0.013 s at 10, pcalg's 0.017 to 0.021 s and 0.83 to 1.31 s: per row, the median of pcalg's
+time over Andrey's was 4.0 to 4.6 at 4 variables and 72 to 79 at 10. Andrey's slowest fit in the
+campaign took 0.48 s, at X100m. The largest possible-d-separation set Andrey's fits formed had 9
+nodes; on the true graphs FCI-JCI forms sets of up to 30 nodes at 100 variables and 35 at P50.
+
 ## Run
 
 ```shell

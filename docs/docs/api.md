@@ -352,6 +352,7 @@ variable.
    fci
    gfci
    cdnod
+   fci_jci
    iamb
    inter_iamb
    mmpc
@@ -428,6 +429,14 @@ step visits the pairs and nodes by a rank computed from the data, so with
 `possible_dsep="order_free"`, the default, their result does not depend on the column order unless
 two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
+
+FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
+with the environment index as one more variable that no data variable causes, so hidden common
+causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
+data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
+assumes no hidden variable causes both the index and a data variable, as when the environment is
+set from outside. The [0.15.0](benchmarks/0.15.0.md#fci-jci) release card measures it against its
+authors' implementation.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
@@ -513,7 +522,6 @@ its first call in a process.
    dagma
    boss_fci
    grasp_fci
-   fci_jci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -528,13 +536,6 @@ rules orient the rest into a PAG. With `env`, the index leads every order of the
 tests and rules treat it as FCI-JCI, below, does. `boss` and `grasp` take `env` as well, and so do
 `ges`, `hc`, `tabu`, and `gfci`: the index joins the search as a variable that no data variable
 causes, as in `cdnod`.
-
-FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
-with the environment index as one more variable that no data variable causes, so hidden common
-causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
-data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
-assumes no hidden variable causes both the index and a data variable, as when the environment is
-set from outside.
 
 A method becomes supported once it has:
 

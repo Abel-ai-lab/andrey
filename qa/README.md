@@ -46,9 +46,9 @@ one manifest only, or has a count that rose. Two more options refit each draw an
 whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP
-  and IGSP are not refit: their data hold each row's environment in one column, and ICP's target
-  is the last variable.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
+  IGSP, and FCI-JCI are not refit: their data hold each row's environment in one column, and ICP's
+  target is the last variable.
 - `--workers N` refits PC, FCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL on `N`
   workers, with every GES pass and every skeleton pass of conditioning size two or more sent to
   the worker pool.
@@ -154,12 +154,12 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP, XGES,
-HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
+The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
+XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
 MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI,
 VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each
-method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn,
-and GPDC, on nonlinear data, and the targets UT-IGSP learns:
+method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn, and
+GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -173,6 +173,7 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `icp_do` at `d = 6, 10`, `n = 200` per environment, every other variable intervened | 10 seeds each | ICP |
 | `known_targets_one_setting_gauss_er`, `known_targets_two_settings_gauss_er` at `d = 20`, `n = 1000` per environment | 10 seeds each | IGSP |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
+| `fci_jci_s4`, `fci_jci_l10`: 4 and 10 variables, two regimes of `n = 500` | 10 seeds each | FCI-JCI |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
@@ -204,6 +205,12 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   and two hidden intermediates; and `latent_anm_er_tenth`, `anm_er`'s additive noise with one node
   in ten hidden, 20 observed. Both have 1,000 rows, and `d` counts the hidden nodes. A seed whose
   graph cannot hide its nodes is skipped and the next one taken, as the driver does.
+- **Environments with hidden common causes.** FCI-JCI's published regimes, drawn by its benchmark
+  driver (`benchmarks/fci_jci_cpu.py`) as its comparison's two in-claim cells of mechanism changes,
+  the simulation of Mooij, Magliacane, and Claassen (2020): `fci_jci_s4`, 4 variables with edge and
+  hidden-confounder probabilities 0.5, and `fci_jci_l10`, 10 variables with 0.25, each with one
+  context variable that changes one variable's mechanism and 500 rows in each of its two regimes.
+  The context variable, the environment, is the last column, and FCI-JCI runs at its defaults.
 - **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
   parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
   partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
@@ -279,7 +286,9 @@ ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and
 endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
 essential graph of the true DAG under the rows' targets, IGSP against the one under the settings'
 targets, GnIES and UT-IGSP against the one under the true targets, and CD-NOD against the CPDAG in
-which the domain index orients the edges it reaches. UT-IGSP's targets are scored apart, as
+which the domain index orients the edges it reaches. FCI-JCI is scored by endpoint SHD over the
+variables and the environment against its PAG at the true distribution, the truth its benchmark
+driver builds. UT-IGSP's targets are scored apart, as
 `UT-IGSP targets`, by the target error: the false plus the missed targets over the settings,
 against the given targets alone in place of the empty graph. GIN's
 errors are the latents it misses: the true latents whose indicators it does not return as one
