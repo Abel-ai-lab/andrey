@@ -272,8 +272,12 @@ ENV_SETTINGS = {
     "gnies": lambda bad: {},
     "igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
     "ut_igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: None}},
+    "ges": lambda bad: {},
+    "hc": lambda bad: {},
+    "tabu": lambda bad: {},
     "boss": lambda bad: {},
     "grasp": lambda bad: {},
+    "gfci": lambda bad: {},
     "boss_fci": lambda bad: {},
     "grasp_fci": lambda bad: {},
 }
@@ -389,6 +393,22 @@ APART_FITS = {
     "grasp_fci, a mapping of DataFrames": (
         lambda: andrey.grasp_fci(APART, confounded_index=False),
         lambda: andrey.grasp_fci(DATA, ENV, confounded_index=False),
+    ),
+    "ges, a mapping of DataFrames": (
+        lambda: andrey.ges(APART),
+        lambda: andrey.ges(DATA, ENV),
+    ),
+    "hc, a list of arrays": (
+        lambda: andrey.hc([t.to_numpy() for t in APART.values()]),
+        lambda: andrey.hc(DATA.to_numpy(), POSITIONS),
+    ),
+    "tabu, a list of DataFrames": (
+        lambda: andrey.tabu(list(APART.values())),
+        lambda: andrey.tabu(DATA, POSITIONS),
+    ),
+    "gfci, a mapping of DataFrames": (
+        lambda: andrey.gfci(APART, confounded_index=False),
+        lambda: andrey.gfci(DATA, ENV, confounded_index=False),
     ),
 }
 
@@ -521,6 +541,10 @@ def files(tmp_path):
     return paths
 
 
+#: The methods that read ``env``, when given, as an index no data variable causes.
+OPTIONAL_ENV = ["boss", "grasp", "boss_fci", "grasp_fci", "ges", "hc", "tabu", "gfci"]
+
+
 def _edges(out: str) -> list[tuple[int, int, str]]:
     structure = json.loads(out)["structure"]
     return sorted((e["source"], e["target"], e["type"]) for e in structure["edges"])
@@ -575,17 +599,17 @@ def test_cli_needs_env(method, files, capsys):
     assert code == 0 and all(i["required"] for i in inputs)
 
 
-@pytest.mark.parametrize("method", ["cdnod", "fci_jci", "boss", "grasp", "boss_fci", "grasp_fci"])
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci", *OPTIONAL_ENV])
 def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
     argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
 
 
-@pytest.mark.parametrize("method", ["boss", "grasp", "boss_fci", "grasp_fci"])
+@pytest.mark.parametrize("method", OPTIONAL_ENV)
 def test_cli_env_column_and_file_fit_alike_and_name_the_index_edges(method, files, capsys):
-    """``env`` is optional for the permutation searches: as a column of ``--data`` or a file it fits
-    the same graph, and the index's edges name the variables."""
+    """``env`` is optional for the score searches and their FCI hybrids: as a column of ``--data``
+    or a file it fits the same graph, and the index's edges name the variables."""
     fits = []
     for argv in (
         ["--data", str(files["data.csv"]), "--env", "e"],

@@ -1024,14 +1024,18 @@ _CONCEPTS = (
         "label one environment that changes the mechanisms of its targets, known or learned "
         "(gies, gnies, igsp, ut_igsp), or of any variables as long as it leaves the target's "
         "mechanism alone (icp); or as a context variable that no data variable causes, the "
-        "environment index, which joins the search as one more variable (cdnod, fci_jci, boss, "
-        "grasp, boss_fci, grasp_fci).",
+        "environment index, which joins the search as one more variable (cdnod, fci_jci, ges, "
+        "hc, tabu, boss, grasp, gfci, boss_fci, grasp_fci).",
         fragment="one label per row",
         suitable=(
             "cdnod",
             "fci_jci",
+            "ges",
+            "hc",
+            "tabu",
             "boss",
             "grasp",
+            "gfci",
             "boss_fci",
             "grasp_fci",
             "icp",
@@ -1050,11 +1054,6 @@ _CONCEPTS = (
                 "fci_jci is FCI with env, the environment index added as a context variable "
                 "(Mooij, Magliacane, and Claassen 2020).",
                 "fci",
-            ),
-            *_exempt(
-                "Pending: env suits it as a context variable that no data variable causes; its "
-                "search does not keep the index's edges pointing out of it yet.",
-                *("ges", "gfci", "hc", "tabu"),
             ),
             *_exempt(
                 "Not taken yet: env suits it as a context variable that no data variable causes, "
@@ -1110,7 +1109,7 @@ _CONCEPTS = (
             "edge it keeps points out of it (FCI-JCI123).",
         ),
         fragment="hidden variable may cause both the index and a data variable",
-        suitable=("fci_jci", "boss_fci", "grasp_fci"),
+        suitable=("fci_jci", "gfci", "boss_fci", "grasp_fci"),
         others_exempt="Not an FCI-JCI search: only those choose between JCI's assumptions on the "
         "index.",
     ),

@@ -18,7 +18,7 @@ import numpy as np
 from andrey.core import GraphStructure, backend
 from andrey.core._bitset import nodes
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.orient import dag2cpdag, orient_out_of, to_structure
 from andrey.core.score import MIXED_SCORES, LocalScore, make_score
 from andrey.core.score_delta import (
     DeltaBICScore,
@@ -536,14 +536,16 @@ def move_rules(
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     d: int,
+    sources: tuple[int, ...] = (),
 ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """The tie mask of ``score_func`` and the edges a DAG search never adds and never removes.
 
     Returns ``(mask, forbidden, required)``: ``mask`` is :func:`~andrey.core.ties.tie_mask`'s;
     ``forbidden[v, u]`` bars an edge ``u -> v``, one from a continuous into a categorical column
-    under a mixed-data score or one the knowledge forbids; ``required[v, u]`` holds an edge the
-    knowledge requires. Each is ``None`` when it bars or holds none. Raises ``ValueError`` when the
-    knowledge requires an edge the mixed-data score does not allow.
+    under a mixed-data score, one the knowledge forbids, or one into a column of ``sources``;
+    ``required[v, u]`` holds an edge the knowledge requires. Each is ``None`` when it bars or holds
+    none. Raises ``ValueError`` when the knowledge requires an edge the mixed-data score does not
+    allow.
     """
     mask = tie_mask(score_func, categorical, d)
     forbidden = None
@@ -554,6 +556,11 @@ def move_rules(
                 "knowledge requires an edge from a continuous into a categorical column, which a "
                 "mixed-data score does not allow"
             )
+    if sources:
+        into_sources = np.zeros((d, d), dtype=bool)
+        into_sources[list(sources)] = True  # [v, u]: no u -> v for a source v
+        np.fill_diagonal(into_sources, False)
+        forbidden = into_sources if forbidden is None else forbidden | into_sources
     if constraints is None:
         return mask, forbidden, None
     knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
@@ -583,16 +590,18 @@ def greedy_search(
     n_starts: int,
     n_perturbations: int,
     seed: int,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Run ``search`` from the start DAG and from changed copies of the best DAG so far.
 
     The first start begins from the required edges of ``constraints`` (:func:`start_dag`); each
     later one from the best DAG so far after :func:`perturb` makes ``n_perturbations`` changes to
     it, and replaces it only when its DAG scores lower by more than :data:`START_EPS`. Every start
-    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`. The search
-    warns once, naming ``method``, if any start takes ``max_iter`` moves. Returns the best DAG's
-    CPDAG, narrowed by the knowledge, and the DAG's total score. The other arguments are those of
-    :func:`hc`.
+    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`, so no
+    move gives a column of ``sources`` a parent. The search warns once, naming ``method``, if any
+    start takes ``max_iter`` moves. Returns the best DAG's CPDAG, with the edges at ``sources``
+    directed out of them (:func:`~andrey.core.orient.orient_out_of`) and narrowed by the knowledge,
+    and the DAG's total score. The other arguments are those of :func:`hc`.
     """
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
@@ -608,7 +617,7 @@ def greedy_search(
         )
 
     score = new_score()
-    mask, forbidden, required = move_rules(score_func, categorical, constraints, d)
+    mask, forbidden, required = move_rules(score_func, categorical, constraints, d, sources)
     adj_int, parents_of = start_dag(d, constraints, max_parents)
     ranks = tie_ranks(X, mask)
     best: tuple[list[int], dict[int, list[int]], float] | None = None
@@ -655,6 +664,8 @@ def greedy_search(
     for v in range(d):
         dag[parents_of[v], v] = True
     cpdag = dag2cpdag(endpoint_marks(dag))
+    if sources:
+        cpdag = orient_out_of(cpdag, sources)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), total
@@ -674,6 +685,7 @@ def hc(
     n_starts: int = 1,
     n_perturbations: int = 1,
     seed: int = 0,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -731,11 +743,17 @@ def hc(
         Random changes to the best DAG so far before each start after the first, at least ``1``.
     seed : int
         Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: no move or change gives
+        one a parent, and their edges are then directed out of them, with Meek's rules orienting
+        what follows (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every
+        variable free.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
+        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG; with ``sources``,
+        the partially directed graph that also directs their edges.
     """
     return greedy_search(
         data,
@@ -752,4 +770,5 @@ def hc(
         n_starts=n_starts,
         n_perturbations=n_perturbations,
         seed=seed,
+        sources=sources,
     )

@@ -21,6 +21,11 @@ scan never selects a move whose rebuilt CPDAG breaks it (:func:`_breaks_cap`), s
 returns is the best of those that keep it; an Insert whose scored family alone exceeds it is left
 out before scoring (:func:`_over_cap`).
 
+Columns no other column may cause (``sources``, such as an environment index) are never the target
+of an Insert, and after each move the whole graph is rebuilt with their edges directed out of them
+(:func:`out_of`), so the search moves over partially directed graphs in which no source has a
+parent.
+
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
 recomputed from the final CPDAG by :func:`andrey.search.ges.recompute_objective`.
 """
@@ -36,6 +41,7 @@ import numpy as np
 
 from andrey.core import _bitset, env
 from andrey.core.knowledge import Constraints, admits
+from andrey.core.orient import cpdag_of_pdag, orient_out_of
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, stable_key
@@ -144,11 +150,33 @@ def _breaks_cap(
     """Whether some DAG of the class of the CPDAG after ``rebuilt(adj.copy(), *move)`` gives a node
     more than ``cap`` parents.
 
-    ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, ``move`` its
-    ``(x, y, subset)``. The rebuild can direct or undirect edges far from the move, so the CPDAG
-    after it is the one checked.
+    ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, or one of
+    them as :func:`out_of` makes it, ``move`` its ``(x, y, subset)``. The rebuild can direct or
+    undirect edges far from the move, so the graph after it is the one checked.
     """
     return cap is not None and ops.exceeds_parent_cap(rebuilt(adj.copy(), *move), cap)
+
+
+def out_of(
+    apply: Callable[[np.ndarray, int, int, Iterable[int]], None], sources: Sequence[int]
+) -> Callable[[np.ndarray, int, int, Iterable[int]], np.ndarray]:
+    """``apply``, :func:`~andrey.search.operators.apply_insert` or ``apply_delete``, as a move that
+    rebuilds the whole graph and keeps ``sources`` without a parent.
+
+    The returned move applies ``apply`` to the graph in place and returns the CPDAG of a consistent
+    extension of the result (:func:`~andrey.core.orient.cpdag_of_pdag`) with every edge at
+    ``sources`` directed out of them and Meek's rules applied
+    (:func:`~andrey.core.orient.orient_out_of`). On a graph that directs every edge at ``sources``
+    out of them, a move whose target is not a source neither adds an edge into one nor reorients
+    one of its edges, since no source is an undirected neighbor, so the extension gives no source
+    a parent.
+    """
+
+    def move(adj: np.ndarray, x: int, y: int, subset: Iterable[int]) -> np.ndarray:
+        apply(adj, x, y, subset)
+        return orient_out_of(cpdag_of_pdag(adj), sources)
+
+    return move
 
 
 def backward_chunk_best(
@@ -162,6 +190,7 @@ def backward_chunk_best(
     constraints: Constraints | None = None,
     excluded: Excluded = None,
     cap: float | None = None,
+    delete: Callable[..., np.ndarray] = ops.delete_cpdag,
 ) -> BackwardResult:
     """The best-improving Delete whose target is in ``targets``, by :func:`move_key`.
 
@@ -174,7 +203,7 @@ def backward_chunk_best(
     With ``constraints``, a required pair is never deleted, and ``H`` holds no ``h`` whose
     orientation ``y -> h`` or ``x -> h`` is forbidden: such an ``h`` stays in the residual, which
     must still be a clique. A move in ``excluded`` is never selected, nor, under ``cap``, one whose
-    CPDAG breaks it (:func:`_breaks_cap`).
+    CPDAG, rebuilt by ``delete``, breaks it (:func:`_breaks_cap`).
     """
     adj_sets, par_of, nbr = state
     best: BackwardResult = None
@@ -211,7 +240,7 @@ def backward_chunk_best(
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:
                             continue
-                        if _breaks_cap(adj, ops.delete_cpdag, (x, y, H), cap):
+                        if _breaks_cap(adj, delete, (x, y, H), cap):
                             continue
                         best_key = key
                         best = (key, x, y, H)
@@ -303,8 +332,8 @@ class _ForwardScan:
     :meth:`best` returns the best-improving Insert into the targets on the graph, by
     :func:`move_key`; a move in ``excluded`` is never selected. With ``forbidden`` (``[i, j]``: no
     edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target. Under
-    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG breaks
-    it is never selected.
+    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG,
+    rebuilt by ``insert``, breaks it is never selected.
     """
 
     def __init__(
@@ -316,12 +345,14 @@ class _ForwardScan:
         ranks: Sequence[int],
         forbidden: np.ndarray | None = None,
         cap: float | None = None,
+        insert: Callable[..., np.ndarray] = ops.insert_cpdag,
     ) -> None:
         self.targets = list(targets)
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
         self.cap = cap
+        self.insert = insert
         self.ranks = ranks
         self.everyone = (1 << n) - 1
         self.forbidden = forbidden
@@ -364,7 +395,7 @@ class _ForwardScan:
             if best is None or key < best[0]:
                 if excluded and key[1:] in excluded:
                     continue
-                if _breaks_cap(adj, ops.insert_cpdag, (x, y, T), self.cap):
+                if _breaks_cap(adj, self.insert, (x, y, T), self.cap):
                     continue
                 best = (key, x, y, T)
                 # A delta that can still win rounds to this key or below, so it lies within half a
@@ -721,14 +752,16 @@ def _admitted(
     constraints: Constraints,
     excluded: set[tuple[int, int, tuple[int, ...]]],
     key: tuple,
+    rebuilt: bool = False,
 ) -> np.ndarray:
     """``after``, the CPDAG a move with ``key`` reaches from ``before``, when its class holds a DAG
     that satisfies ``constraints``; otherwise ``before``.
 
-    An accepted move clears ``excluded``; a rejected one joins it, so the next scan of ``before``
-    selects the next best move.
+    With ``rebuilt``, ``after`` is a graph :func:`out_of` returned, and its class is that of its
+    CPDAG. An accepted move clears ``excluded``; a rejected one joins it, so the next scan of
+    ``before`` selects the next best move.
     """
-    if admits(after, constraints):
+    if admits(cpdag_of_pdag(after) if rebuilt else after, constraints):
         excluded.clear()
         return after
     excluded.add(key[1:])
@@ -745,6 +778,7 @@ def run_ges(
     ranks: list[int],
     constraints: Constraints | None = None,
     cap: float | None = None,
+    sources: tuple[int, ...] = (),
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -765,9 +799,15 @@ def run_ges(
     ``max_parents`` is the forward phase's gate on a node's directed parents and ``cap`` the cap on
     the most parents any DAG of the class gives a node, which ``adj`` must already satisfy: no pass
     selects a move whose CPDAG breaks it, so each applied move keeps it.
+
+    ``sources`` are columns no other column causes, which ``adj`` leaves without an edge. No Insert
+    targets one, and every move is applied by :func:`out_of`, so each graph after a move directs
+    the edges at ``sources`` out of them; ``constraints`` then admit a move when its class holds a
+    DAG that satisfies them and gives no source a parent. The passes run in-process, whatever
+    ``workers``.
     """
     global largest_pass_work
-    workers = max(1, min(workers, n))
+    workers = 1 if sources else max(1, min(workers, n))
     w_min = _min_work()
     engine: DeltaEngine
     lazy: _LazyWorkerSet | None
@@ -780,8 +820,17 @@ def run_ges(
     largest = 0
     # Warn once a pass comes near the default cutoff (only a pass that can fan out).
     warn = workers > 1 and lazy is not None and calibrate.cutoff_is_default("ges")
+    insert, delete = ops.insert_cpdag, ops.delete_cpdag
+    if sources:
+        insert, delete = out_of(ops.apply_insert, sources), out_of(ops.apply_delete, sources)
+        if constraints is not None:  # admit a class only for a DAG with no edge into a source
+            into_sources = constraints.forbidden.copy()
+            into_sources[:, list(sources)] = True
+            np.fill_diagonal(into_sources, False)
+            constraints = Constraints(into_sources, constraints.required, constraints.tier)
     forbidden = None if constraints is None else constraints.forbidden
-    scan = _ForwardScan(range(n), engine, n, max_parents, ranks, forbidden, cap)
+    targets = [y for y in range(n) if y not in sources]
+    scan = _ForwardScan(targets, engine, n, max_parents, ranks, forbidden, cap, insert)
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     excluded: set[tuple[int, int, tuple[int, ...]]] = (
         set()
@@ -815,10 +864,10 @@ def run_ges(
                 break
             key, x, y, T = best
             if constraints is None:
-                adj = ops.insert_cpdag(adj, x, y, T)
+                adj = insert(adj, x, y, T)
             else:
-                moved = ops.insert_cpdag(adj.copy(), x, y, T)
-                adj = _admitted(moved, adj, constraints, excluded, key)
+                moved = insert(adj.copy(), x, y, T)
+                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
         excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
             state = neighborhood_state(adj)
@@ -834,16 +883,16 @@ def run_ges(
                 )
             else:
                 best = backward_chunk_best(
-                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap
+                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap, delete
                 )
             if best is None:
                 break
             key, x, y, H = best
             if constraints is None:
-                adj = ops.delete_cpdag(adj, x, y, H)
+                adj = delete(adj, x, y, H)
             else:
-                moved = ops.delete_cpdag(adj.copy(), x, y, H)
-                adj = _admitted(moved, adj, constraints, excluded, key)
+                moved = delete(adj.copy(), x, y, H)
+                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
     finally:
         if lazy is not None:
             lazy.close()
