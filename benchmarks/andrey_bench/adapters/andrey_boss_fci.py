@@ -13,11 +13,13 @@ harness                               Andrey
 ``lambda_value``                      ``penalty_discount``: both score ``n log s2 + lambda k log n``
 ``depth``                             ``max_depth``; ``-1`` or absent is no cap
 ``grasp_depth``                       ``grasp_depth`` (GRaSP-FCI only)
+``edge_removal``                      ``edge_removal`` (BOSS-FCI, GRaSP-FCI, and GFCI)
 the draw                              ``seed`` (BOSS-FCI, GRaSP-FCI, and GFCI)
 ====================================  ==========================================================
 
 Every other setting is the facade's default: the extended-BIC weight 0, one start, the
-``"sepsets"`` collider rule, and, for GFCI and FCI, the order-free possible-d-separation step.
+``"sepsets"`` collider rule, every edge tested for removal (``edge_removal="all"``), and, for GFCI
+and FCI, the order-free possible-d-separation step.
 
 Each line records ``possible_dsep_max``, the most candidates any pair's possible-d-separation search
 had (the list ``andrey.constraint.fci._possible_dsep`` returns, both endpoints left out), and
@@ -91,6 +93,8 @@ def andrey_kwargs(algorithm: str, params: dict[str, Any], draw: int) -> dict[str
         }
     if algorithm == "grasp_fci" and "grasp_depth" in params:
         kwargs["grasp_depth"] = int(params["grasp_depth"])
+    if algorithm != "fci" and "edge_removal" in params:
+        kwargs["edge_removal"] = params["edge_removal"]
     return kwargs
 
 

@@ -121,8 +121,10 @@ def test_andrey_kwargs_map_the_harness_names() -> None:
     }
     grasp = andrey_boss_fci.andrey_kwargs("grasp_fci", {**params, "depth": 7, "grasp_depth": 7}, 0)
     assert grasp["max_depth"] == 7 and grasp["grasp_depth"] == 7
-    fci = andrey_boss_fci.andrey_kwargs("fci", params, 0)
+    fci = andrey_boss_fci.andrey_kwargs("fci", {**params, "edge_removal": "triangles"}, 0)
     assert set(fci) == {"alpha", "indep_test", "max_depth"}
+    option = {**params, "edge_removal": "triangles"}
+    assert andrey_boss_fci.andrey_kwargs("boss_fci", option, 0)["edge_removal"] == "triangles"
 
 
 def test_counts_the_possible_dsep_searches_and_restores_the_step() -> None:
@@ -144,9 +146,13 @@ def test_counts_the_possible_dsep_searches_and_restores_the_step() -> None:
 
 def test_arms_per_cell() -> None:
     paper, default = _cell(), _cell(setting="default")
-    assert [f["config"] for f in lane.andrey_fits(default)] == ["default", "default"]
-    assert [f["algorithm"] for f in lane.andrey_fits(paper)[:2]] == ["boss_fci", "grasp_fci"]
+    configs = ["default", "default", "default-triangles", "default-triangles"]
+    assert [f["config"] for f in lane.andrey_fits(default)] == configs
+    assert [f["algorithm"] for f in lane.andrey_fits(paper)[:4]] == ["boss_fci", "grasp_fci"] * 2
+    assert {f["params"].get("edge_removal") for f in lane.andrey_fits(paper)} == {None, "triangles"}
     assert lane.andrey_fits(paper)[-1]["params"]["grasp_depth"] == 7
+    out = lane.cell_named("O3|deg=4|L=4|setting=paper|n=1000")
+    assert all("edge_removal" not in f["params"] for f in lane.andrey_fits(out))
     for cell in (paper, default):
         gated = lane.tetrad_fits(cell, "tetrad-7.6.10")
         assert [f["solution"] for f in gated] == list(lane.GATED.values())
@@ -228,6 +234,21 @@ def test_summary_pairs_andrey_with_the_reference_mean() -> None:
     assert row["paired"] == 20 and row["verdict"] == "worse"
     assert row["replication"]["seeds"] == "100-119" and row["replication"]["mean_D"] == 0
     assert row["replication"]["verdict"] == "tie"
+    option = [
+        {**r, "package": "tetrad-7.6.3"} if r["package"] != "andrey" else r
+        for r in _records(cell, 0.0)
+    ]
+    option += [
+        {**r, "config": f"{cell.setting}-triangles", "shd": r["shd"] - 3}
+        for r in option
+        if r["package"] == "andrey"
+    ]
+    entries = {e["role"]: e for e in lane.summarize(option, [])["methods"]}
+    assert entries.keys() == {"context", "option"}
+    assert entries["option"]["config"] == "paper-triangles"
+    assert entries["option"]["comparator"] == entries["context"]["comparator"]
+    assert entries["option"]["rows"][0]["verdict"] == "better"
+    assert entries["context"]["rows"][0]["verdict"] == "tie"
     few = lane.summarize(_records(cell, 2.0, seeds=range(lane.MIN_PAIRS - 1)), [])
     row = few["methods"][0]["rows"][0]
     assert row["paired"] == lane.MIN_PAIRS - 1 and row["verdict"] is None
