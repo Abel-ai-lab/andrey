@@ -27,6 +27,7 @@ DRAWS = {
         "sample_chain": "CHAIN",
         "sample_hidden": "HIDDEN",
         "sample_domains": "DOMAINS",
+        "sample_confounded_domains": "CONFOUNDED_DOMAINS",
         "sample_environments": "ENVIRONMENTS",
     },
     "ges_quickstart": {"sample": "CHAIN"},

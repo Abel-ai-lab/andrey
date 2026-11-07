@@ -458,6 +458,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.15.0: multi-domain data <benchmarks/0.15.0>
 0.14.0: interventional data <benchmarks/0.14.0>
 0.13.0: functional causal models <benchmarks/0.13.0>
 0.12.0: calibration <benchmarks/0.12.0>

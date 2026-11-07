@@ -843,7 +843,7 @@ def paired_row(
     applies = floor_r is not None and floor_r[1] < 0
     gated = cell.claim == "in" and applies and len(paired) >= MIN_PAIRS
     verdict = None
-    if interval is not None:
+    if interval is not None and len(paired) >= MIN_PAIRS:
         verdict = "worse" if interval[0] > 0 else "better" if interval[1] < 0 else "tie"
     same = sum(mine[s]["marks_sha1"] == theirs[s]["marks_sha1"] for s in paired)
     ratios = [mine[s]["wall_s"] / theirs[s]["wall_s"] for s in paired if theirs[s].get("wall_s")]

@@ -175,6 +175,15 @@ def test_a_row_is_judged_by_its_paired_interval(shift, verdict):
     assert row["same_pag"] == (20 if shift == 0 else 0)
 
 
+def test_a_row_under_ten_pairs_has_no_verdict():
+    recs, empty = _records(-2.0)
+    for s in range(lane.MIN_PAIRS - 1, 20):
+        recs[("S4", s, "pcalg.jci1", 0.01)] = {"status": "timeout", "seed": s}
+    row = lane.paired_row(lane.CELLS["S4"], 0.01, "andrey.jci1", "pcalg.jci1", recs, empty)
+    assert row["paired"] == lane.MIN_PAIRS - 1 and row["bootstrap_95"] is not None
+    assert row["verdict"] is None and row["reason"] == "fewer than 10 paired datasets"
+
+
 def test_a_timeout_is_never_a_score():
     recs, empty = _records(0.0)
     recs[("S4", 3, "andrey.jci1", 0.01)] = {"status": "timeout", "seed": 3}
