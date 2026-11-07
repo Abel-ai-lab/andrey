@@ -20,13 +20,14 @@ two children, only those are hidden, as Tetrad does, and ``latents_hidden`` reco
   density=4, n=1000)``, the recovery test's setting, at both settings (10 seeds).
 
 The arms (:func:`andrey_fits`, :func:`tetrad_fits`): Andrey's ``boss_fci`` and ``grasp_fci``
-against the gated reference, causal-cmd 1.12.0's ``bfci`` and ``grasp-fci`` (tetrad-lib 7.6.3) at
-Tetrad's documented defaults (:mod:`~andrey_bench.adapters.tetrad_pag`), run :data:`DRAWS` times
-per dataset with no seed. At the paper's settings, P20 adds context arms: tetrad-lib 7.6.10's
-``BossFci`` and ``GraspFci``, the paper's code, once (also on P100); causal-cmd's GFCI and FCI and
-Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, and O1 add Andrey's ``grasp_fci``
-at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a tuck depth of ``d`` runs past minutes at
-200 rows, where ties between scores are many.
+against the gated reference, tetrad-lib 7.6.10's ``BossFci`` and ``GraspFci``, the paper's code, at
+Tetrad's documented defaults (:mod:`~andrey_bench.adapters.tetrad_search`), run :data:`DRAWS` times
+per dataset with no seed, in every cell at the cell's settings. causal-cmd 1.12.0's ``bfci`` and
+``grasp-fci`` (tetrad-lib 7.6.3) run as context, :data:`DRAWS` times per dataset too
+(:mod:`~andrey_bench.adapters.tetrad_pag`). At the paper's settings, P20 adds context arms:
+causal-cmd's GFCI and FCI and Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, and
+O1 add Andrey's ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a tuck depth
+of ``d`` runs past minutes at 200 rows, where ties between scores are many.
 
 The truth is the PAG of the measured variables (``andrey.data.latent.marginal``); ``check-truth``
 compares it with pcalg's ``dag2pag`` on the DAG numbered in a topological order. Every estimate is
@@ -85,12 +86,16 @@ SETTINGS = {
     "paper": {"alpha": 0.01, "lambda_value": 2.0},
     "default": {"alpha": 0.05, "lambda_value": 1.0},
 }
-#: Runs of the gated reference per dataset; its error is their mean.
+#: Runs of each Tetrad hybrid per dataset; its error is their mean.
 DRAWS = 5
+#: The fewest paired datasets a row is judged on; a row with fewer is reported, not judged.
+MIN_PAIRS = 10
 #: The packages a run may fit.
 PACKAGES = ("andrey", "tetrad-7.6.3", "tetrad-7.6.10")
-#: The gated reference solution of each hybrid, causal-cmd 1.12.0's.
-GATED = {"boss_fci": "tetrad.cmd.boss_fci.bic", "grasp_fci": "tetrad.cmd.grasp_fci.bic"}
+#: The gated reference solution of each hybrid, tetrad-lib 7.6.10's.
+GATED = {"boss_fci": "tetrad.boss_fci.bic", "grasp_fci": "tetrad.grasp_fci.bic"}
+#: The context solution of each hybrid, causal-cmd 1.12.0's (tetrad-lib 7.6.3).
+CMD = {"boss_fci": "tetrad.cmd.boss_fci.bic", "grasp_fci": "tetrad.cmd.grasp_fci.bic"}
 
 
 @dataclass(frozen=True)
@@ -373,18 +378,13 @@ def tetrad_fits(cell: Cell, package: str) -> list[dict]:
             "draws": list(range(draws)),
         }
 
-    if package == "tetrad-7.6.3":
-        draws = 1 if cell.block == "O2" else DRAWS
-        fits = [fit(GATED[a], a, draws) for a in GATED]
-        if cell.block == "P20" and cell.setting == "paper":
-            fits += [fit("tetrad.gfci", "gfci", 1), fit("tetrad.cmd.fci.fisherz", "fci", 1)]
-        return fits
-    if package == "tetrad-7.6.10" and cell.setting == "paper" and cell.block in ("P20", "P100"):
-        return [
-            fit("tetrad.boss_fci.bic", "boss_fci", 1),
-            fit("tetrad.grasp_fci.bic", "grasp_fci", 1),
-        ]
-    return []
+    draws = 1 if cell.block == "O2" else DRAWS
+    if package == "tetrad-7.6.10":
+        return [fit(GATED[a], a, draws) for a in GATED]
+    fits = [fit(CMD[a], a, draws) for a in CMD]
+    if cell.block == "P20" and cell.setting == "paper":
+        fits += [fit("tetrad.gfci", "gfci", 1), fit("tetrad.cmd.fci.fisherz", "fci", 1)]
+    return fits
 
 
 def tetrad_solutions() -> dict:
@@ -767,13 +767,13 @@ def per_dataset(records: list[dict]) -> dict[tuple, dict]:
 #: Each comparison :func:`summarize` writes: Andrey's (algorithm, config suffix) against a
 #: (package, algorithm, config suffix), its comparator name, and its role.
 COMPARISONS = (
-    (("boss_fci", ""), ("tetrad-7.6.3", "boss_fci", ""), "tetrad-cmd-1.12.0.bfci", "gated"),
-    (("grasp_fci", ""), ("tetrad-7.6.3", "grasp_fci", ""), "tetrad-cmd-1.12.0.grasp-fci", "gated"),
-    (("boss_fci", ""), ("tetrad-7.6.10", "boss_fci", ""), "tetrad-lib-7.6.10.BossFci", "context"),
+    (("boss_fci", ""), ("tetrad-7.6.10", "boss_fci", ""), "tetrad-lib-7.6.10.BossFci", "gated"),
+    (("grasp_fci", ""), ("tetrad-7.6.10", "grasp_fci", ""), "tetrad-lib-7.6.10.GraspFci", "gated"),
+    (("boss_fci", ""), ("tetrad-7.6.3", "boss_fci", ""), "tetrad-cmd-1.12.0.bfci", "context"),
     (
         ("grasp_fci", ""),
-        ("tetrad-7.6.10", "grasp_fci", ""),
-        "tetrad-lib-7.6.10.GraspFci",
+        ("tetrad-7.6.3", "grasp_fci", ""),
+        "tetrad-cmd-1.12.0.grasp-fci",
         "context",
     ),
     (("gfci", ""), ("tetrad-7.6.3", "gfci", ""), "tetrad-cmd-1.12.0.gfci", "context"),
@@ -825,6 +825,8 @@ def summarize(records: list[dict], truths: list[dict]) -> dict:
                 mine = {s: e for s, e in mine.items() if s in cell.seeds}
                 theirs = {s: e for s, e in theirs.items() if s in cell.seeds}
             row.update(compare(mine, theirs, "shd", len(cell.seeds)))
+            if row["paired"] < MIN_PAIRS:
+                row.update(verdict=None, reason=f"fewer than {MIN_PAIRS} paired datasets")
             if fresh and rerun is not None:
                 row["replication"] = rerun
             andrey_floor = floor_interval(mine, "shd", "empty_shd")

@@ -147,16 +147,20 @@ def test_arms_per_cell() -> None:
     assert [f["config"] for f in lane.andrey_fits(default)] == ["default", "default"]
     assert [f["algorithm"] for f in lane.andrey_fits(paper)[:2]] == ["boss_fci", "grasp_fci"]
     assert lane.andrey_fits(paper)[-1]["params"]["grasp_depth"] == 7
-    gated = lane.tetrad_fits(paper, "tetrad-7.6.3")[:2]
-    assert [f["solution"] for f in gated] == list(lane.GATED.values())
-    assert all(f["draws"] == list(range(lane.DRAWS)) for f in gated)
-    assert lane.tetrad_fits(default, "tetrad-7.6.10") == []
+    for cell in (paper, default):
+        gated = lane.tetrad_fits(cell, "tetrad-7.6.10")
+        assert [f["solution"] for f in gated] == list(lane.GATED.values())
+        assert all(f["draws"] == list(range(lane.DRAWS)) for f in gated)
+        assert gated[0]["params"]["alpha"] == lane.SETTINGS[cell.setting]["alpha"]
+        context = lane.tetrad_fits(cell, "tetrad-7.6.3")[:2]
+        assert [f["solution"] for f in context] == list(lane.CMD.values())
     o2 = lane.cell_named("O2|deg=6|L=20|setting=paper|n=1000")
-    assert all(f["draws"] == [0] for f in lane.tetrad_fits(o2, "tetrad-7.6.3"))
+    for package in ("tetrad-7.6.10", "tetrad-7.6.3"):
+        assert all(f["draws"] == [0] for f in lane.tetrad_fits(o2, package))
 
 
 @pytest.mark.parametrize("adapter", [tetrad_pag.TetradBFCI(), tetrad_pag.TetradCmdGraspFCI()])
-def test_gated_reference_runs_tetrads_documented_defaults(adapter) -> None:
+def test_causal_cmd_runs_tetrads_documented_defaults(adapter) -> None:
     """No seed, every boolean that is on by default named, and ``depth`` from ``params``."""
     arguments = adapter._arguments({**adapter.params(), "alpha": 0.01, "lambda_value": 2.0})
     pairs = dict(zip(arguments, arguments[1:]))
@@ -190,7 +194,7 @@ def _records(cell: lane.Cell, shift: float, seeds=range(20)) -> list[dict]:
             rows.append(
                 {
                     **base,
-                    "package": "tetrad-7.6.3",
+                    "package": "tetrad-7.6.10",
                     "algorithm": "boss_fci",
                     "config": cell.setting,
                     "draw": draw,
@@ -206,12 +210,12 @@ def test_summary_pairs_andrey_with_the_reference_mean() -> None:
     cell = _cell()
     worse = lane.summarize(_records(cell, 2.0), [])
     (entry,) = worse["methods"]
-    assert entry["comparator"] == "tetrad-cmd-1.12.0.bfci" and entry["role"] == "gated"
+    assert entry["comparator"] == "tetrad-lib-7.6.10.BossFci" and entry["role"] == "gated"
     (row,) = entry["rows"]
     assert row["paired"] == 20 and row["verdict"] == "worse"
     assert row["multi_draw"]["mean_D"] == pytest.approx(2.0)
     assert row["floor"]["applies"] is True
-    assert worse["reference_draws"][f"{cell.name}|tetrad-7.6.3|boss_fci"] == {
+    assert worse["reference_draws"][f"{cell.name}|tetrad-7.6.10|boss_fci"] == {
         "datasets": 20,
         "draws": lane.DRAWS,
         "datasets_with_distinct_draws": 20,
@@ -223,6 +227,9 @@ def test_summary_pairs_andrey_with_the_reference_mean() -> None:
     row = lane.summarize(rerun, [])["methods"][0]["rows"][0]
     assert row["paired"] == 20 and row["verdict"] == "worse"
     assert row["replication"]["seeds"] == "100-119" and row["replication"]["mean_D"] == 0
+    few = lane.summarize(_records(cell, 2.0, seeds=range(lane.MIN_PAIRS - 1)), [])
+    row = few["methods"][0]["rows"][0]
+    assert row["paired"] == lane.MIN_PAIRS - 1 and row["verdict"] is None
     json.dumps(worse)
 
 
