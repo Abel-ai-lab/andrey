@@ -434,7 +434,8 @@ with the environment index as one more variable that no data variable causes, so
 causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
 data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
 assumes no hidden variable causes both the index and a data variable, as when the environment is
-set from outside.
+set from outside. The [0.15.0](benchmarks/0.15.0.md#fci-jci) release card measures it against its
+authors' implementation.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
