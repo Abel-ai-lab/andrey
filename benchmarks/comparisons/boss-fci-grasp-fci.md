@@ -132,7 +132,7 @@ time is its search inside the JVM (`wall_s`); the whole call, with the JVM's sta
 ## References
 
 - Ramsey, J., Andrews, B., Spirtes, P. (2025). Efficient latent variable causal discovery:
-  combining score search and targeted testing. arXiv:2510.04263.
+  combining score search and targeted testing. arXiv:2510.04263v3.
 - Ogarrio, J. M., Spirtes, P., Ramsey, J. (2016). A hybrid causal search algorithm for latent
   variable models. PGM, PMLR 52, 368-379.
 - Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence

@@ -1586,7 +1586,7 @@ def boss_fci(
     :func:`~andrey.boss`; :func:`~andrey.grasp_fci` runs the same steps with GRaSP's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
 
-    The steps are those of the authors' Algorithm 5 [1]_, with the CPDAG from :func:`~andrey.boss`:
+    The steps follow the authors' Algorithm 5 [1]_, with the CPDAG from :func:`~andrey.boss`:
     FCI's adjacency search starts from the CPDAG's adjacencies and removes a pair that a subset of
     either end's neighbors separates; the CPDAG decides the colliders on triples whose ends it
     leaves non-adjacent, and the separating sets decide the others; Zhang's rules R1-R10 [4]_
@@ -1601,7 +1601,10 @@ def boss_fci(
     edge at the first subset of either end's neighbors that separates it; Andrey runs FCI's
     adjacency search instead, as :func:`~andrey.gfci` does: it grows the conditioning size over all
     edges together and records the union of the separating subsets of the smallest size, so the
-    result does not depend on the order of the edges.
+    result does not depend on the order of the edges. Andrey also decides the colliders as GFCI
+    does [2]_ rather than by the printed lines of Algorithm 5, searches a separating set for each
+    pair the CPDAG leaves non-adjacent as well, and reads Algorithm 5's final orientation rules as
+    Zhang's R1-R10 [4]_, R5-R7 included.
 
     **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
     the environment index joins the data as a last variable that leads every BOSS order, and before
@@ -1637,8 +1640,8 @@ def boss_fci(
     References
     ----------
     .. [1] Ramsey, J., Andrews, B., and Spirtes, P. (2025). Efficient latent variable causal
-       discovery: combining score search and targeted testing. arXiv:2510.04263.
-       https://arxiv.org/abs/2510.04263
+       discovery: combining score search and targeted testing. arXiv:2510.04263v3.
+       https://arxiv.org/abs/2510.04263v3
     .. [2] Ogarrio, J. M., Spirtes, P., and Ramsey, J. (2016). A hybrid causal search algorithm
        for latent variable models. PGM, PMLR 52, 368-379.
     .. [3] Andrews, B., Ramsey, J., Sanchez Romero, R., Camchong, J., and Kummerfeld, E. (2023).
@@ -1883,13 +1886,13 @@ def grasp_fci(
     :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps with BOSS's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
 
-    The steps are :func:`~andrey.boss_fci`'s, those of the authors' Algorithm 5 [1]_, with the CPDAG
-    from :func:`~andrey.grasp`. As in Algorithm 5, they leave out GFCI's possible-d-separation step
-    [2]_, which the authors conjecture is not needed; Algorithm 5 removes each edge at the first
-    separating subset of either end's neighbors, and Andrey runs FCI's adjacency search instead, as
-    that function's Notes describe. No step adds an edge, so the PAG's adjacencies are a subset of
-    the GRaSP CPDAG's. Reordering the columns
-    reorders the nodes and changes nothing else, unless two columns are identical.
+    The steps are :func:`~andrey.boss_fci`'s, which follow the authors' Algorithm 5 [1]_, with the
+    CPDAG from :func:`~andrey.grasp`. As in Algorithm 5, they leave out GFCI's possible-d-separation
+    step [2]_, which the authors conjecture is not needed. Andrey differs from the printed algorithm
+    in how it removes edges, decides colliders, and derives separating sets, and it reads the final
+    orientation rules as Zhang's R1-R10, as that function's Notes describe. No step adds an edge, so
+    the PAG's adjacencies are a subset of the GRaSP CPDAG's. Reordering the columns reorders the
+    nodes and changes nothing else, unless two columns are identical.
 
     **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
     the environment index joins the data as a last variable that leads every GRaSP order, and before
@@ -1925,8 +1928,8 @@ def grasp_fci(
     References
     ----------
     .. [1] Ramsey, J., Andrews, B., and Spirtes, P. (2025). Efficient latent variable causal
-       discovery: combining score search and targeted testing. arXiv:2510.04263.
-       https://arxiv.org/abs/2510.04263
+       discovery: combining score search and targeted testing. arXiv:2510.04263v3.
+       https://arxiv.org/abs/2510.04263v3
     .. [2] Ogarrio, J. M., Spirtes, P., and Ramsey, J. (2016). A hybrid causal search algorithm
        for latent variable models. PGM, PMLR 52, 368-379.
     .. [3] Lam, W.-Y., Andrews, B., and Ramsey, J. (2022). Greedy Relaxations of the Sparsest
