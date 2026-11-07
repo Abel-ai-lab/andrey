@@ -15,7 +15,7 @@ names its pull request.
 - `fci_jci` is supported and joins the quality gate. Against pcalg 2.7-12's FCI-JCI, the authors'
   implementation, on the JCI paper's simulation, it ties in all 12 comparisons and fits 4.0 to 4.6
   times faster at 4 variables and 72 to 79 times faster at 10 on one core (median); at 100
-  variables, where pcalg finished no fit within 30 minutes, each of its fits took under half a
+  variables, where pcalg finished no fit within 30 minutes, each `fci_jci` fit took under half a
   second. The [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) gives the
   numbers. ([#739], [#759], [#768])
 - `boss_fci` is supported and joins the quality gate. Against Tetrad 7.6.10's BOSS-FCI, the
