@@ -29,6 +29,7 @@ from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import SCORES
 from andrey.core.structure import Kind
+from andrey.search.gfci import EDGE_REMOVALS
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -1210,6 +1211,25 @@ _CONCEPTS = (
                 "which can change with it (Runge 2020).",
             ),
         ),
+    ),
+    Concept(
+        key="edge_removal",
+        summary="Which edges of a score search's CPDAG the tests of an FCI hybrid may remove: "
+        "every edge (all), or only those in a triangle of the CPDAG (triangles), as Section 5 of "
+        "Ogarrio, Spirtes and Ramsey (2016) does to save time.",
+        param=_template(
+            "edge_removal",
+            "str",
+            "all",
+            "Which edges of the score search's CPDAG the adjacency search may remove: all = every "
+            "edge; triangles = only the edges in a triangle of the CPDAG, whose ends share a "
+            "neighbor in it (Ogarrio, Spirtes and Ramsey 2016, Section 5). An edge in no triangle "
+            "then stays and still conditions the tests of the other pairs.",
+            choices=EDGE_REMOVALS,
+        ),
+        fragment="triangle",
+        suitable=("gfci", "boss_fci", "grasp_fci"),
+        others_exempt="No tests that prune a score search's CPDAG.",
     ),
     Concept(
         key="graph_kind",

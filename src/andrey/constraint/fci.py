@@ -444,6 +444,7 @@ def possible_dsep_step(
     seed: int | None,
     max_depth: int | None,
     constraints: Constraints | None,
+    keep: np.ndarray | None = None,
 ) -> np.ndarray:
     """Remove the pairs a possible-d-sep subset separates; return the PAG re-circled for the
     orientation rules.
@@ -452,13 +453,16 @@ def possible_dsep_step(
     (:func:`_remove_by_possible_dsep`). ``possible_dsep="fast"`` visits the nodes in column order
     with ``test``; ``"order_free"`` visits them in the :func:`~andrey.core.ties.tie_ranks` order,
     with an ``indep_test`` test over ``X``'s columns in that order (:func:`_test_in_rank_order`).
-    The pairs the required edges of ``constraints`` join are never tested. Every kept edge then
-    becomes ``o-o``, and :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An
-    arrowhead the knowledge puts at ``x`` on a kept edge ``x - y`` while its required edges lead
-    from ``x`` to ``y`` raises :class:`~andrey.core.knowledge.KnowledgeError`
+    The pairs the required edges of ``constraints`` join, and those marked in the boolean ``keep``
+    (both ways), are never tested. Every kept edge then becomes ``o-o``, and
+    :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An arrowhead the knowledge
+    puts at ``x`` on a kept edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
+    :class:`~andrey.core.knowledge.KnowledgeError`
     (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     """
-    keep = knowledge_masks(constraints)[1]
+    required = knowledge_masks(constraints)[1]
+    if required is not None:
+        keep = required if keep is None else keep | required
     if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
     else:

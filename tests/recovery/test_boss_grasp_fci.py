@@ -6,11 +6,13 @@ a pair only a possible-d-separation set separates, decided by a d-separation ora
 comes from simulated linear-Gaussian data with hidden variables at the paper's sizes, from data
 simulated on the published ASIA network with one node hidden, and from the Sachs measurements
 against their consensus network. Mixed data, determinism, column-order invariance, the recorded
-outputs, and input validation complete them.
+outputs, and input validation complete them. ``edge_removal="triangles"``, which the hybrids share
+with GFCI, has its own fixed case, decided by the oracle, and column-order check.
 """
 
 from __future__ import annotations
 
+from copy import deepcopy
 from itertools import combinations
 
 import networkx as nx
@@ -19,6 +21,7 @@ import pytest
 
 import andrey
 from andrey import data
+from andrey.constraint import fci
 from andrey.core import ARROW, LATENT, NULL, OBSERVED, TAIL, GraphStructure, ci
 from andrey.data import load_dataset
 from andrey.data.latent import DSepOracle, marginal
@@ -74,16 +77,19 @@ def _empty_errors(truth: GraphStructure) -> int:
 # --- the composition ------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("edge_removal", ["all", "triangles"])
 @pytest.mark.parametrize("seed", range(3))
-def test_each_hybrid_is_the_fci_phase_on_its_search(seed):
+def test_each_hybrid_is_the_fci_phase_on_its_search(seed, edge_removal):
     x = data.sample_scm(d=12, n=600, seed=seed, density=3.0, latents=1).data
+    phase = _FCI_PHASE | dict(edge_removal=edge_removal)
     for name in HYBRIDS:
         pattern, _ = _SEARCH[name](x, ebic_gamma=0.0)  # the standard BIC, as the facades
-        expected = engines.fci_from_pattern(x, pattern, **_FCI_PHASE)
-        assert FIT[name](x).structure == expected
+        expected = engines.fci_from_pattern(x, pattern, **phase)
+        assert FIT[name](x, edge_removal=edge_removal).structure == expected
     pattern, _ = ges(x, ebic_gamma=0.0)
-    gfci_phase = _FCI_PHASE | dict(possible_dsep="order_free")
-    assert andrey.gfci(x).structure == engines.fci_from_pattern(x, pattern, **gfci_phase)
+    gfci_phase = phase | dict(possible_dsep="order_free")
+    found = andrey.gfci(x, edge_removal=edge_removal).structure
+    assert found == engines.fci_from_pattern(x, pattern, **gfci_phase)
 
 
 # --- fixed cases ----------------------------------------------------------------------------------
@@ -173,6 +179,117 @@ def test_only_gfci_removes_a_pair_by_possible_dsep(monkeypatch):
         expected[4, 5] = expected[5, 4] = True
         np.testing.assert_array_equal(adjacent, expected)
     assert engines.gfci(x, indep_test="dsep_oracle") == truth
+
+
+def test_the_possible_dsep_step_never_tests_a_kept_pair(monkeypatch):
+    """On the case above, GFCI's possible-d-separation step removes 4 - 5, unless ``keep`` marks the
+    pair, as ``edge_removal="triangles"`` marks the CPDAG's edges in no triangle."""
+    dag = nx.DiGraph(_PDSEP_DAG)
+    dag.add_nodes_from(range(12))
+    x = np.random.default_rng(0).standard_normal((50, 7))
+    monkeypatch.setitem(
+        ci._CI_REGISTRY,
+        "dsep_oracle",
+        lambda columns: DSepOracle(
+            dag, nodes=[next(j for j in range(7) if np.array_equal(c, x[:, j])) for c in columns.T]
+        ),
+    )
+    monkeypatch.setattr(engines, "ges", lambda *args, **kwargs: (_pdsep_cpdag(), 0.0))
+    calls = []
+
+    def step(*args, **kwargs):
+        calls.append(deepcopy((args, kwargs)))
+        return fci.possible_dsep_step(*args, **kwargs)
+
+    monkeypatch.setattr(engines, "possible_dsep_step", step)
+    engines.gfci(x, indep_test="dsep_oracle")
+    ((args, kwargs),) = calls
+    assert args[0][4, 5] != NULL
+    keep = np.zeros((7, 7), dtype=bool)
+    keep[4, 5] = keep[5, 4] = True
+    assert fci.possible_dsep_step(*deepcopy(args), **kwargs)[4, 5] == NULL
+    assert fci.possible_dsep_step(*deepcopy(args), **(kwargs | {"keep": keep}))[4, 5] != NULL
+
+
+# --- testing only the edges in triangles ----------------------------------------------------------
+
+# Observed nodes 0-5, no hidden one. The handed CPDAG adds two false edges: 1 - 3, in the triangle
+# 1 - 3 - 4, and 0 - 5, in no triangle.
+_TRIANGLE_DAG = [(0, 1), (0, 2), (2, 3), (1, 4), (3, 4), (4, 5)]
+_FALSE_EDGES = [(1, 3), (0, 5)]
+
+
+def _triangle_cpdag() -> GraphStructure:
+    """The DAG's edges, plus :data:`_FALSE_EDGES` undirected."""
+    marks = np.zeros((6, 6), dtype=np.int8)
+    for a, b in _TRIANGLE_DAG:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    for a, b in _FALSE_EDGES:
+        marks[a, b] = marks[b, a] = TAIL
+    return GraphStructure.from_numpy(marks, kind="cpdag")
+
+
+@pytest.mark.parametrize("name", ["gfci", *HYBRIDS])
+def test_triangles_keeps_a_false_edge_in_no_triangle(name, monkeypatch):
+    """Every search returns :func:`_triangle_cpdag` and the tests answer by d-separation in the DAG.
+
+    Testing every edge removes 0 - 5 given {4} and 1 - 3 given {0} or {2}, and returns the true
+    PAG. With ``edge_removal="triangles"``, no test names a pair the CPDAG joins in no triangle, so
+    0 - 5 stays, while 1 - 3 is still removed: only 0 and 2 separate it, and each reaches it
+    through an edge in no triangle, which still conditions the tests.
+    """
+    dag = nx.DiGraph(_TRIANGLE_DAG)
+    x = np.random.default_rng(0).standard_normal((50, 6))
+    tested: set[tuple[int, int]] = set()
+
+    def oracle(columns):
+        """The d-separation test over ``columns``, ``x``'s columns in some order, recording each
+        pair it is asked about by column."""
+        nodes = [next(j for j in range(6) if np.array_equal(c, x[:, j])) for c in columns.T]
+        separated = DSepOracle(dag, nodes=nodes)
+
+        def test(i, j, cond=()):
+            tested.add((min(nodes[i], nodes[j]), max(nodes[i], nodes[j])))
+            return separated(i, j, cond)
+
+        return test
+
+    monkeypatch.setitem(ci._CI_REGISTRY, "dsep_oracle", oracle)
+    for search in ("boss", "grasp", "ges"):
+        monkeypatch.setattr(engines, search, lambda *args, **kwargs: (_triangle_cpdag(), 0.0))
+    marks = np.zeros((6, 6), dtype=np.int8)
+    for a, b in _TRIANGLE_DAG:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    types = np.full(6, OBSERVED, dtype=np.int8)
+    truth = marginal(GraphStructure.from_numpy(marks, kind="dag", node_types=types), "pag")
+    separated = DSepOracle(dag)
+    assert separated(0, 5, (4,)) == 1.0 and separated(1, 3, (0,)) == 1.0
+    assert not any(separated(1, 3, s) for s in ((), (4,)))  # the triangle edges' ends alone
+    alone = engines.outside_triangles(_triangle_cpdag().to_numpy() != NULL)
+    assert sorted(zip(*np.nonzero(np.triu(alone)))) == [(0, 1), (0, 2), (0, 5), (2, 3), (4, 5)]
+
+    assert getattr(engines, name)(x, indep_test="dsep_oracle") == truth
+    tested.clear()
+    found = getattr(engines, name)(x, indep_test="dsep_oracle", edge_removal="triangles")
+    assert not any(alone[pair] for pair in tested)
+    expected = truth.to_numpy() != NULL
+    expected[0, 5] = expected[5, 0] = True
+    np.testing.assert_array_equal(found.to_numpy() != NULL, expected)
+
+
+@pytest.mark.parametrize("name", ["gfci", *HYBRIDS])
+def test_triangles_is_invariant_to_column_order(name):
+    """The triangles come from the CPDAG, so reordering the columns reorders the nodes and changes
+    nothing else; on this input the option changes each method's PAG."""
+    x = data.sample_scm(d=12, n=600, seed=3, density=3.0, latents=1).data
+    fit = getattr(andrey, name)
+    marks = fit(x, edge_removal="triangles").structure.to_numpy()
+    assert not np.array_equal(marks, fit(x).structure.to_numpy())
+    for seed in range(3):
+        order = np.random.default_rng(seed).permutation(x.shape[1])
+        back = np.argsort(order)
+        permuted = fit(x[:, order], edge_removal="triangles").structure.to_numpy()
+        assert np.array_equal(permuted[np.ix_(back, back)], marks)
 
 
 # --- ground truth ---------------------------------------------------------------------------------

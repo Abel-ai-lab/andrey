@@ -819,6 +819,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     possible_dsep: str | None = None,
+    edge_removal: str = "all",
     confounded_index: bool = True,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -916,6 +917,13 @@ def gfci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    edge_removal : {"all", "triangles"}, default="all"
+        Which edges of the GES CPDAG the tests may remove: ``"all"`` tests every edge, and
+        ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a neighbor in
+        it, as Section 5 of [1]_ does, in the adjacency search and the possible-d-separation step.
+        An edge in no triangle then stays in the PAG and still conditions the tests of the other
+        pairs. The triangles come from the CPDAG, so the result does not depend on the column order.
+        See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
@@ -1044,6 +1052,18 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
+    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency
+    search and the possible-d-separation step test only the CPDAG's edges that lie in a triangle
+    of it, a pair whose ends share a neighbor in the CPDAG. Every other edge stays in the PAG, and
+    its ends still condition the tests of the other pairs, as a required edge's do. Section 5 of
+    [1]_ tests only these edges to save time, and its authors conjecture that this is always
+    correct. On finite samples the two choices differ: ``"triangles"`` keeps both the true edges in
+    no triangle that a test would remove and the false edges in no triangle that the GES phase
+    adds. It helps with a strict penalty and alpha, such as ``penalty_discount=2.0`` and
+    ``alpha=0.01``, on dense graphs, where the GES phase adds few false edges and the tests remove
+    more true ones. It hurts at the defaults on sparse graphs, where the GES phase adds more false
+    edges. The default ``"all"`` tests every edge.
+
     **Choosing the penalty.** The GES phase scores a variable with the linear-Gaussian BIC, which
     charges ``penalty_discount * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
     ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, where ``C(n_variables - 1, n_parents)``
@@ -1158,6 +1178,7 @@ def gfci(
         categorical=categorical,
         collider_rule=collider_rule,
         possible_dsep=resolve_possible_dsep(possible_dsep),
+        edge_removal=edge_removal,
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,

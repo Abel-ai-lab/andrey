@@ -1405,6 +1405,7 @@ def boss_fci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    edge_removal: str = "all",
     confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
@@ -1490,6 +1491,12 @@ def boss_fci(
         column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
         named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    edge_removal : {"all", "triangles"}, default="all"
+        Which edges of the BOSS CPDAG the adjacency search may remove: ``"all"`` tests every
+        edge, and ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a
+        neighbor in it, as Section 5 of GFCI's paper [2]_ does. An edge in no triangle then stays in
+        the PAG and still conditions the tests of the other pairs. The triangles come from the
+        CPDAG, so the result does not depend on the column order. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1606,6 +1613,18 @@ def boss_fci(
     pair the CPDAG leaves non-adjacent as well, and reads Algorithm 5's final orientation rules as
     Zhang's R1-R10 [4]_, R5-R7 included.
 
+    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency
+    search tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a
+    neighbor in the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests
+    of the other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these
+    edges to save time, and its authors conjecture that this is always correct. On finite samples
+    the two choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test
+    would remove and the false edges in no triangle that the BOSS phase adds. It helps with a
+    strict penalty and alpha, such as the authors' ``penalty_discount=2.0`` and ``alpha=0.01``
+    [1]_, on dense graphs, where the BOSS phase adds few false edges and the tests remove more
+    true ones. It hurts at the defaults on sparse graphs, where the BOSS phase adds more false
+    edges. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+
     **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
     the environment index joins the data as a last variable that leads every BOSS order, and before
     the collider pass every edge the index keeps gets an arrowhead at its data variable, because no
@@ -1674,6 +1693,7 @@ def boss_fci(
         indep_test=indep_test,
         categorical=categorical,
         collider_rule=collider_rule,
+        edge_removal=edge_removal,
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
@@ -1701,6 +1721,7 @@ def grasp_fci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    edge_removal: str = "all",
     confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
@@ -1790,6 +1811,12 @@ def grasp_fci(
         column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
         named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    edge_removal : {"all", "triangles"}, default="all"
+        Which edges of the GRaSP CPDAG the adjacency search may remove: ``"all"`` tests every
+        edge, and ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a
+        neighbor in it, as Section 5 of GFCI's paper [2]_ does. An edge in no triangle then stays in
+        the PAG and still conditions the tests of the other pairs. The triangles come from the
+        CPDAG, so the result does not depend on the column order. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1894,6 +1921,18 @@ def grasp_fci(
     the PAG's adjacencies are a subset of the GRaSP CPDAG's. Reordering the columns reorders the
     nodes and changes nothing else, unless two columns are identical.
 
+    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency
+    search tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a
+    neighbor in the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests
+    of the other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these
+    edges to save time, and its authors conjecture that this is always correct. On finite samples
+    the two choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test
+    would remove and the false edges in no triangle that the GRaSP phase adds. It helps with a
+    strict penalty and alpha, such as the authors' ``penalty_discount=2.0`` and ``alpha=0.01``
+    [1]_, on dense graphs, where the GRaSP phase adds few false edges and the tests remove more
+    true ones. It hurts at the defaults on sparse graphs, where the GRaSP phase adds more false
+    edges. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+
     **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
     the environment index joins the data as a last variable that leads every GRaSP order, and before
     the collider pass every edge the index keeps gets an arrowhead at its data variable, because no
@@ -1958,6 +1997,7 @@ def grasp_fci(
         indep_test=indep_test,
         categorical=categorical,
         collider_rule=collider_rule,
+        edge_removal=edge_removal,
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
