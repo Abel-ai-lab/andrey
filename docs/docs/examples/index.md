@@ -62,9 +62,10 @@ several domains; and ICP's parents of one variable from several environments.
 :img-top: /_generated/thumbs/permutation_based.svg
 :img-alt: The graph BOSS or GRaSP recovers in this notebook
 
-BOSS and GRaSP search over orderings of the variables for the best-scoring graph; IGSP does
-too, on interventional settings, one per environment, whose changed variables it is told, and
-UT-IGSP on settings whose changed variables it is told in part or not at all.
+BOSS and GRaSP search over orderings of the variables for the best-scoring graph, and BOSS-FCI
+and GRaSP-FCI start from that graph and allow hidden common causes; IGSP searches orderings too,
+on interventional settings, one per environment, whose changed variables it is told, and UT-IGSP
+on settings whose changed variables it is told in part or not at all.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

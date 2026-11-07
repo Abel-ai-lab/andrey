@@ -1566,9 +1566,6 @@ def boss_fci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When the mixed-data score or test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
@@ -1621,21 +1618,29 @@ def boss_fci(
     suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
     per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
-    hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
-    network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
-    the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
-    :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
-    data. Without the possible-d-separation step, a pair that only a set outside both ends'
-    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
-    can hold an edge too many and marks that differ from the true PAG's. Its BIC score and Fisher's
-    z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up to 12
-    measured variables and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11
-    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
-    read a numeric ``env`` as a number, so with three or more environments a shift that does not
-    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
-    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
+    common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to
+    5,000 rows, and 100 measured variables with 10 hidden, mean degree 6 or 10, and 1,000 rows, at a
+    penalty discount of 2 with an alpha of 0.01 and at the defaults, on one core. Its errors
+    (endpoint SHD against the true PAG) were below the empty graph's in every setting, but much of
+    the PAG stays wrong on these data, whose hidden nodes leave many pairs joined only through them:
+    at 20 measured variables and mean degree 6 its errors were about three quarters of the empty
+    graph's, and at mean degree 2 with 8 hidden and 200 rows at the defaults, 34.35 against 37.8.
+    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and
+    under 8 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
+    with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with the
+    mixed-data score and test, on 5 variables with 3,000 rows. It runs a full :func:`~andrey.boss`
+    search before any test, so it takes at least as long as BOSS on the same data. Without the
+    possible-d-separation step, a pair that only a set outside both ends' remaining neighbors
+    separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG can hold an edge too
+    many and marks that differ from the true PAG's. Its BIC score and Fisher's z test assume linear
+    effects with Gaussian noise. With ``env``, its tests run it on up to 12 measured variables and 2
+    hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from
+    nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a
+    number, so with three or more environments a shift that does not follow the labels' values can
+    go unnoticed. ``max_parents`` counts the index as a parent in the score phase. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1655,15 +1660,12 @@ def boss_fci(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import boss_fci
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = x + 0.1 * rng.standard_normal(500)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     boss_fci(np.column_stack([x, y]), seed=0).structure.kind
+    >>> boss_fci(np.column_stack([x, y]), seed=0).structure.kind
     'pag'
     """
     return fci_hybrid(
@@ -1866,9 +1868,6 @@ def grasp_fci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When the mixed-data score or test finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
@@ -1909,21 +1908,29 @@ def grasp_fci(
     suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
     per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
-    hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
-    network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
-    the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
-    :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
-    data. Without the possible-d-separation step, a pair that only a set outside both ends'
-    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
-    can hold an edge too many and marks that differ from the true PAG's. Its BIC score and Fisher's
-    z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up to 12
-    measured variables and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11
-    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
-    read a numeric ``env`` as a number, so with three or more environments a shift that does not
-    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
-    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
+    common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to
+    5,000 rows, and 100 measured variables with 10 hidden, mean degree 6 or 10, and 1,000 rows, at a
+    penalty discount of 2 with an alpha of 0.01 and at the defaults, on one core. Its errors
+    (endpoint SHD against the true PAG) were below the empty graph's in every setting, but much of
+    the PAG stays wrong on these data, whose hidden nodes leave many pairs joined only through them:
+    at 20 measured variables and mean degree 6 its errors were about three quarters of the empty
+    graph's, and at mean degree 2 with 8 hidden and 200 rows at the defaults, 33.3 against 37.8.
+    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and
+    up to 46 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
+    with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with the
+    mixed-data score and test, on 5 variables with 3,000 rows. It runs a full :func:`~andrey.grasp`
+    search before any test, so it takes at least as long as GRaSP on the same data. Without the
+    possible-d-separation step, a pair that only a set outside both ends' remaining neighbors
+    separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG can hold an edge too
+    many and marks that differ from the true PAG's. Its BIC score and Fisher's z test assume linear
+    effects with Gaussian noise. With ``env``, its tests run it on up to 12 measured variables and 2
+    hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from
+    nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a
+    number, so with three or more environments a shift that does not follow the labels' values can
+    go unnoticed. ``max_parents`` counts the index as a parent in the score phase. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1939,15 +1946,12 @@ def grasp_fci(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import grasp_fci
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = x + 0.1 * rng.standard_normal(500)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     grasp_fci(np.column_stack([x, y]), seed=0).structure.kind
+    >>> grasp_fci(np.column_stack([x, y]), seed=0).structure.kind
     'pag'
     """
     return fci_hybrid(

@@ -689,14 +689,14 @@ def _sizes(regime: str) -> tuple[str, ...]:
 
 
 # A method applies where its assumptions hold. PC and the score searches (GES, XGES, HC, Tabu, BOSS,
-# GRaSP, exact search, CALM) assume no hidden variables, FCI and GFCI allow them, and the LiNGAM
-# methods need non-Gaussian noise. Sachs is measured data that fits each only approximately. RCD and
-# BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000 rows RCD marks most pairs
-# <-> and scores worse than the empty graph, and on Sachs BottomUpParceLiNGAM does. ANM and PNL take
-# one pair of variables, so each runs on its benchmark's pairs only. GIES, GnIES, CD-NOD,
-# MultiGroupDirectLiNGAM, and GIN need what only their regimes have: interventions, environments
-# that change noise variances, domains, groups, or latents measured by indicators. CAM-UV runs on
-# its benchmark's nonlinear regimes with hidden variables.
+# GRaSP, exact search, CALM) assume no hidden variables, FCI, GFCI, BOSS-FCI, and GRaSP-FCI allow
+# them, and the LiNGAM methods need non-Gaussian noise. Sachs is measured data that fits each only
+# approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000
+# rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
+# BottomUpParceLiNGAM does. ANM and PNL take one pair of variables, so each runs on its benchmark's
+# pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
+# have: interventions, environments that change noise variances, domains, groups, or latents
+# measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -786,10 +786,10 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
 #: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
-#: fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's optimizer. CD-NOD
-#: and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions
-#: with the published settings: the domain index of four equal blocks of rows, and three groups of
-#: columns.
+#: fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
+#: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
+#: call the public functions with the published settings: the domain index of four equal blocks of
+#: rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -815,6 +815,8 @@ SUPPORTED: dict[str, Method] = {
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
+    "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
+    "GRaSP-FCI": Method(lambda x: andrey.grasp_fci(x, seed=0), "pag", PAG_DATA),
     "UT-IGSP": Method(ut_igsp_fit, "essential", UNKNOWN_TARGET_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
     "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, seed=0), "dag", LINGAM_DATA),

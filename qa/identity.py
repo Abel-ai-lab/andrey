@@ -169,6 +169,8 @@ FITS: dict[str, Fit] = {
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
+    "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
+    "GRaSP-FCI": Fit(functools.partial(andrey.grasp_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
     "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
     "MultiGroupDirectLiNGAM": Fit(
@@ -261,7 +263,7 @@ LARGER: dict[str, str] = {
         ),
         "linear_gauss_er_d100",
     ),
-    **dict.fromkeys(("FCI", "GFCI"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
