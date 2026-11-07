@@ -11,7 +11,10 @@ if __name__ == "__main__":  # worker processes re-import this script
         edges = out.structure.oriented_edges()
         known = sum(frozenset(edge[:2]) in consensus for edge in edges)
         directed = sum(kind == "directed" for *_, kind in edges)
+        heads = {"directed", "partially_directed", "bidirected"}  # the edges with an arrowhead
+        arrowheads = sum(kind in heads for *_, kind in edges)
         line = f"{len(edges):2} edges, {known} in the consensus network, {directed:2} directed"
+        line += f", {arrowheads:2} with an arrowhead"
         if "index_edges" in out.metadata:  # the methods given env
             line += f", {len(out.metadata['index_edges'])} index edges"
         return line
