@@ -23,6 +23,7 @@ COVERS = {
     "plumb": "a plumb bob hanging beside an engraved measuring column, the bob amber",
     "gears": "three engraved spoked gears meshing on a cast-iron base, the output gear amber",
     "dominoes": "engraved dominoes, those before the amber one standing, those after it falling",
+    "crystal": "an engraved crystal lit by three lamps, one lamp and the facet it lights amber",
     "ground": "the stipple ground",
 }
 
