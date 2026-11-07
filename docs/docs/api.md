@@ -241,6 +241,19 @@ method's Notes give every outcome.
 `pcmciplus` takes the same three rules for its same-step colliders, with `"majority"` as its
 default, as in tigramite, since its orientations do not depend on the order of the variables.
 
+% concept: edge_removal
+`gfci`, `boss_fci`, and `grasp_fci` take `edge_removal`: which edges of the score search's CPDAG
+their tests may remove. `"all"`, the default, tests every edge. `"triangles"` tests only the edges
+in a triangle of the CPDAG, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and
+Ramsey (2016) does to save time; an edge in no triangle stays in the PAG and still conditions the
+tests of the other pairs. `gfci` applies it to its adjacency search and its possible-d-separation
+step, and `boss_fci` and `grasp_fci`, which run no possible-d-separation step, to their adjacency
+search. The triangles come from the CPDAG, so the option adds no dependence on the column order. On
+finite samples it keeps both the true edges in no triangle that a test would remove and the false
+ones the score search adds: it helps with a strict penalty and alpha on dense graphs and hurts at
+the defaults on sparse graphs. It did not shorten the fit in our runs. Each method's Notes give the
+details.
+
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
 `gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:

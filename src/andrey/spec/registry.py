@@ -256,6 +256,14 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
+            concept_param(
+                "edge_removal",
+                doc="Which edges of the GES CPDAG the adjacency search and the "
+                "possible-d-separation step may remove: all = every edge; triangles = only the "
+                "edges in a triangle of the CPDAG, whose ends share a neighbor in it (Ogarrio, "
+                "Spirtes and Ramsey 2016, Section 5). An edge in no triangle then stays and still "
+                "conditions the tests of the other pairs.",
+            ),
             concept_param("confounded_index"),
             _TEST_SEED,
             concept_param(
@@ -1415,6 +1423,14 @@ _PERMUTATION_FCI_MAX_PARENTS = concept_param(
     "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of the PAG. "
     "null sets no cap.",
 )
+#: The edges of the BOSS or GRaSP CPDAG that the adjacency search of boss_fci and grasp_fci tests.
+_PERMUTATION_FCI_EDGE_REMOVAL = concept_param(
+    "edge_removal",
+    doc="Which edges of the BOSS or GRaSP CPDAG the adjacency search may remove: all = every edge; "
+    "triangles = only the edges in a triangle of the CPDAG, whose ends share a neighbor in it "
+    "(Ogarrio, Spirtes and Ramsey 2016, Section 5). An edge in no triangle then stays and still "
+    "conditions the tests of the other pairs.",
+)
 #: The seed of boss_fci and grasp_fci: the order search's and a randomized test's.
 _PERMUTATION_FCI_SEED = concept_param(
     "seed",
@@ -1490,6 +1506,7 @@ for _name, _summary, _own, _refs in (
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
+                _PERMUTATION_FCI_EDGE_REMOVAL,
                 concept_param("confounded_index"),
                 _PERMUTATION_FCI_SEED,
                 _N_STARTS,

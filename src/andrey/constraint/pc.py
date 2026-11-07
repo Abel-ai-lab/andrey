@@ -357,13 +357,14 @@ def adjacency_search(
     snapshot of *either* endpoint's neighbors, and the pairs found independent are removed together
     after the size completes, so a separating set is reachable wherever it lives and the skeleton
     does not depend on how the caller ordered the columns. A pair marked in the boolean ``keep``
-    (the required edges, both ways) is never tested, so it stays; it still conditions the tests of
-    other pairs. A removed pair's separating set is the union of every conditioning set that made it
-    independent, and its p-value the largest among those sets' tests; both are keyed ``(x, y)`` with
-    ``x < y``. ``test`` is the conditional-independence test, built over the data. With
-    ``record_pvalues`` false, as for PC's column collider order, which ranks nothing, and for FCI,
-    no p-value is compared or kept and the returned p-value dict is empty; the skeleton and the
-    separating sets are the same.
+    (the required edges and, under the ``edge_removal="triangles"`` of GFCI, BOSS-FCI, and
+    GRaSP-FCI, the edges in no triangle of their CPDAG; both ways) is never tested, so it stays; it
+    still conditions the tests of other pairs. A removed pair's separating set is the union of every
+    conditioning set that made it independent, and its p-value the largest among those sets' tests;
+    both are keyed ``(x, y)`` with ``x < y``. ``test`` is the conditional-independence test, built
+    over the data. With ``record_pvalues`` false, as for PC's column collider order, which ranks
+    nothing, and for FCI, no p-value is compared or kept and the returned p-value dict is empty; the
+    skeleton and the separating sets are the same.
 
     After the last size, a pair marked in the boolean ``apart`` (the pairs background knowledge
     makes non-adjacent, outside ``support``) that shares a neighbor gets its separating set and
