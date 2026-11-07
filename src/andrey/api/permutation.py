@@ -10,7 +10,8 @@ minimal I-MAPs with interventional data (:mod:`andrey.search.igsp`). ``boss_fci`
 run GFCI's test phase (:func:`andrey.search.gfci.fci_from_pattern`) on the CPDAG of a BOSS or GRaSP
 search. With ``env``, ``boss``, ``grasp``, ``boss_fci``, and ``grasp_fci`` append the environment
 index to the data as a last column that leads every order of the search, and drop it from the
-result again, its edges listed in ``metadata``.
+result again, its edges listed in ``metadata`` (:func:`~andrey.api._adapt.cpdag_search`,
+:func:`~andrey.api.constraint.fci_hybrid`).
 """
 
 from __future__ import annotations
@@ -21,29 +22,24 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
-    check_same_data,
     checked_data,
     column_labels,
     column_namer,
     copies_named,
-    env_index,
-    fit_inputs,
-    index_column,
-    json_safe,
+    cpdag_search,
     label_of,
-    split_index,
     structure_output,
 )
 from andrey.api._method import method_spec
-from andrey.api.constraint import _ambiguous_metadata
+from andrey.api.constraint import fci_hybrid
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
-    from andrey.core import GraphStructure, StructureOutput
+    from andrey.core import StructureOutput
 
 
 @method_spec("boss")
@@ -350,7 +346,7 @@ def boss(
     """
     from andrey.search.boss import boss as _boss
 
-    return _cpdag_search(
+    return cpdag_search(
         "boss",
         _boss,
         data,
@@ -689,7 +685,7 @@ def grasp(
     """
     from andrey.search.grasp import grasp as _grasp
 
-    return _cpdag_search(
+    return cpdag_search(
         "grasp",
         _grasp,
         data,
@@ -705,68 +701,6 @@ def grasp(
         n_starts=n_starts,
         max_parents=max_parents,
     )
-
-
-def _cpdag_search(
-    name: str,
-    engine: Callable[..., tuple[GraphStructure, float]],
-    data: npt.ArrayLike,
-    env: npt.ArrayLike | None,
-    *,
-    score_func: str | None,
-    categorical: Sequence[str | int] | None,
-    knowledge: Knowledge | None,
-    **settings: object,
-) -> StructureOutput:
-    """Run ``name``, ``"boss"`` or ``"grasp"``, whose search ``engine`` returns a CPDAG and a score.
-
-    With ``env``, the environment index joins the data as a last column that the search keeps
-    ahead of every other one (``sources``), and leaves the result again: its edges, and the
-    variables they reach, go in ``metadata``. ``settings`` reach ``engine``.
-    """
-    assert score_func is not None  # method_spec picks it from the column types
-    data, index = env_index(data, env, method=name)
-    X, mask, labels, constraints = fit_inputs(
-        data,
-        "score_func",
-        score_func,
-        categorical,
-        knowledge,
-        method=name,
-        # One environment adds no index column (index_column), so it is not a categorical one.
-        index_categorical=index is not None and np.ptp(index) > 0,
-    )
-    augmented, augmented_mask, augmented_constraints, column = index_column(
-        X, mask, constraints, index, "score_func", score_func
-    )
-    with copies_named(labels, _index_namer(labels, column)):
-        cpdag, score = engine(
-            augmented,
-            score_func=score_func,
-            categorical=augmented_mask,
-            constraints=augmented_constraints,
-            sources=() if column is None else (column,),
-            **settings,
-        )
-    cpdag, index_edges = split_index(cpdag, column)
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
-    if env is not None:
-        variable = label_of(labels)
-        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
-        metadata["changing_variables"] = [variable(j) for j, _ in index_edges]
-    return structure_output(cpdag, labels=labels, metadata=metadata)
-
-
-def _index_namer(labels: tuple[str, ...] | None, column: int | None) -> Callable[[int], str] | None:
-    """Name the columns of the data a search reads, for a copies error; ``None`` without ``column``.
-
-    The index ``column`` is ``env``, and the others are named by
-    :func:`~andrey.api._adapt.column_namer`.
-    """
-    if column is None:
-        return None
-    name = column_namer(labels)
-    return lambda j: "env" if j == column else name(j)
 
 
 @method_spec("igsp")
@@ -1458,70 +1392,6 @@ def ut_igsp(
     return structure_output(graph, labels=labels, metadata=metadata)
 
 
-def _fci_hybrid(
-    name: str,
-    data: npt.ArrayLike,
-    env: npt.ArrayLike | None,
-    *,
-    score_func: str | None,
-    indep_test: str | None,
-    categorical: Sequence[str | int] | None,
-    collider_rule: str,
-    knowledge: Knowledge | None,
-    **settings: object,
-) -> StructureOutput:
-    """Run ``name``, ``"boss_fci"`` or ``"grasp_fci"``, as :func:`~andrey.gfci` runs.
-
-    The score and the test must read the data alike (:func:`~andrey.api._adapt.check_same_data`);
-    ``settings`` reach the engine in :mod:`andrey.search.gfci`. With ``env``, the environment
-    index joins the data as a last column, the engine's ``context``, and leaves the PAG again: its
-    edges go in ``metadata``.
-    """
-    from andrey.core.ties import resolve_in_column_order
-    from andrey.search import gfci as engines
-
-    assert score_func is not None and indep_test is not None  # method_spec picks them
-    # Both phases read the same data, so the score and the test must agree on its type.
-    check_same_data(name, score_func, indep_test)
-    data, index = env_index(data, env, method=name)
-    X, mask, labels, constraints = fit_inputs(
-        data,
-        "indep_test",
-        indep_test,
-        categorical,
-        knowledge,
-        method=name,
-        # One environment adds no index column (index_column), so it is not a categorical one.
-        index_categorical=index is not None and np.ptp(index) > 0,
-    )
-    augmented, augmented_mask, augmented_constraints, column = index_column(
-        X, mask, constraints, index, "indep_test", indep_test
-    )
-    ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels, _index_namer(labels, column)):
-        pag = getattr(engines, name)(
-            augmented,
-            score_func=score_func,
-            indep_test=indep_test,
-            collider_rule=collider_rule,
-            categorical=augmented_mask,
-            constraints=augmented_constraints,
-            in_column_order=resolve_in_column_order(),
-            context=column,
-            _ambiguous=ambiguous,
-            **settings,
-        )
-    pag, index_edges = split_index(pag, column)
-    metadata = {
-        **categorical_metadata(mask, data),
-        **_ambiguous_metadata(collider_rule, ambiguous),
-    }
-    if env is not None:
-        variable = label_of(labels)
-        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
-    return structure_output(pag, labels=labels, metadata=metadata)
-
-
 @method_spec("boss_fci")
 def boss_fci(
     data: npt.ArrayLike,
@@ -1793,7 +1663,7 @@ def boss_fci(
     ...     boss_fci(np.column_stack([x, y]), seed=0).structure.kind
     'pag'
     """
-    return _fci_hybrid(
+    return fci_hybrid(
         "boss_fci",
         data,
         env,
@@ -2077,7 +1947,7 @@ def grasp_fci(
     ...     grasp_fci(np.column_stack([x, y]), seed=0).structure.kind
     'pag'
     """
-    return _fci_hybrid(
+    return fci_hybrid(
         "grasp_fci",
         data,
         env,

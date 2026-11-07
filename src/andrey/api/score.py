@@ -3,9 +3,11 @@
 ``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
 scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. Each also scores
 categorical data with BDeu and the multinomial BIC, and mixed data with the degenerate and
-conditional Gaussian BICs. ``gnies`` scores environments that differ in noise variances
-(:mod:`andrey.search.gnies`) and searches with the GIES engine. Reported objectives are stored in
-``metadata``.
+conditional Gaussian BICs. With ``env``, ``ges``, ``hc``, and ``tabu`` append the environment index
+to the data as a last column no other column causes, and drop it from the result again, its edges
+listed in ``metadata`` (:func:`~andrey.api._adapt.cpdag_search`). ``gnies`` scores environments that
+differ in noise variances (:mod:`andrey.search.gnies`) and searches with the GIES engine. Reported
+objectives are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -20,10 +22,10 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
-    checked_data,
     column_labels,
     column_namer,
     copies_named,
+    cpdag_search,
     data_matrix,
     declared_columns,
     fit_inputs,
@@ -47,6 +49,7 @@ if TYPE_CHECKING:
 @method_spec("ges")
 def ges(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -64,9 +67,23 @@ def ges(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and three or more environments, the order of the list can change the
+        result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data. ``"bdeu"``
         is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [7]_, for categorical data
@@ -99,7 +116,8 @@ def ges(
         node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
         CPDAG would break the cap, in either phase, is skipped for the next best move. A cap can
         stop the search short of the lowest-scoring graph, which GES otherwise finds. ``None`` sets
-        no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
+        no cap; the forward phase then keeps its gate of ``n_variables / 2``. With ``env``, the
+        index counts as a parent of each variable it points into. See Notes.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -112,7 +130,7 @@ def ges(
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes.
+        :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -125,7 +143,17 @@ def ges(
         mixed-data scores, see Notes. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        position. With ``env``, the graph over the data variables is partially directed: the index
+        directs edges that the CPDAG of the pooled rows leaves undirected, so the graph stands for
+        the DAGs that agree on every direction the index identifies, and is tagged ``cpdag``, as
+        :func:`~andrey.cdnod`'s is. ``metadata["index_edges"]`` then lists the index's edges, each
+        ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, when the index is only a cause and no hidden common cause
+        acts. Their descendants change in distribution too, through them, and are not listed. Both
+        are empty for a single environment, and ``metadata["score"]`` is the score of the graph over
+        the data and the index. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
         under their parameter names.
 
@@ -147,7 +175,9 @@ def ges(
         column repeats another up to scale and shift given more than two rows or, with more rows
         than columns, is a linear function of other columns. One message names every group of copies
         and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
-        or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold
+        one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -166,7 +196,11 @@ def ges(
     every variable has few parents [2]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
     oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
-    :func:`~andrey.gies`.
+    :func:`~andrey.gies`. With ``env``, it takes rows pooled from several environments, such as
+    sites, batches, or experiments, whose shifts change variables it does not know;
+    :func:`~andrey.gies` takes the changed variables when they are known, :func:`~andrey.cdnod` runs
+    PC with the same index, and :func:`~andrey.gfci` takes ``env`` when unmeasured common causes are
+    plausible.
 
     **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``penalty_discount *
     log(n_samples)`` per parent and adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``,
@@ -231,6 +265,18 @@ def ges(
     ``ebic_gamma=0.0`` by a constant per variable, so it finds the same graph. Moves are scored in
     this process.
 
+    **Several environments.** With ``env``, the environment index joins the data as a last variable
+    that no Insert gives a parent: the background knowledge Joint Causal Inference gives a context
+    variable [9]_, and the index CD-NOD adds to PC [10]_. Pooling makes the environment a common
+    cause of the variables it shifts; with the index among the variables, the score explains two
+    variables the environments shift together without an edge between them. After every move, the
+    edges at the index are directed out of it and Meek's rules direct the edges that follow, so the
+    search moves over partially directed graphs, and the result can direct edges that the CPDAG of
+    the pooled rows leaves undirected. Every move is then scored in this process. The index is
+    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
+    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
+    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -259,13 +305,21 @@ def ges(
     one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
     variance. On simulated mixed data (conditional linear Gaussian networks on sparse random graphs,
     the first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables
-    with 2,000 rows, its median errors at 40 variables were 8 with ``"degen_gauss"`` and
-    6.5 with ``"cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4
-    cores. On simulated categorical networks with 2 or 3 categories per variable, of the same sizes
-    and rows, ``"bdeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial
-    BIC is not benchmarked with GES yet: its tests check it against the formula and run GES on small
-    fixed categorical networks. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    with 2,000 rows, its median errors at 40 variables were 8 with ``"degen_gauss"`` and 6.5 with
+    ``"cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4 cores. On simulated
+    categorical networks with 2 or 3 categories per variable, of the same sizes and rows, ``"bdeu"``
+    gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC is not benchmarked with GES
+    yet: its tests check it against the formula and run GES on small fixed categorical networks.
+    With ``env``, GES is experimental and not benchmarked yet; its tests run it on up to 12
+    variables with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from
+    nine conditions, with ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with
+    three or more environments a shift that does not follow the labels' values, such as one in the
+    middle environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can
+    change the result. ``max_parents`` counts the index as a parent of each variable it points into.
+    The conditions under which an Insert or a Delete is valid are proved for CPDAGs [1]_; with
+    ``env`` the search applies them to the partially directed graphs the index gives. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -287,6 +341,11 @@ def ges(
        461-464.
     .. [8] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [9] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [10] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
+       Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
+       1-53.
 
     Examples
     --------
@@ -320,28 +379,18 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    assert score_func is not None  # method_spec picks it from the column types
-    X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="ges"
-    )
-    with copies_named(labels):
-        cpdag, score = _ges(
-            X,
-            score_func=score_func,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            max_parents=max_parents,
-            categorical=mask,
-            constraints=constraints,
-        )
-    return structure_output(
-        cpdag,
-        labels=labels,
-        metadata={
-            "score": json_safe(score),
-            **categorical_metadata(mask, data),
-        },
+    return cpdag_search(
+        "ges",
+        _ges,
+        data,
+        env,
+        score_func=score_func,
+        categorical=categorical,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_parents=max_parents,
     )
 
 
@@ -1227,6 +1276,7 @@ def xges(
 @method_spec("hc")
 def hc(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -1248,9 +1298,23 @@ def hc(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and three or more environments, the order of the list can change the
+        result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
@@ -1299,7 +1363,8 @@ def hc(
         A cap on every node's parents, at least ``0``: the search takes no move that gives a node
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
         (every DAG of a class has the same largest number of parents). A cap can stop the search
-        short of the lowest-scoring graph. ``None`` sets no cap.
+        short of the lowest-scoring graph. ``None`` sets no cap. With ``env``, the index counts as a
+        parent of each variable it points into.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1312,7 +1377,7 @@ def hc(
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes.
+        :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -1323,10 +1388,20 @@ def hc(
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
-        ``metadata["n_perturbations"]`` the number of changes before each later climb.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
-        under their parameter names.
+        ``metadata["n_perturbations"]`` the number of changes before each later climb. With ``env``,
+        the graph over the data variables is partially directed: the index directs edges that the
+        CPDAG of the pooled rows leaves undirected, so the graph stands for the DAGs that agree on
+        every direction the index identifies, and is tagged ``cpdag``, as :func:`~andrey.cdnod`'s
+        is. ``metadata["index_edges"]`` then lists the index's edges, each ``env -> variable``, as
+        ``[variable, "directed"]`` pairs, and ``metadata["changing_variables"]`` the same variables,
+        by name or 0-based position, in column order: the variables whose causal module, the
+        distribution given their causes, changes across the environments, when the index is only a
+        cause and no hidden common cause acts. Their descendants change in distribution too, through
+        them, and are not listed, unless the climb stops with a chain directed against the index;
+        see Notes. Both are empty for a single environment, and ``metadata["score"]`` is the score
+        of the DAG found over the data and the index. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records
+        the penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -1344,7 +1419,9 @@ def hc(
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
         contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a mixed-data score,
-        requires an edge from a continuous into a categorical column.
+        requires an edge from a continuous into a categorical column. Also if ``env`` does not hold
+        one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -1358,15 +1435,19 @@ def hc(
 
     Notes
     -----
-    **When to use.** Hill climbing suits i.i.d. observational data with no unmeasured common
-    causes. Its default BIC score assumes continuous data, where each variable depends linearly on
-    its causes with Gaussian noise; categorical and mixed data take the scores and defaults of
-    :func:`~andrey.ges`. Each move adds, removes, or reverses one edge of a DAG [1]_, and the
-    search suits sparse graphs: on dense ones it more often stops at a DAG that no single move
-    improves but that scores worse than the true one. It returns the CPDAG of the DAG found. When
-    unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian
-    and every edge should be oriented, use :func:`~andrey.direct_lingam`; with nonlinear effects,
-    use :func:`~andrey.cam`.
+    **When to use.** Hill climbing suits i.i.d. observational data with no unmeasured common causes.
+    Its default BIC score assumes continuous data, where each variable depends linearly on its
+    causes with Gaussian noise; categorical and mixed data take the scores and defaults of
+    :func:`~andrey.ges`. Each move adds, removes, or reverses one edge of a DAG [1]_, and the search
+    suits sparse graphs: on dense ones it more often stops at a DAG that no single move improves but
+    that scores worse than the true one. It returns the CPDAG of the DAG found. When unmeasured
+    common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every
+    edge should be oriented, use :func:`~andrey.direct_lingam`; with nonlinear effects, use
+    :func:`~andrey.cam`. With ``env``, it takes rows pooled from several environments, such as
+    sites, batches, or experiments, whose shifts change variables it does not know;
+    :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
+    runs PC with the same index. With ``env``, set ``n_starts`` above ``1`` (see **Several
+    environments.**).
 
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set; with ``n_starts``, each climb stops so. Under a mixed-data
@@ -1405,6 +1486,25 @@ def hc(
     median of 5.3 times as long as one start. On categorical data drawn from the ALARM network with
     1,000 rows, under BDeu, they lowered them from 29.6 to 16.9.
 
+    **Several environments.** With ``env``, the environment index joins the data as a last variable
+    that no move gives a parent: the background knowledge Joint Causal Inference gives a context
+    variable [5]_, and the index CD-NOD adds to PC [6]_. Pooling makes the environment a common
+    cause of the variables it shifts; with the index among the variables, the score explains two
+    variables the environments shift together without an edge between them. The edges at the index
+    of the DAG found are then directed out of it, and Meek's rules direct the edges that follow, so
+    the graph can direct edges that the CPDAG of the pooled rows leaves undirected. The index is
+    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
+    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
+    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+
+    Through the ties between the two directions of an edge, one climb can direct a chain against
+    the index and then keep an edge from the index to each variable on it: no single move improves
+    the score there, though the true graph scores better. ``index_edges`` and
+    ``changing_variables`` then list every variable on the chain, not only the ones the environments
+    change. Each later start climbs again from a changed copy of the best DAG so far and can leave
+    such a DAG, so with ``env`` set ``n_starts`` above ``1``. :func:`~andrey.tabu`, which also takes
+    moves that do not improve the score, can leave it in one run.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -1429,12 +1529,20 @@ def hc(
     that leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
     mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
     variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
-    median errors at 40 variables were 12.5 with ``"degen_gauss"`` and 11 with
-    ``"cond_gauss"``, against 40. On simulated categorical networks with 2 or 3
-    categories per variable, of the same sizes and rows, they were 18 with ``"bdeu"``
-    and 20 with ``"discrete_bic"``. Every median fit took under 0.2 s at 40
-    variables, on 4 cores. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    median errors at 40 variables were 12.5 with ``"degen_gauss"`` and 11 with ``"cond_gauss"``,
+    against 40. On simulated categorical networks with 2 or 3 categories per variable, of the same
+    sizes and rows, they were 18 with ``"bdeu"`` and 20 with ``"discrete_bic"``. Every median fit
+    took under 0.2 s at 40 variables, on 4 cores. With ``env``, hill climbing is experimental and
+    not benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two
+    environments, and on Sachs's 11 proteins, 7,466 cells from nine conditions, with
+    ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
+    environments a shift that does not follow the labels' values, such as one in the middle
+    environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
+    result. ``max_parents`` counts the index as a parent of each variable it points into. At the
+    default ``n_starts=1``, ``changing_variables`` often lists variables the environments change
+    only through their causes (see **Several environments.**). The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1447,6 +1555,11 @@ def hc(
     .. [4] Scutari, M., Graafland, C. E., and Gutierrez, J. M. (2019). Who learns better Bayesian
        network structures: accuracy and speed of structure learning algorithms. International
        Journal of Approximate Reasoning 115, 235-253. https://doi.org/10.1016/j.ijar.2019.10.003
+    .. [5] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [6] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
+       Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
+       1-53.
 
     Examples
     --------
@@ -1460,35 +1573,30 @@ def hc(
     """
     from andrey.search.hc import hc as _hc
 
-    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
-    X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="hc"
+    assert seed is not None  # method_spec picks the seed
+    return cpdag_search(
+        "hc",
+        _hc,
+        data,
+        env,
+        score_func=score_func,
+        categorical=categorical,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_iter=max_iter,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        n_perturbations=n_perturbations,
+        seed=seed,
     )
-    changes = X.shape[1] if n_perturbations is None else n_perturbations
-    with copies_named(labels):
-        cpdag, score = _hc(
-            X,
-            score_func=score_func,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            max_iter=max_iter,
-            max_parents=max_parents,
-            categorical=mask,
-            constraints=constraints,
-            n_starts=n_starts,
-            n_perturbations=changes,
-            seed=seed,
-        )
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
-    if n_starts > 1:
-        metadata["n_perturbations"] = changes
-    return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
 @method_spec("tabu")
 def tabu(
     data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
@@ -1512,9 +1620,23 @@ def tabu(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``. A column that ``env`` names is not a variable: it leaves the
+        data before the fit, and ``categorical``, ``knowledge``, and the result's positions count
+        the other columns. A list of DataFrames or 2-D arrays gives each environment's rows apart,
+        labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows are
+        stacked in that order, and ``env`` stays ``None``. A position is the environment's number,
+        so with ``"bic"`` and three or more environments, the order of the list can change the
+        result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
+        string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
+        row has the same value, the data come from one environment, and the graph equals the one
+        without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"`` or ``"discrete_bic"``, the BDeu score or the multinomial BIC for categorical data
@@ -1569,7 +1691,8 @@ def tabu(
         A cap on every node's parents, at least ``0``: the search takes no move that gives a node
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
         (every DAG of a class has the same largest number of parents). A cap can stop the search
-        short of the lowest-scoring graph. ``None`` sets no cap.
+        short of the lowest-scoring graph. ``None`` sets no cap. With ``env``, the index counts as a
+        parent of each variable it points into.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1582,7 +1705,7 @@ def tabu(
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes.
+        :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
 
     Returns
     -------
@@ -1593,10 +1716,20 @@ def tabu(
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
-        ``metadata["n_perturbations"]`` the number of changes before each later search.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
-        under their parameter names.
+        ``metadata["n_perturbations"]`` the number of changes before each later search. With
+        ``env``, the graph over the data variables is partially directed: the index directs edges
+        that the CPDAG of the pooled rows leaves undirected, so the graph stands for the DAGs that
+        agree on every direction the index identifies, and is tagged ``cpdag``, as
+        :func:`~andrey.cdnod`'s is. ``metadata["index_edges"]`` then lists the index's edges, each
+        ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, when the index is only a cause and no hidden common cause
+        acts. Their descendants change in distribution too, through them, and are not listed. Both
+        are empty for a single environment, and ``metadata["score"]`` is the score of the DAG found
+        over the data and the index. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
 
     Raises
     ------
@@ -1613,7 +1746,9 @@ def tabu(
         more than two rows or, with more rows than columns, is a linear function of other columns.
         One message names every group of copies and says to keep one column per group. Also if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
+        label or is infinite, or mixes strings and numbers, or, with a categorical or mixed-data
+        score, holds a number that is not whole.
 
     Warns
     -----
@@ -1629,13 +1764,16 @@ def tabu(
     -----
     **When to use.** Tabu search suits the data of :func:`~andrey.hc`: i.i.d. observational data
     with no unmeasured common causes. Its default BIC score assumes continuous data, where each
-    variable depends linearly on its causes with Gaussian noise; categorical and mixed data take
-    the scores and defaults of :func:`~andrey.ges`. Its non-improving moves [1]_ let it leave a DAG
-    that no single move improves, where hill climbing stops, and it suits sparse graphs: on dense
-    ones it can still stop at a DAG that scores worse than the true one. It returns the CPDAG of
-    the best-scoring DAG visited. When unmeasured common causes are plausible, use
-    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`; with nonlinear effects, use :func:`~andrey.cam`.
+    variable depends linearly on its causes with Gaussian noise; categorical and mixed data take the
+    scores and defaults of :func:`~andrey.ges`. Its non-improving moves [1]_ let it leave a DAG that
+    no single move improves, where hill climbing stops, and it suits sparse graphs: on dense ones it
+    can still stop at a DAG that scores worse than the true one. It returns the CPDAG of the
+    best-scoring DAG visited. When unmeasured common causes are plausible, use :func:`~andrey.fci`;
+    when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`; with nonlinear effects, use :func:`~andrey.cam`. With ``env``, it
+    takes rows pooled from several environments, such as sites, batches, or experiments, whose
+    shifts change variables it does not know; :func:`~andrey.gies` takes the changed variables when
+    they are known, and :func:`~andrey.cdnod` runs PC with the same index.
 
     The search starts from the empty graph. Each step adds the current DAG to the tabu list, which
     keeps the last ``tabu_length`` DAGs visited, then takes the best improving move outside the
@@ -1675,6 +1813,17 @@ def tabu(
     median of 4.8 times as long as one start. On categorical data drawn from the ALARM network with
     1,000 rows, under BDeu, they lowered them from 23.8 to 13.0.
 
+    **Several environments.** With ``env``, the environment index joins the data as a last variable
+    that no move gives a parent: the background knowledge Joint Causal Inference gives a context
+    variable [7]_, and the index CD-NOD adds to PC [8]_. Pooling makes the environment a common
+    cause of the variables it shifts; with the index among the variables, the score explains two
+    variables the environments shift together without an edge between them. The edges at the index
+    of the DAG found are then directed out of it, and Meek's rules direct the edges that follow, so
+    the graph can direct edges that the CPDAG of the pooled rows leaves undirected. The index is
+    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
+    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
+    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -1698,7 +1847,13 @@ def tabu(
     the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its
     child exactly, so the search never selects one, nor any parent set that leaves its child a
     residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
-    run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
+    run it on small fixed categorical networks. With ``env``, Tabu search is experimental and not
+    benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two environments,
+    and on Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"``
+    reads a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
+    go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
+    a parent of each variable it points into. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
 
     References
@@ -1717,6 +1872,11 @@ def tabu(
     .. [6] Scutari, M., Graafland, C. E., and Gutierrez, J. M. (2019). Who learns better Bayesian
        network structures: accuracy and speed of structure learning algorithms. International
        Journal of Approximate Reasoning 115, 235-253. https://doi.org/10.1016/j.ijar.2019.10.003
+    .. [7] Mooij, J. M., Magliacane, S., and Claassen, T. (2020). Joint causal inference from
+       multiple contexts. JMLR 21(99), 1-108.
+    .. [8] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
+       Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
+       1-53.
 
     Examples
     --------
@@ -1730,33 +1890,26 @@ def tabu(
     """
     from andrey.search.tabu import tabu as _tabu
 
-    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="tabu")
-    max_tabu = tabu_cap(max_tabu, tabu_length)
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
-    changes = X.shape[1] if n_perturbations is None else n_perturbations
-    with copies_named(labels):
-        cpdag, score = _tabu(
-            X,
-            score_func=score_func,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            tabu_length=tabu_length,
-            max_tabu=max_tabu,
-            max_iter=max_iter,
-            max_parents=max_parents,
-            categorical=mask,
-            constraints=constraints,
-            n_starts=n_starts,
-            n_perturbations=changes,
-            seed=seed,
-        )
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
-    if n_starts > 1:
-        metadata["n_perturbations"] = changes
-    return structure_output(cpdag, labels=labels, metadata=metadata)
+    assert seed is not None  # method_spec picks the seed
+    return cpdag_search(
+        "tabu",
+        _tabu,
+        data,
+        env,
+        score_func=score_func,
+        categorical=categorical,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        tabu_length=tabu_length,
+        max_tabu=tabu_cap(max_tabu, tabu_length),
+        max_iter=max_iter,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        n_perturbations=n_perturbations,
+        seed=seed,
+    )
 
 
 @method_spec("exact_search")
