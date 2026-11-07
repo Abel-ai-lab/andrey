@@ -523,6 +523,73 @@ def split_index(
     return GraphStructure.from_numpy(marks[:column, :column].copy(), kind=structure.kind), edges
 
 
+def cpdag_search(
+    name: str,
+    engine: Callable[..., tuple[GraphStructure, float]],
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | None,
+    *,
+    score_func: str | None,
+    categorical: Sequence[str | int] | None,
+    knowledge: Knowledge | None,
+    **settings: object,
+) -> StructureOutput:
+    """Run the score search ``name``, whose ``engine`` returns a CPDAG and its score, on ``data``.
+
+    With ``env``, the environment index joins the data as a last column that no other column
+    causes (the engine's ``sources``), and leaves the result again: its edges, and the variables
+    they reach, go in ``metadata``. ``settings`` reach ``engine``. An ``n_perturbations`` of
+    ``None``, the default of ``hc`` and ``tabu``, becomes one change per data variable, which
+    ``metadata`` records when ``n_starts`` is above 1.
+    """
+    assert score_func is not None  # method_spec picks it from the column types
+    data, index = env_index(data, env, method=name)
+    X, mask, labels, constraints = fit_inputs(
+        data,
+        "score_func",
+        score_func,
+        categorical,
+        knowledge,
+        method=name,
+        # One environment adds no index column (index_column), so it is not a categorical one.
+        index_categorical=index is not None and np.ptp(index) > 0,
+    )
+    if "n_perturbations" in settings and settings["n_perturbations"] is None:
+        settings["n_perturbations"] = X.shape[1]  # one change per data variable
+    augmented, augmented_mask, augmented_constraints, column = index_column(
+        X, mask, constraints, index, "score_func", score_func
+    )
+    with copies_named(labels, index_namer(labels, column)):
+        cpdag, score = engine(
+            augmented,
+            score_func=score_func,
+            categorical=augmented_mask,
+            constraints=augmented_constraints,
+            sources=() if column is None else (column,),
+            **settings,
+        )
+    cpdag, index_edges = split_index(cpdag, column)
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    if "n_perturbations" in settings and settings["n_starts"] != 1:
+        metadata["n_perturbations"] = settings["n_perturbations"]
+    if env is not None:
+        variable = label_of(labels)
+        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
+        metadata["changing_variables"] = [variable(j) for j, _ in index_edges]
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def index_namer(labels: tuple[str, ...] | None, column: int | None) -> Callable[[int], str] | None:
+    """Name the columns of the data a search reads, for a copies error; ``None`` without ``column``.
+
+    The index ``column`` is ``env``, and the others are named by :func:`column_namer`.
+    """
+    if column is None:
+        return None
+    name = column_namer(labels)
+    return lambda j: "env" if j == column else name(j)
+
+
 def categories_as_numbers(
     data: npt.ArrayLike,
     setting: str,

@@ -91,6 +91,7 @@ def tabu(
     n_starts: int = 1,
     n_perturbations: int = 1,
     seed: int = 0,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over a linear-Gaussian, categorical, or mixed-data score.
 
@@ -142,11 +143,15 @@ def tabu(
         Random changes to the best DAG so far before each start after the first, at least ``1``.
     seed : int
         Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index, as for
+        :func:`~andrey.search.hc.hc`.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total score.
+        The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total score; with
+        ``sources``, the partially directed graph that also directs their edges.
     """
     if max_tabu is None:
         max_tabu = tabu_length
@@ -167,4 +172,5 @@ def tabu(
         n_starts=n_starts,
         n_perturbations=n_perturbations,
         seed=seed,
+        sources=sources,
     )
