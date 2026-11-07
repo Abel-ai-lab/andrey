@@ -1089,17 +1089,78 @@ def error_comparisons(methods: list[dict]) -> list[dict]:
     return out
 
 
+def settings_text(cells: list[tuple[dict, dict]]) -> str:
+    """Name settings, a comparison and row each, with one comparison's sizes together: "FCI
+    compared with causal-learn on <regime> at 50 and 100 variables"."""
+    sizes: dict[tuple[str, str, str, str], list[int]] = {}
+    for method, row in cells:
+        key = (method["method"], method["comparator"], method["regime"], method["unit"])
+        sizes.setdefault(key, []).append(row["d"])
+    return listed(
+        [
+            f"{name} compared with {comparator} on {REGIMES[regime]} at "
+            f"{listed([f'{d:,}' for d in dict.fromkeys(ds)])} {unit}"
+            for (name, comparator, regime, unit), ds in sizes.items()
+        ]
+    )
+
+
+def recorded_outcomes(summaries: list[dict]) -> tuple[dict[str, list], dict[str, list]]:
+    """The outcome the summaries record at each setting of the comparisons the charts cover
+    (:func:`claimed_comparisons`), as (comparison, row) pairs, in two groups.
+
+    The first holds the settings a release card judges (``card_verdict``), by verdict: "tie"
+    where the paired 95% interval of the difference in errors contains 0, "better", or "worse";
+    a setting the card did not judge is left out. The second holds the settings from summaries
+    that predate ``card_verdict``, by the two packages' error counts alone, as
+    :func:`error_comparisons` compares them: "same", "fewer", or "more". Past a time cap a
+    package has no graph to count.
+    """
+    judged: dict[str, list] = {"tie": [], "better": [], "worse": []}
+    counted: dict[str, list] = {"same": [], "fewer": [], "more": []}
+    for m in claimed_comparisons(summaries):
+        for r in m["rows"]:
+            ours, theirs = r["andrey_errors"], r["comparator_errors"]
+            if r["card_verdict"] in judged:
+                judged[r["card_verdict"]].append((m, r))
+            elif r["card_verdict"] == "unrecorded" and ours is not None and theirs is not None:
+                kind = "same" if abs(ours - theirs) < 1e-9 else "fewer" if ours < theirs else "more"
+                counted[kind].append((m, r))
+    return judged, counted
+
+
 def quality_intro(summaries: list[dict]) -> str:
-    """Say what an error is in each count the comparisons use, and that releases are tested
-    against true graphs (the quality gate, which every publish job needs)."""
+    """Say what an error is in each count the comparisons use, the outcome the summaries record
+    (:func:`recorded_outcomes`), naming every setting where Andrey makes more errors, and that
+    releases are tested against true graphs (the quality gate, which every publish job needs)."""
     kinds = dict.fromkeys(m["error_kind"] for m in claimed_comparisons(summaries))
     errors = ", or, ".join(ERRORS[kind][1] for kind in kinds)
-    return (
-        f"An error is {errors}. Andrey's graphs are as accurate as the reference packages' (the "
-        "other packages it is compared with) on the same data: the charts give both packages' "
-        "errors at each size, and every release is tested against the true graphs that generated "
-        "the data."
-    )
+    judged, counted = recorded_outcomes(summaries)
+
+    def outcome(cells: list) -> str:
+        return str(len(cells)) if cells else "none"
+
+    def named(cells: list) -> str:
+        return f": {settings_text(cells)}." if cells else "."
+
+    text = f"An error is {errors}. The charts give both packages' errors at each size."
+    if any(judged.values()):
+        text += (
+            f" Of the {sum(map(len, judged.values()))} settings in the charted comparisons that "
+            "a release card judges, Andrey ties the other package in "
+            f"{outcome(judged['tie'])}, where the paired 95% interval of the difference in errors "
+            f"contains 0, makes fewer errors in {outcome(judged['better'])}, and makes more in "
+            f"{outcome(judged['worse'])}" + named(judged["worse"])
+        )
+    if any(counted.values()):
+        text += (
+            f" Of the {sum(map(len, counted.values()))} settings in the charted comparisons "
+            "without a card's verdict, compared by their error counts alone, Andrey makes the "
+            f"same number of errors as the other package in {outcome(counted['same'])}, fewer "
+            f"in {outcome(counted['fewer'])}, and more in {outcome(counted['more'])}"
+            + named(counted["more"])
+        )
+    return text + " Every release is tested against the true graphs that generated the data."
 
 
 def accuracy_card(name: str, methods: list[dict]) -> str:

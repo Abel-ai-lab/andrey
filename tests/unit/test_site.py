@@ -1202,6 +1202,51 @@ def test_a_row_its_release_card_does_not_count_better_is_never_a_win():
     assert best["name"] not in judged(lambda i: "worse" if i == 0 else "better")
 
 
+def test_the_quality_intro_states_each_recorded_outcome_and_names_every_setting_with_more():
+    def cells(outcomes):
+        return {k: {(m["method"], r["d"]) for m, r in v} for k, v in outcomes.items()}
+
+    # Without card verdicts, each setting the charts show compares the two error counts. ICA-LiNGAM
+    # has no ratio, so no chart, and DirectLiNGAM's other package has no graph at 200 variables.
+    judged, counted = build.recorded_outcomes([SUMMARY])
+    assert not any(judged.values())
+    assert cells(counted) == {
+        "same": {("PC", 400), ("FCI", 20)},
+        "fewer": {("FCI", 50), ("FCI", 400), ("FCI", 800)},
+        "more": {("DirectLiNGAM", 100)},
+    }
+    intro = build.quality_intro([SUMMARY])
+    assert "DirectLiNGAM compared with lingam" in intro and "FCI compared" not in intro
+    assert "as accurate" not in intro.lower()
+
+    # Where a card judges, its verdict decides, not the counts; a setting it did not judge is
+    # left out.
+    verdict = {("PC", 400): "better", ("FCI", 50): "worse", ("FCI", 800): None}
+    summary = {
+        **SUMMARY,
+        "methods": [
+            {
+                **m,
+                "rows": [
+                    {**r, "card_verdict": verdict.get((m["method"], r["d"]), "tie")}
+                    for r in m["rows"]
+                ],
+            }
+            for m in SUMMARY["methods"]
+        ],
+    }
+    judged, counted = build.recorded_outcomes([summary])
+    assert not any(counted.values())
+    assert cells(judged) == {
+        "tie": {("FCI", 20), ("FCI", 400), ("DirectLiNGAM", 100), ("DirectLiNGAM", 200)},
+        "better": {("PC", 400)},
+        "worse": {("FCI", 50)},
+    }
+    intro = build.quality_intro([summary])
+    assert "FCI compared with causal-learn" in intro and "50 variables" in intro
+    assert "DirectLiNGAM" not in intro
+
+
 def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     # The claim is the largest cut in errors, the chart's first row, not a count of methods.
     fewer = build.fewest_errors(placeholder_summaries())
