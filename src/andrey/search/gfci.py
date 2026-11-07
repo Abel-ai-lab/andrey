@@ -11,7 +11,9 @@ endpoint's neighbors separates. An unshielded triple of the result is a collider
 the pattern, or, when the pattern shields it, when the separating set of its endpoints leaves out
 its middle node. GFCI then runs the possible-d-separation step of :mod:`andrey.constraint.fci`,
 which Algorithm 5 leaves out, and all three run its rules R1-R10, with its rule implementations,
-conditional-independence tests, and mark convention.
+conditional-independence tests, and mark convention. With ``edge_removal="triangles"``, the tests
+consider only the pattern's edges that lie in a triangle of the pattern, as Section 5 of Ogarrio,
+Spirtes, and Ramsey (2016) does.
 """
 
 from __future__ import annotations
@@ -49,6 +51,22 @@ from andrey.search.grasp import grasp
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
 
+#: The pattern edges the test phase may remove: every one, or those in a triangle of the pattern.
+EDGE_REMOVALS: tuple[str, ...] = ("all", "triangles")
+
+
+def check_edge_removal(edge_removal: str) -> None:
+    """Raise ``ValueError`` unless ``edge_removal`` is one of :data:`EDGE_REMOVALS`."""
+    if edge_removal not in EDGE_REMOVALS:
+        raise ValueError(f"edge_removal must be 'all' or 'triangles', got {edge_removal!r}")
+
+
+def outside_triangles(adjacent: np.ndarray) -> np.ndarray:
+    """The pairs the symmetric boolean ``adjacent`` joins that share no neighbor: its edges in no
+    triangle."""
+    joined = adjacent.astype(np.float64)
+    return adjacent & (joined @ joined == 0)
+
 
 def gfci(
     data: np.ndarray,
@@ -63,6 +81,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "order_free",
+    edge_removal: str = "all",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -77,8 +96,10 @@ def gfci(
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
-    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`~andrey.constraint.fci.fci_orient`).
+    ``edge_removal`` ``"triangles"`` lets the adjacency search and the possible-d-sep step test only
+    the GES CPDAG's edges that lie in a triangle of it (:func:`fci_from_pattern`); ``"all"`` tests
+    every edge. ``in_column_order`` applies the orientation rules one firing at a time in column
+    order instead of in order-free rounds (:func:`~andrey.constraint.fci.fci_orient`).
     ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
@@ -103,6 +124,7 @@ def gfci(
 
     check_collider_rule(collider_rule)
     validate_possible_dsep(possible_dsep)
+    check_edge_removal(edge_removal)
     cpdag_structure, _score = ges(
         X,
         score_func=score_func,
@@ -123,6 +145,7 @@ def gfci(
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=possible_dsep,
+        edge_removal=edge_removal,
         max_depth=max_depth,
         constraints=constraints,
         in_column_order=in_column_order,
@@ -147,6 +170,7 @@ def boss_fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
+    edge_removal: str = "all",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -160,12 +184,14 @@ def boss_fci(
 
     The score settings, ``seed``, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS
     search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`, whose
-    possible-d-separation step it leaves out (:func:`fci_from_pattern`). ``context``,
+    possible-d-separation step it leaves out (:func:`fci_from_pattern`), so ``edge_removal`` acts
+    on the adjacency search alone. ``context``,
     the column of an environment index, leads every BOSS order, and the test phase gives its edges
     the marks of Joint Causal Inference (:func:`fci_from_pattern`, with ``confounded_index``).
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
+    check_edge_removal(edge_removal)
     pattern, _score = boss(
         X,
         penalty_discount=penalty_discount,
@@ -187,6 +213,7 @@ def boss_fci(
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=None,
+        edge_removal=edge_removal,
         max_depth=max_depth,
         constraints=constraints,
         in_column_order=in_column_order,
@@ -212,6 +239,7 @@ def grasp_fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
+    edge_removal: str = "all",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -229,6 +257,7 @@ def grasp_fci(
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
+    check_edge_removal(edge_removal)
     pattern, _score = grasp(
         X,
         penalty_discount=penalty_discount,
@@ -251,6 +280,7 @@ def grasp_fci(
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=None,
+        edge_removal=edge_removal,
         max_depth=max_depth,
         constraints=constraints,
         in_column_order=in_column_order,
@@ -271,6 +301,7 @@ def fci_from_pattern(
     collider_rule: str,
     categorical: np.ndarray | None,
     possible_dsep: str | None,
+    edge_removal: str = "all",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool,
@@ -290,13 +321,25 @@ def fci_from_pattern(
     Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
     ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
 
+    ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
+    pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
+    does: neither the adjacency search nor the possible-d-separation step tests an edge in no
+    triangle (:func:`outside_triangles`), which stays and still conditions the tests of the other
+    pairs, as a required edge does. ``"all"`` tests every edge.
+
     ``context``, the column of an environment index, runs the test phase as
     :func:`~andrey.constraint.fci_jci.fci_jci` runs FCI's: before each collider pass, every edge
     of the index gets the marks of Joint Causal Inference
     (:func:`~andrey.constraint.fci_jci.mark_index`, with ``confounded_index``), and the rules leave
     out R5-R7, since JCI assumes no selection bias. The PAG still holds the index.
     """
+    check_edge_removal(edge_removal)
     pattern = from_structure(cpdag)
+    keep = knowledge_masks(constraints)[1]
+    untested = None
+    if edge_removal == "triangles":
+        untested = outside_triangles(pattern != NULL)
+        keep = untested if keep is None else keep | untested
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     skeleton, sepsets, _ = adjacency_search(
@@ -304,7 +347,7 @@ def fci_from_pattern(
         X.shape[1],
         alpha,
         support=pattern != NULL,
-        keep=knowledge_masks(constraints)[1],
+        keep=keep,
         max_depth=max_depth,
         workers=workers,
     )
@@ -333,6 +376,7 @@ def fci_from_pattern(
             seed=seed,
             max_depth=max_depth,
             constraints=constraints,
+            keep=untested,
         )
     if context is not None:
         mark_index(marks, context, confounded_index)
