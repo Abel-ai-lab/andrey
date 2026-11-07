@@ -22,6 +22,7 @@ from andrey.api._adapt import (
     column_namer,
     copies_named,
     data_kind,
+    env_index,
     fit_inputs,
     label_of,
     structure_output,
@@ -1099,14 +1100,14 @@ def cdnod(
         so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the order of the list
         can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
-        or the time step for data that drift over time, or the name of a column of the DataFrame
-        ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
-        numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
-        are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
-        number, not both. See Notes for more than two domains. When every row has the same value,
-        the data come from one domain, and the result equals :func:`~andrey.pc`'s. ``None``
-        needs ``data`` as each domain's rows apart.
+        The environment (domain) of each row of ``data``: one label per row, such as ``0`` and
+        ``1`` for two domains or the time step for data that drift over time, or the name of a
+        column of the DataFrame ``data`` that holds them. Numbers are coerced to ``float64`` and
+        read as numbers; whole numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or
+        ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted order, whatever the row
+        order; a label is a string or a finite number, not both. See Notes for more than two
+        domains. When every row has the same value, the data come from one domain, and the result
+        equals :func:`~andrey.pc`'s. ``None`` needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1370,16 +1371,14 @@ def cdnod(
     [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.core.environments import normalize_env_targets
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     if env is None:
         raise TypeError(
             "cdnod needs env, the environment of each row, or data as each environment's rows apart"
         )
-    data, codes, env_labels, _ = normalize_env_targets(
-        data, env, None, require_known_targets=False, method="cdnod"
-    )
+    data, c = env_index(data, env, method="cdnod")
+    assert c is not None  # env is not None
     assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask, labels, constraints = fit_inputs(
@@ -1392,9 +1391,6 @@ def cdnod(
         missing=True,
         index_categorical=True,
     )
-    # Numbers reach the search as given, such as a time step; text labels as their codes.
-    text = any(isinstance(label, str) for label in env_labels)
-    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     if dependence_threshold is not None and np.isnan(X).any():
@@ -1477,12 +1473,12 @@ def fci_jci(
         domain's number, so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the
         order of the list can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
-        or the name of a column of the DataFrame ``data`` that holds them. Numbers are coerced to
-        ``float64`` and read as numbers; whole numbers with ``"chisq"``, ``"gsq"``,
-        ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted
-        order, whatever the row order; a label is a string or a number, not both. When every row
-        has the same value, the data come from one domain, and the result equals
+        The environment (domain) of each row of ``data``: one label per row, such as ``0`` and
+        ``1`` for two domains, or the name of a column of the DataFrame ``data`` that holds them.
+        Numbers are coerced to ``float64`` and read as numbers; whole numbers with ``"chisq"``,
+        ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...``
+        in sorted order, whatever the row order; a label is a string or a finite number, not both.
+        When every row has the same value, the data come from one domain, and the result equals
         :func:`~andrey.fci`'s. ``None`` needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
@@ -1703,7 +1699,6 @@ def fci_jci(
     [[0, 'partially_directed']]
     """
     from andrey.constraint.fci_jci import fci_jci as _fci_jci
-    from andrey.core.environments import normalize_env_targets
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
     if env is None:
@@ -1711,9 +1706,8 @@ def fci_jci(
             "fci_jci needs env, the environment of each row, or data as each environment's rows "
             "apart"
         )
-    data, codes, env_labels, _ = normalize_env_targets(
-        data, env, None, require_known_targets=False, method="fci_jci"
-    )
+    data, c = env_index(data, env, method="fci_jci")
+    assert c is not None  # env is not None
     assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask, labels, constraints = fit_inputs(
@@ -1726,9 +1720,6 @@ def fci_jci(
         missing=True,
         index_categorical=True,
     )
-    # Numbers reach the search as given; text labels as their codes.
-    text = any(isinstance(label, str) for label in env_labels)
-    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     # The search appends the index as column d, so a copy of it is named as the index.
@@ -1794,13 +1785,12 @@ def icp(
         order, ``env`` stays ``None``, and ``targets``, when given, maps those labels to their
         variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. Every distinct label is one
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. Every distinct label is one
         environment, and at least two are needed. Which variables an environment changed, and how,
         does not matter, as long as it left the target's mechanism alone. ``None`` takes the
-        environments from ``data`` given as each environment's rows apart, or else from
-        ``targets`` given as a column or a 0/1 matrix: rows with the same targets are one
-        environment.
+        environments from ``data`` given as each environment's rows apart, or else from ``targets``
+        given as a column or a 0/1 matrix: rows with the same targets are one environment.
     target : str, int, or None
         Required. The variable whose parents to find: a column label (a string) or a 0-based
         position (an integer). ``None`` raises ``ValueError``.
@@ -1860,14 +1850,14 @@ def icp(
         and shift or, with more rows than columns, is a linear function of other columns, one
         message naming every group of copies; if ``data`` holds each environment's rows apart with
         ``env`` or with ``targets`` other than a mapping, or its tables differ in kind or columns,
-        or one has no rows; if ``env`` does not hold one label per row, misses a label, mixes
-        strings and numbers, or names a column ``data`` lacks; if ``targets`` names a variable or an
-        environment ``data`` or ``env`` lacks, or gives two rows of one environment different
-        targets; if fewer than two environments remain once those that intervened on ``target`` are
-        left out, as with one table and neither ``env`` nor ``targets``, or one has fewer than 3
-        rows; if a column is constant on the rows that remain; or if a regression has as many
-        coefficients as rows: under ``"exact"``, on the rows outside each environment, where a
-        variable constant there also raises.
+        or one has no rows; if ``env`` does not hold one label per row, misses a label or holds
+        ``inf``, mixes strings and numbers, or names a column ``data`` lacks; if ``targets`` names a
+        variable or an environment ``data`` or ``env`` lacks, or gives two rows of one environment
+        different targets; if fewer than two environments remain once those that intervened on
+        ``target`` are left out, as with one table and neither ``env`` nor ``targets``, or one has
+        fewer than 3 rows; if a column is constant on the rows that remain; or if a regression has
+        as many coefficients as rows: under ``"exact"``, on the rows outside each environment, where
+        a variable constant there also raises.
 
     Warns
     -----

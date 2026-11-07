@@ -621,21 +621,6 @@ def test_cdnod_on_a_latent_confounded_sample_is_invariant_to_column_order():
 # --- real data ------------------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="module")
-def sachs_conditions(tmp_path_factory):
-    """The Sachs cells of all nine conditions, log-transformed as Mooij et al. (2020) use them."""
-    import pandas as pd
-
-    from andrey.data import load_dataset
-    from tests.unit.conftest import serve_datasets_offline
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        serve_datasets_offline(monkeypatch, tmp_path_factory.mktemp("cache"))
-        pooled = load_dataset("sachs", conditions=True)
-    logged = pd.DataFrame(np.log(pooled.data.to_numpy()), columns=list(pooled.feature_names))
-    return logged, pooled.env, pooled.graph
-
-
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(sachs_conditions):
     """Pooled across the nine conditions, under half of PC's adjacencies are in the consensus

@@ -2,9 +2,9 @@
 
 Every accepted form of ``env`` and ``targets`` gives the same fit as the 0/1 intervention matrix
 it describes, each former form warns once and gives the same fit as its replacement, and every
-form that cannot say which variables an environment intervened on raises. Data given as each
-environment's rows apart fit, in every method that takes ``env``, what the table they stack into
-fits.
+form that cannot say which variables an environment intervened on raises. Every method that takes
+``env`` refuses a label that is not finite. Data given as each environment's rows apart fit, in
+every method that takes ``env``, what the table they stack into fits.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
 from andrey.resample import build_job
-from andrey.spec import get_spec
+from andrey.spec import REGISTRY, get_spec
 
 N = 900
 #: Each row's environment: observational rows, then rows that set x1, then rows that set x2.
@@ -260,6 +260,45 @@ def test_bootstrap_draws_cdnod_rows_within_domains_for_text():
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
 
 
+# --- every method that takes env -----------------------------------------------------------------
+
+#: What each method that takes ``env`` needs besides ``DATA`` and ``env``, where ``set x2``'s rows
+#: carry the label ``bad``: its targets, keyed by the labels, or ICP's target.
+ENV_SETTINGS = {
+    "cdnod": lambda bad: {},
+    "fci_jci": lambda bad: {},
+    "icp": lambda bad: {"target": "x2"},
+    "gies": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "gnies": lambda bad: {},
+    "igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "ut_igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: None}},
+    "boss": lambda bad: {},
+    "grasp": lambda bad: {},
+    "boss_fci": lambda bad: {},
+    "grasp_fci": lambda bad: {},
+}
+
+
+def test_every_method_that_takes_env_has_settings():
+    takes = {m for m, spec in REGISTRY.items() if any(i.name == "env" for i in spec.data.inputs)}
+    assert set(ENV_SETTINGS) == takes
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["inf", "-inf in a column"])
+@pytest.mark.parametrize("method", list(ENV_SETTINGS))
+def test_every_method_refuses_an_env_label_that_is_not_finite(method, bad):
+    """The label ``inf`` or ``-inf`` raises one ``ValueError`` before the fit, naming the method
+    and the first row that holds it, whether ``env`` holds the labels or names their column."""
+    env = np.select([ENV == "observed", ENV == "set x1"], [0.0, 1.0], bad)
+    data, env = (DATA, env) if bad > 0 else (DATA.assign(site=env), "site")
+    with (
+        warnings.catch_warnings(),
+        pytest.raises(ValueError, match=rf"^{method}: env contains {bad} at row 700; "),
+    ):
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        getattr(andrey, method)(data, env, **ENV_SETTINGS[method](bad))
+
+
 # --- data as each environment's rows apart -------------------------------------------------------
 
 #: The rows of ``DATA`` by environment; ``ENV`` holds its labels in this order, so the tables stack
@@ -334,6 +373,22 @@ APART_FITS = {
         lambda: andrey.cdnod(
             pd.DataFrame(X, columns=["x", "y"]), np.array(["a", "b", "c"])[DOMAIN.astype(int)]
         ),
+    ),
+    "boss, a mapping of DataFrames": (
+        lambda: andrey.boss(APART),
+        lambda: andrey.boss(DATA, ENV),
+    ),
+    "grasp, a list of arrays": (
+        lambda: andrey.grasp([t.to_numpy() for t in APART.values()]),
+        lambda: andrey.grasp(DATA.to_numpy(), POSITIONS),
+    ),
+    "boss_fci, a list of DataFrames": (
+        lambda: andrey.boss_fci(list(APART.values())),
+        lambda: andrey.boss_fci(DATA, POSITIONS),
+    ),
+    "grasp_fci, a mapping of DataFrames": (
+        lambda: andrey.grasp_fci(APART, confounded_index=False),
+        lambda: andrey.grasp_fci(DATA, ENV, confounded_index=False),
     ),
 }
 
@@ -520,11 +575,30 @@ def test_cli_needs_env(method, files, capsys):
     assert code == 0 and all(i["required"] for i in inputs)
 
 
-@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci", "boss", "grasp", "boss_fci", "grasp_fci"])
 def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
     argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
+
+
+@pytest.mark.parametrize("method", ["boss", "grasp", "boss_fci", "grasp_fci"])
+def test_cli_env_column_and_file_fit_alike_and_name_the_index_edges(method, files, capsys):
+    """``env`` is optional for the permutation searches: as a column of ``--data`` or a file it fits
+    the same graph, and the index's edges name the variables."""
+    fits = []
+    for argv in (
+        ["--data", str(files["data.csv"]), "--env", "e"],
+        ["--data", str(files["plain.csv"]), "--env", str(files["env.csv"])],
+    ):
+        code, out, _ = _run(["run", method, *argv, "--json"], capsys)
+        assert code == 0
+        fits.append(json.loads(out))
+    assert fits[0]["structure"] == fits[1]["structure"]
+    assert fits[0]["metadata"]["index_edges"] == fits[1]["metadata"]["index_edges"]
+    assert {variable for variable, _ in fits[0]["metadata"]["index_edges"]} <= {"x0", "x1", "x2"}
+    code, out, _ = _run(["run", method, "--data", str(files["plain.csv"]), "--json"], capsys)
+    assert code == 0 and "index_edges" not in json.loads(out)["metadata"]
 
 
 def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkeypatch):

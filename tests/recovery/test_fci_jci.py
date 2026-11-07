@@ -17,13 +17,12 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.constraint.fci_jci import fci_jci as fci_jci_engine
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, ci
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure
 from andrey.core.structure import LATENT, OBSERVED
-from andrey.data.latent import DSepOracle, marginal
+from andrey.data.latent import marginal
 from andrey.metrics import shd, skeleton_scores
+from tests.recovery.helpers.jci import oracle_fit, random_dag, sample_pooled
 
-_ORACLE = "dsep_oracle"
 _INDEX_MARK = {"directed": TAIL, "partially_directed": CIRCLE, "bidirected": ARROW}
 
 
@@ -34,46 +33,8 @@ def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # --- models ---------------------------------------------------------------------------------------
 #
-# Nodes 0..d-1 are the data variables, d is the domain index, and the hidden variables follow. The
-# index is a root that shifts a third of the data variables; each hidden variable causes two data
-# variables, and with ``confounded`` the first one also causes the index.
-
-
-def _random_dag(seed: int, d: int, n_latent: int, *, confounded: bool = False) -> nx.DiGraph:
-    rng = np.random.default_rng(seed)
-    dag = nx.DiGraph()
-    dag.add_nodes_from(range(d + 1 + n_latent))
-    order = rng.permutation(d)
-    for i in range(d):
-        for j in range(i + 1, d):
-            if rng.random() < 2.0 / (d - 1):
-                dag.add_edge(int(order[i]), int(order[j]))
-    for latent in range(d + 1, d + 1 + n_latent):
-        for child in rng.choice(d, 2, replace=False):
-            dag.add_edge(latent, int(child))
-    for target in rng.choice(d, max(1, d // 3), replace=False):
-        dag.add_edge(d, int(target))
-    if confounded:
-        dag.add_edge(d + 1, d)
-    return dag
-
-
-def _sample(dag: nx.DiGraph, d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    """Linear-Gaussian data from ``dag``, with the index two equal domains: (data, index)."""
-    rng = np.random.default_rng([seed, 1])
-    values = np.zeros((n, dag.number_of_nodes()))
-    for node in nx.topological_sort(dag):
-        if node == d:
-            values[:, d] = np.repeat([0.0, 1.0], n // 2)
-            continue
-        values[:, node] = rng.standard_normal(n)
-        for parent in dag.predecessors(node):
-            if parent == d:
-                weight = rng.uniform(1.0, 2.0) * rng.choice([-1.0, 1.0])
-                values[:, node] += weight * (values[:, d] - 0.5)
-            else:
-                values[:, node] += rng.uniform(0.5, 1.5) * rng.choice([-1, 1]) * values[:, parent]
-    return values[:, :d], values[:, d]
+# Nodes 0..d-1 are the data variables, d is the domain index, and the hidden variables follow, as in
+# tests/recovery/helpers/jci.py.
 
 
 def _true_graphs(dag: nx.DiGraph, d: int) -> tuple[np.ndarray, np.ndarray]:
@@ -85,17 +46,6 @@ def _true_graphs(dag: nx.DiGraph, d: int) -> tuple[np.ndarray, np.ndarray]:
     types = np.array([OBSERVED] * (d + 1) + [LATENT] * (n - d - 1), dtype=np.int8)
     truth = GraphStructure.from_numpy(M, kind="dag", node_types=types)
     return marginal(truth, "mag").to_numpy(), marginal(truth, "pag").to_numpy()
-
-
-def _oracle_fit(
-    dag: nx.DiGraph, d: int, monkeypatch: pytest.MonkeyPatch, **params
-) -> tuple[GraphStructure, list]:
-    """FCI-JCI over the graph's data variables and index, with d-separation in place of tests."""
-    monkeypatch.setitem(ci._CI_REGISTRY, _ORACLE, lambda _data: DSepOracle(dag))
-    placeholder = np.zeros((2, d))
-    return fci_jci_engine(
-        placeholder, np.array([0.0, 1.0]), indep_test=_ORACLE, possible_dsep="fast", **params
-    )
 
 
 def _with_index(pag: GraphStructure, index_edges: list) -> np.ndarray:
@@ -114,10 +64,10 @@ def _with_index(pag: GraphStructure, index_edges: list) -> np.ndarray:
 def test_oracle_orients_a_chain_from_its_shifted_root(monkeypatch):
     """index -> 0 -> 1 -> 2: R1 directs the chain, which FCI without the index leaves o-o."""
     dag = nx.DiGraph([(3, 0), (0, 1), (1, 2)])
-    pag, index_edges = _oracle_fit(dag, 3, monkeypatch)
+    pag, index_edges = oracle_fit(dag, 3, monkeypatch)
     assert pag.oriented_edges() == [(0, 1, "directed"), (1, 2, "directed")]
     assert index_edges == [(0, "partially_directed")]
-    _, randomized = _oracle_fit(dag, 3, monkeypatch, confounded_index=False)
+    _, randomized = oracle_fit(dag, 3, monkeypatch, confounded_index=False)
     assert randomized == [(0, "directed")]
 
 
@@ -125,7 +75,7 @@ def test_oracle_marks_a_hidden_common_cause_the_index_reveals(monkeypatch):
     """index -> A <- L -> B <- D with L hidden: A <-> B, which needs the index to tell apart."""
     a, b, dd, index, hidden = range(5)
     dag = nx.DiGraph([(index, a), (hidden, a), (hidden, b), (dd, b)])
-    pag, index_edges = _oracle_fit(dag, 3, monkeypatch)
+    pag, index_edges = oracle_fit(dag, 3, monkeypatch)
     assert pag.oriented_edges() == [(a, b, "bidirected"), (dd, b, "partially_directed")]
     assert index_edges == [(a, "partially_directed")]
 
@@ -133,7 +83,7 @@ def test_oracle_marks_a_hidden_common_cause_the_index_reveals(monkeypatch):
 def test_oracle_removes_the_edge_pooling_adds(monkeypatch):
     """The index shifts two variables that share no other cause: no edge between them."""
     dag = nx.DiGraph([(2, 0), (2, 1)])
-    pag, index_edges = _oracle_fit(dag, 2, monkeypatch)
+    pag, index_edges = oracle_fit(dag, 2, monkeypatch)
     assert pag.oriented_edges() == []
     assert index_edges == [(0, "partially_directed"), (1, "partially_directed")]
 
@@ -146,10 +96,10 @@ def test_oracle_marks_agree_with_the_true_ancestral_graph(seed, confounded, monk
     ``confounded_index=False`` runs only where its assumption holds: no hidden cause of the index.
     """
     d, n_latent = 5 + seed % 8, 1 + seed % 2
-    dag = _random_dag(seed, d, n_latent, confounded=confounded)
+    dag = random_dag(seed, d, n_latent, confounded=confounded)
     mag, plain = _true_graphs(dag, d)
     for confounded_index in (True,) if confounded else (True, False):
-        found = _with_index(*_oracle_fit(dag, d, monkeypatch, confounded_index=confounded_index))
+        found = _with_index(*oracle_fit(dag, d, monkeypatch, confounded_index=confounded_index))
         assert np.array_equal(found != NULL, mag != NULL)
         resolved = (found != NULL) & (found != CIRCLE)
         assert np.array_equal(found[resolved], mag[resolved])
@@ -181,7 +131,7 @@ def test_the_rules_without_selection_bias_leave_an_uncovered_circle_cycle():
 
 def _chain(seed: int = 0, n: int = 2000) -> tuple[np.ndarray, np.ndarray]:
     """index -> x0 -> x1 -> x2 from two domains."""
-    return _sample(nx.DiGraph([(3, 0), (0, 1), (1, 2)]), 3, n, seed)
+    return sample_pooled(nx.DiGraph([(3, 0), (0, 1), (1, 2)]), 3, n, seed)
 
 
 def test_fci_jci_orients_a_chain_from_a_domain_shift():
@@ -196,7 +146,7 @@ def test_fci_jci_orients_a_chain_from_a_domain_shift():
 
 
 def test_fci_jci_removes_the_edge_pooling_adds():
-    x, index = _sample(nx.DiGraph([(2, 0), (2, 1)]), 2, 2000, seed=1)
+    x, index = sample_pooled(nx.DiGraph([(2, 0), (2, 1)]), 2, 2000, seed=1)
     assert andrey.fci(x).structure.oriented_edges() != []
     out = andrey.fci_jci(x, index)
     assert out.structure.oriented_edges() == []
@@ -205,7 +155,7 @@ def test_fci_jci_removes_the_edge_pooling_adds():
 
 def test_fci_jci_marks_a_hidden_common_cause_the_index_reveals():
     dag = nx.DiGraph([(3, 0), (4, 0), (4, 1), (2, 1)])  # index -> A <- L -> B <- D, L hidden
-    x, index = _sample(dag, 3, 2000, seed=0)
+    x, index = sample_pooled(dag, 3, 2000, seed=0)
     assert andrey.fci(x).structure.oriented_edges() == [
         (0, 1, "partially_directed"),
         (2, 1, "partially_directed"),
@@ -289,7 +239,7 @@ def test_fci_jci_recovers_the_pag_in_the_papers_setting(seed, confounded_index):
     d = 10
     dag = _paper_dag(seed)
     x, index = _paper_sample(dag, d, 500, seed)
-    pag, index_edges = _oracle_fit(dag, d, pytest.MonkeyPatch(), confounded_index=confounded_index)
+    pag, index_edges = oracle_fit(dag, d, pytest.MonkeyPatch(), confounded_index=confounded_index)
     truth = GraphStructure.from_numpy(_with_index(pag, index_edges), kind="pag")
     out = andrey.fci_jci(x, index, alpha=0.01, confounded_index=confounded_index)
     marks = _with_index(out.structure, out.metadata["index_edges"])
@@ -303,7 +253,7 @@ def test_fci_jci_recovers_the_pag_in_the_papers_setting(seed, confounded_index):
 
 
 def _pooled(seed: int, d: int = 8) -> tuple[np.ndarray, np.ndarray]:
-    return _sample(_random_dag(seed, d, 1), d, 1200, seed)
+    return sample_pooled(random_dag(seed, d, 1), d, 1200, seed)
 
 
 @pytest.mark.parametrize("seed", range(3))
@@ -379,7 +329,7 @@ def test_fci_jci_names_the_index_edges_by_column():
         (np.zeros((2000, 2)), "one value per row"),
         (np.zeros(1999), "one value per row"),
         (np.r_[np.zeros(1999), np.nan], "NaN or None"),
-        (np.r_[np.zeros(1999), np.inf], "NaN or inf"),
+        (np.r_[np.zeros(1999), np.inf], "must be finite"),
     ],
 )
 def test_fci_jci_rejects_a_bad_index(index, message):

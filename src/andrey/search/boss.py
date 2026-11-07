@@ -18,7 +18,7 @@ import numpy.typing as npt
 
 from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.orient import dag2cpdag, orient_out_of, to_structure
 from andrey.core.score import MIXED_SCORES, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
 from andrey.core.seeding import start_rng
@@ -94,6 +94,18 @@ def precedence_sort(order: Sequence[int], before: np.ndarray) -> list[int]:
         k = next(k for k, v in enumerate(pending) if not before[pending, v].any())
         placed.append(pending.pop(k))
     return placed
+
+
+def sources_ahead(
+    sources: Sequence[int], n_features: int, before: np.ndarray | None = None
+) -> np.ndarray | None:
+    """The precedence ``before`` (``before[a, b]``: ``a`` precedes ``b``) with every variable of
+    ``sources`` ahead of every other one; ``before`` itself when there are no sources."""
+    if not sources:
+        return before
+    ahead = np.zeros((n_features, n_features), dtype=bool)
+    ahead[np.ix_(list(sources), [v for v in range(n_features) if v not in sources])] = True
+    return ahead if before is None else before | ahead
 
 
 def parent_knowledge(constraints: Constraints, v: int) -> tuple[list[int], list[int]]:
@@ -830,16 +842,20 @@ def permutation_search(
     max_parents: int | None,
     n_starts: int,
     seed: int,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Run ``n_starts`` permutation searches; return the best one's CPDAG and total score.
 
     Every start builds its own score, caches, and trees (:func:`_search_state`), and
     ``run_start(start, rng, gsts, before)`` returns its parent sets over the score's variables,
-    with ``rng`` from :func:`~andrey.core.seeding.start_rng`. A start's total score is the sum of
-    the full local scores of its parent sets, lower is better, and a later start replaces the best
-    one only when it scores lower by more than ``SCORE_EPS``. The best parent sets' DAG, mapped
-    back to the columns of ``data``, is returned as its CPDAG, narrowed by the knowledge. The other
-    arguments are those of :func:`boss`.
+    with ``rng`` from :func:`~andrey.core.seeding.start_rng`. ``before`` holds the knowledge's
+    precedence and puts ``sources``, columns of ``data``, ahead of every other variable
+    (:func:`sources_ahead`). A start's total score is the sum of the full local scores of its
+    parent sets, lower is better, and a later start replaces the best one only when it scores
+    lower by more than ``SCORE_EPS``. The best parent sets' DAG, mapped back to the columns of
+    ``data``, is returned as its CPDAG, with the edges at ``sources`` directed out of them
+    (:func:`~andrey.core.orient.orient_out_of`) and narrowed by the knowledge. The other arguments
+    are those of :func:`boss`.
     """
     X = np.asarray(data, dtype=np.float64)
     p = X.shape[1]
@@ -863,6 +879,7 @@ def permutation_search(
             constraints,
             max_parents,
         )
+        before = sources_ahead(sorted(int(ranks[column]) for column in sources), p, before)
         parents = run_start(start, start_rng(seed, start), gsts, before)
         total = 0.0
         for child in range(p):
@@ -878,6 +895,8 @@ def permutation_search(
         dag[parents[child], child] = True
 
     cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
+    if sources:
+        cpdag = orient_out_of(cpdag, sources)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total)
@@ -925,6 +944,7 @@ def boss(
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by best-order score search and return it with its total score.
 
@@ -968,11 +988,18 @@ def boss(
         :meth:`~andrey.core.knowledge.Constraints.precedence`, starting from the tie-rank order
         rearranged as little as possible. The CPDAG is then narrowed by the knowledge
         (:func:`~andrey.core.knowledge.mpdag`).
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: they lead every order, a
+        precedence each move keeps (:func:`sources_ahead`), and their edges are then directed out
+        of them, with Meek's rules orienting what follows
+        (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every variable
+        free.
 
     Returns
     -------
     GraphStructure
-        The learned CPDAG (``kind="cpdag"``).
+        The learned CPDAG (``kind="cpdag"``); with ``sources``, the partially directed graph that
+        also directs their edges.
     float
         The total score of the learned order's DAG -- the sum of each variable's local score
         given its traced parents (lower is better, matching :meth:`BICScore.score`).
@@ -1006,4 +1033,5 @@ def boss(
         max_parents=max_parents,
         n_starts=n_starts,
         seed=seed,
+        sources=sources,
     )
