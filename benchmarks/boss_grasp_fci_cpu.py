@@ -27,7 +27,10 @@ per dataset with no seed, in every cell at the cell's settings. causal-cmd 1.12.
 (:mod:`~andrey_bench.adapters.tetrad_pag`). At the paper's settings, P20 adds context arms:
 causal-cmd's GFCI and FCI and Andrey's ``gfci`` and ``fci``. At the paper's settings, P20, P100, and
 O1 add Andrey's ``grasp_fci`` at tuck depth 7, nearer Tetrad's GRaSP, which has no cap; a tuck depth
-of ``d`` runs past minutes at 200 rows, where ties between scores are many.
+of ``d`` runs past minutes at 200 rows, where ties between scores are many. In claim, Andrey's
+``boss_fci`` and ``grasp_fci`` also run with ``edge_removal="triangles"``, which tests only the
+CPDAG's edges that lie in a triangle of it, the rule of Ogarrio, Spirtes, and Ramsey (2016, Sec. 5)
+that causal-cmd 1.12.0 runs; those arms are paired with causal-cmd's as the option's reference.
 
 The truth is the PAG of the measured variables (``andrey.data.latent.marginal``); ``check-truth``
 compares it with pcalg's ``dag2pag`` on the DAG numbered in a topological order. Every estimate is
@@ -358,6 +361,11 @@ def andrey_fits(cell: Cell) -> list[dict]:
         }
 
     fits = [fit("boss_fci"), fit("grasp_fci")]
+    if cell.claim == "in":
+        fits += [
+            fit(a, f"{cell.setting}-triangles", edge_removal="triangles")
+            for a in ("boss_fci", "grasp_fci")
+        ]
     if cell.block == "P20" and cell.setting == "paper":
         fits += [fit("gfci"), fit("fci")]
     if cell.block in ("P20", "P100", "O1") and cell.setting == "paper":
@@ -765,7 +773,8 @@ def per_dataset(records: list[dict]) -> dict[tuple, dict]:
 
 
 #: Each comparison :func:`summarize` writes: Andrey's (algorithm, config suffix) against a
-#: (package, algorithm, config suffix), its comparator name, and its role.
+#: (package, algorithm, config suffix), its comparator name, and its role: ``gated``, ``context``,
+#: or ``option``, Andrey with ``edge_removal="triangles"`` against causal-cmd, which runs that rule.
 COMPARISONS = (
     (("boss_fci", ""), ("tetrad-7.6.10", "boss_fci", ""), "tetrad-lib-7.6.10.BossFci", "gated"),
     (("grasp_fci", ""), ("tetrad-7.6.10", "grasp_fci", ""), "tetrad-lib-7.6.10.GraspFci", "gated"),
@@ -778,6 +787,18 @@ COMPARISONS = (
     ),
     (("gfci", ""), ("tetrad-7.6.3", "gfci", ""), "tetrad-cmd-1.12.0.gfci", "context"),
     (("fci", ""), ("tetrad-7.6.3", "fci", ""), "tetrad-cmd-1.12.0.fci", "context"),
+    (
+        ("boss_fci", "-triangles"),
+        ("tetrad-7.6.3", "boss_fci", ""),
+        "tetrad-cmd-1.12.0.bfci",
+        "option",
+    ),
+    (
+        ("grasp_fci", "-triangles"),
+        ("tetrad-7.6.3", "grasp_fci", ""),
+        "tetrad-cmd-1.12.0.grasp-fci",
+        "option",
+    ),
 )
 
 
@@ -800,9 +821,10 @@ def summarize(records: list[dict], truths: list[dict]) -> dict:
             if not mine or not theirs:
                 continue
             entry = entries.setdefault(
-                (cell.regime, algorithm, comparator),
+                (cell.regime, algorithm, mine_suffix, comparator),
                 {
                     "method": algorithm,
+                    "config": cell.setting + mine_suffix,
                     "comparator": comparator,
                     "role": role,
                     "regime": cell.regime,
