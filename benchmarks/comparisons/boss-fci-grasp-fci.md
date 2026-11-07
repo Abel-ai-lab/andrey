@@ -127,9 +127,10 @@ finished within its cap.
 
 Means over the 20 datasets of each cell, seeds 0 to 19, of the endpoint SHD against the PAG of the
 measured variables; 7.6.10's SHD on a dataset is the mean of its five runs. D is Andrey's SHD minus
-7.6.10's, with its 95% interval, and the verdict is the one on seeds 0 to 19.
+7.6.10's, with its 95% interval, and the verdict is the one on seeds 0 to 19. Each cell flagged for
+either hybrid was rerun with both on seeds 100 to 119.
 
-| Settings | Measured | Degree | Hidden | n | Empty | BOSS-FCI | 7.6.10 | D [95%] | | GRaSP-FCI | 7.6.10 | D [95%] | |
+| Settings | Measured | Degree | Hidden | n | Empty | BOSS-FCI | 7.6.10 | D [95%] | Verdict | GRaSP-FCI | 7.6.10 | D [95%] | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | paper's | 20 | 2 | 0 | 200 | 40 | 19 | 18.82 | +0.18 [-0.82, +1.21] | tie | 19.45 | 19.22 | +0.23 [-1.41, +1.85] | tie |
 | paper's | 20 | 2 | 0 | 500 | 40 | 13.85 | 13.53 | +0.32 [-0.2, +0.97] | tie | 13.1 | 13.73 | -0.63 [-1.61, +0.14] | tie |
