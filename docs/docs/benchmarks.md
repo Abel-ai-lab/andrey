@@ -17,40 +17,71 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.14.0
+:link: benchmarks/0.15.0
 :link-type: doc
-:link-alt: The 0.14.0 release card: interventional data
-:class-card: release-cover release-art release-art-0-14-0
+:link-alt: The 0.15.0 release card: multi-domain data
+:class-card: release-cover release-art release-art-0-15-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Interventional data
+Multi-domain data
 
-0.14.0
+0.15.0
 :::
 
 ::::{div} release-tldr
 
-0.14.0 is here: interventional data. The card measures the methods it makes supported against
-their authors' code: GnIES and UT-IGSP, which learn the targets of experiments they are not told,
-IGSP, ICP, CAM-UV, and DYNOTEARS.
+0.15.0 is here: multi-domain data. The card measures the methods it makes supported against their
+authors' code: FCI-JCI, which learns from data pooled from several environments, against pcalg,
+and BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes.
 
 :::{div} release-stats
 
-- **6 methods** newly supported: GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS
-- **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
-- **34x** GnIES's median speed over the authors' gnies package
+- **3 methods** newly supported: FCI-JCI, BOSS-FCI, and GRaSP-FCI
+- **0 of 158** comparisons where pcalg or Tetrad 7.6.10 makes significantly fewer errors
+- **72x to 79x** FCI-JCI's median speed over pcalg at 10 variables
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.14.0.md)
+[Read the release card](benchmarks/0.15.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.14.0
+:link-type: doc
+:link-alt: The 0.14.0 release card: interventional data
+:class-card: release-tile release-art-0-14-0
+:shadow: none
+:margin: 0
+
+0.14.0
+:::
+
+:::{div} release-body
+<h3>Interventional data</h3>
+
+GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS against their authors' code; GnIES and UT-IGSP
+learn the targets of experiments they are not told.
+
+- **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
+- GnIES **34x** faster than the authors' gnies package in the median
+:::
+
+:::{div} release-meta
+Released November 5, 2026
+
+- [Release card<span class="visually-hidden"> 0.14.0</span>](benchmarks/0.14.0.md)
+- [Post: Interventional data](../blog/20261105-andrey-0-14-0.md)
+:::
+::::
 
 ::::{div} release-row
 

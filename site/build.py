@@ -66,6 +66,7 @@ RELEASES = (
     "0.12.0",
     "0.13.0",
     "0.14.0",
+    "0.15.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -396,6 +397,42 @@ REGIMES = {
     "hidden",
     "camuv_paper": "nonlinear data from the CAM-UV paper's simulation, with hidden common causes "
     "and hidden intermediates",
+    "fci_jci_s4": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 500 rows each",
+    "fci_jci_s4p": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a perfect intervention, 500 rows each",
+    "fci_jci_l10": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 500 rows each",
+    "fci_jci_x100": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 100 rows each",
+    "fci_jci_s4m": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and two mechanism changes as one environment, outside the method's claim",
+    "fci_jci_l10m": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and ten mechanism changes as one environment, outside the method's claim",
+    "fci_jci_l10n100": "linear-Gaussian data with hidden confounders from the JCI paper's "
+    "simulation, observation and a mechanism change, 100 rows each, outside the method's claim",
+    "fci_jci_l10n2000": "linear-Gaussian data with hidden confounders from the JCI paper's "
+    "simulation, observation and a mechanism change, 2,000 rows each, outside the method's claim",
+    "bgf_p20_deg2_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with no hidden variables",
+    "bgf_p20_deg2_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with up to 4 hidden confounders",
+    "bgf_p20_deg2_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with up to 8 hidden confounders",
+    "bgf_p20_deg4_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with no hidden variables",
+    "bgf_p20_deg4_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with up to 4 hidden confounders",
+    "bgf_p20_deg4_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with up to 8 hidden confounders",
+    "bgf_p20_deg6_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with no hidden variables",
+    "bgf_p20_deg6_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with up to 4 hidden confounders",
+    "bgf_p20_deg6_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with up to 8 hidden confounders",
+    "bgf_o3_deg4_l4": "linear-Gaussian data from Erdos-Renyi graphs at mean degree 4 with 4 of 24 "
+    "variables hidden, standardized, outside the method's claim",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -449,7 +486,8 @@ NOT_COUNTED = {"earlier-build", "second-machine timing"}
 # bound.
 NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # Lanes the homepage omits: settings swept around a method's default, which its release card
-# reports. IGSP at other levels and starts, and UT-IGSP at its paper's level.
+# reports. IGSP at other levels and starts, UT-IGSP and FCI-JCI at their papers' levels, and
+# BOSS-FCI and GRaSP-FCI at their paper's penalty and level.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -457,12 +495,23 @@ NOT_SHOWN_LANES = {
     "igsp.alpha_1e-4_starts_5",
     "igsp.alpha_1e-4_starts_10",
     "ut_igsp.paper_level",
+    "fci_jci.alpha_0.01",
+    "boss_grasp_fci.paper",
 }
-# Packages the homepage omits: a reference patched to follow its paper where the package does
-# not, which the release card reports beside the package itself.
-NOT_SHOWN_COMPARATORS = {"graphical-model-learning 0.1a8, patched to Definition 4.2"}
+# Packages the homepage omits, each reported on its release card beside the default comparison: a
+# reference patched to follow its paper where the package does not; pcalg under the JCI
+# assumptions that match FCI-JCI's non-default confounded_index=False; an earlier Tetrad release,
+# 7.6.3 in causal-cmd 1.12.0, measured as context; and Tetrad 7.6.3 against the
+# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI.
+NOT_SHOWN_COMPARATORS = {
+    "graphical-model-learning 0.1a8, patched to Definition 4.2",
+    'pcalg 2.7-12, jci = "123"',
+    "causal-cmd 1.12.0 bfci (tetrad-lib 7.6.3)",
+    "causal-cmd 1.12.0 grasp-fci (tetrad-lib 7.6.3)",
+    "Tetrad 7.6.3",
+}
 # The summary lanes that measure each graph size at several sample sizes.
-GRID_LANES = {"nonlinear"}
+GRID_LANES = {"nonlinear", "boss_grasp_fci"}
 # A method's line uses its shortest-named comparison by default. These settings override that
 # choice: BOSS and GRaSP with the BDeu score on categorical data, as measured in 0.8.0, each shown
 # under the method's name.
