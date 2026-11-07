@@ -1099,34 +1099,33 @@ def settings_text(cells: list[tuple[dict, dict]]) -> str:
     return listed(
         [
             f"{name} compared with {comparator} on {REGIMES[regime]} at "
-            f"{listed([f'{d:,}' for d in ds])} {unit}"
+            f"{listed([f'{d:,}' for d in dict.fromkeys(ds)])} {unit}"
             for (name, comparator, regime, unit), ds in sizes.items()
         ]
     )
 
 
 def recorded_outcomes(summaries: list[dict]) -> tuple[dict[str, list], dict[str, list]]:
-    """The outcome the summaries record at each setting the charts show, as (comparison, row)
-    pairs, in two groups.
+    """The outcome the summaries record at each setting of the comparisons the charts cover
+    (:func:`claimed_comparisons`), as (comparison, row) pairs, in two groups.
 
     The first holds the settings a release card judges (``card_verdict``), by verdict: "tie"
     where the paired 95% interval of the difference in errors contains 0, "better", or "worse";
     a setting the card did not judge is left out. The second holds the settings from summaries
     that predate ``card_verdict``, by the two packages' error counts alone, as
-    :func:`error_comparisons` compares them: "same", "fewer", or "more".
+    :func:`error_comparisons` compares them: "same", "fewer", or "more". Past a time cap a
+    package has no graph to count.
     """
-    found = claimed_comparisons(summaries)
     judged: dict[str, list] = {"tie": [], "better": [], "worse": []}
-    for m in found:
+    counted: dict[str, list] = {"same": [], "fewer": [], "more": []}
+    for m in claimed_comparisons(summaries):
         for r in m["rows"]:
+            ours, theirs = r["andrey_errors"], r["comparator_errors"]
             if r["card_verdict"] in judged:
                 judged[r["card_verdict"]].append((m, r))
-    counted: dict[str, list] = {"same": [], "fewer": [], "more": []}
-    unrecorded = [
-        {**m, "rows": [r for r in m["rows"] if r["card_verdict"] == "unrecorded"]} for m in found
-    ]
-    for c in error_comparisons(unrecorded):
-        counted[c["kind"]].append((c["method"], c["row"]))
+            elif r["card_verdict"] == "unrecorded" and ours is not None and theirs is not None:
+                kind = "same" if abs(ours - theirs) < 1e-9 else "fewer" if ours < theirs else "more"
+                counted[kind].append((m, r))
     return judged, counted
 
 
@@ -1147,18 +1146,19 @@ def quality_intro(summaries: list[dict]) -> str:
     text = f"An error is {errors}. The charts give both packages' errors at each size."
     if any(judged.values()):
         text += (
-            f" Of the {sum(map(len, judged.values()))} settings in the charts that a release "
-            f"card judges, Andrey ties the other package in {outcome(judged['tie'])}, where the "
-            "paired 95% interval of the difference in errors contains 0, makes fewer errors in "
-            f"{outcome(judged['better'])}, and makes more in {outcome(judged['worse'])}"
-            + named(judged["worse"])
+            f" Of the {sum(map(len, judged.values()))} settings in the charted comparisons that "
+            "a release card judges, Andrey ties the other package in "
+            f"{outcome(judged['tie'])}, where the paired 95% interval of the difference in errors "
+            f"contains 0, makes fewer errors in {outcome(judged['better'])}, and makes more in "
+            f"{outcome(judged['worse'])}" + named(judged["worse"])
         )
     if any(counted.values()):
         text += (
-            f" Of the {sum(map(len, counted.values()))} settings in the charts compared by their "
-            "error counts alone, Andrey makes the same number of errors as the other package in "
-            f"{outcome(counted['same'])}, fewer in {outcome(counted['fewer'])}, and more in "
-            f"{outcome(counted['more'])}" + named(counted["more"])
+            f" Of the {sum(map(len, counted.values()))} settings in the charted comparisons "
+            "without a card's verdict, compared by their error counts alone, Andrey makes the "
+            f"same number of errors as the other package in {outcome(counted['same'])}, fewer "
+            f"in {outcome(counted['fewer'])}, and more in {outcome(counted['more'])}"
+            + named(counted["more"])
         )
     return text + " Every release is tested against the true graphs that generated the data."
 
