@@ -1489,7 +1489,7 @@ for _name, _summary, _own, _refs in (
                 + _ENV_PAG_DOC,
             ),
             accel="numpy",
-            status="experimental",
+            status="supported",
             column_order="relabels",
             tie_break=True,
             order_note=(

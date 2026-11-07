@@ -36,8 +36,6 @@ from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 from tests.unit.conftest import serve_datasets_offline
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 HYBRIDS = ("boss_fci", "grasp_fci")
 FIT = {
     "boss_fci": lambda x, **params: andrey.boss_fci(x, **params),
