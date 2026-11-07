@@ -10,6 +10,8 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-07
+
 ### Highlights
 
 - `fci_jci` is supported and joins the quality gate. Against pcalg 2.7-12's FCI-JCI, the authors'
@@ -94,7 +96,9 @@ names its pull request.
 - `gfci`, `boss_fci`, and `grasp_fci` take `edge_removal="triangles"`, which tests for removal only
   the edges of the score search's CPDAG that lie in a triangle of it, as Section 5 of the GFCI
   paper does (Ogarrio, Spirtes, and Ramsey 2016), while the default, `"all"`, tests every edge, as
-  before. ([#774])
+  before. With `"triangles"`, `boss_fci` and `grasp_fci` follow the same rule as Tetrad 7.6.3, and
+  against it on the BOSS-FCI paper's simulation, at the paper's settings and at Andrey's defaults,
+  they tie in 72 and 71 of 73 settings and are better in the rest, with none worse. ([#774], [#781])
 - `notears`, `dagma`, and `dynotears` take `standardize=True`, as `calm` does, which scales each
   column to unit variance before the fit, so that the fit does not read the columns' units.
   ([#738])
@@ -1753,7 +1757,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
@@ -1985,3 +1990,4 @@ First alpha release.
 [#771]: https://github.com/Abel-ai-lab/andrey/pull/771
 [#774]: https://github.com/Abel-ai-lab/andrey/pull/774
 [#775]: https://github.com/Abel-ai-lab/andrey/pull/775
+[#781]: https://github.com/Abel-ai-lab/andrey/pull/781

@@ -18,16 +18,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.14.0
+## ⭐ What's new in 0.15.0
 
-Interventional data: rows from experiments, where a variable was changed from outside. Where
-observation leaves the direction of an edge open, an experiment on either end can settle it. IGSP
-learns graphs from experiments with known targets, GnIES and UT-IGSP from experiments whose targets
-they are not told, and ICP finds the causes of one variable, all as accurately as their authors'
-code. CAM-UV and DYNOTEARS are supported too.
+Multi-domain data: rows pooled from several environments, such as sites, batches, or the conditions
+of an experiment, that share one causal structure and differ in some mechanisms. With each row's
+environment as one more variable, a method can tell a dependence that a shift creates from an edge,
+and the shifts can direct edges that one environment leaves undirected. FCI-JCI learns from these
+data while allowing hidden common causes, and BOSS-FCI and GRaSP-FCI allow them too, all as
+accurately as their authors' code and faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
+BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
 
-**[Read the post](https://andrey.abel.ai/blog/20261105-andrey-0-14-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.14.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261107-andrey-0-15-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html)**
 
 ---
 
@@ -187,7 +189,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.14.0},
+  version = {0.15.0},
   url = {https://andrey.abel.ai},
 }
 ```
