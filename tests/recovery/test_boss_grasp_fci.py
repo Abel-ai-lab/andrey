@@ -7,7 +7,8 @@ comes from simulated linear-Gaussian data with hidden variables at the paper's s
 simulated on the published ASIA network with one node hidden, and from the Sachs measurements
 against their consensus network. Mixed data, determinism, column-order invariance, the recorded
 outputs, and input validation complete them. ``edge_removal="triangles"``, which the hybrids share
-with GFCI, has its own fixed case, decided by the oracle, and column-order check.
+with GFCI, has its own fixed case, decided by the oracle, and column-order checks, the second with
+an environment index and a required edge.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from itertools import combinations
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import pytest
 
 import andrey
@@ -181,7 +183,7 @@ def test_only_gfci_removes_a_pair_by_possible_dsep(monkeypatch):
     assert engines.gfci(x, indep_test="dsep_oracle") == truth
 
 
-def test_the_possible_dsep_step_never_tests_a_kept_pair(monkeypatch):
+def test_the_possible_dsep_step_never_removes_a_kept_pair(monkeypatch):
     """On the case above, GFCI's possible-d-separation step removes 4 - 5, unless ``keep`` marks the
     pair, as ``edge_removal="triangles"`` marks the CPDAG's edges in no triangle."""
     dag = nx.DiGraph(_PDSEP_DAG)
@@ -280,7 +282,8 @@ def test_triangles_keeps_a_false_edge_in_no_triangle(name, monkeypatch):
 @pytest.mark.parametrize("name", ["gfci", *HYBRIDS])
 def test_triangles_is_invariant_to_column_order(name):
     """The triangles come from the CPDAG, so reordering the columns reorders the nodes and changes
-    nothing else; on this input the option changes each method's PAG."""
+    nothing else, GFCI at its default ``possible_dsep``; on this input the option changes each
+    method's PAG."""
     x = data.sample_scm(d=12, n=600, seed=3, density=3.0, latents=1).data
     fit = getattr(andrey, name)
     marks = fit(x, edge_removal="triangles").structure.to_numpy()
@@ -290,6 +293,33 @@ def test_triangles_is_invariant_to_column_order(name):
         back = np.argsort(order)
         permuted = fit(x[:, order], edge_removal="triangles").structure.to_numpy()
         assert np.array_equal(permuted[np.ix_(back, back)], marks)
+
+
+@pytest.mark.parametrize("name", ["gfci", *HYBRIDS])
+def test_triangles_with_an_environment_index_and_a_required_edge(name):
+    """Two environments, the second shifting two variables, and ``v0 -> v1`` required: the option
+    changes each method's PAG, which keeps the required edge, and reordering the columns reorders
+    the nodes and changes nothing else."""
+    x = np.array(data.sample_scm(d=12, n=600, seed=3, density=3.0, latents=1).data, dtype=float)
+    env = np.repeat([0, 1], len(x) // 2)
+    x[env == 1, 2] += 1.5
+    x[env == 1, 5] *= 1.6
+    labels = [f"v{j}" for j in range(x.shape[1])]
+    table = pd.DataFrame(x, columns=labels)
+    knowledge = andrey.Knowledge(required=[("v0", "v1")])
+
+    def marks(columns, **params):
+        found = getattr(andrey, name)(table[columns], env=env, knowledge=knowledge, **params)
+        names = found.structure.labels
+        return pd.DataFrame(found.structure.to_numpy(), names, names).loc[labels, labels]
+
+    every = marks(labels)
+    triangles = marks(labels, edge_removal="triangles")
+    assert not triangles.equals(every)
+    assert triangles.loc["v0", "v1"] == TAIL and triangles.loc["v1", "v0"] == ARROW
+    for seed in range(3):
+        order = [labels[j] for j in np.random.default_rng(seed).permutation(len(labels))]
+        assert marks(order, edge_removal="triangles").equals(triangles)
 
 
 # --- ground truth ---------------------------------------------------------------------------------

@@ -1496,7 +1496,7 @@ def boss_fci(
         edge, and ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a
         neighbor in it, as Section 5 of GFCI's paper [2]_ does. An edge in no triangle then stays in
         the PAG and still conditions the tests of the other pairs. The triangles come from the
-        CPDAG, so the result does not depend on the column order. See Notes.
+        CPDAG, so the option adds no dependence on the column order. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1624,10 +1624,11 @@ def boss_fci(
     remove more true ones, and hurts at the defaults on sparse graphs, where the BOSS phase adds
     more false edges. On simulated data at the authors' sizes [1]_ (see When to use), it lowered the
     mean endpoint errors (SHD against the true PAG) with their ``penalty_discount=2.0`` and
-    ``alpha=0.01`` at every mean degree and size, from 637 to 580 at 100 variables. At the defaults,
-    it raised them with mean degree 2, from 20.9 to 23.7 at 20 variables, where it kept 3.2 false
-    edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119. The default
-    ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+    ``alpha=0.01`` at every mean degree and size, from 637 to 580 at 100 variables (with
+    ``max_depth=7``). At the defaults, it raised them with mean degree 2, from 20.9 to 23.7 at 20
+    variables, where it kept 3.2 false edges per graph against 1.8, and lowered them with mean
+    degree 6, from 121 to 119. It did not shorten the fit in these runs: the median fit times differ
+    by at most 0.01 s. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
 
     **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
     the environment index joins the data as a last variable that leads every BOSS order, and before
@@ -1820,7 +1821,7 @@ def grasp_fci(
         edge, and ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a
         neighbor in it, as Section 5 of GFCI's paper [2]_ does. An edge in no triangle then stays in
         the PAG and still conditions the tests of the other pairs. The triangles come from the
-        CPDAG, so the result does not depend on the column order. See Notes.
+        CPDAG, so the option adds no dependence on the column order. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1936,10 +1937,11 @@ def grasp_fci(
     tests remove more true ones, and hurts at the defaults on sparse graphs, where the GRaSP phase
     adds more false edges. On simulated data at the authors' sizes [1]_ (see When to use), it
     lowered the mean endpoint errors (SHD against the true PAG) with their ``penalty_discount=2.0``
-    and ``alpha=0.01`` at every mean degree and size, from 639 to 586 at 100 variables. At the
-    defaults, it raised them with mean degree 2, from 21.1 to 23.4 at 20 variables, where it kept
-    2.8 false edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119. The
-    default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+    and ``alpha=0.01`` at every mean degree and size, from 639 to 586 at 100 variables (with
+    ``max_depth=7``). At the defaults, it raised them with mean degree 2, from 21.1 to 23.4 at 20
+    variables, where it kept 2.8 false edges per graph against 1.8, and lowered them with mean
+    degree 6, from 121 to 119. It did not shorten the fit in these runs: the median fit times differ
+    by at most 0.01 s. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
 
     **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
     the environment index joins the data as a last variable that leads every GRaSP order, and before

@@ -922,8 +922,8 @@ def gfci(
         ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a neighbor in
         it, as Section 5 of [1]_ does, in the adjacency search and the possible-d-separation step.
         An edge in no triangle then stays in the PAG and still conditions the tests of the other
-        pairs. The triangles come from the CPDAG, so the result does not depend on the column order.
-        See Notes.
+        pairs. The triangles come from the CPDAG, so the option adds no dependence on the column
+        order. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
@@ -1065,10 +1065,11 @@ def gfci(
     causes, 20 measured variables with 0 to 8 hidden ones, mean degree 2 to 6, and 200 to 5,000
     rows, and 100 measured variables with 10 hidden ones, mean degree 6, and 1,000 rows, it lowered
     the mean endpoint errors (SHD against the true PAG) with ``penalty_discount=2.0`` and
-    ``alpha=0.01`` at every mean degree and size, from 649 to 604 at 100 variables. At the
-    defaults, it raised them with mean degree 2, from 21.4 to 24.7 at 20 variables, where it kept
-    3.3 false edges per graph against 1.9, and with mean degree 4, from 64.8 to 65.9. The default
-    ``"all"`` tests every edge.
+    ``alpha=0.01`` at every mean degree and size, from 649 to 604 at 100 variables (with
+    ``max_depth=7``). At the defaults, it raised them with mean degree 2, from 21.4 to 24.7 at 20
+    variables, where it kept 3.3 false edges per graph against 1.9, and with mean degree 4, from
+    64.8 to 65.9. It did not shorten the fit in these runs: the median fit times differ by at most
+    0.04 s. The default ``"all"`` tests every edge.
 
     **Choosing the penalty.** The GES phase scores a variable with the linear-Gaussian BIC, which
     charges ``penalty_discount * log(n_samples)`` per parent, plus the extended-BIC term ``2 *

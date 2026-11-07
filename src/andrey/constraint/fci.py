@@ -493,11 +493,12 @@ def _remove_by_possible_dsep(
     conditioning subset outside either endpoint's adjacency, of at most ``max_depth`` members when
     one is given; the first subset found removes the pair at once, so each removal changes the sets
     of the pairs after it, and is stored under the endpoint order returned by ``_edge_order``. A
-    pair marked in the boolean ``keep`` (the required edges, both ways) is never tested. The pairs,
-    their endpoints, and the nodes of each set are visited in column order. ``by_rank``, when given,
-    is the column order of ``test``'s data, as :func:`_test_in_rank_order` returns them: the step
-    then runs on the nodes in that order, with ``keep`` permuted the same way, and maps its removals
-    and separating sets back to the column labels once.
+    pair marked in the boolean ``keep`` (the required edges and, under GFCI's
+    ``edge_removal="triangles"``, the edges in no triangle of its CPDAG; both ways) is never tested.
+    The pairs, their endpoints, and the nodes of each set are visited in column order. ``by_rank``,
+    when given, is the column order of ``test``'s data, as :func:`_test_in_rank_order` returns them:
+    the step then runs on the nodes in that order, with ``keep`` permuted the same way, and maps its
+    removals and separating sets back to the column labels once.
     """
     if by_rank is None:
         _remove_in_node_order(marks, test, alpha, sepsets, keep, max_depth)
