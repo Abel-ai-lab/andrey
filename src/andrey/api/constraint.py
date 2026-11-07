@@ -846,9 +846,9 @@ def gfci(
         so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
         can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. The environment index then joins the
-        search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
@@ -988,8 +988,8 @@ def gfci(
         and says to keep one column per group. Also if a given ``max_parents`` is below the parents
         some graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
         column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
-        ``env`` does not hold one label per row, misses a label, or mixes strings and numbers, or,
-        with a categorical or mixed-data setting, holds a number that is not whole.
+        ``env`` does not hold one label per row, misses a label or is infinite, or mixes strings and
+        numbers, or, with a categorical or mixed-data setting, holds a number that is not whole.
 
     Warns
     -----
@@ -1204,14 +1204,14 @@ def cdnod(
         so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the order of the list
         can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
-        or the time step for data that drift over time, or the name of a column of the DataFrame
-        ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
-        numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
-        are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
-        number, not both. See Notes for more than two domains. When every row has the same value,
-        the data come from one domain, and the result equals :func:`~andrey.pc`'s. ``None``
-        needs ``data`` as each domain's rows apart.
+        The environment (domain) of each row of ``data``: one label per row, such as ``0`` and
+        ``1`` for two domains or the time step for data that drift over time, or the name of a
+        column of the DataFrame ``data`` that holds them. Numbers are coerced to ``float64`` and
+        read as numbers; whole numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or
+        ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted order, whatever the row
+        order; a label is a string or a finite number, not both. See Notes for more than two
+        domains. When every row has the same value, the data come from one domain, and the result
+        equals :func:`~andrey.pc`'s. ``None`` needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1577,12 +1577,12 @@ def fci_jci(
         domain's number, so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the
         order of the list can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
-        or the name of a column of the DataFrame ``data`` that holds them. Numbers are coerced to
-        ``float64`` and read as numbers; whole numbers with ``"chisq"``, ``"gsq"``,
-        ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...`` in sorted
-        order, whatever the row order; a label is a string or a number, not both. When every row
-        has the same value, the data come from one domain, and the result equals
+        The environment (domain) of each row of ``data``: one label per row, such as ``0`` and
+        ``1`` for two domains, or the name of a column of the DataFrame ``data`` that holds them.
+        Numbers are coerced to ``float64`` and read as numbers; whole numbers with ``"chisq"``,
+        ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels are coded ``0, 1, ...``
+        in sorted order, whatever the row order; a label is a string or a finite number, not both.
+        When every row has the same value, the data come from one domain, and the result equals
         :func:`~andrey.fci`'s. ``None`` needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
@@ -1890,13 +1890,12 @@ def icp(
         order, ``env`` stays ``None``, and ``targets``, when given, maps those labels to their
         variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. Every distinct label is one
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. Every distinct label is one
         environment, and at least two are needed. Which variables an environment changed, and how,
         does not matter, as long as it left the target's mechanism alone. ``None`` takes the
-        environments from ``data`` given as each environment's rows apart, or else from
-        ``targets`` given as a column or a 0/1 matrix: rows with the same targets are one
-        environment.
+        environments from ``data`` given as each environment's rows apart, or else from ``targets``
+        given as a column or a 0/1 matrix: rows with the same targets are one environment.
     target : str, int, or None
         Required. The variable whose parents to find: a column label (a string) or a 0-based
         position (an integer). ``None`` raises ``ValueError``.
@@ -1956,14 +1955,14 @@ def icp(
         and shift or, with more rows than columns, is a linear function of other columns, one
         message naming every group of copies; if ``data`` holds each environment's rows apart with
         ``env`` or with ``targets`` other than a mapping, or its tables differ in kind or columns,
-        or one has no rows; if ``env`` does not hold one label per row, misses a label, mixes
-        strings and numbers, or names a column ``data`` lacks; if ``targets`` names a variable or an
-        environment ``data`` or ``env`` lacks, or gives two rows of one environment different
-        targets; if fewer than two environments remain once those that intervened on ``target`` are
-        left out, as with one table and neither ``env`` nor ``targets``, or one has fewer than 3
-        rows; if a column is constant on the rows that remain; or if a regression has as many
-        coefficients as rows: under ``"exact"``, on the rows outside each environment, where a
-        variable constant there also raises.
+        or one has no rows; if ``env`` does not hold one label per row, misses a label or holds
+        ``inf``, mixes strings and numbers, or names a column ``data`` lacks; if ``targets`` names a
+        variable or an environment ``data`` or ``env`` lacks, or gives two rows of one environment
+        different targets; if fewer than two environments remain once those that intervened on
+        ``target`` are left out, as with one table and neither ``env`` nor ``targets``, or one has
+        fewer than 3 rows; if a column is constant on the rows that remain; or if a regression has
+        as many coefficients as rows: under ``"exact"``, on the rows outside each environment, where
+        a variable constant there also raises.
 
     Warns
     -----

@@ -24,9 +24,21 @@ list of datasets and returns one result per dataset. The first argument of every
 `andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
 dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
-`env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
-then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`,
-`igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
+% concept: env
+`boss`, `boss_fci`, `cdnod`, `fci_jci`, `ges`, `gfci`, `gies`, `gnies`, `grasp`, `grasp_fci`, `hc`,
+`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, with one meaning: one label
+per row, text or finite numbers, or the name of a column of a DataFrame `data`, which is then not a
+variable, or, with `env` left out, the data given as one table per environment (see below).
+`andrey run` reads it from `--env`, a column of `--data` or a file. A label that is missing or
+infinite raises a `ValueError`. The methods read `env` in one of two ways. `gies`, `gnies`, `igsp`,
+and `ut_igsp` read it as interventions: each distinct label is one environment, which changes the
+mechanisms of its targets, known or learned, and leaves the others as they are. `icp` reads it as
+interventions on any variables, as long as they leave the mechanism of its `target` alone. `cdnod`,
+`fci_jci`, `boss`, `grasp`, `ges`, `hc`, `tabu`, `boss_fci`, `grasp_fci`, and `gfci` read it as a
+context variable that no data variable causes, the environment index, which joins the search as one
+more variable; a numeric label, such as a time step, stays a number.
+
+`gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
 variables, by name or position, with `[]` for an observational environment; as the name of a column
 whose cells give each row's variables, from whose distinct values `env` follows when you leave it
 out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a

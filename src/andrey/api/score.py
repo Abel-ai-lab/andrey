@@ -77,9 +77,9 @@ def ges(
         so with ``"bic"`` and three or more environments, the order of the list can change the
         result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. The environment index then joins the
-        search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
@@ -176,8 +176,8 @@ def ges(
         than columns, is a linear function of other columns. One message names every group of copies
         and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
         or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold
-        one label per row, misses a label, or mixes strings and numbers, or, with a categorical or
-        mixed-data score, holds a number that is not whole.
+        one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -429,9 +429,9 @@ def gies(
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``: its distinct values, or none, for observational data.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the environments
+        from ``targets``: its distinct values, or none, for observational data.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, named by column label or 0-based position.
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
@@ -535,11 +535,11 @@ def gies(
         one column per group. Also if a given ``max_parents`` is below the parents some graph of the
         required edges of ``knowledge`` gives a node, or if ``knowledge`` names a column ``data``
         lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` comes
-        without ``targets``; if ``env`` does not hold one label per row, misses a label, or mixes
-        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label ``env``
-        lacks, or leaves an environment's targets unknown; if a column or an array of ``targets``
-        gives two rows of one environment different targets; if ``targets`` names a variable
-        ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks.
+        without ``targets``; if ``env`` does not hold one label per row, misses a label or holds
+        ``inf``, or mixes strings and numbers; if a ``targets`` mapping comes without ``env``, names
+        a label ``env`` lacks, or leaves an environment's targets unknown; if a column or an array
+        of ``targets`` gives two rows of one environment different targets; if ``targets`` names a
+        variable ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks.
 
     Warns
     -----
@@ -749,12 +749,12 @@ def gnies(
         order, ``env`` stays ``None``, and ``targets``, when given, maps
         those labels to their known variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
-        environments, each with at least two rows, and at least as many rows as variables once
-        each environment's mean is taken out: ``n_samples - n_environments >= n_variables``. One of
-        them may be observational, but none has to be. ``None`` takes the environments from
-        ``targets``, as a column or a 0/1 matrix.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
+        environments, each with at least two rows, and at least as many rows as variables once each
+        environment's mean is taken out: ``n_samples - n_environments >= n_variables``. One of them
+        may be observational, but none has to be. ``None`` takes the environments from ``targets``,
+        as a column or a 0/1 matrix.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables known to be intervened on, by column label or 0-based position. ``None``,
         the setting GnIES is built for, leaves every environment's targets unknown, and the search
@@ -826,16 +826,16 @@ def gnies(
         of other columns, within the environments (one message names every group of copies and says
         to keep one column per group). Also if ``data`` holds each environment's rows apart with
         ``env`` or with ``targets`` other than a mapping, or its tables differ in kind or columns,
-        or one has no rows; if ``env`` does not hold one label per row, misses a label, or mixes
-        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label ``env``
-        lacks, or names one label by two keys; if a column or an array of ``targets`` gives two rows
-        of one environment different targets, or an array does not have ``data``'s shape or holds a
-        value other than 0 or 1; if ``targets`` names a variable ``data`` lacks; or if ``env`` or
-        ``targets`` names a column ``data`` lacks. Also if a given ``max_parents`` is below the
-        parents some graph of the required edges of ``knowledge`` gives a node; if the required
-        edges give a known target more parents than the smallest environment's rows minus 2; or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        or one has no rows; if ``env`` does not hold one label per row, misses a label or holds
+        ``inf``, or mixes strings and numbers; if a ``targets`` mapping comes without ``env``, names
+        a label ``env`` lacks, or names one label by two keys; if a column or an array of
+        ``targets`` gives two rows of one environment different targets, or an array does not have
+        ``data``'s shape or holds a value other than 0 or 1; if ``targets`` names a variable
+        ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
+        a node; if the required edges give a known target more parents than the smallest
+        environment's rows minus 2; or if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1308,9 +1308,9 @@ def hc(
         so with ``"bic"`` and three or more environments, the order of the list can change the
         result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. The environment index then joins the
-        search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
@@ -1420,8 +1420,8 @@ def hc(
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
         contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a mixed-data score,
         requires an edge from a continuous into a categorical column. Also if ``env`` does not hold
-        one label per row, misses a label, or mixes strings and numbers, or, with a categorical or
-        mixed-data score, holds a number that is not whole.
+        one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -1630,9 +1630,9 @@ def tabu(
         so with ``"bic"`` and three or more environments, the order of the list can change the
         result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. The environment index then joins the
-        search as a variable that no data variable causes; see Notes. Numbers are coerced to
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
@@ -1747,8 +1747,8 @@ def tabu(
         One message names every group of copies and says to keep one column per group. Also if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
-        label, or mixes strings and numbers, or, with a categorical or mixed-data score, holds a
-        number that is not whole.
+        label or is infinite, or mixes strings and numbers, or, with a categorical or mixed-data
+        score, holds a number that is not whole.
 
     Warns
     -----

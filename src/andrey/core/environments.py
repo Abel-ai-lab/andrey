@@ -62,9 +62,9 @@ def normalize_env_targets(
         each environment's rows apart, labeled by position or key (:func:`pool_environments`),
         with ``env`` ``None`` and ``targets`` a mapping from those labels or ``None``.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None
-        Each row's environment: a label per row, strings or numbers but not both, or the name of a
-        column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``.
+        Each row's environment: a label per row, strings or finite numbers but not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
+        environments from ``targets``.
     targets : mapping, str, array-like, or None
         The variables intervened on in each environment, by column label or 0-based position:
 
@@ -113,14 +113,14 @@ def normalize_env_targets(
     Raises
     ------
     ValueError
-        If ``data`` holds each environment apart and :func:`pool_environments` raises; if
-        ``env`` does not hold one label per row, misses a label (``None`` or ``NaN``), holds a
+        If ``data`` holds each environment apart and :func:`pool_environments` raises; if ``env``
+        does not hold one label per row, misses a label (``None`` or ``NaN``), holds ``inf`` or a
         label that is neither a string nor a number, or mixes strings and numbers; if ``env`` or
         ``targets`` names a column ``data`` lacks, or both name one column; if a mapping comes
         without ``env``, has a key that names no label of ``env``, or has two keys that name one
-        label, such as ``1`` and ``"1"``; if a cell or a mapping names a
-        variable ``data`` lacks, or a value that is neither a label nor a position; if a matrix is
-        not ``(n_samples, n_variables)`` or holds a value other than 0 or 1; if two rows of one
+        label, such as ``1`` and ``"1"``; if a cell or a mapping names a variable ``data`` lacks, or
+        a value that is neither a label nor a position; if a matrix is not
+        ``(n_samples, n_variables)`` or holds a value other than 0 or 1; if two rows of one
         environment give different targets; or, with ``require_known_targets``, if some
         environment's targets are unknown.
 
@@ -316,13 +316,15 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
 
     The codes are ``0..K-1`` for the ``K`` distinct labels in sorted order, text or numbers alike,
     so they do not depend on the row order. Raises ``ValueError`` when ``env`` does not hold one
-    label per row, as shape ``(n,)`` or ``(n, 1)``, when a label is missing (``None`` or ``NaN``),
-    when a label is neither a string nor a number, or when ``env`` mixes strings and numbers.
+    label per row, as shape ``(n,)`` or ``(n, 1)``, when a label is missing (``None`` or ``NaN``)
+    or infinite, when a label is neither a string nor a number, or when ``env`` mixes strings and
+    numbers.
     """
     import pandas as pd
 
     if isinstance(env, np.ndarray) and env.shape in ((n,), (n, 1)) and env.dtype.kind in "iuU":
-        # Integer or text labels: none can be missing or of the other kind, so no row is checked.
+        # Integer or text labels: none can be missing, infinite, or of the other kind, so no row is
+        # checked.
         codes, labels = pd.factorize(np.asarray(env).reshape(-1), sort=True)
         return codes.astype(np.intp), labels.tolist()
     prefix = f"{method}: " if method else ""
@@ -337,6 +339,14 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
     if missing:
         raise ValueError(
             f"{prefix}env contains NaN or None at row {missing[0]}; every row needs a label"
+        )
+    infinite = [
+        i for i, v in enumerate(values) if isinstance(v, (float, np.floating)) and math.isinf(v)
+    ]
+    if infinite:
+        raise ValueError(
+            f"{prefix}env contains {float(values[infinite[0]])} at row {infinite[0]}; a numeric "
+            "label must be finite"
         )
     kinds = {isinstance(v, str) for v in values}
     if not all(isinstance(v, str) or _is_number(v) for v in values):

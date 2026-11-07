@@ -1016,6 +1016,86 @@ _CONCEPTS = (
         suitable=ALL_METHODS,
     ),
     Concept(
+        key="env",
+        summary="Each row's environment, one input with one meaning: one label per row, text or "
+        "finite numbers, or the name of a column of a DataFrame data, which is then not a "
+        "variable; or, with env left out, data given as one table per environment, labeled by "
+        "position or key. A method reads it one of two ways: as interventions, each distinct "
+        "label one environment that changes the mechanisms of its targets, known or learned "
+        "(gies, gnies, igsp, ut_igsp), or of any variables as long as it leaves the target's "
+        "mechanism alone (icp); or as a context variable that no data variable causes, the "
+        "environment index, which joins the search as one more variable (cdnod, fci_jci, ges, "
+        "hc, tabu, boss, grasp, gfci, boss_fci, grasp_fci).",
+        fragment="one label per row",
+        suitable=(
+            "cdnod",
+            "fci_jci",
+            "ges",
+            "hc",
+            "tabu",
+            "boss",
+            "grasp",
+            "gfci",
+            "boss_fci",
+            "grasp_fci",
+            "icp",
+            "gies",
+            "gnies",
+            "igsp",
+            "ut_igsp",
+        ),
+        exempt=(
+            *_exempt(
+                "cdnod is PC with env, the environment index tested as a context variable "
+                "(Huang et al. 2020).",
+                "pc",
+            ),
+            *_exempt(
+                "fci_jci is FCI with env, the environment index added as a context variable "
+                "(Mooij, Magliacane, and Claassen 2020).",
+                "fci",
+            ),
+            *_exempt(
+                "Not taken yet: env suits it as a context variable that no data variable causes, "
+                "which its knowledge could hold as forbidden edges into the index, but it does not "
+                "read env.",
+                *("xges", "exact_search", "mmhc", "rsmax2"),
+            ),
+            *_exempt(
+                "Takes a list of datasets, one per group or per time point, in place of a label "
+                "per row.",
+                *("multi_group_direct_lingam", "longitudinal_lingam"),
+            ),
+            *_exempt(
+                "A time-series method: its rows are the steps of a series, read in order through "
+                "its lags, and it takes no context variable here.",
+                *PCMCI_FAMILY,
+                *("granger", "varma_lingam", "dynotears"),
+            ),
+            *_exempt(
+                "Continuous optimization of a least-squares or Gaussian likelihood loss, which "
+                "reads every column as a continuous variable; an environment label is not one.",
+                *CONTINUOUS,
+                "calm",
+            ),
+            *_exempt(
+                "A Markov-blanket search, with no place for a context variable; cdnod is the "
+                "test-based search that takes env.",
+                *("iamb", "inter_iamb", "mmpc"),
+            ),
+            *_exempt(
+                "Its model reads the noise of continuous variables, which an environment label "
+                "does not have; multi_group_direct_lingam takes one dataset per environment.",
+                *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
+            ),
+            *_exempt(
+                "Its regressions fit smooth functions of continuous causes, which an environment "
+                "label is not.",
+                *("cam", "resit", "camuv", "anm", "pnl"),
+            ),
+        ),
+    ),
+    Concept(
         key="confounded_index",
         summary="With an environment index, whether a hidden variable may cause both the index and "
         "a data variable (FCI-JCI1, the default), or the index is set from outside, as in a "
