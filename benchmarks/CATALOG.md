@@ -83,6 +83,9 @@ presents, with the median errors and fit times from the runs behind the file.
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.15.0 | [Multi-domain data](../docs/docs/benchmarks/0.15.0.md) | [`published/0.15.0/summary.json`](published/0.15.0/summary.json) |
+| 0.14.0 | [Interventional data](../docs/docs/benchmarks/0.14.0.md) | [`published/0.14.0/summary.json`](published/0.14.0/summary.json) |
+| 0.13.0 | [Functional causal models](../docs/docs/benchmarks/0.13.0.md) | [`published/0.13.0/summary.json`](published/0.13.0/summary.json) |
 | 0.12.0 | [Calibration](../docs/docs/benchmarks/0.12.0.md) | [`published/0.12.0/summary.json`](published/0.12.0/summary.json) |
 | 0.11.0 | [Ready for real data](../docs/docs/benchmarks/0.11.0.md) | [`published/0.11.0/summary.json`](published/0.11.0/summary.json) |
 | 0.10.0 | [The boundary](../docs/docs/benchmarks/0.10.0.md) | [`published/0.10.0/summary.json`](published/0.10.0/summary.json) |
