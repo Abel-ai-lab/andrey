@@ -18,10 +18,10 @@ whose Reproduce table lists the driver.
 | [XGES](comparisons/xges.md) | `xges_cpu.py` | XGES, with and without the extended search; GES | xges | 0.3.0, 0.9.0 |
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
-| [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
-| [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | |
-| [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
-| [IGSP](comparisons/igsp.md) | `igsp_cpu.py`, `igsp_cases.py` | IGSP; GIES, GRaSP, and UT-IGSP as context | graphical-model-learning (IGSP, and a copy patched to Definition 4.2; UT-IGSP as context) | |
+| [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | 0.14.0 |
+| [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | 0.14.0 |
+| [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | 0.14.0 |
+| [IGSP](comparisons/igsp.md) | `igsp_cpu.py`, `igsp_cases.py` | IGSP; GIES, GRaSP, and UT-IGSP as context | graphical-model-learning (IGSP, and a copy patched to Definition 4.2; UT-IGSP as context) | 0.14.0 |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
 | BOSS and GRaSP | `boss_grasp_cpu.py`, `boss_grasp_reach.py` | BOSS, GRaSP | causal-learn | 0.1.0, 0.9.0 |
@@ -32,7 +32,7 @@ whose Reproduce table lists the driver.
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI, each also with `edge_removal="triangles"`; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | 0.15.0 |
 | [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
-| [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
+| [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | 0.14.0 |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
@@ -45,7 +45,7 @@ whose Reproduce table lists the driver.
 | [PCMCI+ and LPCMCI](comparisons/pcmciplus-lpcmci.md) | `pcmci_cpu.py` | PCMCI+, LPCMCI | tigramite | 0.5.0, 0.9.0 |
 | [Granger causality](comparisons/granger.md) | `granger_var.py` | Granger | causal-learn | 0.5.0, 0.9.0 |
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
-| [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | |
+| [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | 0.14.0 |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |

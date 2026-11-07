@@ -40,7 +40,7 @@ and BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes.
 :::{div} release-stats
 
 - **3 methods** newly supported: FCI-JCI, BOSS-FCI, and GRaSP-FCI
-- **0 of 158** comparisons where the authors' code makes significantly fewer errors
+- **0 of 158** comparisons where pcalg or Tetrad 7.6.10 makes significantly fewer errors
 - **72x to 79x** FCI-JCI's median speed over pcalg at 10 variables
 :::
 
