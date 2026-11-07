@@ -5,16 +5,16 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
-from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import column_labels, relabel
+from andrey.core.structure import EDGE_TYPES, column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
@@ -447,6 +447,80 @@ def fit_inputs(
     )
     labels = column_labels(data)
     return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
+
+
+def env_index(
+    data: Any, env: npt.ArrayLike | None, *, method: str
+) -> tuple[Any, np.ndarray | None]:
+    """Return ``data`` and the environment index a search reads from ``env``.
+
+    ``env`` is checked as :func:`~andrey.core.environments.normalize_env_targets` checks it, which
+    also returns ``data`` without a column ``env`` names. Text labels become their codes ``0, 1,
+    ...`` in sorted order; numbers, such as a time step, stay as given, coerced to ``float64``.
+    ``None`` gives ``data`` and ``None``.
+    """
+    if env is None:
+        return data, None
+    from andrey.core.environments import normalize_env_targets
+
+    data, codes, labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method=method
+    )
+    text = any(isinstance(label, str) for label in labels)
+    return data, codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
+
+
+def index_column(
+    X: np.ndarray,
+    mask: np.ndarray | None,
+    constraints: Constraints | None,
+    index: np.ndarray | None,
+    option: str,
+    value: str,
+) -> tuple[np.ndarray, np.ndarray | None, Constraints | None, int | None]:
+    """Append the environment ``index`` to ``X`` as a last column, for the setting ``option=value``.
+
+    Returns the data, their categorical-column mask, the knowledge over their columns, and the
+    index's column. A categorical or mixed-data setting reads the index as categories, so it must
+    hold whole numbers (:func:`check_categories`, which raises ``ValueError``), and a mask marks it
+    categorical. The knowledge leaves the index unconstrained
+    (:meth:`~andrey.core.knowledge.Constraints.padded`). ``None``, or an index with one value, one
+    environment and nothing to condition on, gives ``X``, ``mask``, and ``constraints`` and no
+    column.
+    """
+    if index is None:
+        return X, mask, constraints, None
+    if data_kind(value) != "continuous":
+        check_categories(index, None, f"{option}={value!r}", name="env")
+    if np.ptp(index) == 0:
+        return X, mask, constraints, None
+    d = X.shape[1]
+    return (
+        np.column_stack([X, index]),
+        None if mask is None else np.append(mask, True),
+        None if constraints is None else constraints.padded(d + 1),
+        d,
+    )
+
+
+def split_index(
+    structure: GraphStructure, column: int | None
+) -> tuple[GraphStructure, list[tuple[int, str]]]:
+    """Drop the index ``column``, the last one, from ``structure``; return the rest and its edges.
+
+    Each edge is ``(variable, kind)``, in column order, with the kind of the edge read from the
+    index (:data:`~andrey.core.structure.EDGE_TYPES`): ``"directed"`` for ``index -> variable``,
+    ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+    ``index <-> variable``. ``None`` gives ``structure`` and no edges.
+    """
+    if column is None:
+        return structure, []
+    marks = structure.to_numpy()
+    edges = [
+        (int(j), EDGE_TYPES[(int(marks[column, j]), int(marks[j, column]))][0])
+        for j in np.flatnonzero(marks[column] != NULL)
+    ]
+    return GraphStructure.from_numpy(marks[:column, :column].copy(), kind=structure.kind), edges
 
 
 def categories_as_numbers(

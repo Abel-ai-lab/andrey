@@ -272,6 +272,10 @@ ENV_SETTINGS = {
     "gnies": lambda bad: {},
     "igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
     "ut_igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: None}},
+    "boss": lambda bad: {},
+    "grasp": lambda bad: {},
+    "boss_fci": lambda bad: {},
+    "grasp_fci": lambda bad: {},
 }
 
 
@@ -369,6 +373,22 @@ APART_FITS = {
         lambda: andrey.cdnod(
             pd.DataFrame(X, columns=["x", "y"]), np.array(["a", "b", "c"])[DOMAIN.astype(int)]
         ),
+    ),
+    "boss, a mapping of DataFrames": (
+        lambda: andrey.boss(APART),
+        lambda: andrey.boss(DATA, ENV),
+    ),
+    "grasp, a list of arrays": (
+        lambda: andrey.grasp([t.to_numpy() for t in APART.values()]),
+        lambda: andrey.grasp(DATA.to_numpy(), POSITIONS),
+    ),
+    "boss_fci, a list of DataFrames": (
+        lambda: andrey.boss_fci(list(APART.values())),
+        lambda: andrey.boss_fci(DATA, POSITIONS),
+    ),
+    "grasp_fci, a mapping of DataFrames": (
+        lambda: andrey.grasp_fci(APART, confounded_index=False),
+        lambda: andrey.grasp_fci(DATA, ENV, confounded_index=False),
     ),
 }
 
@@ -555,11 +575,30 @@ def test_cli_needs_env(method, files, capsys):
     assert code == 0 and all(i["required"] for i in inputs)
 
 
-@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci", "boss", "grasp", "boss_fci", "grasp_fci"])
 def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
     argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
+
+
+@pytest.mark.parametrize("method", ["boss", "grasp", "boss_fci", "grasp_fci"])
+def test_cli_env_column_and_file_fit_alike_and_name_the_index_edges(method, files, capsys):
+    """``env`` is optional for the permutation searches: as a column of ``--data`` or a file it fits
+    the same graph, and the index's edges name the variables."""
+    fits = []
+    for argv in (
+        ["--data", str(files["data.csv"]), "--env", "e"],
+        ["--data", str(files["plain.csv"]), "--env", str(files["env.csv"])],
+    ):
+        code, out, _ = _run(["run", method, *argv, "--json"], capsys)
+        assert code == 0
+        fits.append(json.loads(out))
+    assert fits[0]["structure"] == fits[1]["structure"]
+    assert fits[0]["metadata"]["index_edges"] == fits[1]["metadata"]["index_edges"]
+    assert {variable for variable, _ in fits[0]["metadata"]["index_edges"]} <= {"x0", "x1", "x2"}
+    code, out, _ = _run(["run", method, "--data", str(files["plain.csv"]), "--json"], capsys)
+    assert code == 0 and "index_edges" not in json.loads(out)["metadata"]
 
 
 def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkeypatch):

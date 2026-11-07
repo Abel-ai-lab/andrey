@@ -35,6 +35,7 @@ from andrey.constraint.fci import (
     possible_dsep_step,
     validate_possible_dsep,
 )
+from andrey.constraint.fci_jci import mark_index
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
@@ -142,12 +143,16 @@ def boss_fci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with BOSS adjacency and FCI orientation.
 
     The score settings, ``seed``, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS
-    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`.
+    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`. ``context``,
+    the column of an environment index, leads every BOSS order, and the test phase gives its edges
+    the marks of Joint Causal Inference (:func:`fci_from_pattern`, with ``confounded_index``).
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
@@ -163,6 +168,7 @@ def boss_fci(
         max_parents=max_parents,
         categorical=categorical,
         constraints=constraints,
+        sources=() if context is None else (context,),
     )
     return fci_from_pattern(
         X,
@@ -177,6 +183,8 @@ def boss_fci(
         in_column_order=in_column_order,
         workers=backend.worker_count(workers),
         seed=seed,
+        context=context,
+        confounded_index=confounded_index,
         _ambiguous=_ambiguous,
     )
 
@@ -201,13 +209,15 @@ def grasp_fci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GRaSP adjacency and FCI orientation.
 
     The score settings, ``grasp_depth``, ``seed``, ``max_parents``, ``n_starts``, and
     ``constraints`` reach the GRaSP search (:func:`~andrey.search.grasp.grasp`), and the rest act
-    as for :func:`gfci`.
+    as for :func:`gfci`. ``context`` and ``confounded_index`` act as for :func:`boss_fci`.
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
@@ -224,6 +234,7 @@ def grasp_fci(
         max_parents=max_parents,
         categorical=categorical,
         constraints=constraints,
+        sources=() if context is None else (context,),
     )
     return fci_from_pattern(
         X,
@@ -238,6 +249,8 @@ def grasp_fci(
         in_column_order=in_column_order,
         workers=backend.worker_count(workers),
         seed=seed,
+        context=context,
+        confounded_index=confounded_index,
         _ambiguous=_ambiguous,
     )
 
@@ -256,6 +269,8 @@ def fci_from_pattern(
     in_column_order: bool,
     workers: int = 1,
     seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Prune and orient the score search's ``cpdag`` with FCI's tests and rules: a PAG.
@@ -265,6 +280,12 @@ def fci_from_pattern(
     before the possible-d-separation step and the rules R1-R10. ``max_depth``, ``constraints``,
     ``workers`` (a worker count), ``seed``, and ``_ambiguous`` act on the test phase as for
     :func:`gfci`.
+
+    ``context``, the column of an environment index, runs the test phase as
+    :func:`~andrey.constraint.fci_jci.fci_jci` runs FCI's: before each collider pass, every edge
+    of the index gets the marks of Joint Causal Inference
+    (:func:`~andrey.constraint.fci_jci.mark_index`, with ``confounded_index``), and the rules leave
+    out R5-R7, since JCI assumes no selection bias. The PAG still holds the index.
     """
     pattern = from_structure(cpdag)
 
@@ -284,6 +305,8 @@ def fci_from_pattern(
 
     marks = circle_pag(skeleton)
     knowledge_marks(marks, constraints)
+    if context is not None:
+        mark_index(marks, context, confounded_index)
     orient_colliders(marks, sepsets, pattern=pattern)
     marks = possible_dsep_step(
         marks,
@@ -298,6 +321,8 @@ def fci_from_pattern(
         max_depth=max_depth,
         constraints=constraints,
     )
+    if context is not None:
+        mark_index(marks, context, confounded_index)
     ambiguous = (
         frozenset(
             triple
@@ -313,7 +338,14 @@ def fci_from_pattern(
         _ambiguous.update(ambiguous)
     orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
     fci_orient(
-        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+        marks,
+        test,
+        alpha,
+        sepsets,
+        ambiguous,
+        max_depth=max_depth,
+        in_column_order=in_column_order,
+        selection_bias=context is None,
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")

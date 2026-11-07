@@ -22,6 +22,7 @@ from andrey.api._adapt import (
     column_namer,
     copies_named,
     data_kind,
+    env_index,
     fit_inputs,
     label_of,
     structure_output,
@@ -1370,16 +1371,14 @@ def cdnod(
     [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.core.environments import normalize_env_targets
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     if env is None:
         raise TypeError(
             "cdnod needs env, the environment of each row, or data as each environment's rows apart"
         )
-    data, codes, env_labels, _ = normalize_env_targets(
-        data, env, None, require_known_targets=False, method="cdnod"
-    )
+    data, c = env_index(data, env, method="cdnod")
+    assert c is not None  # env is not None
     assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask, labels, constraints = fit_inputs(
@@ -1392,9 +1391,6 @@ def cdnod(
         missing=True,
         index_categorical=True,
     )
-    # Numbers reach the search as given, such as a time step; text labels as their codes.
-    text = any(isinstance(label, str) for label in env_labels)
-    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     if dependence_threshold is not None and np.isnan(X).any():
@@ -1704,7 +1700,6 @@ def fci_jci(
     [[0, 'partially_directed']]
     """
     from andrey.constraint.fci_jci import fci_jci as _fci_jci
-    from andrey.core.environments import normalize_env_targets
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
     if env is None:
@@ -1712,9 +1707,8 @@ def fci_jci(
             "fci_jci needs env, the environment of each row, or data as each environment's rows "
             "apart"
         )
-    data, codes, env_labels, _ = normalize_env_targets(
-        data, env, None, require_known_targets=False, method="fci_jci"
-    )
+    data, c = env_index(data, env, method="fci_jci")
+    assert c is not None  # env is not None
     assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask, labels, constraints = fit_inputs(
@@ -1727,9 +1721,6 @@ def fci_jci(
         missing=True,
         index_categorical=True,
     )
-    # Numbers reach the search as given; text labels as their codes.
-    text = any(isinstance(label, str) for label in env_labels)
-    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     # The search appends the index as column d, so a copy of it is named as the index.
