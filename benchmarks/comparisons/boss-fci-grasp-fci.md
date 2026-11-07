@@ -4,6 +4,8 @@
 as the floor. The claim: on the paper's simulation, linear-Gaussian data with hidden common causes,
 at the paper's settings and at Andrey's defaults, Andrey's PAGs make no more endpoint errors than
 those of tetrad-lib 7.6.10, the authors' current implementation, at Tetrad's documented defaults.
+With `edge_removal="triangles"`, the GFCI paper's rule, they make no more than those of causal-cmd
+1.12.0 (tetrad-lib 7.6.3), which runs the same rule.
 
 ## The model
 
@@ -11,9 +13,10 @@ BOSS-FCI and GRaSP-FCI (Ramsey, Andrews, and Spirtes 2025) are GFCI with BOSS's 
 place of FGES's: conditional-independence tests remove the adjacencies hidden common causes explain,
 the CPDAG decides the colliders, and FCI's rules orient the PAG. The paper proves them correct with
 GFCI's possible-d-separation step and conjectures the step unneeded, and its Algorithm 5 leaves the
-step out and tests every edge of the CPDAG; Andrey's hybrids and tetrad-lib 7.6.10's follow
-Algorithm 5. tetrad-lib 7.6.3 leaves the step out too, but tests only the edges that lie in a
-triangle of the CPDAG, the rule of the GFCI paper (Ogarrio, Spirtes, and Ramsey 2016, Sec. 5). The
+step out and tests every edge of the CPDAG; Andrey's hybrids by default and tetrad-lib 7.6.10's
+follow Algorithm 5. tetrad-lib 7.6.3 leaves the step out too, but tests only the edges that lie in a
+triangle of the CPDAG, the rule of the GFCI paper (Ogarrio, Spirtes, and Ramsey 2016, Sec. 5), and
+so do Andrey's hybrids with `edge_removal="triangles"`. The
 BOSS-FCI paper's simulation (Sec. 8.1.1) draws linear-Gaussian SEMs on random forward DAGs over 20
 measured variables plus 0, 4, or 8 hidden ones, at mean degree 2, 4, or 6 and 200 to 5,000 rows,
 with coefficients uniform on [-1, 1], noise variances uniform on [1, 3], no standardization, and the
@@ -50,11 +53,12 @@ search reads the parents among lower-numbered nodes only).
 Both packages run each row's penalty discount and alpha: the paper's 2.0 and 0.01, or Andrey's
 defaults, 1.0 and 0.05.
 
-| | Andrey | tetrad-lib 7.6.10, gated | causal-cmd 1.12.0 (tetrad-lib 7.6.3), context |
+| | Andrey | tetrad-lib 7.6.10, gated | causal-cmd 1.12.0 (tetrad-lib 7.6.3), context and the option's reference |
 |---|---|---|---|
 | BOSS-FCI | `boss_fci(score_func="bic", indep_test="fisherz", seed=0)` | `BossFci` | `bfci` |
 | GRaSP-FCI | `grasp_fci(...)`, `grasp_depth=3` | `GraspFci` | `grasp-fci`, `depth` as GRaSP's depth |
 | depth 7 | `max_depth=7` | `depth 7` | `depth 7` |
+| edges tested for removal | every edge (`edge_removal="all"`, the default) or, in claim, also only those in a triangle (`"triangles"`) | every edge | those in a triangle |
 | runs per dataset | 1 | 5, no seed | 5, no seed |
 
 Tetrad runs its documented defaults (`parameter.definitions.html` in each jar): one start, no BES,
@@ -68,18 +72,20 @@ steps' separating sets alike.
 
 The gated reference is tetrad-lib 7.6.10's `BossFci` and `GraspFci`, the paper's code, which removes
 edges as Algorithm 5 does. causal-cmd 1.12.0's `bfci` and `grasp-fci` (tetrad-lib 7.6.3) run as
-context, at the same settings. 7.6.10 orients with rules R5 and R9 that read a covered path as
-uncovered, so they can put a tail where no Markov-equivalent MAG has one, a defect of the reference;
-7.6.3 does not have that code. Its tails count against it in the scores below. Tetrad's searches
-take no seed by default, and 7.6.10's removes edges in an unseeded shuffled order, so each Tetrad
-hybrid runs five times per dataset with no seed (once on O2); its errors are the mean of the five,
-and the summary counts the datasets whose runs differ.
+context, at the same settings, and as the reference of Andrey's hybrids with
+`edge_removal="triangles"`, which run on every cell in the claim and are judged against causal-cmd's
+by the same rules as the default against 7.6.10. 7.6.10 orients with rules R5 and R9 that read a
+covered path as uncovered, so they can put a tail where no Markov-equivalent MAG has one, a defect
+of the reference; 7.6.3 does not have that code. Its tails count against it in the scores below.
+Tetrad's searches take no seed by default, and 7.6.10's removes edges in an unseeded shuffled order,
+so each Tetrad hybrid runs five times per dataset with no seed (once on O2); its errors are the mean
+of the five, and the summary counts the datasets whose runs differ.
 
 The implementations differ in parts each adapter names and the lane measures rather than matches:
 
 | part | Andrey | Tetrad |
 |---|---|---|
-| removing adjacencies | FCI's adjacency search from the CPDAG's adjacencies, level by level | every edge of the CPDAG, one pass in a shuffled order, at the first separating subset of either end's neighbors (7.6.10); only the edges in a triangle of the CPDAG (7.6.3) |
+| removing adjacencies | FCI's adjacency search from the CPDAG's adjacencies, level by level; with `edge_removal="triangles"`, only the edges in a triangle of the CPDAG are tested | every edge of the CPDAG, one pass in a shuffled order, at the first separating subset of either end's neighbors (7.6.10); only the edges in a triangle of the CPDAG (7.6.3) |
 | BOSS's or GRaSP's start | one start from the columns' ranks | one start from the column order |
 | GRaSP's tuck depth | 3, independent of `max_depth` | `depth`, -1 (none) by default, the FCI cap too |
 
@@ -108,7 +114,8 @@ runs, and its interval the percentile bootstrap 95% interval of the mean D over 
 resamples). A row in claim is worse when the interval lies above 0, better when it lies below, and a
 tie otherwise; a row with fewer than 10 pairs is reported, not judged. A worse or better row is run
 again on seeds 100-119 and keeps its verdict only if that interval lies on the same side of 0. The
-floor applies where 7.6.10's SHD lies below the empty graph's on the first seeds. A fit stopped at
+floor applies where 7.6.10's SHD lies below the empty graph's on the first seeds (7.6.3's for the
+option). A fit stopped at
 its cap, 1,800 s (3,600 s at 100 variables and out of claim), is a timeout: it is counted in the
 coverage and never scored.
 
@@ -120,8 +127,10 @@ core of an AMD EPYC 7713 or 9534 processor (an Intel Xeon Gold 6542Y for O1) wit
 causal-cmd's runs come from the lane's first campaign, on the same datasets. Every number below is
 in [`published/0.15.0/boss-fci-grasp-fci.json`](../published/0.15.0/boss-fci-grasp-fci.json), with
 the context arms, the other scores, and every row's coverage. The true PAG agreed with pcalg's
-`dag2pag` on all 330 distinct graphs of up to 30 measured variables, and every fit of every package
-finished within its cap.
+`dag2pag` on all 350 distinct graphs of up to 30 measured variables, and every fit of every package
+finished within its cap. The option's fits come from the same release branch with `edge_removal`,
+on an AMD EPYC 7713, on the same datasets; Andrey's other arms there returned the same PAGs as in
+the campaign on every dataset.
 
 ### In the claim
 
@@ -275,6 +284,67 @@ in 18 of the 24 rows and more in none: 7.6.3's mean is 24.02 and 23.47 against A
 36.7 against 37.8). 7.6.10 and Andrey, which test every edge, are within 0.9 of each other in every
 row of this table.
 
+### The triangle option against tetrad-lib 7.6.3
+
+With `edge_removal="triangles"`, Andrey's hybrids test only the CPDAG's edges that lie in a triangle
+of it, as causal-cmd 1.12.0 (tetrad-lib 7.6.3) does, and keep the others, which still condition the
+tests. Paired with causal-cmd's runs on the same datasets and judged by the same rules, the option
+ties 7.6.3 in 143 of the 146 rows in the claim and is better in 3, with none worse. Pooled over the
+hidden counts and the four sizes on P20 (means of the row means), with the card's verdicts:
+
+| Method | Settings | Variables | Degree | Empty | Andrey, triangles | 7.6.3 | Better, tie, worse | Adjacency recall: Andrey, 7.6.3 |
+|---|---|---|---|---|---|---|---|---|
+| BOSS-FCI | paper's | 20 + 0, 4, or 8 hidden | 2 | 39.2 | 17.97 | 18.11 | 0, 12, 0 | 0.68, 0.68 |
+| BOSS-FCI | paper's | 20 + 0, 4, or 8 hidden | 4 | 89.7 | 53.3 | 53.6 | 0, 12, 0 | 0.59, 0.59 |
+| BOSS-FCI | paper's | 20 + 0, 4, or 8 hidden | 6 | 158.77 | 118.52 | 119.3 | 0, 12, 0 | 0.42, 0.41 |
+| BOSS-FCI | paper's | 100 + 10 hidden | 6 | 950.3 | 579.75 | 583.8 | 0, 1, 0 | 0.48, 0.48 |
+| BOSS-FCI | defaults | 20 + 0, 4, or 8 hidden | 2 | 39.2 | 23.61 | 24.02 | 1, 11, 0 | 0.74, 0.74 |
+| BOSS-FCI | defaults | 20 + 0, 4, or 8 hidden | 4 | 89.7 | 55.27 | 55.9 | 0, 12, 0 | 0.62, 0.62 |
+| BOSS-FCI | defaults | 20 + 0, 4, or 8 hidden | 6 | 158.77 | 118.53 | 118.89 | 0, 12, 0 | 0.44, 0.43 |
+| GRaSP-FCI | paper's | 20 + 0, 4, or 8 hidden | 2 | 39.2 | 18.27 | 18.46 | 0, 12, 0 | 0.68, 0.68 |
+| GRaSP-FCI | paper's | 20 + 0, 4, or 8 hidden | 4 | 89.7 | 53.9 | 54.36 | 0, 12, 0 | 0.58, 0.58 |
+| GRaSP-FCI | paper's | 20 + 0, 4, or 8 hidden | 6 | 158.77 | 119.49 | 119.99 | 1, 11, 0 | 0.42, 0.41 |
+| GRaSP-FCI | paper's | 100 + 10 hidden | 6 | 950.3 | 585.5 | 589.45 | 0, 1, 0 | 0.47, 0.47 |
+| GRaSP-FCI | defaults | 20 + 0, 4, or 8 hidden | 2 | 39.2 | 23.15 | 23.47 | 0, 12, 0 | 0.74, 0.74 |
+| GRaSP-FCI | defaults | 20 + 0, 4, or 8 hidden | 4 | 89.7 | 55 | 55.97 | 1, 11, 0 | 0.62, 0.61 |
+| GRaSP-FCI | defaults | 20 + 0, 4, or 8 hidden | 6 | 158.77 | 118.86 | 119.93 | 0, 12, 0 | 0.43, 0.43 |
+
+On seeds 0 to 19, 17 rows came out better and 2 worse, none by more than 4 errors, in 17 cells, and
+each of those cells was rerun with both packages on seeds 100 to 119. Three better rows held, and
+both worse rows tie on the rerun:
+
+| Method | Settings | Measured | Degree | Hidden | n | Seeds 0-19: D [95%] | Seeds 100-119: D [95%] | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| GRaSP-FCI | paper's | 20 | 2 | 0 | 500 | -1.65 [-3.35, -0.2], better | +0.25 [-0.75, +1.5] | tie |
+| BOSS-FCI | paper's | 20 | 2 | 0 | 5,000 | -0.65 [-1.3, -0.1], better | +0.55 [-0.4, +1.7] | tie |
+| GRaSP-FCI | paper's | 20 | 2 | 0 | 5,000 | -1 [-2.15, -0.05], better | +0.45 [-0.1, +1.2] | tie |
+| BOSS-FCI | paper's | 20 | 2 | 8 | 5,000 | -0.9 [-1.75, -0.05], better | 0 [-0.65, +0.7] | tie |
+| GRaSP-FCI | paper's | 20 | 4 | 8 | 5,000 | -2.85 [-5.3, -0.95], better | -2.05 [-4.35, +0.05] | tie |
+| BOSS-FCI | paper's | 20 | 6 | 0 | 1,000 | -3.2 [-6.3, -0.3], better | -0.25 [-3.3, +3.1] | tie |
+| GRaSP-FCI | paper's | 20 | 6 | 0 | 1,000 | -2.25 [-4.65, -0.15], better | -3.75 [-6.8, -0.4] | better |
+| BOSS-FCI | paper's | 20 | 6 | 0 | 5,000 | -3.6 [-6.85, -0.7], better | -0.05 [-3.05, +3.1] | tie |
+| GRaSP-FCI | paper's | 20 | 6 | 4 | 5,000 | -2.5 [-4.85, -0.3], better | +2.2 [-0.65, +4.9] | tie |
+| BOSS-FCI | paper's | 20 | 6 | 8 | 500 | +2.6 [+0.7, +4.55], worse | -0.6 [-2.1, +1.1] | tie |
+| GRaSP-FCI | paper's | 20 | 6 | 8 | 1,000 | -2.4 [-4.45, -0.4], better | -1.4 [-3.6, +0.75] | tie |
+| BOSS-FCI | defaults | 20 | 2 | 0 | 5,000 | -1.35 [-2.9, -0.3], better | +1.2 [-0.1, +2.6] | tie |
+| BOSS-FCI | defaults | 20 | 2 | 4 | 200 | +1.45 [+0.25, +2.75], worse | +0.9 [-0.75, +2.65] | tie |
+| BOSS-FCI | defaults | 20 | 2 | 8 | 1,000 | -1.55 [-2.7, -0.45], better | -1.4 [-3.15, -0.15] | better |
+| BOSS-FCI | defaults | 20 | 2 | 8 | 5,000 | -1.4 [-2.65, -0.35], better | +0.45 [-0.4, +1.35] | tie |
+| GRaSP-FCI | defaults | 20 | 4 | 0 | 5,000 | -3.25 [-5.4, -1.25], better | -2.65 [-5.35, -0.3] | better |
+| GRaSP-FCI | defaults | 20 | 4 | 8 | 5,000 | -3.1 [-5.4, -0.95], better | -0.25 [-3.3, +2.9] | tie |
+| GRaSP-FCI | defaults | 20 | 6 | 0 | 1,000 | -2.6 [-4.3, -0.8], better | -1.65 [-4.65, +1.7] | tie |
+| BOSS-FCI | defaults | 20 | 6 | 4 | 5,000 | -3.95 [-7.6, -0.7], better | -1.1 [-3.15, +0.95] | tie |
+
+The floor applies in 144 of the 146 rows, where 7.6.3's SHD lies below the empty graph's, and the
+option's lies below it in each. In the other two, degree 2 with 8 hidden and 200 rows at the
+defaults, the floor is reported and not judged: 7.6.3 made 38.45 errors with BOSS-FCI and 36.7 with
+GRaSP-FCI against the empty graph's 37.8, intervals that include 0, and the option 38.55 and 36.95.
+The option returned the same PAG as 7.6.3 on 343 of the 1,460 datasets with BOSS-FCI and on 236
+with GRaSP-FCI: the rule is the same, and the other parts in the table under Settings still differ.
+Andrey's median fit with the option took 0.012 to 0.42 s at 20 variables, and at 100 2.5 s with
+BOSS-FCI and 2.2 s with GRaSP-FCI, against 7.6.3's 0.041 to 3.7 s, 24.2 s, and 28.2 s, timed in
+separate runs on AMD EPYC 7713 or 9534 processors.
+
 ### The reference's tails and runs
 
 tetrad-lib 7.6.10's rules R5 and R9 read a covered path as uncovered, so they can put a tail where
@@ -329,9 +399,10 @@ $ANDREY_BENCH_PYTHON benchmarks/boss_grasp_fci_cpu.py summarize --runs outputs/b
 core with one BLAS thread; Tetrad starts one JVM per run, with one untimed warm-up search before the
 timed one, and Andrey runs each fit once untimed on the same data first. `--blocks`, `--settings`,
 `--degrees`, and `--latents` cut a campaign into small runs, `--packages` picks the packages,
-`--seeds 100-119` reruns cells on fresh seeds, and `--resume` continues a run. `check-truth` needs R
-with pcalg (see the README). Tetrad's time is its search inside the JVM (`wall_s`); the whole call,
-with the JVM's start, is `call_s`.
+`--seeds 100-119` reruns cells on fresh seeds, and `--resume` continues a run. In the claim,
+Andrey's child also fits both hybrids with `edge_removal="triangles"`, and `summarize` pairs those
+fits with causal-cmd's. `check-truth` needs R with pcalg (see the README). Tetrad's time is its
+search inside the JVM (`wall_s`); the whole call, with the JVM's start, is `call_s`.
 
 ## References
 
