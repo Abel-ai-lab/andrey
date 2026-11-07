@@ -1613,17 +1613,21 @@ def boss_fci(
     pair the CPDAG leaves non-adjacent as well, and reads Algorithm 5's final orientation rules as
     Zhang's R1-R10 [4]_, R5-R7 included.
 
-    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency
-    search tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a
-    neighbor in the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests
-    of the other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these
-    edges to save time, and its authors conjecture that this is always correct. On finite samples
-    the two choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test
-    would remove and the false edges in no triangle that the BOSS phase adds. It helps with a
-    strict penalty and alpha, such as the authors' ``penalty_discount=2.0`` and ``alpha=0.01``
-    [1]_, on dense graphs, where the BOSS phase adds few false edges and the tests remove more
-    true ones. It hurts at the defaults on sparse graphs, where the BOSS phase adds more false
-    edges. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency search
+    tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a neighbor in
+    the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests of the
+    other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these edges to
+    save time, and its authors conjecture that this is always correct. On finite samples the two
+    choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test would
+    remove and the false edges in no triangle that the BOSS phase adds. It helps with a strict
+    penalty and alpha, most on dense graphs, where the BOSS phase adds few false edges and the tests
+    remove more true ones, and hurts at the defaults on sparse graphs, where the BOSS phase adds
+    more false edges. On simulated data at the authors' sizes [1]_ (see When to use), it lowered the
+    mean endpoint errors (SHD against the true PAG) with their ``penalty_discount=2.0`` and
+    ``alpha=0.01`` at every mean degree and size, from 637 to 580 at 100 variables. At the defaults,
+    it raised them with mean degree 2, from 20.9 to 23.7 at 20 variables, where it kept 3.2 false
+    edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119. The default
+    ``"all"`` tests every edge, as Algorithm 5 does [1]_.
 
     **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
     the environment index joins the data as a last variable that leads every BOSS order, and before
@@ -1921,17 +1925,21 @@ def grasp_fci(
     the PAG's adjacencies are a subset of the GRaSP CPDAG's. Reordering the columns reorders the
     nodes and changes nothing else, unless two columns are identical.
 
-    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency
-    search tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a
-    neighbor in the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests
-    of the other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these
-    edges to save time, and its authors conjecture that this is always correct. On finite samples
-    the two choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test
-    would remove and the false edges in no triangle that the GRaSP phase adds. It helps with a
-    strict penalty and alpha, such as the authors' ``penalty_discount=2.0`` and ``alpha=0.01``
-    [1]_, on dense graphs, where the GRaSP phase adds few false edges and the tests remove more
-    true ones. It hurts at the defaults on sparse graphs, where the GRaSP phase adds more false
-    edges. The default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
+    **Testing only the edges in triangles.** With ``edge_removal="triangles"``, the adjacency search
+    tests only the CPDAG's edges that lie in a triangle of it, a pair whose ends share a neighbor in
+    the CPDAG. Every other edge stays in the PAG, and its ends still condition the tests of the
+    other pairs, as a required edge's do. Section 5 of GFCI's paper [2]_ tests only these edges to
+    save time, and its authors conjecture that this is always correct. On finite samples the two
+    choices differ: ``"triangles"`` keeps both the true edges in no triangle that a test would
+    remove and the false edges in no triangle that the GRaSP phase adds. It helps with a strict
+    penalty and alpha, most on dense graphs, where the GRaSP phase adds few false edges and the
+    tests remove more true ones, and hurts at the defaults on sparse graphs, where the GRaSP phase
+    adds more false edges. On simulated data at the authors' sizes [1]_ (see When to use), it
+    lowered the mean endpoint errors (SHD against the true PAG) with their ``penalty_discount=2.0``
+    and ``alpha=0.01`` at every mean degree and size, from 639 to 586 at 100 variables. At the
+    defaults, it raised them with mean degree 2, from 21.1 to 23.4 at 20 variables, where it kept
+    2.8 false edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119. The
+    default ``"all"`` tests every edge, as Algorithm 5 does [1]_.
 
     **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
     the environment index joins the data as a last variable that leads every GRaSP order, and before
