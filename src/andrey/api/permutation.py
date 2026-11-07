@@ -639,9 +639,9 @@ def igsp(
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``: its distinct values.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the environments
+        from ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, named by column label or 0-based position.
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
@@ -973,9 +973,9 @@ def ut_igsp(
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``: its distinct values.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the environments
+        from ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The known targets of each environment, named by column label or 0-based position. A
         mapping ``{label: [variables]}`` takes a label of ``env`` to its known targets: ``[]``
