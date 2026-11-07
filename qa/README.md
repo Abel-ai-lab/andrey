@@ -286,9 +286,9 @@ ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and
 BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables. GIES is scored
 against the interventional essential graph of the true DAG under the rows' targets, IGSP against the
 one under the settings' targets, GnIES and UT-IGSP against the one under the true targets, and
-CD-NOD against the CPDAG in which the domain index orients the edges it reaches. FCI-JCI is scored by endpoint SHD over the
-variables and the environment against its PAG at the true distribution, the truth its benchmark
-driver builds. UT-IGSP's targets are scored apart, as
+CD-NOD against the CPDAG in which the domain index orients the edges it reaches. FCI-JCI is scored
+by endpoint SHD over the variables and the environment against its PAG at the true distribution, the
+truth its benchmark driver builds. UT-IGSP's targets are scored apart, as
 `UT-IGSP targets`, by the target error: the false plus the missed targets over the settings,
 against the given targets alone in place of the empty graph. GIN's
 errors are the latents it misses: the true latents whose indicators it does not return as one
