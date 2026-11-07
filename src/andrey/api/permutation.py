@@ -1467,7 +1467,6 @@ def _fci_hybrid(
     indep_test: str | None,
     categorical: Sequence[str | int] | None,
     collider_rule: str,
-    possible_dsep: str | None,
     knowledge: Knowledge | None,
     **settings: object,
 ) -> StructureOutput:
@@ -1478,7 +1477,7 @@ def _fci_hybrid(
     index joins the data as a last column, the engine's ``context``, and leaves the PAG again: its
     edges go in ``metadata``.
     """
-    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order
     from andrey.search import gfci as engines
 
     assert score_func is not None and indep_test is not None  # method_spec picks them
@@ -1506,7 +1505,6 @@ def _fci_hybrid(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=augmented_mask,
-            possible_dsep=resolve_possible_dsep(possible_dsep),
             constraints=augmented_constraints,
             in_column_order=resolve_in_column_order(),
             context=column,
@@ -1537,7 +1535,6 @@ def boss_fci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    possible_dsep: str | None = None,
     confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
@@ -1623,9 +1620,6 @@ def boss_fci(
         column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
         named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    possible_dsep : {"order_free", "fast"} or None, default=None
-        The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
-        ``andrey.config.tie_break``.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1719,27 +1713,29 @@ def boss_fci(
     penalty discount of 2 and tested by Fisher's z at an alpha of 0.01. They pick BOSS's search for
     its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes rows pooled
     from several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
-    :func:`~andrey.boss`; :func:`~andrey.grasp_fci` and :func:`~andrey.gfci` run the same pipeline
-    with GRaSP's and GES's searches.
+    :func:`~andrey.boss`; :func:`~andrey.grasp_fci` runs the same steps with GRaSP's search, and
+    :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
 
-    The steps are :func:`~andrey.gfci`'s with the CPDAG from :func:`~andrey.boss`: FCI's adjacency
-    search starts from the CPDAG's adjacencies and removes a pair that a subset of either end's
-    neighbors separates; the CPDAG decides the colliders on triples whose ends it leaves
-    non-adjacent, and the separating sets decide the others; FCI's possible-d-separation step and
-    Zhang's rules R1-R10 [4]_ follow. No step adds an edge, so the PAG's adjacencies are a subset of
-    the BOSS CPDAG's. Reordering the columns reorders the nodes and changes nothing else, unless two
-    columns are identical, as for both phases on their own.
+    The steps are those of the authors' Algorithm 5 [1]_, with the CPDAG from :func:`~andrey.boss`:
+    FCI's adjacency search starts from the CPDAG's adjacencies and removes a pair that a subset of
+    either end's neighbors separates; the CPDAG decides the colliders on triples whose ends it
+    leaves non-adjacent, and the separating sets decide the others; Zhang's rules R1-R10 [4]_
+    follow. No step adds an edge, so the PAG's adjacencies are a subset of the BOSS CPDAG's.
+    Reordering the columns reorders the nodes and changes nothing else, unless two columns are
+    identical, as for both phases on their own.
 
-    **The published method.** Ramsey, Andrews, and Spirtes [1]_ define BOSS-FCI by a template (their
-    Algorithm 5) that removes edges in one pass, each at the first subset of either end's neighbors
-    that separates it, and leaves out GFCI's possible-d-separation step: they prove the method
-    correct with that step, as GFCI is, and conjecture that it is not needed. Andrey keeps the
-    step, and FCI's adjacency search, which grows the conditioning size over all edges together and
-    records the union of the separating subsets of the smallest size, as :func:`~andrey.gfci` does.
+    **The published method.** Algorithm 5 leaves out the possible-d-separation step that GFCI [2]_
+    runs after the colliders, and so does Andrey. The authors prove BOSS-FCI correct with that step,
+    as GFCI is, and conjecture that it is not needed: they report no counterexample, even with a
+    d-separation oracle in place of the tests, and leave a proof open [1]_. Algorithm 5 removes each
+    edge at the first subset of either end's neighbors that separates it; Andrey runs FCI's
+    adjacency search instead, as :func:`~andrey.gfci` does: it grows the conditioning size over all
+    edges together and records the union of the separating subsets of the smallest size, so the
+    result does not depend on the order of the edges.
 
     **Several environments.** With ``env``, BOSS-FCI runs as :func:`~andrey.fci_jci` runs FCI [5]_:
     the environment index joins the data as a last variable that leads every BOSS order, and before
-    each collider pass every edge the index keeps gets an arrowhead at its data variable, because no
+    the collider pass every edge the index keeps gets an arrowhead at its data variable, because no
     data variable causes the index, and, with ``confounded_index=False``, a tail at the index. Joint
     Causal Inference assumes no selection bias, so the rules leave out R5-R7. The index removes the
     edges that pooling adds and can orient more, and it is dropped from the PAG; a variable keeps an
@@ -1757,15 +1753,16 @@ def boss_fci(
     network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
     the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
     :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
-    data, and its possible-d-separation step can test many subsets of each node's possible
-    d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
-    to 12 measured variables and 2 hidden ones, with 2,000 rows from two environments, and on
-    Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and
-    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
-    that does not follow the labels' values can go unnoticed. ``max_parents`` counts the index as a
-    parent in the score phase. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    data. Without the possible-d-separation step, a pair that only a set outside both ends'
+    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
+    can hold an edge too many and marks that differ from the true PAG's. Its BIC score and Fisher's
+    z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up to 12
+    measured variables and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11
+    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
+    read a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
+    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1804,7 +1801,6 @@ def boss_fci(
         indep_test=indep_test,
         categorical=categorical,
         collider_rule=collider_rule,
-        possible_dsep=possible_dsep,
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
@@ -1832,7 +1828,6 @@ def grasp_fci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    possible_dsep: str | None = None,
     confounded_index: bool = True,
     seed: int | None = None,
     n_starts: int = 1,
@@ -1922,9 +1917,6 @@ def grasp_fci(
         column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
         named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    possible_dsep : {"order_free", "fast"} or None, default=None
-        The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
-        ``andrey.config.tie_break``.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -2018,18 +2010,20 @@ def grasp_fci(
     1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
     time beside BOSS's. It returns a PAG, and with ``env`` takes rows pooled from several
     environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
-    :func:`~andrey.grasp`; :func:`~andrey.boss_fci` and :func:`~andrey.gfci` run the same pipeline
-    with BOSS's and GES's searches.
+    :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps with BOSS's search, and
+    :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
 
-    The steps are :func:`~andrey.boss_fci`'s with the CPDAG from :func:`~andrey.grasp`, and differ
-    from the published template [1]_ as that function's Notes describe: Andrey keeps GFCI's
-    possible-d-separation step. No step adds an edge, so the PAG's adjacencies are a subset of the
-    GRaSP CPDAG's. Reordering the columns reorders the nodes and changes nothing else, unless two
-    columns are identical.
+    The steps are :func:`~andrey.boss_fci`'s, those of the authors' Algorithm 5 [1]_, with the CPDAG
+    from :func:`~andrey.grasp`. As in Algorithm 5, they leave out GFCI's possible-d-separation step
+    [2]_, which the authors conjecture is not needed; Algorithm 5 removes each edge at the first
+    separating subset of either end's neighbors, and Andrey runs FCI's adjacency search instead, as
+    that function's Notes describe. No step adds an edge, so the PAG's adjacencies are a subset of
+    the GRaSP CPDAG's. Reordering the columns
+    reorders the nodes and changes nothing else, unless two columns are identical.
 
     **Several environments.** With ``env``, GRaSP-FCI runs as :func:`~andrey.fci_jci` runs FCI [4]_:
     the environment index joins the data as a last variable that leads every GRaSP order, and before
-    each collider pass every edge the index keeps gets an arrowhead at its data variable, because no
+    the collider pass every edge the index keeps gets an arrowhead at its data variable, because no
     data variable causes the index, and, with ``confounded_index=False``, a tail at the index. Joint
     Causal Inference assumes no selection bias, so the rules leave out R5-R7. The index removes the
     edges that pooling adds and can orient more, and it is dropped from the PAG; a variable keeps an
@@ -2047,15 +2041,16 @@ def grasp_fci(
     network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
     the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
     :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
-    data, and its possible-d-separation step can test many subsets of each node's possible
-    d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up
-    to 12 measured variables and 2 hidden ones, with 2,000 rows from two environments, and on
-    Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and
-    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
-    that does not follow the labels' values can go unnoticed. ``max_parents`` counts the index as a
-    parent in the score phase. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    data. Without the possible-d-separation step, a pair that only a set outside both ends'
+    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
+    can hold an edge too many and marks that differ from the true PAG's. Its BIC score and Fisher's
+    z test assume linear effects with Gaussian noise. With ``env``, its tests run it on up to 12
+    measured variables and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11
+    proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"``
+    read a numeric ``env`` as a number, so with three or more environments a shift that does not
+    follow the labels' values can go unnoticed. ``max_parents`` counts the index as a parent in the
+    score phase. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2090,7 +2085,6 @@ def grasp_fci(
         indep_test=indep_test,
         categorical=categorical,
         collider_rule=collider_rule,
-        possible_dsep=possible_dsep,
         knowledge=knowledge,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,

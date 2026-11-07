@@ -125,27 +125,27 @@ def test_andrey_kwargs_map_the_harness_names() -> None:
     assert set(fci) == {"alpha", "indep_test", "max_depth"}
 
 
-def test_trace_skips_the_possible_dsep_removals_and_restores_the_step() -> None:
+def test_counts_the_possible_dsep_searches_and_restores_the_step() -> None:
+    """GFCI's step searches possible-d-separation sets; BOSS-FCI, without the step, searches none."""
     import andrey
     import andrey.constraint.fci as fci
 
     X, _ = lane.dataset(_cell(n=500), 0)
-    kwargs = andrey_boss_fci.andrey_kwargs("boss_fci", lane._params(_cell()), 0)
-    before = (fci._possible_dsep, fci._remove_by_possible_dsep)
-    with andrey_boss_fci.instrumented(None) as shipped:
-        andrey.boss_fci(X, **kwargs)
-    with andrey_boss_fci.instrumented("no_possible_dsep") as skipped:
-        andrey.boss_fci(X, **kwargs)
-    assert (fci._possible_dsep, fci._remove_by_possible_dsep) == before
-    assert shipped["possible_dsep_searches"] > 0 and shipped["possible_dsep_max"] >= 1
-    assert skipped == {"possible_dsep_max": None, "possible_dsep_searches": 0}
+    before = fci._possible_dsep
+    counts = {}
+    for name in ("gfci", "boss_fci"):
+        kwargs = andrey_boss_fci.andrey_kwargs(name, lane._params(_cell()), 0)
+        with andrey_boss_fci.instrumented() as counts[name]:
+            getattr(andrey, name)(X, **kwargs)
+    assert fci._possible_dsep is before
+    assert counts["gfci"]["possible_dsep_searches"] > 0 and counts["gfci"]["possible_dsep_max"] >= 1
+    assert counts["boss_fci"] == {"possible_dsep_max": None, "possible_dsep_searches": 0}
 
 
 def test_arms_per_cell() -> None:
     paper, default = _cell(), _cell(setting="default")
     assert [f["config"] for f in lane.andrey_fits(default)] == ["default", "default"]
-    traces = [f for f in lane.andrey_fits(paper) if f["trace"] == "no_possible_dsep"]
-    assert sorted(f["algorithm"] for f in traces) == ["boss_fci", "grasp_fci"]
+    assert [f["algorithm"] for f in lane.andrey_fits(paper)[:2]] == ["boss_fci", "grasp_fci"]
     assert lane.andrey_fits(paper)[-1]["params"]["grasp_depth"] == 7
     gated = lane.tetrad_fits(paper, "tetrad-7.6.3")[:2]
     assert [f["solution"] for f in gated] == list(lane.GATED.values())

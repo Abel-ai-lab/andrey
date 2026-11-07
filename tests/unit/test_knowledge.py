@@ -202,7 +202,7 @@ def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
 
 @pytest.mark.parametrize("columns", [LABELS, LABELS[::-1], list("cfaebd")])
 @pytest.mark.parametrize("setting", [{}, {"possible_dsep": "fast"}], ids=["default", "fast"])
-@pytest.mark.parametrize("name", ["fci", "gfci", "boss_fci", "grasp_fci", "fci_jci"])
+@pytest.mark.parametrize("name", ["fci", "gfci", "fci_jci"])
 def test_knowledge_holds_through_the_possible_dsep_step_in_every_column_order(
     name, setting, columns, data
 ):
@@ -295,7 +295,11 @@ def test_bdeu_search_honors_required_forbidden_and_tiers(name):
 @pytest.mark.parametrize(
     ("name", "setting"),
     [(name, {}) for name in DEPTH]
-    + [(name, {"possible_dsep": "fast"}) for name in DEPTH if name in PAGS],
+    + [
+        (name, {"possible_dsep": "fast"})
+        for name in DEPTH
+        if any(param.name == "possible_dsep" for param in REGISTRY[name].params)
+    ],
     ids=lambda value: value if isinstance(value, str) else ("fast" if value else "default"),
 )
 def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):

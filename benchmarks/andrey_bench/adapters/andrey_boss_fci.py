@@ -3,8 +3,7 @@
 ``boss_grasp_fci_cpu.py`` starts this file with ``ANDREY_BENCH_PYTHON`` as
 ``python andrey_boss_fci.py <request.npz> <out.jsonl>``. The request holds the data ``X`` and
 ``fits``, a JSON list; each fit names an ``algorithm`` (``boss_fci``, ``grasp_fci``, ``gfci``, or
-``fci``), a ``config``, its ``params`` in the harness's names, a ``trace`` or ``None``, and
-``draws``. The names map to Andrey's:
+``fci``), a ``config``, its ``params`` in the harness's names, and ``draws``. The names map to Andrey's:
 
 ====================================  ==========================================================
 harness                               Andrey
@@ -18,15 +17,13 @@ the draw                              ``seed`` (BOSS-FCI, GRaSP-FCI, and GFCI)
 ====================================  ==========================================================
 
 Every other setting is the facade's default: the extended-BIC weight 0, one start, the
-``"sepsets"`` collider rule, and the order-free possible-d-separation step.
+``"sepsets"`` collider rule, and, for GFCI and FCI, the order-free possible-d-separation step.
 
 Each line records ``possible_dsep_max``, the most candidates any pair's possible-d-separation search
 had (the list ``andrey.constraint.fci._possible_dsep`` returns, both endpoints left out), and
 ``possible_dsep_searches``, the number of searches; both are ``None`` and ``0`` when the step
-searched no pair. The trace ``"no_possible_dsep"`` skips that step's removals for the fit
-(``andrey.constraint.fci._remove_by_possible_dsep`` does nothing): the step still turns every kept
-edge into ``o-o``, so the colliders and rules run as after a step that removed no edge. Both read
-private functions, so each line keeps the Andrey version that ran.
+searched no pair, as for BOSS-FCI and GRaSP-FCI, which have no such step. The counts read a private
+function, so each line keeps the Andrey version that ran.
 
 Before the first draw of each fit, one untimed warm-up runs the same call on the first
 ``warmup_rows`` rows. Each call stops at ``cap_s`` seconds (:func:`capped`): a draw past it is a
@@ -75,8 +72,6 @@ def capped(seconds: float) -> Iterator[None]:
 
 #: The score names of the harness that Andrey calls by another name.
 _SCORE = {"local_score_BIC": "bic"}
-#: The traces a fit may name.
-TRACES = (None, "no_possible_dsep")
 
 
 def andrey_kwargs(algorithm: str, params: dict[str, Any], draw: int) -> dict[str, Any]:
@@ -100,17 +95,15 @@ def andrey_kwargs(algorithm: str, params: dict[str, Any], draw: int) -> dict[str
 
 
 @contextmanager
-def instrumented(trace: str | None) -> Iterator[dict[str, Any]]:
-    """Count the possible-d-separation searches and their largest candidate set; apply ``trace``.
+def instrumented() -> Iterator[dict[str, Any]]:
+    """Count the possible-d-separation searches and their largest candidate set.
 
-    Yields the counts, which fill in as the fit runs; the private functions come back on exit.
+    Yields the counts, which fill in as the fit runs; the private function comes back on exit.
     """
     import andrey.constraint.fci as fci
 
-    if trace not in TRACES:
-        raise ValueError(f"trace must be one of {TRACES}, not {trace!r}")
     seen: dict[str, Any] = {"possible_dsep_max": None, "possible_dsep_searches": 0}
-    candidates, removals = fci._possible_dsep, fci._remove_by_possible_dsep
+    candidates = fci._possible_dsep
 
     def counted(*args, **kwargs):
         found = candidates(*args, **kwargs)
@@ -119,12 +112,10 @@ def instrumented(trace: str | None) -> Iterator[dict[str, Any]]:
         return found
 
     fci._possible_dsep = counted
-    if trace == "no_possible_dsep":
-        fci._remove_by_possible_dsep = lambda *args, **kwargs: None
     try:
         yield seen
     finally:
-        fci._possible_dsep, fci._remove_by_possible_dsep = candidates, removals
+        fci._possible_dsep = candidates
 
 
 def run_fit(fit: dict, X: np.ndarray, draw: int) -> dict[str, Any]:
@@ -133,7 +124,7 @@ def run_fit(fit: dict, X: np.ndarray, draw: int) -> dict[str, Any]:
 
     method = getattr(andrey, fit["algorithm"])
     kwargs = andrey_kwargs(fit["algorithm"], fit["params"], draw)
-    with instrumented(fit.get("trace")) as seen:
+    with instrumented() as seen:
         out = method(X, **kwargs)
     return {"marks": out.structure.to_numpy().astype(int).tolist(), **seen}
 

@@ -3,13 +3,15 @@ and :func:`andrey.grasp_fci`.
 
 The algorithms, their settings, and their references are described on those functions.
 
-The steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016). GES, BOSS, or GRaSP returns a
-CPDAG, the pattern, and :func:`fci_from_pattern` runs the rest. FCI's adjacency search, started from
-the pattern's adjacencies instead of a complete graph, removes the pairs a subset of either
+GFCI's steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016), and BOSS-FCI's and
+GRaSP-FCI's follow Algorithm 5 of Ramsey, Andrews, and Spirtes (2025). GES, BOSS, or GRaSP returns
+a CPDAG, the pattern, and :func:`fci_from_pattern` runs the rest. FCI's adjacency search, started
+from the pattern's adjacencies instead of a complete graph, removes the pairs a subset of either
 endpoint's neighbors separates. An unshielded triple of the result is a collider when it is one in
 the pattern, or, when the pattern shields it, when the separating set of its endpoints leaves out
-its middle node. The possible-d-separation and R0-R10 passes of :mod:`andrey.constraint.fci`
-follow, with its rule implementations, conditional-independence tests, and mark convention.
+its middle node. GFCI then runs the possible-d-separation step of :mod:`andrey.constraint.fci`,
+which Algorithm 5 leaves out, and all three run its rules R1-R10, with its rule implementations,
+conditional-independence tests, and mark convention.
 """
 
 from __future__ import annotations
@@ -36,8 +38,8 @@ from andrey.constraint.fci import (
     validate_possible_dsep,
 )
 from andrey.constraint.fci_jci import mark_index
-from andrey.constraint.pc import adjacency_search, knowledge_masks
-from andrey.core import NULL, GraphStructure, backend
+from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
 from andrey.search.boss import boss
@@ -137,7 +139,6 @@ def boss_fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
-    possible_dsep: str = "order_free",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -150,13 +151,13 @@ def boss_fci(
     """Discover a PAG with BOSS adjacency and FCI orientation.
 
     The score settings, ``seed``, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS
-    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`. ``context``,
+    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`, whose
+    possible-d-separation step it leaves out (:func:`fci_from_pattern`). ``context``,
     the column of an environment index, leads every BOSS order, and the test phase gives its edges
     the marks of Joint Causal Inference (:func:`fci_from_pattern`, with ``confounded_index``).
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
-    validate_possible_dsep(possible_dsep)
     pattern, _score = boss(
         X,
         penalty_discount=penalty_discount,
@@ -177,7 +178,7 @@ def boss_fci(
         indep_test=indep_test,
         collider_rule=collider_rule,
         categorical=categorical,
-        possible_dsep=possible_dsep,
+        possible_dsep=None,
         max_depth=max_depth,
         constraints=constraints,
         in_column_order=in_column_order,
@@ -203,7 +204,6 @@ def grasp_fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
-    possible_dsep: str = "order_free",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -217,11 +217,10 @@ def grasp_fci(
 
     The score settings, ``grasp_depth``, ``seed``, ``max_parents``, ``n_starts``, and
     ``constraints`` reach the GRaSP search (:func:`~andrey.search.grasp.grasp`), and the rest act
-    as for :func:`gfci`. ``context`` and ``confounded_index`` act as for :func:`boss_fci`.
+    as for :func:`boss_fci`.
     """
     X = np.asarray(data, dtype=np.float64)
     check_collider_rule(collider_rule)
-    validate_possible_dsep(possible_dsep)
     pattern, _score = grasp(
         X,
         penalty_discount=penalty_discount,
@@ -243,7 +242,7 @@ def grasp_fci(
         indep_test=indep_test,
         collider_rule=collider_rule,
         categorical=categorical,
-        possible_dsep=possible_dsep,
+        possible_dsep=None,
         max_depth=max_depth,
         constraints=constraints,
         in_column_order=in_column_order,
@@ -263,7 +262,7 @@ def fci_from_pattern(
     indep_test: str,
     collider_rule: str,
     categorical: np.ndarray | None,
-    possible_dsep: str,
+    possible_dsep: str | None,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool,
@@ -277,9 +276,11 @@ def fci_from_pattern(
 
     FCI's adjacency search starts from the pattern's adjacencies; the pattern then decides the
     colliders on triples whose ends it leaves non-adjacent, and the separating sets the others,
-    before the possible-d-separation step and the rules R1-R10. ``max_depth``, ``constraints``,
-    ``workers`` (a worker count), ``seed``, and ``_ambiguous`` act on the test phase as for
-    :func:`gfci`.
+    before the rules R1-R10. ``possible_dsep`` (``"order_free"`` or ``"fast"``, as for
+    :func:`gfci`) runs the possible-d-separation step between the two, after a first collider pass
+    that sets the arrowheads its sets read; ``None`` leaves the step out, as Algorithm 5 of Ramsey,
+    Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
+    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
 
     ``context``, the column of an environment index, runs the test phase as
     :func:`~andrey.constraint.fci_jci.fci_jci` runs FCI's: before each collider pass, every edge
@@ -305,22 +306,26 @@ def fci_from_pattern(
 
     marks = circle_pag(skeleton)
     knowledge_marks(marks, constraints)
-    if context is not None:
-        mark_index(marks, context, confounded_index)
-    orient_colliders(marks, sepsets, pattern=pattern)
-    marks = possible_dsep_step(
-        marks,
-        X,
-        test,
-        alpha,
-        sepsets,
-        possible_dsep=possible_dsep,
-        indep_test=indep_test,
-        categorical=categorical,
-        seed=seed,
-        max_depth=max_depth,
-        constraints=constraints,
-    )
+    if possible_dsep is None:
+        if constraints is not None:
+            check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
+    else:
+        if context is not None:
+            mark_index(marks, context, confounded_index)
+        orient_colliders(marks, sepsets, pattern=pattern)
+        marks = possible_dsep_step(
+            marks,
+            X,
+            test,
+            alpha,
+            sepsets,
+            possible_dsep=possible_dsep,
+            indep_test=indep_test,
+            categorical=categorical,
+            seed=seed,
+            max_depth=max_depth,
+            constraints=constraints,
+        )
     if context is not None:
         mark_index(marks, context, confounded_index)
     ambiguous = (

@@ -116,8 +116,8 @@ already running in the process, so a CPU fit never pays to start a GPU.
   reordering the columns relabels the result. `position` orders them by column position, which skips
   computing the ranks, fires the orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`,
   `grasp_fci`, and `fci_jci` one at a time in column order, and visits the possible-d-separation
-  step of `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` in column order; the result can then
-  depend on the column order. A fit whose result the rule can change records it in
+  step of `fci`, `gfci`, and `fci_jci` in column order; the result can then depend on the column
+  order. A fit whose result the rule can change records it in
   `metadata["tie_break"]`.
 
 Results repeat on the same machine; across platforms they can differ, CALM's most of all.
