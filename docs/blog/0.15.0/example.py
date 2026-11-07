@@ -11,7 +11,10 @@ if __name__ == "__main__":  # worker processes re-import this script
         edges = out.structure.oriented_edges()
         known = sum(frozenset(edge[:2]) in consensus for edge in edges)
         directed = sum(kind == "directed" for *_, kind in edges)
-        return f"{len(edges)} edges, {known} in the consensus network, {directed} directed"
+        line = f"{len(edges):2} edges, {known} in the consensus network, {directed:2} directed"
+        if "index_edges" in out.metadata:  # the methods given env
+            line += f", {len(out.metadata['index_edges'])} index edges"
+        return line
 
     # PC on the observational cells alone, and on all nine conditions pooled without env.
     print(f"pc, observational:  {summary(andrey.pc(data[env == 0]))}")
@@ -32,7 +35,5 @@ if __name__ == "__main__":  # worker processes re-import this script
     boss_fci = andrey.boss_fci(data, env, indep_test="cond_gauss", confounded_index=False, **scores)
     print(f"boss_fci:           {summary(boss_fci)}")
 
-    # What the conditions change, and the index's edges into those variables.
+    # The variables whose mechanism changes across the conditions.
     print(f"changing variables: {cdnod.metadata['changing_variables']}")
-    index = fci_jci.metadata["index_edges"]
-    print(f"fci_jci's index:    {len(index)} edges, {', '.join({kind for _, kind in index})}")
