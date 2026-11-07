@@ -331,7 +331,7 @@ def test_fci_jci_names_the_index_edges_by_column():
         (np.zeros((2000, 2)), "one value per row"),
         (np.zeros(1999), "one value per row"),
         (np.r_[np.zeros(1999), np.nan], "NaN or None"),
-        (np.r_[np.zeros(1999), np.inf], "NaN or inf"),
+        (np.r_[np.zeros(1999), np.inf], "must be finite"),
     ],
 )
 def test_fci_jci_rejects_a_bad_index(index, message):

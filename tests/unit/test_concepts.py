@@ -60,6 +60,11 @@ def tagged(concept: Concept, method: str):
     return next((p for p in REGISTRY[method].params if p.concept == concept.key), None)
 
 
+def env_kind(method: str) -> str | None:
+    """The kind of the method's ``env`` input, if it takes one."""
+    return next((i.kind for i in REGISTRY[method].data.inputs if i.name == "env"), None)
+
+
 def lacks(concept: Concept, method: str) -> None:
     """No parameter of the method implements the concept or takes its name for another one,
     unless that other concept records the name as a deviation."""
@@ -168,6 +173,12 @@ def test_docstring_entry_states_the_concept(concept, method):
     name = tagged(concept, method).name  # ty: ignore[possibly-missing-attribute]
     entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[name]
     assert fragment.lower() in entry
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if env_kind(m)])
+def test_the_env_entry_states_the_concept(method):
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")["env"]
+    assert CONCEPTS["env"].fragment in entry
 
 
 def docstring_section(doc: str, title: str) -> str:
@@ -595,6 +606,7 @@ def keeps_the_required_edge(method: str) -> bool:
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
+    "env": (lambda m: env_kind(m) or False, "context"),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
     "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
     "algorithm": (lambda m: coded_fit(m)[0].metadata["algorithm"], "{method}"),
@@ -623,7 +635,7 @@ def test_every_behavior_has_an_observation():
         pytest.param(c, m, id=f"{c.key}-{m}")
         for c in BEHAVIORS
         for m in REGISTRY
-        if m in c.suitable or c.deviation(m) or c.key == "missing"
+        if m in c.suitable or c.deviation(m) or c.key in ("missing", "env")
     ],
 )
 def test_behavior_cell(concept, method):
@@ -1255,6 +1267,8 @@ def test_documented_method_lists_match_the_table():
         named = set(re.findall(r"`(\w+)`", " ".join(paragraph))) & set(REGISTRY)
         if key == "missing":
             takes = {m for m, spec in REGISTRY.items() if spec.data.missing}
+        elif key == "env":
+            takes = {m for m in REGISTRY if env_kind(m)}
         else:
             takes = {m for m in REGISTRY if tagged(CONCEPTS[key], m) is not None}
         assert named == takes, f"{key}: documented {sorted(named)}, table {sorted(takes)}"

@@ -118,8 +118,8 @@ SHARED = {
         "Parameters",
         "env",
         "first",
-        "The environment of each row: one label per row, strings or numbers, not both, or the name "
-        "of a column of the DataFrame ``data`` that holds them.",
+        "The environment of each row: one label per row, strings or finite numbers, not both, or "
+        "the name of a column of the DataFrame ``data`` that holds them.",
         lambda m: (
             any(i.name == "env" for i in REGISTRY[m].data.inputs) and m not in ("cdnod", "fci_jci")
         ),

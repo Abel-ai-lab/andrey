@@ -79,8 +79,8 @@ def boss(
         so with ``"bic"`` and three or more environments, the order of the list can change the
         result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
         the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
@@ -186,8 +186,8 @@ def boss(
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
         contradicts itself, as :class:`~andrey.Knowledge` lists, or if ``env`` does not hold one
-        label per row, misses a label, or mixes strings and numbers, or, with a categorical or
-        mixed-data score, holds a number that is not whole.
+        label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -403,8 +403,8 @@ def grasp(
         so with ``"bic"`` and three or more environments, the order of the list can change the
         result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
         the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
@@ -515,8 +515,8 @@ def grasp(
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
         contradicts itself, as :class:`~andrey.Knowledge` lists, or if ``env`` does not hold one
-        label per row, misses a label, or mixes strings and numbers, or, with a categorical or
-        mixed-data score, holds a number that is not whole.
+        label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
+        categorical or mixed-data score, holds a number that is not whole.
 
     Warns
     -----
@@ -805,9 +805,9 @@ def igsp(
         ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that order,
         ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``: its distinct values.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the environments
+        from ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, named by column label or 0-based position.
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
@@ -1138,9 +1138,9 @@ def ut_igsp(
         ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that order,
         ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name of
-        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``: its distinct values.
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the environments
+        from ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The known targets of each environment, named by column label or 0-based position. A
         mapping ``{label: [variables]}`` takes a label of ``env`` to its known targets: ``[]``
@@ -1565,8 +1565,8 @@ def boss_fci(
         so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
         can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
         the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
@@ -1697,8 +1697,8 @@ def boss_fci(
         parents some graph of the required edges of ``knowledge`` gives a node, or if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
-        label, or mixes strings and numbers, or, with a categorical or mixed-data setting, holds a
-        number that is not whole.
+        label or is infinite, or mixes strings and numbers, or, with a categorical or mixed-data
+        setting, holds a number that is not whole.
 
     Warns
     -----
@@ -1860,8 +1860,8 @@ def grasp_fci(
         so with ``"bic"`` and ``"fisherz"`` and three or more environments, the order of the list
         can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
-        The environment of each row: one label per row, strings or numbers, not both, or the name
-        of a column of the DataFrame ``data`` that holds them. The environment index then joins
+        The environment of each row: one label per row, strings or finite numbers, not both, or the
+        name of a column of the DataFrame ``data`` that holds them. The environment index then joins
         the search as a variable that no data variable causes; see Notes. Numbers are coerced to
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
@@ -1996,8 +1996,8 @@ def grasp_fci(
         parents some graph of the required edges of ``knowledge`` gives a node, or if
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
-        label, or mixes strings and numbers, or, with a categorical or mixed-data setting, holds a
-        number that is not whole.
+        label or is infinite, or mixes strings and numbers, or, with a categorical or mixed-data
+        setting, holds a number that is not whole.
 
     Warns
     -----
