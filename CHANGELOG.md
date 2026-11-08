@@ -36,7 +36,7 @@ names its pull request.
   variables and 5 to 200 datasets of 10 to 200 steps, it ties in all 28 comparisons and fits 14 to
   168 times faster on one core (median). The
   [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) gives the numbers.
-  ([#796], [#PR])
+  ([#796], [#803])
 - `ges`, `hc`, `tabu`, `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take `env`, each row's
   environment, for data from several environments (experimental): the environment index
   joins the search as a variable that no data variable causes, which removes the edges that pooling
@@ -2027,3 +2027,4 @@ First alpha release.
 [#796]: https://github.com/Abel-ai-lab/andrey/pull/796
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
+[#803]: https://github.com/Abel-ai-lab/andrey/pull/803
