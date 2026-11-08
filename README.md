@@ -20,12 +20,13 @@ banner links the website's homepage. -->
 
 ## ⭐ What's new in 0.15.0
 
-Multi-domain data: rows pooled from several environments, such as sites, batches, or the conditions
-of an experiment, that share one causal structure and differ in some mechanisms. With each row's
-environment as one more variable, a method can tell a dependence that a shift creates from an edge,
-and the shifts can direct edges that one environment leaves undirected. FCI-JCI learns from these
-data while allowing hidden common causes, and BOSS-FCI and GRaSP-FCI allow them too, all as
-accurately as their authors' code and faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
+Multi-domain data come from several environments, such as sites, batches, or the conditions of an
+experiment, that share one causal structure and differ in the mechanisms of some variables. With
+each row's environment recorded as an environment index, a method can tell a dependence that
+changing mechanisms create from a causal edge, and it can orient edges that one environment leaves
+undirected. FCI-JCI learns from these data while allowing hidden common causes, and BOSS-FCI and
+GRaSP-FCI allow them too. In our comparisons with their authors' code, none of the three made
+significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
 BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
 
 **[Read the post](https://andrey.abel.ai/blog/20261107-andrey-0-15-0.html)** ·

@@ -10,19 +10,19 @@ With `edge_removal="triangles"`, the GFCI paper's rule, they make no more than t
 ## The model
 
 BOSS-FCI and GRaSP-FCI (Ramsey, Andrews, and Spirtes 2025) are GFCI with BOSS's or GRaSP's CPDAG in
-place of FGES's: conditional-independence tests remove the adjacencies hidden common causes explain,
-the CPDAG decides the colliders, and FCI's rules orient the PAG. The paper proves them correct with
-GFCI's possible-d-separation step and conjectures the step unneeded, and its Algorithm 5 leaves the
-step out and tests every edge of the CPDAG; Andrey's hybrids by default and tetrad-lib 7.6.10's
-follow Algorithm 5. tetrad-lib 7.6.3 leaves the step out too, but tests only the edges that lie in a
-triangle of the CPDAG, the rule of the GFCI paper (Ogarrio, Spirtes, and Ramsey 2016, Sec. 5), and
-so do Andrey's hybrids with `edge_removal="triangles"`. The
-BOSS-FCI paper's simulation (Sec. 8.1.1) draws linear-Gaussian SEMs on random forward DAGs over 20
-measured variables plus 0, 4, or 8 hidden ones, at mean degree 2, 4, or 6 and 200 to 5,000 rows,
-with coefficients uniform on [-1, 1], noise variances uniform on [1, 3], no standardization, and the
-columns shuffled; 20 runs per cell, at BIC penalty discount 2.0 and Fisher z alpha 0.01. A larger
-cell has 100 measured variables, 10 hidden, degree 6, and 1,000 rows, with conditioning sets of at
-most 7.
+place of FGES's: conditional-independence tests remove the adjacencies whose endpoints are
+independent given some set of other variables, the CPDAG decides the colliders, and FCI's rules
+orient the PAG. The paper proves them correct with GFCI's possible-d-separation step and conjectures
+the step unneeded, and its Algorithm 5 leaves the step out and tests every edge of the CPDAG;
+Andrey's hybrids by default and tetrad-lib 7.6.10's follow Algorithm 5. tetrad-lib 7.6.3 leaves the
+step out too, but tests only the edges that lie in a triangle of the CPDAG, the rule of the GFCI
+paper (Ogarrio, Spirtes, and Ramsey 2016, Sec. 5), and so do Andrey's hybrids with
+`edge_removal="triangles"`. The BOSS-FCI paper's simulation (Sec. 8.1.1) draws linear-Gaussian SEMs
+on random forward DAGs over 20 measured variables plus 0, 4, or 8 hidden ones, at mean degree 2, 4,
+or 6 and 200 to 5,000 rows, with coefficients uniform on [-1, 1], noise variances uniform on [1, 3],
+no standardization, and the columns shuffled; 20 runs per cell, at BIC penalty discount 2.0 and
+Fisher z alpha 0.01. A larger cell has 100 measured variables, 10 hidden, degree 6, and 1,000 rows,
+with conditioning sets of at most 7.
 
 The driver draws the same data with `andrey.data`: a DAG over `d + L` nodes in a random forward
 order with exactly `degree * d / 2` edges, as Tetrad's `RandomForward` draws, and the SEM as its

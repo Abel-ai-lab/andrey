@@ -1019,7 +1019,7 @@ def gfci(
     search rather than a complete graph, which shrinks the candidate edges, but its
     possible-d-separation round of tests is exponential in the worst case and can make it much
     slower than GES, while its authors report more accurate adjacencies and endpoints than FCI's on
-    simulated data [1]_. With ``env``, it takes rows pooled from several environments, as
+    simulated data [1]_. With ``env``, it takes data from several environments, as
     :func:`~andrey.fci_jci` does. It returns a PAG, whose circle marks (``o``) are the endpoints the
     data cannot determine and whose bidirected edges (``<->``) mark probable latent common causes.
     When every common cause is measured, use :func:`~andrey.ges`, whose CPDAG the first phase of
@@ -1217,7 +1217,7 @@ def cdnod(
 
     CD-NOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
     distribution shifts across environments are modeled, then runs PC-style discovery. It applies
-    to samples pooled across domains, regimes, or time blocks. The environment index is appended as
+    to samples from several domains, regimes, or time blocks. The environment index is appended as
     a trailing pseudo-node and removed from the result.
 
     Parameters
@@ -1371,7 +1371,7 @@ def cdnod(
 
     Notes
     -----
-    **When to use.** CD-NOD suits data pooled from several domains or regimes, or data whose
+    **When to use.** CD-NOD suits data from several domains or regimes, or data whose
     distribution drifts over time, in which the causal mechanisms may change with ``env``, any
     unmeasured common cause is a function of that index, and every
     independence follows from the graph with the index added (faithfulness) [1]_. Its default
@@ -1586,7 +1586,7 @@ def fci_jci(
 ) -> StructureOutput:
     """Learn a PAG from multi-domain data with FCI and the environment index as a context variable.
 
-    FCI-JCI [1]_ runs FCI [2]_ [3]_ on data pooled from several domains, regimes, or experiments,
+    FCI-JCI [1]_ runs FCI [2]_ [3]_ on data from several domains, regimes, or experiments,
     with the environment index as one more variable that no data variable causes. It allows hidden
     common causes, as :func:`~andrey.fci` does, and uses the index, as :func:`~andrey.cdnod` does,
     to remove the edges that pooling adds and to orient more edges. The index is removed from the
@@ -1596,7 +1596,7 @@ def fci_jci(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables), or a list or mapping of them
-        Observed data, one row per sample, pooled across the domains. Coerced to ``float64``. A
+        Observed data, one row per sample, from all the domains. Coerced to ``float64``. A
         DataFrame's column names become the structure's ``labels``. A column that ``env`` names is
         not a variable: it leaves the data before the fit, and ``categorical``, ``knowledge``, and
         the result's positions count the other columns. A list of DataFrames or 2-D arrays gives
@@ -1724,7 +1724,7 @@ def fci_jci(
 
     Notes
     -----
-    **When to use.** FCI-JCI suits independent rows pooled from several domains, sites, batches,
+    **When to use.** FCI-JCI suits independent rows from several domains, sites, batches,
     or experiments, with each row's domain known, where hidden common causes may act on the data
     variables and on the domain itself [1]_. It assumes no selection bias and a distribution
     faithful to the graph over the data and the domain. Its authors simulate linear-Gaussian models
@@ -1999,7 +1999,7 @@ def icp(
 
     Notes
     -----
-    **When to use.** ICP suits continuous data pooled from several environments, such as
+    **When to use.** ICP suits continuous data from several environments, such as
     observation and experiments, when you want the causal parents of one target with an error
     guarantee. Its claim [1]_: when the target is a linear function of its parents plus noise
     whose distribution is the same in every environment, so that the environments change the other

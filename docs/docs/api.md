@@ -59,7 +59,7 @@ out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
 out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
-out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) pools the rows
+out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) fits without env
 out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
@@ -445,7 +445,7 @@ step of FCI, GFCI, and FCI-JCI visits the pairs and nodes by a rank computed fro
 two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
 
-FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
+FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data from several environments,
 with the environment index as one more variable that no data variable causes, so hidden common
 causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
 data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
@@ -455,16 +455,16 @@ authors' implementation.
 
 BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
 BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
-conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
-rules orient the rest into a PAG. They follow the paper's Algorithm 5, which leaves out GFCI's
-possible-d-separation step: the authors conjecture that the step is not needed. The
-[0.15.0](benchmarks/0.15.0.md#boss-fci) release card measures them against their authors'
-implementation. With `env`, the index leads every order of their search, and their tests and rules
-treat it as FCI-JCI, above, does. `boss` and `grasp` take `env` as well, and so do `ges`, `hc`,
-`tabu`, and `gfci`: the index joins the search as a variable that no data variable causes, as in
-`cdnod`.
+conditional-independence tests remove the adjacencies whose endpoints are independent given some set
+of other variables, and FCI's rules orient the rest into a PAG. They follow the paper's Algorithm 5,
+which leaves out GFCI's possible-d-separation step: the authors conjecture that the step is not
+needed. The [0.15.0](benchmarks/0.15.0.md#boss-fci) release card measures them against their
+authors' implementation. With `env`, the index leads every order of their search, and their tests
+and rules treat it as FCI-JCI, above, does. `boss` and `grasp` take `env` as well, and so do `ges`,
+`hc`, `tabu`, and `gfci`: the index joins the search as a variable that no data variable causes, as
+in `cdnod`.
 
-GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
+GnIES (Gamella et al. 2022) learns from linear-Gaussian data collected in two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
 without being told which. It returns the interventional essential graph of the targets it learns,
 which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
@@ -506,7 +506,7 @@ no target maps to `[]`, which `targets` reads as observational. The
 the authors' library.
 
 ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
-of one `target` from continuous data pooled from several environments, such as observation and
+of one `target` from continuous data collected in several environments, such as observation and
 experiments, that leave the target's mechanism alone. It tests every set of the other variables, or
 every set of at most `max_parents`, for a regression on the target that is the same in every
 environment, by the paper's approximate or exact test, and returns the variables in every accepted
@@ -976,7 +976,7 @@ column the interventions do not reach is the same in the two.
 
 `envs=` on `SCM.sample`, `sample_discrete`, and `sample_mixed` draws several environments into one
 dataset: one mapping of interventions per environment, `{}` for none. Each environment draws its own
-noise, and the rows come pooled, environment 0 first, with `env`, each row's environment, and
+noise, and the rows are stacked, environment 0 first, with `env`, each row's environment, and
 `targets`, each environment's intervened columns:
 
 ```python

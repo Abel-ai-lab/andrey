@@ -206,7 +206,7 @@ def boss(
     highly connected variables [1]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.boss_fci`, the same search followed by FCI's tests and rules, or
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`. With ``env``, it takes rows pooled from several environments,
+    :func:`~andrey.direct_lingam`. With ``env``, it takes data from several environments,
     such as sites, batches, or experiments, whose shifts change variables it does not know;
     :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
     runs PC with the same index.
@@ -535,7 +535,7 @@ def grasp(
     search even on dense graphs [1]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.grasp_fci`, the same search followed by FCI's tests and rules, or
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`. With ``env``, it takes rows pooled from several environments,
+    :func:`~andrey.direct_lingam`. With ``env``, it takes data from several environments,
     such as sites, batches, or experiments, whose shifts change variables it does not know;
     :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
     runs PC with the same index.
@@ -720,7 +720,7 @@ def igsp(
 ) -> StructureOutput:
     """Learn an interventional essential graph with IGSP from settings with known targets.
 
-    IGSP (interventional greedy sparsest permutation) learns from data pooled from an
+    IGSP (interventional greedy sparsest permutation) learns from data collected in an
     observational environment and interventional ones, the settings, whose targets, the variables
     each one intervened on, are known [1]_ [2]_. It searches variable orders for the DAG with the
     fewest edges and, among those, the fewest edges the settings contradict: each order gives the
@@ -1052,8 +1052,8 @@ def ut_igsp(
 ) -> StructureOutput:
     """Learn an interventional essential graph and unknown intervention targets with UT-IGSP.
 
-    UT-IGSP (unknown-target interventional greedy sparsest permutation) learns from data pooled
-    from an observational environment and interventional ones, the settings, whose targets, the
+    UT-IGSP (unknown-target interventional greedy sparsest permutation) learns from data collected
+    in an observational environment and interventional ones, the settings, whose targets, the
     variables each one intervened on, may be known in part or not at all [1]_. It searches
     variable orders for the DAG with the fewest edges and targets: each order gives the DAG of the
     edges its conditional-independence tests keep on the observational rows, and a setting's
@@ -1417,9 +1417,9 @@ def boss_fci(
 
     BOSS-FCI [1]_ is GFCI [2]_ with the Best Order Score Search [3]_ in place of GES: one
     :func:`~andrey.boss` search gives a CPDAG, conditional-independence tests remove the adjacencies
-    that hidden common causes explain, and FCI's rules orient the rest into a PAG. It allows hidden
-    common causes, as :func:`~andrey.gfci` does, with a search its authors designed for highly
-    connected variables.
+    whose endpoints are independent given some set of other variables, and FCI's rules orient the
+    rest into a PAG. It allows hidden common causes, as :func:`~andrey.gfci` does, with a search its
+    authors designed for highly connected variables.
 
     Parameters
     ----------
@@ -1585,7 +1585,7 @@ def boss_fci(
     measured variables with 0, 4, or 8 hidden common causes, mean degree 2 to 6, and 200 to 5,000
     rows, and 100 measured variables with 10 hidden ones and 1,000 rows, scored by the BIC with a
     penalty discount of 2 and tested by Fisher's z at an alpha of 0.01. They pick BOSS's search for
-    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes rows pooled
+    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes data
     from several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
     :func:`~andrey.boss`; :func:`~andrey.grasp_fci` runs the same steps with GRaSP's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
@@ -1740,9 +1740,9 @@ def grasp_fci(
 
     GRaSP-FCI [1]_ is GFCI [2]_ with the greedy relaxation of the sparsest permutation [3]_ in place
     of GES: one :func:`~andrey.grasp` search gives a CPDAG, conditional-independence tests remove
-    the adjacencies that hidden common causes explain, and FCI's rules orient the rest into a PAG.
-    It allows hidden common causes, as :func:`~andrey.gfci` does, with GRaSP's search over variable
-    orders.
+    the adjacencies whose endpoints are independent given some set of other variables, and FCI's
+    rules orient the rest into a PAG. It allows hidden common causes, as :func:`~andrey.gfci` does,
+    with GRaSP's search over variable orders.
 
     Parameters
     ----------
@@ -1912,7 +1912,7 @@ def grasp_fci(
     setting of :func:`~andrey.boss_fci`: 20 measured variables with 0, 4, or 8 hidden common causes,
     mean degree 2 to 6, and 200 to 5,000 rows, and 100 measured variables with 10 hidden ones and
     1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
-    time beside BOSS's. It returns a PAG, and with ``env`` takes rows pooled from several
+    time beside BOSS's. It returns a PAG, and with ``env`` takes data from several
     environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
     :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps with BOSS's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
