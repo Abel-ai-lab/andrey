@@ -113,4 +113,10 @@ opened or reviewed, and a `feature` or `bug` pull request adds a bullet under `#
 maintainer (or an agent) lists the milestone's pull requests with
 `gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
 CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
-the notes GitHub generates by label (`.github/release.yml`).
+the notes GitHub generates by label (`.github/release.yml`). The same pass refreshes the stored
+intersphinx inventories that the docs build falls back on (`docs/DEVELOPMENT.md`) and commits any
+that changed:
+
+```shell
+uv run --group docs python scripts/refresh_intersphinx.py
+```
