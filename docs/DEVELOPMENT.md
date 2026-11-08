@@ -26,6 +26,16 @@ uv run --group docs sphinx-build -W -b html docs docs/_build/html
 
 Every link is relative, so one build serves any hostname.
 
+Every build, a rebuild into the same folder included, reads each intersphinx inventory
+(`intersphinx_mapping` in `conf.py`) from its project's site, or from its stored copy in
+`_intersphinx/` when the site does not answer within `intersphinx_timeout` seconds, so an
+unreachable site costs the build a few seconds and no references. Each release refreshes the
+copies (`CONTRIBUTING.md`):
+
+```shell
+uv run --group docs python scripts/refresh_intersphinx.py
+```
+
 After the build, `_version_assets` in `conf.py` adds each local image's content hash to its
 address (`?v=<hash>`) in the pages and stylesheets, and gives each stylesheet link the hash of
 the rewritten stylesheet, so a deploy never shows an image Cloudflare or a browser cached from an
