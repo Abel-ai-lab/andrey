@@ -120,7 +120,11 @@ names its pull request.
   the second endpoint's search leaves out the subsets the first endpoint's search found dependent,
   and with more than one worker a search of at least 250,000 subsets with the `fisherz`,
   `student_t`, or `normal_scores` test runs on the worker processes
-  (`ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK` sets the cutoff). ([#PR])
+  (`ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK` sets the cutoff). A fit with more than one worker warns
+  once on the default when a search reaches a tenth of it, and `andrey calibrate --method
+  possible_dsep` measures the value for your machine. On two-domain data with 80 to 100 variables,
+  where the step takes most of the fit, it runs about 1.5 times faster on one core and 5 to 12
+  times faster on 4 to 8 workers, with identical output. ([#PR])
 
 ### Fixed
 

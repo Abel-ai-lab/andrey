@@ -455,8 +455,9 @@ def _first_separating(
     (:func:`~andrey.constraint._skeleton.canonical_capable`) and at most
     :data:`~andrey.constraint._skeleton.MASK_BITS` candidates, a search whose subsets, counted over
     every size it tests, number at least the ``pool``'s cutoff
-    (:attr:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.min_dsep_subsets`) runs on
-    the pool (:meth:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.first_separating`),
+    (:meth:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.takes_search`, which warns
+    once on the default cutoff) runs on the pool
+    (:meth:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.first_separating`),
     and one of at least ``_ARRAY_MIN_SUBSETS`` enumerates its subsets as arrays in this process
     (:func:`~andrey.constraint._skeleton.first_separating_subset`). Another search asks them as
     tuples (:func:`_separating_choice`). Every path tests the subsets in the same order and stops
@@ -470,7 +471,7 @@ def _first_separating(
             sum(1 << i for i, v in enumerate(dsep) if v in nodes)
             for nodes in (adj_a, adj_b, tested)
         )
-        if pool is not None and subsets >= pool.min_dsep_subsets:
+        if pool is not None and pool.takes_search(subsets):
             return pool.first_separating(x, y, dsep, within, sizes, alpha)
         if subsets >= _ARRAY_MIN_SUBSETS:
             order = (block for size in sizes for block in blocks(len(dsep), size, CHUNK))

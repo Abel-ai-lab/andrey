@@ -65,17 +65,19 @@ requested backend uses `auto`, without a warning.
   AMD EPYC 9534 server running Linux; `0` always uses them.
 - `ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`: a possible-d-separation search of FCI, FCI-JCI, and
   GFCI uses the workers only when its candidate set has at least this many subsets, counted over
-  every size it tests. The default is `250000`; `0` always uses them.
+  every size it tests. The default is `250000`, measured on an AMD EPYC server running Linux with 4
+  and 8 workers; `0` always uses them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
   measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures the GES, skeleton,
-and RCoT cutoffs for your machine and prints the values to set; `andrey calibrate --method
-skeleton` measures the skeleton's alone, and `--method rcot` RCoT's. With more than one worker and
-one of these three on its default, a fit warns once when a pass reaches a tenth of it; setting the
-variable, to any value, silences the warning.
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all four for your
+machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
+alone, `--method rcot` RCoT's, and `--method possible_dsep` the possible-d-separation search's.
+With more than one worker and a default cutoff, a fit warns once when a pass or a
+possible-d-separation search reaches a tenth of it; setting the variable, to any value, silences
+the warning.
 
 The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
 that directory is on a file system that rejects the socket, as some cluster file systems do, we

@@ -103,7 +103,11 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "FCI-JCI, and GFCI with `fisherz`, `student_t`, or `normal_scores`: a pair's search "
             "runs on the worker pool only when its candidate set has at least this many subsets, "
             "counted over every size it tests, else in-process. `0` sends every search to the "
-            "pool. No effect unless the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1."
+            "pool. The default was measured on an AMD EPYC server running Linux with 4 and 8 "
+            "workers. No effect unless the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. "
+            "A fit with more than one worker warns once on the default when a search reaches a "
+            "tenth of it; `andrey calibrate --method possible_dsep` measures a value for your "
+            "machine."
         ),
         group="backend",
     ),

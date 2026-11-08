@@ -22,9 +22,9 @@ start-of-size neighborhood from the adjacency snapshot the task carries and dele
 FCI's possible-d-sep step sends a search of at least :data:`MIN_POOL_DSEP_SUBSETS` subsets, or the
 ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` that overrides it, to a second
 :class:`SkeletonWorkerPool`, started after the skeleton search's pool has closed
-(:meth:`SkeletonWorkerPool.first_separating`). Each task covers a contiguous run of the subsets in
-the serial order and returns the first that separates the pair, and the caller reads the tasks in
-that order, so the subset found is the serial one.
+(:meth:`SkeletonWorkerPool.takes_search`, :meth:`SkeletonWorkerPool.first_separating`). Each task
+covers a contiguous run of the subsets in the serial order and returns the first that separates the
+pair, and the caller reads the tasks in that order, so the subset found is the serial one.
 
 An RCoT test runs on a pool of its own (:class:`RCoTWorkerPool`), with its own cutoff in RCoT tests
 times rows, :data:`MIN_POOL_RCOT_WORK` or the ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it,
@@ -79,7 +79,13 @@ MIN_POOL_QUERIES: int = 500_000
 
 #: The default for the fewest subsets, counted over every size it tests, a possible-d-sep search of
 #: FCI or GFCI needs to run on the worker pool; a smaller search runs in the caller's process.
-#: ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` overrides it (0 sends every search to the pool).
+#: ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` overrides it (0 sends every search to the pool), and a
+#: fit with workers warns once on the default when a search nears it; ``andrey calibrate --method
+#: possible_dsep`` measures the value for a machine. On an AMD EPYC server with 4 and 8 workers, a
+#: search on a pool started for it, the start included, beat the search in process from 65,535
+#: subsets, and at 262,143 took 0.39 to 0.49 s against 1.2 s. That pool was not the process's
+#: first: a later pool starts in about 0.11 s, the first in about 1.5 s. The default stays above the
+#: crossover.
 MIN_POOL_DSEP_SUBSETS: int = 250_000
 
 #: The most subsets one task of a possible-d-sep search holds.
@@ -174,6 +180,9 @@ class SkeletonWorkerPool:
         self._min_queries = par.min_work(env.SKELETON_PARALLEL_MIN_WORK, MIN_POOL_QUERIES)
         # Warn once a pass comes near the default cutoff (only a fit that can fan out).
         self._warn = self._workers > 1 and calibrate.cutoff_is_default("skeleton")
+        # The possible-d-sep cutoff is read at the first search (takes_search), so a PC fit never
+        # parses it.
+        self._warn_dsep = self._workers > 1
         self._pool: ProcessPoolExecutor | None = None
         self._token: object = None
 
@@ -234,6 +243,17 @@ class SkeletonWorkerPool:
         :data:`MIN_POOL_DSEP_SUBSETS`, or the ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` that
         overrides it."""
         return par.min_work(env.POSSIBLE_DSEP_PARALLEL_MIN_WORK, MIN_POOL_DSEP_SUBSETS)
+
+    def takes_search(self, subsets: int) -> bool:
+        """Whether a possible-d-sep search of ``subsets`` subsets, counted over every size it
+        tests, runs on the pool: whether they reach :attr:`min_dsep_subsets`. With more than one
+        worker and the default cutoff, the first search that reaches a tenth of it warns once."""
+        cutoff = self.min_dsep_subsets
+        if self._warn_dsep and subsets >= calibrate.WARN_FRACTION * cutoff:
+            self._warn_dsep = False
+            if calibrate.cutoff_is_default("possible_dsep"):
+                calibrate.warn_default_cutoff("possible_dsep", cutoff)
+        return subsets >= cutoff
 
     def first_separating(
         self,
