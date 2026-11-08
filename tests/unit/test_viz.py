@@ -457,11 +457,11 @@ def test_to_graphviz_draws_a_self_loop_as_one_directed_edge() -> None:
     looped = GraphStructure.from_numpy(m, kind="digraph", allow_self_loops=True)
     loop = viz.to_graphviz(looped).get_edge("0", "0")
     assert loop.attr.get("dir") in (None, "")
-    # As in draw, a target's loop takes no bar, so the target gets the barred stub.
+    # As in draw, a target's loop takes no bar.
     marked = viz.to_graphviz(looped, targets=[0])
     assert marked.get_edge("0", "0").attr.get("arrowhead") in (None, "")
-    assert marked.has_edge("do 0", "0")
-    assert '<g class="intervention">' in viz.draw(looped, targets=[0], engine="builtin")
+    assert sorted(marked.nodes()) == ["0", "1"]
+    assert "intervention" not in viz.draw(looped, targets=[0], engine="builtin")
 
 
 def test_without_pygraphviz_the_default_is_the_builtin_layout(monkeypatch) -> None:
@@ -563,13 +563,12 @@ def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -
         assert 15 < np.hypot(bx - cx, by - cy) < 35 and bx < cx
 
 
-def test_a_target_no_arrowhead_points_into_gets_a_barred_stub() -> None:
+def test_a_target_no_arrowhead_points_into_is_a_square_alone() -> None:
     g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
     svg = viz.draw(g, targets=[0], engine="builtin")
     minidom.parseString(svg)
-    assert svg.count('<g class="intervention">') == 1 and len(_intervention_bars(svg)) == 1
-    # A target with an edge into it gets no stub.
-    assert '<g class="intervention">' not in viz.draw(g, targets=[1], engine="builtin")
+    assert svg.count('class="intervened"') == 1 and "intervention" not in svg
+    assert sorted(viz.to_graphviz(g, targets=["x"]).nodes()) == ["0", "1"]
 
 
 def test_without_targets_the_drawing_is_unchanged() -> None:
@@ -609,8 +608,8 @@ def test_to_graphviz_bars_an_arrowtail_into_a_target_and_never_a_circle() -> Non
         "normal",
     )
     assert (edges[("1", "3")]["arrowtail"], edges[("1", "3")]["arrowhead"]) == ("odot", "odot")
-    assert edges[("do 3", "3")]["arrowhead"] == "normaltee"
-    assert len(edges) == 3  # x gets no stub
+    assert graph.get_node("3").attr["shape"] == "square"
+    assert len(edges) == 2
 
 
 _MARK_PAIRS = {
@@ -647,8 +646,8 @@ def test_to_graphviz_marks_the_targets_draw_marks(kind, seed) -> None:
         if "tee" in (graph.get_edge(a, b).attr.get(key) or "")
     ]
     assert all(int(end) in targets for end in bars)
-    assert len(bars) == len(_intervention_bars(svg))  # stubs included
-    assert sum(v not in nodes for v in graph.nodes()) == svg.count('<g class="intervention">')
+    assert len(bars) == len(_intervention_bars(svg))
+    assert set(graph.nodes()) == nodes
     plain = viz.to_graphviz(g).to_string()
     assert viz.to_graphviz(g, targets=()).to_string() == plain
     assert "square" not in plain and "tee" not in plain

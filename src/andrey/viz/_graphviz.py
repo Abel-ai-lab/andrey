@@ -71,9 +71,8 @@ def to_graphviz(
     targets : iterable of int or str, default=()
         The intervened variables, named by label or by 0-based position, marked as
         :func:`~andrey.viz.draw` marks them. Each is a ``square`` node, and each arrowhead into it
-        is ``normaltee``, an arrowhead with a bar behind it. A target no arrowhead points into gets
-        a barred arrow from an invisible ``point`` node named ``"do k"``, which a layout places as
-        it places any other node. The default marks none.
+        is ``normaltee``, an arrowhead with a bar behind it. A target no arrowhead points into is
+        marked by its square alone. The default marks none.
 
     Returns
     -------
@@ -103,20 +102,14 @@ def to_graphviz(
     graph.node_attr["shape"] = "circle"
     for k in range(n):
         graph.add_node(str(k), label=labels[k], **({"shape": "square"} if k in marked else {}))
-    barred = set()  # the targets an arrowhead points into
     for i, j, attrs in structure._dot_edges():
         # j holds an arrowhead unless the edge is undirected; i holds one only with dir="both".
         head = attrs.get("arrowhead", "none" if attrs.get("dir") == "none" else "normal")
         if i != j and j in marked and head == "normal":
             attrs["arrowhead"] = "normaltee"
-            barred.add(j)
         if i != j and i in marked and attrs.get("arrowtail") == "normal":
             attrs["arrowtail"] = "normaltee"
-            barred.add(i)
         graph.add_edge(str(i), str(j), **attrs)
-    for k in sorted(marked - barred):
-        graph.add_node(f"do {k}", shape="point", style="invis")
-        graph.add_edge(f"do {k}", str(k), arrowhead="normaltee")
     return graph
 
 

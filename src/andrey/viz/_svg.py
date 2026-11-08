@@ -29,7 +29,6 @@ CLEAR = NODE_R + 4.0  # minimum distance from an edge to a node it does not join
 HALF = 11.5  # half the side of an intervened node's square, about a node circle's area
 BAR = AW + 2.0  # half the length of the bar across an edge into an intervened node
 BAR_GAP = 4.0  # from an arrowhead's base to the bar
-STUB = ALEN + 9.0  # the length of the stub into an intervened node that no edge points into
 _BEND_STEP = NODE_R
 _BEND_STEPS = 8
 _SAMPLES = 16  # line segments approximating an arc for the clearance check
@@ -129,19 +128,6 @@ def _bar(px: float, py: float, ux: float, uy: float, color: str) -> str:
         f'x2="{_f(cx - nx)}" y2="{_f(cy - ny)}" stroke="{color}" stroke-width="{SW}" '
         'stroke-linecap="round"/>'
     )
-
-
-def _stub(x: float, y: float, ux: float, uy: float, palette: Palette) -> str:
-    """Draw a short arrow from outside into an intervened node no edge points into, with the bar.
-
-    ``(ux, uy)`` points from the node out to where the stub starts.
-    """
-    r = _reach(ux, uy, True)
-    px, py = x + ux * r, y + uy * r
-    color = palette.edge_directed
-    line = _line(px + ux * ALEN, py + uy * ALEN, px + ux * STUB, py + uy * STUB, color)
-    head = _head(px, py, ux, uy, "arrow", color, palette.surface)
-    return f'<g class="intervention">{line}{head}</g>' + _bar(px, py, ux, uy, color)
 
 
 def _glyph(mark: int) -> str:
@@ -355,8 +341,7 @@ def render(
     """Emit the full SVG string. Optional background, then edges, then nodes on top.
 
     ``highlight`` holds ``(node, neighbor)`` pairs: the mark at ``node`` on that edge is lit.
-    ``targets`` holds the intervened nodes: squares, with a bar across each arrowhead into them,
-    or a barred stub from outside when no arrowhead points into one.
+    ``targets`` holds the intervened nodes: squares, with a bar across each arrowhead into them.
     """
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
@@ -409,23 +394,6 @@ def render(
                     square=(i in targets, j in targets),
                 )  # fmt: skip
             )
-    for k in sorted(targets):
-        if any(
-            (i == k and mi == ARROW) or (j == k and mj == ARROW)
-            for i, j, mi, mj, _ in edges
-            if i != j
-        ):
-            continue
-        # The stub comes from the side away from the node's neighbors, or from the left.
-        x, y = pos[k]
-        dx = dy = 0.0
-        for m in {j if i == k else i for i, j, *_ in edges if k in (i, j) and i != j}:
-            ox, oy = x - pos[m][0], y - pos[m][1]
-            d = math.hypot(ox, oy) or 1.0
-            dx, dy = dx + ox / d, dy + oy / d
-        norm = math.hypot(dx, dy)
-        ux, uy = (dx / norm, dy / norm) if norm > 1e-9 else (-1.0, 0.0)
-        parts.append(_stub(x, y, ux, uy, palette))
     # Use one placement for the figure; short labels fit clear of endpoint marks inside nodes.
     labels_inside = all(len(label) <= 2 for label in labels)
     for k in range(n):
