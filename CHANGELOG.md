@@ -21,7 +21,7 @@ names its pull request.
   can therefore change where both p-values were below 1e-16 and the HSIC statistics decided; on
   970 pairs drawn as the ANM and PNL benchmarks draw theirs, from 200 to 16,000 rows, no direction
   changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
-  `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#PR])
+  `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2041,3 +2041,4 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#808]: https://github.com/Abel-ai-lab/andrey/pull/808
