@@ -95,7 +95,7 @@ names its pull request.
   variables, stands in for the hidden contexts with one-hot dummies of the dataset and the time
   step, and returns the temporal structure of `pcmciplus` over the system variables.
   `andrey.data.sample_context_series` draws the model the paper describes; here each context drives
-  exactly one system variable, so no hidden context is a common cause of two. ([#PR])
+  exactly one system variable, so no hidden context is a common cause of two. ([#796])
 - `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
   or GRaSP search, removing with tests the adjacencies whose endpoints are independent given some
   set of other variables and orienting the rest with FCI's rules, without GFCI's
@@ -2002,3 +2002,4 @@ First alpha release.
 [#775]: https://github.com/Abel-ai-lab/andrey/pull/775
 [#781]: https://github.com/Abel-ai-lab/andrey/pull/781
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
+[#796]: https://github.com/Abel-ai-lab/andrey/pull/796
