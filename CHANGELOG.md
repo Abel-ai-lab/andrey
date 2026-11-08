@@ -138,7 +138,7 @@ names its pull request.
   Andrey at every size they measure, instead of also grouping comparisons that share no size,
   drawing Andrey from the first alone, and leaving the method off the panel. The panel's legend
   names each package once, without its version or setting, so a package keeps one marker shape per
-  family; lingam's CAM-UV at its default set size stays on the 0.14.0 card. ([#PR])
+  family; lingam's CAM-UV at its default set size stays on the 0.14.0 card. ([#797])
 
 ### New contributors
 
@@ -2001,3 +2001,4 @@ First alpha release.
 [#775]: https://github.com/Abel-ai-lab/andrey/pull/775
 [#781]: https://github.com/Abel-ai-lab/andrey/pull/781
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
+[#797]: https://github.com/Abel-ai-lab/andrey/pull/797
