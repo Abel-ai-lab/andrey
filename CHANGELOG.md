@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- A release without its own art has a default release-card cover: the navy ground, the "Release
+  card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
+  tile among the earlier releases shows the version on navy, and a post without art has the same
+  link preview, the wordmark and its release on navy. ([#PR])
+
 ## [0.15.0] - 2026-11-07
 
 ### Highlights

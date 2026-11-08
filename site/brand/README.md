@@ -61,7 +61,8 @@
   fanning one beam into many rays). A narrow tile's art, and any tile that shows a number, is
   cobalt only, so the number is its one amber.
 - The release cards' covers (`docs/_static/release-cards/<release>.jpg`) are tall versions of the
-  same art, in the same tones, with calm areas where the card's text sits.
+  same art, in the same tones, with calm areas where the card's text sits. A release without art
+  takes the default cover, drawn in CSS from `wordmark-dark.svg` on navy, and needs no file here.
 - `abel-logo-white.svg`: the Abel AI Lab logotype, from Abel's brand kit. Its last path is the
   mark, which the homepage's footer draws beside Abel's name.
 - `abel-symbol-night.svg`: Abel's logomark in Night Teal, for light backgrounds, unchanged from

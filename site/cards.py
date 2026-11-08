@@ -193,9 +193,10 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 # the right, the art, at the card size (``W`` x ``H``) link previews expect. Each art (``ART``), its
 # subject on the right, is stored already recolored to the brand's tones (``brand_tones``), so the
 # file is what the page shows and cobalt and amber match across posts; a test fails on art stored
-# otherwise. A post without art shows the stipple ground. An art may also come centered
-# (``CENTERED``), its subject in the middle, for the cover and the thumbnail, which carry no text.
-# A JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
+# otherwise. A post without art shows the stipple ground on its cover and thumbnail, and its
+# banner is the default release cover's: the wordmark and the line on navy. An art may also come
+# centered (``CENTERED``), its subject in the middle, for the cover and the thumbnail, which carry
+# no text. A JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {
@@ -238,6 +239,8 @@ BANNER_LINE = 40  # the release or kind under the title
 # its height; the others center it under the wordmark.
 BANNER_LOW = {"punch-cards"}
 BANNER_BOTTOM = 552
+# A banner without art: the wordmark's top and height, and the line's baseline under it.
+DEFAULT_TOP, DEFAULT_WORDMARK, DEFAULT_LINE = 206, 132, 430
 # An earlier post's thumbnail on the blog's front page: the art, THUMB_W wide, sharp at three
 # times the rows' 10 rem.
 THUMB_W = 480
@@ -311,8 +314,10 @@ def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
 
 # A release card's cover art, 8.5 x 11 at three times the cover's 288 px width: the art in the
 # brand's tones, with a soft navy shade where the card's text sits, the masthead and title across
-# the top and the version at the bottom left. A release without art, and every earlier release's
-# tile, shows the stipple ground under the same shade (``release_ground_jpeg``).
+# the top and the version at the bottom left. A release without art takes the default cover, the
+# navy ground with the wordmark in the title's place, drawn in CSS (``release-default`` in
+# ``docs/_static/benchmarks.css``); 0.1.0's tile, which names neither, shows the stipple ground
+# under the same shade (``release_ground_jpeg``).
 RELEASE_W, RELEASE_H = 864, 1119
 RELEASE_SHADE = (0.55, 0.5)  # the shade's depth at the top edge and at the bottom left corner
 
@@ -333,7 +338,8 @@ def release_art(image: Image.Image) -> Image.Image:
 
 
 def release_ground_jpeg() -> bytes:
-    """The stipple ground as a release cover (``release_art``), for a release without art."""
+    """The stipple ground as a release cover (``release_art``), for a cover or tile that names
+    neither art nor the default."""
     out = io.BytesIO()
     release_art(grain.stipple(RELEASE_W, RELEASE_H).convert("RGB")).save(
         out, "JPEG", quality=60, subsampling=0, optimize=True
@@ -358,12 +364,34 @@ def _jpeg_href(image: Image.Image) -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
+def _line(line: str, x: float, y: float) -> str:
+    """The banner's short line, its baseline at (``x``, ``y``); nothing when ``line`` is empty."""
+    return (
+        f'<text x="{x}" y="{y}" font-family="Inter" font-weight="600" font-size="{BANNER_LINE}" '
+        f'fill="#ffffff" opacity="0.9">{html.escape(line)}</text>'
+        if line
+        else ""
+    )
+
+
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
     aligned with the banner's. The wordmark, ``title``, and ``line`` sit over the left side, with
-    an amber dot before ``line``, the title low for an art in ``BANNER_LOW``. Text sizes follow
-    the height."""
+    an amber dot before ``line``, the title low for an art in ``BANNER_LOW``.
+
+    Without art (the ``"ground"`` kind) the banner is the default release cover's: the navy ground,
+    the wordmark ``DEFAULT_WORDMARK`` tall in the title's place, and ``line`` under it. It has no
+    dot, since the wordmark's amber stroke is its one accent. Text sizes follow the height."""
     k = height / COVER_H
+    if kind == "ground":
+        text = _placed(
+            BRAND / "wordmark-dark.svg", BANNER_LEFT, DEFAULT_TOP, DEFAULT_WORDMARK
+        ) + _line(line, BANNER_LEFT, DEFAULT_LINE)
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+            f'<rect width="{width}" height="{height}" fill="{grain.NAVY}"/>'
+            f'<g transform="scale({k:.4f})">{text}</g></svg>'
+        )
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
@@ -382,12 +410,10 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
         + title_text
         + (
             f'<circle cx="{BANNER_LEFT + 9}" cy="{rule_y + 2.5}" r="9" fill="{grain.AMBER}"/>'
-            f'<text x="{BANNER_LEFT + 34}" y="{rule_y + 17}" font-family="Inter" '
-            f'font-weight="600" font-size="{BANNER_LINE}" fill="#ffffff" opacity="0.9">'
-            f"{html.escape(line)}</text>"
             if line
             else ""
         )
+        + _line(line, BANNER_LEFT + 34, rule_y + 17)
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
