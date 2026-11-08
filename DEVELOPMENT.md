@@ -154,6 +154,9 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 
 ### Add a method
 
+Start from the method's spec (`CONTRIBUTING.md`, "Propose a method"): the peer-reviewed paper that
+defines it, the existing implementations, and the setting the paper claims.
+
 1. Implement the facade in `src/andrey/api/<family>.py`, decorated with `@method_spec("<name>")`,
    add its name to `andrey.api.__all__`, and re-export it as `andrey.<name>` in
    `src/andrey/__init__.py`, in its imports and its `__all__`. The wrapper

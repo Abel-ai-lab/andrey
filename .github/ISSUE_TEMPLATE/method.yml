@@ -1,0 +1,48 @@
+name: Method request
+description: A validated, peer-reviewed causal discovery method Andrey should implement, with its spec.
+labels: [feature]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Andrey implements methods that are validated and peer-reviewed; it does not develop new ones.
+        A new method is developed in its own repository, with its evidence and a paper, and joins
+        Andrey after that.
+  - type: input
+    id: method
+    attributes:
+      label: Method
+      description: Its name, as its paper names it.
+    validations:
+      required: true
+  - type: textarea
+    id: paper
+    attributes:
+      label: Paper
+      description: The peer-reviewed paper that defines the method, with a link (journal, proceedings, or DOI).
+    validations:
+      required: true
+  - type: textarea
+    id: implementations
+    attributes:
+      label: Existing implementations
+      description: The authors' code first, then others, each with a link and its license.
+    validations:
+      required: true
+  - type: textarea
+    id: setting
+    attributes:
+      label: Setting the paper claims
+      description: The data (continuous, discrete, mixed, time series, several environments), the assumptions, and the sizes it is shown to work at.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: What the paper reports against other methods, and on which data.
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The task, and what stops you doing it with Andrey today.
