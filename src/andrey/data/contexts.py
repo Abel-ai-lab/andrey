@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+__all__ = ["ContextSeries", "sample_context_series"]
+
 _DRAWS = 1000  # draws of the weights before giving up on a stationary model
 _BURN_IN = 100  # steps dropped from the start of each series
 
