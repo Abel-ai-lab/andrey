@@ -12,6 +12,8 @@ fallback fails.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
@@ -207,8 +209,8 @@ def test_permutation_fci_matches_the_cpu(device, method):
 
 def test_pnl_matches_the_cpu(device):
     """PNL on cuda matches the CPU's p-values and statistics to rounding and makes the same
-    decisions, on 2,000 rows where dependent pairs' p-values are zero and the statistics decide,
-    with one worker or three."""
+    decisions, on 2,000 rows where dependent pairs' p-values fall far below 1e-16 and their
+    logarithms decide, with one worker or three."""
     if device != "cuda":
         pytest.skip("PNL has no mps backend")
     rng = np.random.default_rng(3)
@@ -225,10 +227,10 @@ def test_pnl_matches_the_cpu(device):
         got = pnl_pairs(table)
         threaded = pnl_pairs(table, n_jobs=3)
     assert backend.dispatch_stats() == {("pnl", "cuda"): 2}
-    assert (cpu[:, :2] == 0).all(axis=1).any()  # the statistics decide a pair
+    assert (cpu[:, :2] < math.log(1e-16)).all(axis=1).any()  # the logarithms decide a pair
     # The largest difference over 4,490 pairs of up to 5,000 rows was 5e-15 on an A100.
     for rows in (got, threaded):
-        assert np.allclose(rows[:, :2], cpu[:, :2], rtol=0, atol=1e-12)
+        assert np.allclose(np.exp(rows[:, :2]), np.exp(cpu[:, :2]), rtol=0, atol=1e-12)
         assert np.allclose(rows[:, 2:], cpu[:, 2:], rtol=1e-12, atol=0)
 
     def decisions(rows):

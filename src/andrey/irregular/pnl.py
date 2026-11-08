@@ -16,8 +16,8 @@ the ``numpy`` backend, each pair's four numbers equal :func:`pnl`'s on that pair
 
 On the ``cuda`` backend, or under ``auto`` from ``ANDREY_PNL_GPU_THRESHOLD`` rows squared, the
 kernels and their sums run in float64 torch on the device, a batch of disturbances at a time; the
-fits, the normal scores, and the gamma p-values stay on the CPU, so the results match the CPU's to
-rounding.
+fits, the normal scores, and the gamma p-values' logarithms stay on the CPU, so the results match
+the CPU's to rounding.
 """
 
 from __future__ import annotations
@@ -205,7 +205,7 @@ class _Buffers:
 def _hsic(
     kxc: np.ndarray, trace_x: float, sumsq_x: float, disturbance: np.ndarray, buffers: _Buffers
 ) -> tuple[float, float]:
-    """Return ``hsic_statistic_test(cause, disturbance)`` given the cause's centered kernel.
+    """Return ``hsic_statistic_log_p(cause, disturbance)`` given the cause's centered kernel.
 
     ``kxc`` is the cause's centered kernel, ``trace_x`` its trace, and ``sumsq_x`` the sum of its
     squared entries.
@@ -222,7 +222,7 @@ def _hsic(
 def _run_tasks(
     columns: dict[int, _Column], tasks: list[tuple[int, int]]
 ) -> list[tuple[float, float]]:
-    """Return ``(statistic, p_value)`` for each ``(cause, effect)`` task, in order.
+    """Return ``(statistic, log_p)`` for each ``(cause, effect)`` task, in order.
 
     The cause's kernel is rebuilt only when the cause changes, so tasks sorted by cause share it.
     """
@@ -261,7 +261,7 @@ def _device_kernels(z, width: float):
 def _device_tests(
     columns: dict[int, _Column], ordered: list[tuple[int, int]], workers: int, dev: str
 ) -> list[tuple[float, float]]:
-    """Return ``(statistic, p_value)`` for each ``(cause, effect)`` task in ``ordered``, sorted by
+    """Return ``(statistic, log_p)`` for each ``(cause, effect)`` task in ``ordered``, sorted by
     cause, with the kernels on the torch device ``dev``.
 
     ``workers`` threads fit the disturbances in order while this thread runs each cause's kernel
@@ -329,7 +329,7 @@ def _thread_count(n: int, requested: int) -> int:
 def _ordered_tests(
     columns: dict[int, _Column], tasks: list[tuple[int, int]], workers: int, dev: str = "numpy"
 ) -> dict[tuple[int, int], tuple[float, float]]:
-    """Return ``{(cause, effect): (statistic, p_value)}`` for the distinct ``tasks``.
+    """Return ``{(cause, effect): (statistic, log_p)}`` for the distinct ``tasks``.
 
     On ``numpy`` the tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per
     worker thread (:func:`_thread_count` lowers the number of threads to fit a memory budget), each
@@ -360,21 +360,23 @@ def _ordered_tests(
 
 
 def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
-    """Return ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the pair ``x, y``.
+    """Return ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for ``x, y``.
 
-    ``pval_forward`` is the HSIC independence p-value between ``x`` and the disturbance recovered
-    under the ``x -> y`` post-nonlinear model; ``pval_backward`` is the same quantity under the
-    ``y -> x`` model. A larger p-value means the assumed cause and the recovered disturbance are
-    more independent, so it favors that direction. ``stat_forward`` and ``stat_backward`` are the
-    HSIC statistics of the same two tests, each divided by its mean under independence; a smaller
-    value means weaker dependence. ``x`` and ``y`` are 1-D arrays of equal length.
+    ``log_p_forward`` is the natural logarithm of the HSIC independence p-value between ``x`` and
+    the disturbance recovered under the ``x -> y`` post-nonlinear model; ``log_p_backward`` is the
+    same quantity under the ``y -> x`` model. A larger p-value means the assumed cause and the
+    recovered disturbance are more independent, so it favors that direction; the logarithms keep
+    their order where the p-values underflow (:mod:`andrey.core.independence`). ``stat_forward``
+    and ``stat_backward`` are the HSIC statistics of the same two tests, each divided by its mean
+    under independence; a smaller value means weaker dependence. ``x`` and ``y`` are 1-D arrays of
+    equal length.
     """
     columns = {0: _column(x), 1: _column(y)}
     n = columns[0].standardized.shape[0]
     dev = backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=False)
     tests = _ordered_tests(columns, [(0, 1), (1, 0)], backend.worker_count(), dev)
-    (stat_forward, pval_forward), (stat_backward, pval_backward) = tests[0, 1], tests[1, 0]
-    return pval_forward, pval_backward, stat_forward, stat_backward
+    (stat_forward, log_p_forward), (stat_backward, log_p_backward) = tests[0, 1], tests[1, 0]
+    return log_p_forward, log_p_backward, stat_forward, stat_backward
 
 
 def pnl_pairs(
@@ -385,7 +387,7 @@ def pnl_pairs(
 ) -> np.ndarray:
     """Return :func:`pnl`'s four numbers for pairs of ``data``'s columns, one row per pair.
 
-    Row ``k`` is ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the ``k``-th
+    Row ``k`` is ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for the ``k``-th
     pair ``(i, j)``, where forward means column ``i`` -> column ``j``; on the ``numpy`` backend it
     equals ``pnl(data[:, i], data[:, j])`` bit for bit, and on a torch device to rounding, because
     a device sums a batch of a cause's pairs in another order than a single pair. ``pairs``

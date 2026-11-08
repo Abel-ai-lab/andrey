@@ -8,6 +8,7 @@ cause hides unordered.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -77,8 +78,9 @@ def fit_pair(
     ``data`` must be a table of two columns; the tests read the rows where both are observed
     (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
     magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
-    mean and unit variance. ``native`` returns the forward and backward p-values and statistics,
-    and the result holds the edge they choose with ``alpha`` (:func:`pairwise_output`).
+    mean and unit variance. ``native`` returns the natural logarithms of the forward and backward
+    p-values, then the two statistics, and the result holds the edge they choose with ``alpha``
+    (:func:`pairwise_output`).
     """
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:
         raise ValueError(
@@ -90,12 +92,13 @@ def fit_pair(
     if standardize:
         X = X / np.abs(X).max(axis=0)
         X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
-    pval_forward, pval_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
+    log_p_forward, log_p_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
     return pairwise_output(
-        pval_forward,
-        pval_backward,
+        math.exp(log_p_forward),
+        math.exp(log_p_backward),
         stat_forward=stat_forward,
         stat_backward=stat_backward,
+        log_p=(log_p_forward, log_p_backward),
         alpha=alpha,
         labels=labels,
         extra=rows,
@@ -166,14 +169,16 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     :func:`~andrey.resit` or :func:`~andrey.cam`, and when the effect also passes through an
     invertible nonlinear transform, :func:`~andrey.pnl`.
 
-    With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
-    sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
-    the choice to the HSIC statistics, each divided by its mean under independence, and the edge
-    points in the direction with the smaller one, the weaker dependence between the proposed cause
-    and its residual. Equal statistics give no edge. The rule therefore produces an edge even for
-    unrelated variables, a deterministic pair whose p-values are both near zero, or a pair whose
-    direction cannot be identified. Mooij et al. (2016) [3]_ compare p-values to avoid choosing a
-    significance level and found the comparison among the best methods in their benchmark.
+    With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
+    compared through their logarithms, which keep their order where both p-values fall below about
+    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction. Equal
+    p-values leave the choice to the HSIC statistics, each divided by its mean under independence,
+    and the edge points in the direction with the smaller one, the weaker dependence between the
+    proposed cause and its residual. Equal statistics give no edge. The rule therefore produces an
+    edge even for unrelated variables, a deterministic pair whose p-values are both near zero, or a
+    pair whose direction cannot be identified. Mooij et al. (2016) [3]_ compare p-values to avoid
+    choosing a significance level and found the comparison among the best methods in their
+    benchmark.
 
     With a significance level, only the p-values decide; a direction passes when its p-value
     exceeds ``alpha``:
@@ -302,14 +307,16 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     model; for more than two variables, use :func:`~andrey.resit` or :func:`~andrey.cam`, which
     assume additive noise.
 
-    With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
-    sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
-    the choice to the HSIC statistics, each divided by its mean under independence, and the edge
-    points in the direction with the smaller one, the weaker dependence between the proposed cause
-    and its estimated noise. Equal statistics give no edge. The rule therefore produces an edge
-    even for unrelated variables or a pair whose direction cannot be identified, such as a linear
-    Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a significance level
-    and found the comparison among the best methods in their benchmark of additive-noise models.
+    With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
+    compared through their logarithms, which keep their order where both p-values fall below about
+    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction. Equal
+    p-values leave the choice to the HSIC statistics, each divided by its mean under independence,
+    and the edge points in the direction with the smaller one, the weaker dependence between the
+    proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
+    produces an edge even for unrelated variables or a pair whose direction cannot be identified,
+    such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a
+    significance level and found the comparison among the best methods in their benchmark of
+    additive-noise models.
 
     With a significance level, only the p-values decide; a direction passes when its p-value
     exceeds ``alpha``:

@@ -10,6 +10,19 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, and `indep_test="kci"` without conditions
+  compute their HSIC p-values from the gamma law's upper tail through its logarithm, as `resit` and
+  `camuv` do, instead of as one minus the lower tail, which rounded every p-value below about 1e-16
+  to 0. `anm` and `pnl` compare the logarithms of their two p-values, which keep their order where
+  both p-values fall below about 1e-308 and read 0, and `bottom_up_parce_lingam` and `gin` pool a
+  finite logarithm by Fisher's method where they pooled infinity or the smallest double. A result
+  can therefore change where both p-values were below 1e-16 and the HSIC statistics decided; on
+  970 pairs drawn as the ANM and PNL benchmarks draw theirs, from 200 to 16,000 rows, no direction
+  changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
+  `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#PR])
+
 ## [0.15.0] - 2026-11-07
 
 ### Highlights
