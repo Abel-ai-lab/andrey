@@ -404,6 +404,7 @@ variable.
    pcmci
    pcmciplus
    lpcmci
+   jpcmciplus
    granger
    dynotears
 ```
@@ -533,6 +534,15 @@ ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It retu
 structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at lag 0. The
 [0.14.0](benchmarks/0.14.0.md#dynotears) release card measures it against CausalNex.
 
+J-PCMCI+ (Gunther, Ninad, and Runge 2023) runs PCMCI+ on several datasets of the same variables,
+such as sites or subjects. Pass the datasets as a list; `time_contexts` names the columns that
+change over time and are the same in every dataset, and `space_contexts` those fixed within a
+dataset. One-hot dummies of the dataset and of the time step stand in for the contexts you did not
+measure. It returns the temporal structure of PCMCI+ over the other columns, and lists the context
+links in `metadata["context_links"]` and the dummies' links in `metadata["index_edges"]` and
+`metadata["time_index_edges"]`. The [0.15.0](benchmarks/0.15.0.md#j-pcmci) release card
+measures it against tigramite, the package of its authors.
+
 ### Experimental methods
 
 A new method ships as experimental: it passes recovery tests but has no published benchmark, its
@@ -548,21 +558,12 @@ its first call in a process.
 
    notears
    dagma
-   jpcmciplus
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-J-PCMCI+ (Gunther, Ninad, and Runge 2023) runs PCMCI+ on several datasets of the same variables,
-such as sites or subjects. Pass the datasets as a list; `time_contexts` names the columns that
-change over time and are the same in every dataset, and `space_contexts` those fixed within a
-dataset. One-hot dummies of the dataset and of the time step stand in for the contexts you did not
-measure. It returns the temporal structure of PCMCI+ over the other columns, and lists the context
-links in `metadata["context_links"]` and the dummies' links in `metadata["index_edges"]` and
-`metadata["time_index_edges"]`.
 
 A method becomes supported once it has:
 

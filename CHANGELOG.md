@@ -17,7 +17,7 @@ names its pull request.
   arrowhead with a bar behind it, and a target no arrowhead points into gets a barred arrow from an
   invisible `point` node. ([#PR])
 
-## [0.15.0] - 2026-11-07
+## [0.15.0] - 2026-11-08
 
 ### Highlights
 
@@ -38,6 +38,12 @@ names its pull request.
   faster at 20 measured variables and 7.6 times faster at 100 on one core (median), as the
   [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) shows. ([#737], [#761],
   [#775])
+- `jpcmciplus` is supported and joins the quality gate. Against tigramite 5.2.10.1's J-PCMCI+, the
+  authors' implementation, on the model of the J-PCMCI+ paper's experiment script with 5 system
+  variables and 5 to 200 datasets of 10 to 200 steps, it ties in all 28 comparisons and fits 14 to
+  168 times faster on one core (median). The
+  [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) gives the numbers.
+  ([#796], [#803])
 - `ges`, `hc`, `tabu`, `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take `env`, each row's
   environment, for data from several environments (experimental): the environment index
   joins the search as a variable that no data variable causes, which removes the edges that pooling
@@ -96,13 +102,13 @@ names its pull request.
   Causal Inference, Mooij, Magliacane, and Claassen 2020): it takes `env` as `cdnod` does,
   `confounded_index=False` when the environment is set from outside, and lists the environment's
   edges in `metadata["index_edges"]`. ([#739])
-- `jpcmciplus` (experimental) learns the links of time series from several datasets of the same
-  variables whose differences come from context variables, as J-PCMCI+ (Gunther, Ninad, and Runge
-  2023) does: it finds the links from the measured time and space contexts into the system
-  variables, stands in for the hidden contexts with one-hot dummies of the dataset and the time
-  step, and returns the temporal structure of `pcmciplus` over the system variables.
-  `andrey.data.sample_context_series` draws the model the paper describes; here each context drives
-  exactly one system variable, so no hidden context is a common cause of two. ([#796])
+- `jpcmciplus` learns the links of time series from several datasets of the same variables whose
+  differences come from context variables, as J-PCMCI+ (Gunther, Ninad, and Runge 2023) does: it
+  finds the links from the measured time and space contexts into the system variables, stands in for
+  the hidden contexts with one-hot dummies of the dataset and the time step, and returns the
+  temporal structure of `pcmciplus` over the system variables. `andrey.data.sample_context_series`
+  draws the model the paper describes; here each context drives exactly one system variable, so no
+  hidden context is a common cause of two. ([#796])
 - `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
   or GRaSP search, removing with tests the adjacencies whose endpoints are independent given some
   set of other variables and orienting the rest with FCI's rules, without GFCI's
@@ -2028,3 +2034,4 @@ First alpha release.
 [#796]: https://github.com/Abel-ai-lab/andrey/pull/796
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
+[#803]: https://github.com/Abel-ai-lab/andrey/pull/803

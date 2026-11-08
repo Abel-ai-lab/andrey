@@ -42,6 +42,7 @@
       "PCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "PCMCIplus": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "LPCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "J-PCMCI+": {"median_shd": 1, "reason": "No draw changed when every value of the system variables, and each context column as a whole, was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "VARMA-LiNGAM": {"median_shd": 2, "reason": "Where the likelihood fit stops depends on the CPU's BLAS kernels, so a draw's graph can differ between CPU types; the gate checks the median. Under a relative 1e-12 input perturbation, three times, 4 of 60 draws changed and no median moved. Two covers a moved median with one to spare."},
       "LongitudinalLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
       "Granger": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single p-value that lies on the edge of alpha to flip on another host."},
@@ -244,6 +245,10 @@
       "LPCMCI": {
         "lpcmci_paper_d5_n500": {"median_shd": 4.5, "empty_median_shd": 16.0, "shd": [6, 26, 0, 16, 0, 2, 25, 2, 21, 3]},
         "lpcmci_paper_d10_n1000": {"median_shd": 41.5, "empty_median_shd": 62.0, "shd": [49, 3, 73, 34, 50, 20, 24, 19, 103, 99]}
+      },
+      "J-PCMCI+": {
+        "jpcmciplus_all_m10_t100": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [2, 0, 4, 2, 4, 6, 2, 0, 0, 0]},
+        "jpcmciplus_half_m10_t100": {"median_shd": 3.0, "empty_median_shd": 20.0, "shd": [2, 4, 0, 2, 0, 8, 8, 4, 6, 0]}
       },
       "VARMA-LiNGAM": {
         "varma_lingam_paper_d3_n300": {"median_shd": 2.0, "empty_median_shd": 7.0, "shd": [4, 5, 2, 2, 2, 1, 0, 1, 4, 2]},

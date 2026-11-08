@@ -93,7 +93,9 @@ benchmarks/start_tigramite.sh
 export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
 ```
 
-Its adapter calls the package's public API only.
+Its adapters call the package's public API only. The J-PCMCI+ lane's adapter applies
+`patches/tigramite-jpcmciplus-context-links.patch` to `JPCMCIplus` in memory, which leaves the
+installed package unchanged.
 
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
 lingam's MultiGroupDirectLiNGAM and CAM-UV, and causal-learn's CAM-UV, which fits with pygam too,
