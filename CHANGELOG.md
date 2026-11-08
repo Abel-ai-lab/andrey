@@ -15,7 +15,7 @@ names its pull request.
 - `andrey.viz.to_graphviz(structure, targets=)` marks the intervened variables as `draw` does,
   named by label or by position: each is a `square` node, each arrowhead into it is `normaltee`, an
   arrowhead with a bar behind it, and a target no arrowhead points into gets a barred arrow from an
-  invisible `point` node. ([#PR])
+  invisible `point` node. ([#806])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2035,3 +2035,4 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#806]: https://github.com/Abel-ai-lab/andrey/pull/806
