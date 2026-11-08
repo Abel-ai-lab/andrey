@@ -228,10 +228,13 @@ def shd(a, b):
 
 
 def is_valid(structure):
-    """Whether a cpdag has a consistent DAG extension, or a pag the MAG of Zhang's construction."""
+    """Whether a cpdag has a consistent DAG extension, or a pag a MAG by Zhang's construction."""
     marks = structure.to_numpy()
     try:
-        (pdag2dag if structure.kind == "cpdag" else mag_of_pag)(marks)
+        if structure.kind == "cpdag":
+            pdag2dag(marks)
+        else:
+            GraphStructure.from_numpy(mag_of_pag(marks), kind="mag").to_pag()  # raises for no MAG
     except ValueError:
         return False
     return True
@@ -291,6 +294,16 @@ def test_pc_resamples_that_no_dag_extends_do_not_become_the_averaged_graph():
     assert out.metadata["averaged_graph"] == "nearest_resample"  # the vote has no valid cpdag
     assert is_valid(out.structure)
     assert out.structure.markov_blanket("x0")
+
+
+def test_fci_resamples_that_are_not_pags_do_not_become_the_averaged_graph():
+    data = andrey.data.sample_scm(d=8, n=1000, seed=16, density=3.0).data
+    with andrey.config(n_jobs=1), pytest.warns(andrey.AndreyWarning, match="no valid pag"):
+        out = bootstrap("fci", data, n_resamples=30, seed=16, keep_fits=True)
+    assert sum(not is_valid(fit.structure) for fit in out.fits) > 15  # most fits are not PAGs
+    assert out.metadata["averaged_graph"] == "nearest_resample"
+    assert is_valid(out.structure)
+    out.structure.m_separated(0, 4, [])  # a graph query raises on a pag that is not a PAG
 
 
 @pytest.mark.parametrize("seed", range(4))
