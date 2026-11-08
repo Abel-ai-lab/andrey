@@ -18,7 +18,7 @@ names its pull request.
   returned one. On 28 and 29 of them, the MAG that Zhang's construction builds from the `pag` is
   not ancestral, and a graph query such as `m_separated` raised `ValueError`. `bootstrap`'s Notes
   name a `pag` from which Zhang's construction builds no MAG among the fits its averaged graph
-  passes over for the nearest valid resample. ([#PR])
+  passes over for the nearest valid resample. ([#807])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2038,3 +2038,4 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#807]: https://github.com/Abel-ai-lab/andrey/pull/807
