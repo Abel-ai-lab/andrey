@@ -157,8 +157,8 @@ ANM and PNL test which of two variables causes the other.
 :img-top: /_generated/thumbs/time_series.svg
 :img-alt: The true graph of this notebook's series, its lags merged
 
-PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, and Longitudinal LiNGAM on data over
-time.
+PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, Longitudinal LiNGAM, and J-PCMCI+ on data
+over time.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

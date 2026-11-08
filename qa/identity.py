@@ -18,11 +18,12 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's, IGSP's, and FCI-JCI's (:class:`Fit`) on ``K`` seeded
-column orders and maps each answer back to the original columns before hashing it; ``--workers N``
-refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on ``N`` workers,
-with every GES pass, every skeleton pass of conditioning size two or more, and every possible-d-sep
-search sent to the pool. Both report each refit whose answer differs from the first fit.
+``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, and J-PCMCI+'s (:class:`Fit`) on
+``K`` seeded column orders and maps each answer back to the original columns before hashing it;
+``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
+``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
+possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
+fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -76,9 +77,9 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, and FCI-JCI, whose draws a column order
-    does not apply to: each row's environment is a column of the draw, and ICP's target is the last
-    variable.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, and J-PCMCI+, whose draws a
+    column order does not apply to: each row's environment is a column of the draw, ICP's target is
+    the last variable, and J-PCMCI+'s contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -136,6 +137,20 @@ def _pcmci(x: np.ndarray) -> StructureOutput:
     return andrey.pcmci(x, **params)
 
 
+def _jpcmciplus(x: np.ndarray) -> StructureOutput:
+    """J-PCMCI+ at the gate's settings on a draw of its datasets, the contexts at the gate's
+    positions."""
+    contexts = qg.context_columns(x)
+    return andrey.jpcmciplus(
+        list(x),
+        time_contexts=contexts["time_contexts"],
+        space_contexts=contexts["space_contexts"],
+        time_dummy=True,
+        tau_max=2,
+        alpha=ALPHA,
+    )
+
+
 def _longitudinal(x):
     """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
     as lingam does."""
@@ -185,6 +200,7 @@ FITS: dict[str, Fit] = {
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
+    "J-PCMCI+": Fit(_jpcmciplus, shuffled=False, alpha=ALPHA),
     "VARMA-LiNGAM": Fit(
         lambda x: andrey.varma_lingam(
             x, order=tuple(_VARMA["order"]), criterion=_VARMA["criterion"], prune=_VARMA["prune"]
@@ -244,6 +260,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.hidden_cause_draws, "latent_anm_er_tenth", 33, 1000
     ),
     "dynotears_paper_d40_n1000": functools.partial(qg.series_draws, "dynotears_paper", 40, 1000),
+    "jpcmciplus_half_m200_t10": functools.partial(qg.context_draws, "half-M200-T10"),
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
@@ -280,6 +297,7 @@ LARGER: dict[str, str] = {
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
+    "J-PCMCI+": "jpcmciplus_half_m200_t10",
     "VARMA-LiNGAM": "varma_lingam_paper_d8_n300",
     "LongitudinalLiNGAM": "longitudinal_lingam_stable_d10_n20_m500",
     "Granger": "var2_lagged_d10_n1000",
