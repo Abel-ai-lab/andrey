@@ -26,6 +26,7 @@ import statistics
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
+from collections import Counter
 from html import escape
 from pathlib import Path
 from typing import get_args
@@ -512,12 +513,13 @@ NOT_SHOWN_COMPARATORS = {
 }
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear", "boss_grasp_fci"}
-# A method's line uses its shortest-named comparison by default. These settings override that
-# choice: BOSS and GRaSP with the BDeu score on categorical data, as measured in 0.8.0, each shown
-# under the method's name.
+# A method's line uses its first shortest-named comparison by default. These settings override that
+# choice, each shown under the method's name from its first comparison: BOSS and GRaSP with the
+# BDeu score on categorical data, as measured in 0.8.0, and ICP with its default approximate test.
 SHOWN_SETTINGS = {
     "BOSS on discrete data, BDeu score": "BOSS",
     "GRaSP on discrete data, BDeu score": "GRaSP",
+    "ICP, approximate test": "ICP",
 }
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
@@ -912,18 +914,28 @@ def family_intro() -> str:
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
     """The comparisons a chart each: a method's comparisons share one chart when they come from
-    the same runs (Andrey's times agree at every common size), otherwise one chart apiece."""
+    the same runs, otherwise one chart apiece. A comparison joins a chart when it measures a size
+    every comparison in the chart measures, and Andrey's times agree with each of them at every
+    size they share."""
+
+    def times(method: dict) -> dict[int, Counter]:
+        out: dict[int, Counter] = {}
+        for r in method["rows"]:
+            out.setdefault(r["d"], Counter())[r["andrey_s"]] += 1
+        return out
+
     groups: list[tuple[str, list[dict]]] = []
     for method in claimed_comparisons(summaries):
+        ours = times(method)
         same = [
             g
             for g in groups
             if g[0] == method["method"]
+            and set(ours).intersection(*(times(m).keys() for m in g[1]))
             and all(
-                a["andrey_s"] == b["andrey_s"]
-                for a in g[1][0]["rows"]
-                for b in method["rows"]
-                if a["d"] == b["d"]
+                theirs[d] == ours[d]
+                for theirs in map(times, g[1])
+                for d in theirs.keys() & ours.keys()
             )
         ]
         if same:
@@ -931,6 +943,16 @@ def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
         else:
             groups.append((method["method"], [method]))
     return groups
+
+
+def andrey_rows(methods: list[dict]) -> list[dict]:
+    """Andrey's rows across a chart's comparisons (:func:`time_groups`), smallest size first: each
+    size from the first comparison that measures it, since the chart's comparisons agree there."""
+    rows: list[dict] = []
+    for method in methods:
+        known = {r["d"] for r in rows}
+        rows += [r for r in method["rows"] if r["d"] not in known]
+    return sorted(rows, key=lambda r: r["d"])
 
 
 def log_scale(lo: float, hi: float, a: float, b: float):
@@ -965,7 +987,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float]) -> str:
             f'<line x1="{left}" x2="{right}" y1="{y(d):.1f}" y2="{y(d):.1f}" class="tc-grid"/>'
             f'<text x="{left - 6}" y="{y(d) + 3:.1f}" text-anchor="end">{d:,}</text>'
         )
-    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in methods[0]["rows"]]
+    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in andrey_rows(methods)]
     series = [("Andrey", ours, "tc-andrey")]
     series += [
         (
@@ -2419,10 +2441,8 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
         if not all(faster(m) for m in methods):
             continue
         shown = default.get(methods[0]["spec"])
-        if (
-            name in SHOWN_SETTINGS
-            or (shown is not None and shown[0] not in SHOWN_SETTINGS and len(name) < len(shown[0]))
-            or shown is None
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
         ):
             default[methods[0]["spec"]] = (name, methods)
     out: dict[str, list[dict]] = {}

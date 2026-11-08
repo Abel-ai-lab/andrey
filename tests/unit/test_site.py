@@ -17,6 +17,7 @@ import subprocess
 import sys
 import types
 import warnings
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -261,6 +262,78 @@ def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
     # Method names omit setting descriptions such as "XGES without extended search".
     names = {p["method"] for shown in points.values() for p in shown}
     assert not any(" on " in n or " without " in n or ", " in n for n in names)
+
+
+def test_a_chart_joins_only_comparisons_from_the_same_runs():
+    # PC against gCastle on the causal-learn runs with one more size, against causal-learn at a
+    # size no other comparison measures, and against pcalg on runs of its own.
+    runs = [_row(20, 0.1, 1.0, 10.0, 5, 6, 20), _row(50, 0.3, 4.0, 13.3, 12, 13, 50)]
+    larger = _row(100, 0.9, 20.0, 22.2, 30, 31, 100)
+    summary = {
+        **SUMMARY,
+        "methods": [
+            _method("PC", "constraint-based", "causal-learn", runs),
+            _method("PC", "constraint-based", "gCastle", [*runs, larger]),
+            _method("PC", "constraint-based", "causal-learn", [_row(200, 2, 90, 45, 60, 62, 200)]),
+            _method("PC", "constraint-based", "pcalg", [_row(50, 0.35, 2.0, 5.7, 12, 12, 50)]),
+        ],
+    }
+    groups = build.time_groups([summary])
+    assert [[m["comparator"] for m in methods] for _, methods in groups] == [
+        ["causal-learn", "gCastle"],
+        ["causal-learn"],
+        ["pcalg"],
+    ]
+    # Andrey's line covers every size a chart's comparisons time.
+    for name, methods in groups:
+        chart = build.time_chart(name, methods, (0.01, 100))
+        sizes = {r["d"] for m in methods for r in m["rows"]}
+        assert chart.count('class="tc-point tc-andrey') == len(sizes)
+    # The panel draws PC over the sizes its first chart's packages share.
+    ours = [p for p in build.frontier_points([summary])["constraint"] if p["ours"]]
+    assert [(p["method"], [d for d, _, _ in p["sizes"]]) for p in ours] == [("PC", [20, 50])]
+
+
+def test_every_chart_draws_its_comparisons_and_every_scored_method_reaches_the_panel():
+    summaries = placeholder_summaries()
+    groups = build.time_groups(summaries)
+    assert sum(len(methods) for _, methods in groups) == len(build.claimed_comparisons(summaries))
+    for name, methods in groups:
+        times = []
+        for m in methods:
+            times.append({})
+            for r in m["rows"]:
+                times[-1].setdefault(r["d"], Counter())[r["andrey_s"]] += 1
+        # A chart's comparisons share a size, and Andrey's times agree wherever two share one.
+        assert set(times[0]).intersection(*times[1:]), name
+        for d in {d for t in times for d in t}:
+            seen = [t[d] for t in times if d in t]
+            assert all(s == seen[0] for s in seen), (name, d)
+        # The chart draws every Andrey time its comparisons record.
+        drawn = build.andrey_rows(methods)
+        assert {(r["d"], r["andrey_s"]) for m in methods for r in m["rows"]} <= {
+            (r["d"], r["andrey_s"]) for r in drawn
+        }
+        chart = build.time_chart(name, methods, (1e-4, 1e5))
+        assert chart.count('class="tc-point tc-andrey') == sum(
+            r["andrey_s"] is not None for r in drawn
+        )
+
+    # A method reaches the speed panel when one of its charts has a size where every package
+    # has a time and a score.
+    def scored(method: dict, row: dict) -> bool:
+        timed = row["andrey_s"] is not None and row["comparator_s"] is not None
+        if method["family"] in build.F1_FAMILIES:
+            return timed and None not in (row["andrey_f1"], row["comparator_f1"])
+        return timed and bool(row["empty_errors"])
+
+    charts = build.speed_groups(summaries)
+    names = {p["method"] for shown in build.frontier_points(summaries).values() for p in shown}
+    shown = {ms[0]["spec"] for n, ms in charts if build.SHOWN_SETTINGS.get(n, n) in names}
+    for _, methods in charts:
+        sizes = [{r["d"] for r in m["rows"] if scored(m, r)} for m in methods]
+        if set.intersection(*sizes):
+            assert methods[0]["spec"] in shown, methods[0]["method"]
 
 
 def test_the_temporal_figure_scores_links_by_f1():

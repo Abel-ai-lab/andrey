@@ -133,6 +133,10 @@ names its pull request.
   always `0`. ([#738])
 - `andrey.viz.draw` outlines each label below a node in the palette's `paper` color, so an edge that
   passes under a label no longer crosses its letters. ([#791])
+- The homepage speed panel shows FCI-JCI, IAMB, MMPC, ICP, and CAM-UV. A speed chart groups a
+  method's comparisons only when they share a size and Andrey's times agree there, and draws
+  Andrey at every size they measure, instead of also grouping comparisons that share no size,
+  drawing Andrey from the first alone, and leaving the method off the panel. ([#PR])
 
 ### New contributors
 
