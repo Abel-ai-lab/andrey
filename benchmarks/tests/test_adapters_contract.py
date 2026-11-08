@@ -34,6 +34,7 @@ from andrey_bench.adapters.andrey_gies import AndreyGIES
 from andrey_bench.adapters.andrey_grasp import AndreyGRaSP
 from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_ica_lingam import AndreyICALiNGAM
+from andrey_bench.adapters.andrey_jpcmciplus import AndreyJPCMCIPlus, AndreyPooledPCMCIPlus
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.andrey_xges import AndreyXGES
@@ -58,6 +59,7 @@ from andrey_bench.adapters.pcalg_gies import PcalgGIES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
 from andrey_bench.adapters.pcalg_rfci import PcalgRFCI
 from andrey_bench.adapters.tetrad_gfci import TetradGFCI
+from andrey_bench.adapters.tigramite_jpcmciplus import TigramiteJPCMCIPlus
 from andrey_bench.adapters.tigramite_pc import TigramitePC
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.oracle import OracleGES
@@ -83,6 +85,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyXGES(name="andrey.xges.numpy.no_extended_search", extended_search=False),
     AndreyGIES(),
     AndreyExactSearch(),
+    AndreyJPCMCIPlus(),
+    AndreyPooledPCMCIPlus(),
     CausalLearnGES(),
     CausalLearnPC(),
     CausalLearnPC("kci"),
@@ -111,6 +115,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     BnlearnPCStable(),
     TigramitePC("cmiknn"),
     TigramitePC("gpdc"),
+    TigramiteJPCMCIPlus(),
     OracleGES(),
     BaselineEmpty(),
 ]
@@ -180,6 +185,8 @@ DEFERRED_MODULES = {
     "andrey.xges.numpy.no_extended_search": "andrey.search.xges",
     "andrey.gies.numpy": "andrey.search.gies",
     "andrey.exact_search.numpy": "andrey.search.exact",
+    "andrey.jpcmciplus.numpy": "andrey.temporal.jpcmciplus",
+    "andrey.pcmciplus.pooled.numpy": "andrey.temporal.pcmciplus",
     "causal-learn.exact_search": "causallearn.search.ScoreBased.ExactSearch",
     "causal-learn.boss": "causallearn.search.PermutationBased.BOSS",
     "causal-learn.grasp": "causallearn.search.PermutationBased.GRaSP",

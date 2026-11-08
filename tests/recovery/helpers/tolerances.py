@@ -97,6 +97,14 @@ SPEC: dict[str, dict] = {
             "statistics": {"atol": 1e-8, "rtol": 1e-6},
         },
     },
+    # J-PCMCI+: PCMCI+'s fields over the system variables, and the context and dummy links.
+    "JPCMCIplus": {
+        "structural": ["graph", "conflicts", "context_links", "index_edges", "time_index_edges"],
+        "numeric": {
+            "p_values": {"atol": 1e-8, "rtol": 1e-6},
+            "statistics": {"atol": 1e-8, "rtol": 1e-6},
+        },
+    },
     "LPCMCI": {
         "structural": ["links", "conflicts"],
         "numeric": {

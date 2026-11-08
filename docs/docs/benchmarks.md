@@ -34,13 +34,14 @@ Multi-domain data
 ::::{div} release-tldr
 
 0.15.0 is here: multi-domain data. The card measures the methods it makes supported against their
-authors' code: FCI-JCI, which learns from data collected in several environments, against pcalg,
-and BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes.
+authors' code: FCI-JCI, which learns from data collected in several environments, against pcalg;
+BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes; and J-PCMCI+, which
+learns from time series of several datasets, against tigramite.
 
 :::{div} release-stats
 
-- **3 methods** newly supported: FCI-JCI, BOSS-FCI, and GRaSP-FCI
-- **0 of 158** comparisons where pcalg or Tetrad 7.6.10 makes significantly fewer errors
+- **4 methods** newly supported: FCI-JCI, BOSS-FCI, GRaSP-FCI, and J-PCMCI+
+- **0 of 186** comparisons where pcalg, Tetrad 7.6.10, or tigramite makes significantly fewer errors
 - **72x to 79x** FCI-JCI's median speed over pcalg at 10 variables
 :::
 

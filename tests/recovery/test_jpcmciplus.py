@@ -10,6 +10,8 @@ import pytest
 import andrey
 from andrey.core import ARROW, NULL, TAIL
 from andrey.data import sample_context_series
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.harness import assert_recorded_output
 
 N_DATASETS = 10
 
@@ -39,6 +41,11 @@ def _same_step(out: andrey.StructureOutput) -> set[tuple[int, int, str]]:
 
 def _noise(rng: np.random.Generator, n_steps: int, n_columns: int = 1) -> np.ndarray:
     return rng.standard_normal((N_DATASETS, n_steps, n_columns))
+
+
+def test_the_recorded_output_is_reproduced():
+    out = andrey.jpcmciplus(datagen.generate_groups("context_var_4v"), tau_max=1)
+    assert_recorded_output(out, "JPCMCIplus", case="context_var_4v")
 
 
 def test_independent_series_have_no_links():
