@@ -47,8 +47,8 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, and FCI-JCI are not refit: their data hold each row's environment in one column, and ICP's
-  target is the last variable.
+  IGSP, FCI-JCI, and J-PCMCI+ are not refit: their data hold each row's environment in one column,
+  ICP's target is the last variable, and J-PCMCI+'s contexts follow the system variables.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -157,9 +157,10 @@ fails, or no such run, runs the gate.
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
 XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL,
-PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets
-whose assumptions each method needs, PC with each supported nonlinear conditional-independence test,
-KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
+PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the
+datasets whose assumptions each method needs, PC with each supported nonlinear
+conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
+UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -184,6 +185,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
+| `jpcmciplus_all_m10_t100`, `jpcmciplus_half_m10_t100`: 5 system variables, 10 datasets of 100 steps | 10 seeds each | J-PCMCI+ |
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
@@ -235,6 +237,14 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   split the groups. GIN's number of tests grows combinatorially with the indicator count, so it runs
   at the two smaller sizes. A test keeps the domain, group, and measurement draws in step with the
   harness.
+- **Several datasets with contexts.** J-PCMCI+'s published cells, drawn by its benchmark driver
+  (`benchmarks/jpcmciplus_cpu.py`) from the model of the J-PCMCI+ authors' experiment script
+  (Gunther, Ninad, and Runge 2023): 5 system variables with lagged links, 2 time and 2 space
+  contexts, and 10 datasets of 100 steps, with every context observed and with one of each kind
+  observed. A draw where a hidden context confounds an observed context and a system variable
+  (Assumption 3 broken) is skipped and the next seed taken, as the driver's claimed rows leave it
+  out. J-PCMCI+ runs with both dummies at the benchmark's claimed setting, `tau_max=2` and
+  `alpha=0.05`.
 - **Unknown targets.** UT-IGSP's published regime, drawn by its benchmark driver
   (`benchmarks/ut_igsp_cpu.py`) as two of its comparison's cells: 20 variables at mean degree 1.5,
   an observational environment and five settings of 1,000 rows, each setting with one target it is
@@ -296,9 +306,10 @@ cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the late
 edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
 nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
 time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
-endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
-series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the
-missing and extra lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
+endpoint SHD over the window of lags, J-PCMCI+ by endpoint SHD over the window of lags of the
+system variables, LPCMCI by endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM
+and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the missing and extra
+lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
 scored by its directed edges against the edges between observed variables that no hidden causal or
 backdoor path joins, the edges it can identify as direct: an edge in one set and not the other
 counts 1, a reversed one 2. A method that estimates a set of variables is scored by the set's false

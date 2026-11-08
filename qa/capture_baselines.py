@@ -150,11 +150,12 @@ ALGORITHMS = {
     "GPDC": (_run_ci_test, "nonmonotone_4v"),
 }
 
-# Multi-group and panel methods take a list of matrices (runner receives
+# Multi-group, panel, and multi-dataset methods take a list of matrices (runner receives
 # ``generate_groups(case)``).
 GROUP_ALGORITHMS = {
     "MultiGroupDirectLiNGAM": (_run_multi_group_direct_lingam, "mgdl_2groups"),
     "LongitudinalLiNGAM": (_facade("longitudinal_lingam"), "panel_4v"),
+    "JPCMCIplus": (_facade("jpcmciplus", tau_max=1), "context_var_4v"),
 }
 
 

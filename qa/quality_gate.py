@@ -56,6 +56,7 @@ import fci_jci_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
+import jpcmciplus_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
 from andrey_bench import (  # noqa: E402
@@ -70,6 +71,7 @@ from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
 from andrey_bench.adapters.andrey_dynotears import AndreyDYNOTEARS  # noqa: E402
 from andrey_bench.adapters.andrey_fci_jci import AndreyFCIJCI  # noqa: E402
 from andrey_bench.adapters.andrey_gies import stack, unstack  # noqa: E402
+from andrey_bench.adapters.andrey_jpcmciplus import AndreyJPCMCIPlus  # noqa: E402
 from andrey_bench.adapters.andrey_lingam_ts import (  # noqa: E402
     AndreyLongitudinalLiNGAM,
     AndreyVarmaLiNGAM,
@@ -239,6 +241,15 @@ HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
 #: last column of the data.
 INDEX_PAG_CELLS: dict[str, str] = {"fci_jci_s4": "S4", "fci_jci_l10": "L10"}
 
+#: J-PCMCI+'s published cells, drawn by its benchmark driver (``benchmarks/jpcmciplus_cpu.py``) from
+#: the model of its authors' experiment script: 5 system variables and 10 datasets of 100 steps,
+#: with every context observed, and with one time and one space context observed, the draws where
+#: Assumption 3 holds.
+CONTEXT_CELLS: dict[str, str] = {
+    "jpcmciplus_all_m10_t100": "all-M10-T100",
+    "jpcmciplus_half_m10_t100": "half-M10-T100",
+}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -404,6 +415,21 @@ def index_pag_draws(cell: str) -> tuple[Draw, ...]:
         ds = fci_jci_cpu.draw(fci_jci_cpu.CELLS[cell], seed)
         marks = fci_jci_cpu.truth(ds)["1"]
         out.append(Draw(ds.full, GraphStructure.from_numpy(marks, kind="pag")))
+    return tuple(out)
+
+
+def context_draws(cell: str) -> tuple[Draw, ...]:
+    """The datasets of a J-PCMCI+ cell, ``(datasets, steps, columns)``: the system variables, then
+    the observed time contexts, then the observed space contexts, as many of each kind; and the
+    window graph of the system variables over lags 0 to 2. A seed whose draw breaks Assumption 3 is
+    skipped and the next one taken, as the driver's claimed rows leave it out."""
+    out: list[Draw] = []
+    seed = 0
+    while len(out) < len(SEEDS):
+        ds = jpcmciplus_cpu.draw(jpcmciplus_cpu.CELLS[cell], seed)
+        seed += 1
+        if not ds.draw.breaks_assumption_3:
+            out.append(Draw(ds.draw.datasets, ds.truth))
     return tuple(out)
 
 
@@ -616,6 +642,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         for name, cell in HIDDEN_CAUSE_CELLS.items()
     },
     **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
+    **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
     "sachs": sachs_draws,
@@ -709,6 +736,8 @@ NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
 #: FCI-JCI needs data pooled from an observational and an interventional regime.
 INDEX_PAG_DATA = tuple(INDEX_PAG_CELLS)
+#: J-PCMCI+ needs time series from several datasets that differ through context variables.
+CONTEXT_DATA = tuple(CONTEXT_CELLS)
 KNOWN_TARGET_DATA = tuple(KNOWN_TARGET_CELLS)
 
 
@@ -756,6 +785,27 @@ def fci_jci_fit(x: np.ndarray) -> Any:
     """``andrey.fci_jci`` at its defaults on an FCI-JCI draw, its last column as ``env``: the PAG
     over the variables and the environment, as the benchmark driver scores it."""
     return FCI_JCI.to_structure(FCI_JCI.fit(x, {"context_vars": [x.shape[1] - 1]}))
+
+
+JPCMCIPLUS = AndreyJPCMCIPlus()
+#: The system variables of every J-PCMCI+ draw the gate fits.
+CONTEXT_SYSTEM = 5
+
+
+def context_columns(x: np.ndarray) -> dict[str, list[int]]:
+    """The observed time and space contexts of a J-PCMCI+ draw (:func:`context_draws`)."""
+    contexts = list(range(CONTEXT_SYSTEM, x.shape[-1]))
+    half = len(contexts) // 2
+    return {"time_contexts": contexts[:half], "space_contexts": contexts[half:]}
+
+
+def jpcmciplus_fit(x: np.ndarray) -> Any:
+    """``andrey.jpcmciplus`` with both dummies, ``tau_max=2``, and alpha 0.05, the benchmark's
+    claimed setting: the window graph of the system variables, as the benchmark driver scores it."""
+    params = {**JPCMCIPLUS.params(), "tau_max": 2, "alpha": 0.05, **context_columns(x)}
+    marks = np.asarray(JPCMCIPLUS.fit(x, params))
+    n = CONTEXT_SYSTEM
+    return WindowGraph(marks[:, :n, :n], lag0="cpdag")
 
 
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
@@ -841,6 +891,7 @@ SUPPORTED: dict[str, Method] = {
         _adapted(andrey_pcmciplus_adapter(5)), "window", _series("pcmciplus_paper")
     ),
     "LPCMCI": Method(_adapted(andrey_lpcmci_adapter(3)), "window", _series("lpcmci_paper")),
+    "J-PCMCI+": Method(jpcmciplus_fit, "window", CONTEXT_DATA),
     "VARMA-LiNGAM": Method(
         _adapted(AndreyVarmaLiNGAM()), "cross_links", _series("varma_lingam_paper")
     ),

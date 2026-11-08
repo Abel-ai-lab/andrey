@@ -1185,9 +1185,6 @@ def jpcmciplus(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -1226,37 +1223,47 @@ def jpcmciplus(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test.
 
-    **Limitations.** Not benchmarked yet; its tests run it on simulated linear-Gaussian series of up
-    to 5 system variables and 4 contexts, with up to 10 datasets of up to 300 steps. It assumes
-    faithfulness, so a dummy link it misses can leave the links a hidden context adds. A dataset
-    effect far larger than the noise can hide its dummy, as the lagged values stand in for it: with
-    10 datasets of 100 steps, the dummy link was found for effects of 1 and 2 noise standard
-    deviations and missed for 5, which left false lagged links. The lagged phase tests each
-    candidate without conditions first, so an autocorrelated target can hide a context link from it
-    for good: on data from :func:`~andrey.data.sample_context_series` with 10 datasets, at
-    ``alpha=0.01`` and ``tau_max=2``, it found 82% of the context links at 50 steps and 92% at 100.
-    With few steps against many datasets, false positives stay high as the datasets grow, a
-    finite-sample bias of the kind fixed-effects panels have [1]_. A time context that the lags of
-    the time contexts determine, such as a sine and cosine of one period, or a sine or a quadratic
-    trend alone from ``tau_max=2``, cannot be told apart from them: each of its links a test cannot
-    read stays, so ``context_links`` can name other lags of the context that has the effect, and
-    other time contexts that determine it at some lag, including ones with no effect. Only the
-    variables the context links reach can be trusted, not the context or the lag that reaches them.
-    Following the text of [1]_, it tests no same-step link between two contexts and reports no link
-    between contexts: the lagged parents of each time context, which the lagged phase selects among
-    the time contexts, serve only as conditions. A dummy link needs one level that stands out, so
-    the time dummy misses a smooth effect spread over the steps, and the links it adds stay: list
-    such a context if it is known. Under the ``"majority"`` and ``"conservative"`` rules, a context
-    cannot orient a link into a variable that has the context's dummy as a parent, so hidden
-    contexts leave same-step links undirected: on 10 datasets of 100 steps, with one measured
-    context and a hidden one on every variable, of 300 links 5 were oriented correctly, 5 wrongly,
-    and 290 not at all. Cost grows fastest with the system variables: on one core and 10 datasets of
-    100 steps, a fit took 0.1 s at 10 variables, 1.5 s at 15, and 47 s at 20, ran past 300 s at 30,
-    and ran out of 12 GB at 20 with the time dummy. The time dummy adds a column per step to the
-    conditions of every test that takes it: at 5 variables and 1,600 steps a fit took 7 s with it
-    and 0.05 s without. The nonlinear tests read the dummies' columns as any other. The numbers are
-    a reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Measured on the linear model of its authors' experiment script [1]_, with both
+    dummies at ``tau_max=2`` and ``alpha=0.05``, on one core: 5 system variables with lagged links
+    only, 2 time and 2 space contexts, every context observed or one of each kind, and 10 datasets
+    of 10 to 200 steps or 5 to 200 datasets of 10 steps. Its mean errors (endpoint SHD over the
+    links between system variables at lags 0 to 2) were below the empty graph's 20 in every setting:
+    3.1 to 7.7 with every context observed; with one of each kind observed, where no hidden context
+    confounds an observed one and a system variable, 3.6 to 7.2 with 10 to 200 datasets and 13.0
+    with 5 datasets of 10 steps. The median fit took 0.017 to 0.17 s. With 10 and 15 system
+    variables and 10 datasets of 100 steps, its mean errors were 8.1 and 18.8 against the empty
+    graph's 40 and 60. With ``"gpdc"`` on the authors' nonlinear model of 2 system variables and 20
+    steps, the median fit took 4.8 s with 5 datasets and 385 s with 50. It assumes faithfulness, so
+    a dummy link it misses can leave the links a hidden context adds. A dataset effect far larger
+    than the noise can hide its dummy, as the lagged values stand in for it: with 10 datasets of 100
+    steps, the dummy link was found for effects of 1 and 2 noise standard deviations and missed for
+    5, which left false lagged links. The lagged phase tests each candidate without conditions
+    first, so an autocorrelated target can hide a context link from it for good: on data from
+    :func:`~andrey.data.sample_context_series` with 10 datasets, at ``alpha=0.01`` and
+    ``tau_max=2``, it found 82% of the context links at 50 steps and 92% at 100. With few steps
+    against many datasets, false positives stay high as the datasets grow, a finite-sample bias of
+    the kind fixed-effects panels have [1]_. A time context that the lags of the time contexts
+    determine, such as a sine and cosine of one period, or a sine or a quadratic trend alone from
+    ``tau_max=2``, cannot be told apart from them: each of its links a test cannot read stays, so
+    ``context_links`` can name other lags of the context that has the effect, and other time
+    contexts that determine it at some lag, including ones with no effect. Only the variables the
+    context links reach can be trusted, not the context or the lag that reaches them. Following the
+    text of [1]_, it tests no same-step link between two contexts and reports no link between
+    contexts: the lagged parents of each time context, which the lagged phase selects among the time
+    contexts, serve only as conditions. A dummy link needs one level that stands out, so the time
+    dummy misses a smooth effect spread over the steps, and the links it adds stay: list such a
+    context if it is known. Under the ``"majority"`` and ``"conservative"`` rules, a context cannot
+    orient a link into a variable that has the context's dummy as a parent, so hidden contexts leave
+    same-step links undirected: on 10 datasets of 100 steps, with one measured context and a hidden
+    one on every variable, of 300 links 5 were oriented correctly, 5 wrongly, and 290 not at all.
+    Cost grows fastest with the system variables: on one core and 10 datasets of 100 steps, the
+    median fit with both dummies took 0.3 s at 10 variables and 11.5 s at 15 in the measurement
+    above; without the time dummy, a fit took 0.1 s at 10, 1.5 s at 15, and 47 s at 20 and ran past
+    300 s at 30, and with it, a fit ran out of 12 GB at 20. The time dummy adds a column per step to
+    the conditions of every test that takes it: at 5 variables and 1,600 steps a fit took 7 s with
+    it and 0.05 s without. The nonlinear tests read the dummies' columns as any other. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
