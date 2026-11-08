@@ -196,7 +196,7 @@ def ges(
     every variable has few parents [2]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
     oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
-    :func:`~andrey.gies`. With ``env``, it takes rows pooled from several environments, such as
+    :func:`~andrey.gies`. With ``env``, it takes data from several environments, such as
     sites, batches, or experiments, whose shifts change variables it does not know;
     :func:`~andrey.gies` takes the changed variables when they are known, :func:`~andrey.cdnod` runs
     PC with the same index, and :func:`~andrey.gfci` takes ``env`` when unmeasured common causes are
@@ -732,7 +732,7 @@ def gnies(
 ) -> StructureOutput:
     """Learn an interventional essential graph and its unknown targets with greedy search (GnIES).
 
-    GnIES learns from data pooled from several environments that share one linear model with
+    GnIES learns from data collected in several environments that share one linear model with
     Gaussian noise and differ in the noise variances of some variables, the targets, which it need
     not be told [1]_. It learns the targets together with the graph's interventional equivalence
     class, so every edge at a target gets its direction from the data.
@@ -1443,7 +1443,7 @@ def hc(
     that scores worse than the true one. It returns the CPDAG of the DAG found. When unmeasured
     common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every
     edge should be oriented, use :func:`~andrey.direct_lingam`; with nonlinear effects, use
-    :func:`~andrey.cam`. With ``env``, it takes rows pooled from several environments, such as
+    :func:`~andrey.cam`. With ``env``, it takes data from several environments, such as
     sites, batches, or experiments, whose shifts change variables it does not know;
     :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
     runs PC with the same index. With ``env``, set ``n_starts`` above ``1`` (see **Several
@@ -1771,7 +1771,7 @@ def tabu(
     best-scoring DAG visited. When unmeasured common causes are plausible, use :func:`~andrey.fci`;
     when the noise is non-Gaussian and every edge should be oriented, use
     :func:`~andrey.direct_lingam`; with nonlinear effects, use :func:`~andrey.cam`. With ``env``, it
-    takes rows pooled from several environments, such as sites, batches, or experiments, whose
+    takes data from several environments, such as sites, batches, or experiments, whose
     shifts change variables it does not know; :func:`~andrey.gies` takes the changed variables when
     they are known, and :func:`~andrey.cdnod` runs PC with the same index.
 

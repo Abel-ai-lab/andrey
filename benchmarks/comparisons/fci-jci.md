@@ -2,7 +2,7 @@
 
 `fci_jci_cpu.py` compares Andrey's `fci_jci` with `fci` from pcalg 2.7-12, the implementation of
 FCI-JCI by the method's authors (Mooij, Magliacane, and Claassen 2020), on their simulation of data
-pooled from an observational regime and interventional regimes, with hidden confounders. Tetrad's
+from an observational environment and interventional environments, with hidden confounders. Tetrad's
 FCI with the environment in its first knowledge tier, Andrey's `fci` on the pooled rows and on the
 observational rows, and Andrey's `cdnod` run beside them as context: reported, never judged.
 

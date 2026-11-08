@@ -32,7 +32,7 @@ names its pull request.
   [0.15.0 release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html) shows. ([#737], [#761],
   [#775])
 - `ges`, `hc`, `tabu`, `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take `env`, each row's
-  environment, for data pooled from several environments (experimental): the environment index
+  environment, for data from several environments (experimental): the environment index
   joins the search as a variable that no data variable causes, which removes the edges that pooling
   adds and can orient more. They list the index's edges in `metadata["index_edges"]`; `ges`, `hc`,
   `tabu`, `boss`, and `grasp` also list the variables the environments change in
@@ -84,15 +84,16 @@ names its pull request.
 
 ### Added
 
-- `andrey.fci_jci` learns a PAG from data pooled from several environments while allowing hidden
+- `andrey.fci_jci` learns a PAG from data collected in several environments while allowing hidden
   common causes, running FCI with the environment as a variable that no data variable causes (Joint
   Causal Inference, Mooij, Magliacane, and Claassen 2020): it takes `env` as `cdnod` does,
   `confounded_index=False` when the environment is set from outside, and lists the environment's
   edges in `metadata["index_edges"]`. ([#739])
 - `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
-  or GRaSP search, removing with tests the edges that hidden causes explain and orienting the rest
-  with FCI's rules, without GFCI's possible-d-separation step, as Algorithm 5 of their paper does
-  (Ramsey, Andrews, and Spirtes 2025). ([#737], [#771])
+  or GRaSP search, removing with tests the adjacencies whose endpoints are independent given some
+  set of other variables and orienting the rest with FCI's rules, without GFCI's
+  possible-d-separation step, as Algorithm 5 of their paper does (Ramsey, Andrews, and Spirtes
+  2025). ([#737], [#771])
 - `gfci`, `boss_fci`, and `grasp_fci` take `edge_removal="triangles"`, which tests for removal only
   the edges of the score search's CPDAG that lie in a triangle of it, as Section 5 of the GFCI
   paper does (Ogarrio, Spirtes, and Ramsey 2016), while the default, `"all"`, tests every edge, as

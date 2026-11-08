@@ -34,7 +34,7 @@ Multi-domain data
 ::::{div} release-tldr
 
 0.15.0 is here: multi-domain data. The card measures the methods it makes supported against their
-authors' code: FCI-JCI, which learns from data pooled from several environments, against pcalg,
+authors' code: FCI-JCI, which learns from data collected in several environments, against pcalg,
 and BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes.
 
 :::{div} release-stats

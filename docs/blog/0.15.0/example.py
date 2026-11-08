@@ -19,11 +19,11 @@ if __name__ == "__main__":  # worker processes re-import this script
             line += f", {len(out.metadata['index_edges'])} index edges"
         return line
 
-    # PC on the observational cells alone, and on all nine conditions pooled without env.
+    # PC on the observational cells alone, and on data from all nine conditions without env.
     print(f"pc, observational:  {summary(andrey.pc(data[env == 0]))}")
     print(f"pc, pooled:         {summary(andrey.pc(data))}")
 
-    # The conditions are categories, not numbers: these tests and scores read env as one.
+    # The conditions are categories, not numbers: these tests and scores read env as a category.
     cdnod = andrey.cdnod(data, env, indep_test="cond_gauss")
     print(f"cdnod:              {summary(cdnod)}")
     scores = {"score_func": "cond_gauss", "categorical": []}
