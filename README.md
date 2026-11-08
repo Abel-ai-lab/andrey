@@ -30,7 +30,7 @@ comparisons with their authors' code, in the settings their papers study, none o
 significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
 BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
 
-**[Read the post](https://andrey.abel.ai/blog/20261107-andrey-0-15-0.html)** ·
+**[Read the post](https://andrey.abel.ai/blog/20261108-andrey-0-15-0.html)** ·
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html)**
 
 ---
