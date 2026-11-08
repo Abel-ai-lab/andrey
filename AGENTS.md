@@ -11,6 +11,11 @@ Andrey is an independent causal-discovery package built for CPU-parallel and GPU
 Tests compare against fixed cases, ground truth, and Andrey's own recorded outputs. Comparisons
 with other packages and older Andrey builds belong in `benchmarks/`.
 
+Andrey implements methods that are validated and peer-reviewed; it does not develop new ones. A new
+method is developed in its own repository, with its evidence and a paper, and joins Andrey after
+that, from a spec: the paper that defines it, the existing implementations, and the setting the
+paper claims. Use cases are curated examples of using Andrey, not new research.
+
 ## Coding style
 
 Follow KISS, YAGNI, Locality-of-Behavior, Fail-fast, in that order. "Make it work, make it
