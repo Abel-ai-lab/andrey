@@ -43,6 +43,7 @@ whose Reproduce table lists the driver.
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
 | [PCMCI on lagged series](comparisons/pcmci.md) | `pcmci_cpu.py` | PCMCI | tigramite | 0.5.0, 0.9.0 |
 | [PCMCI+ and LPCMCI](comparisons/pcmciplus-lpcmci.md) | `pcmci_cpu.py` | PCMCI+, LPCMCI | tigramite | 0.5.0, 0.9.0 |
+| [J-PCMCI+](comparisons/jpcmciplus.md) | `jpcmciplus_cpu.py` | J-PCMCI+; PCMCI+ on the pooled datasets as context | tigramite (J-PCMCI+, with a fix) | 0.15.0 |
 | [Granger causality](comparisons/granger.md) | `granger_var.py` | Granger | causal-learn | 0.5.0, 0.9.0 |
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
 | [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | 0.14.0 |
@@ -79,7 +80,10 @@ seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows 
 means of its floor intervals come from the runs behind the file. BOSS-FCI's and GRaSP-FCI's rows
 come from [`published/0.15.0/boss-fci-grasp-fci.json`](published/0.15.0/boss-fci-grasp-fci.json),
 both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md)
-presents, with the median errors and fit times from the runs behind the file.
+presents, with the median errors and fit times from the runs behind the file. J-PCMCI+'s rows come
+from [`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with
+tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors,
+fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
 
 | Release | Release card | Summary |
 |---|---|---|

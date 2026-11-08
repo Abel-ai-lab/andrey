@@ -435,6 +435,34 @@ REGIMES = {
     "bgf_o3_deg4_l4": "linear-Gaussian data from Erdos-Renyi graphs at mean degree 4 with 4 of 24 "
     "variables hidden, standardized, outside the method's claim",
 }
+# J-PCMCI+'s cells at alpha 0.05, keyed as its summary keys them: linear time series of 5 variables
+# from the J-PCMCI+ paper's script, with every context observed, or one of each kind and the draws
+# where no hidden context confounds an observed one and a variable; and, outside the claim, the
+# model of andrey.data.sample_context_series and the script's model with 10 and 15 variables.
+JPCMCIPLUS_PAPER = "linear time series from the J-PCMCI+ paper's script"
+REGIMES |= {
+    **{
+        f"jpcmciplus_all_m10_t{t}": f"{JPCMCIPLUS_PAPER}, 10 datasets of {t} steps, every context "
+        "observed"
+        for t in (10, 20, 30, 50, 100, 150, 200)
+    },
+    **{
+        f"jpcmciplus_half_m{m}_t{t}": f"{JPCMCIPLUS_PAPER}, {m} datasets of {t} steps, half the "
+        "contexts observed"
+        for m, t in [(10, t) for t in (10, 20, 30, 50, 100, 150, 200)]
+        + [(m, 10) for m in (5, 20, 30, 50, 100, 150, 200)]
+    },
+    **{
+        f"jpcmciplus_current_m{m}_t{t}": f"linear time series with same-step links, {m} datasets "
+        f"of {t} steps, every context observed, outside the method's claim"
+        for m, t in ((5, 100), (10, 50), (10, 100), (10, 200), (20, 50), (20, 100), (50, 10))
+    },
+    **{
+        f"jpcmciplus_all_n{n}_m10_t100": f"{JPCMCIPLUS_PAPER} with {n} variables, 10 datasets of "
+        "100 steps, every context observed, outside the method's claim"
+        for n in (10, 15)
+    },
+}
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other
@@ -488,7 +516,10 @@ NOT_COUNTED = {"earlier-build", "second-machine timing"}
 NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # Lanes the homepage omits: settings swept around a method's default, which its release card
 # reports. IGSP at other levels and starts, UT-IGSP and FCI-JCI at their papers' levels, and
-# BOSS-FCI and GRaSP-FCI at their paper's penalty and level.
+# BOSS-FCI and GRaSP-FCI at their paper's penalty and level. J-PCMCI+ shows its claimed level, the
+# paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
+# paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
+# dummies.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -498,6 +529,10 @@ NOT_SHOWN_LANES = {
     "ut_igsp.paper_level",
     "fci_jci.alpha_0.01",
     "boss_grasp_fci.paper",
+    "jpcmciplus.alpha_0.01",
+    "jpcmciplus.context_links",
+    "jpcmciplus.assumption_3_broken",
+    "jpcmciplus.gpdc",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
@@ -524,6 +559,7 @@ PACKAGE_NAMES = {
     'pcalg 2.7-12, jci = "1"': "pcalg",
     "tetrad-lib 7.6.10 BossFci": "Tetrad",
     "tetrad-lib 7.6.10 GraspFci": "Tetrad",
+    "tigramite 5.2.10.1": "tigramite",
 }
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear", "boss_grasp_fci"}

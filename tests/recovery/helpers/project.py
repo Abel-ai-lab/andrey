@@ -132,6 +132,17 @@ def project_output(out: Any, algorithm: str) -> dict:
             "score": out.metadata["score"],
             "targets": [targets[key] for key in sorted(targets)],
         }
+    if algorithm == "JPCMCIplus":  # PCMCI+'s fields, and the context and dummy links
+        s, md = out.structure, out.metadata
+        return {
+            "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
+            "p_values": np.asarray(md["p_values"]),
+            "statistics": np.asarray(md["statistics"]),
+            "conflicts": md["conflicts"],
+            "context_links": md["context_links"],
+            "index_edges": md["index_edges"],
+            "time_index_edges": md["time_index_edges"],
+        }
     if algorithm in _PCMCI:
         s = out.structure
         candidate = {

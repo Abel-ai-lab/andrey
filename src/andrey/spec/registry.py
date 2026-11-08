@@ -2157,7 +2157,7 @@ _add(
             "context_links, and the dummies' links in metadata.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
