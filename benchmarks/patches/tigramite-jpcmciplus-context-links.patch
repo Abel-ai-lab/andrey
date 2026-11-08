@@ -1,0 +1,21 @@
+tigramite 5.2.10.1 JPCMCIplus.add_found_context_link_assumptions: each end of a same-step link
+between two observed contexts lists the other as a context parent, and '-->' at both ends makes
+_set_link_assumptions raise "Inconsistent link assumptions". The link stays 'o?o' instead.
+Applied in memory by andrey_bench/adapters/tigramite_jpcmciplus.py; the installed package is
+unchanged.
+
+--- a/tigramite/jpcmciplus.py
++++ b/tigramite/jpcmciplus.py
+@@ -472,7 +472,11 @@
+                 for lag in range(tau_max + 1):
+                     if (c, -lag) in link_assumptions_dummy[j]:
+                         link_assumptions_dummy[j].pop((c, -lag), None)
+-            link_assumptions_dummy[j].update({parent: '-->' for parent in self.observed_context_parents[j]})
++            # Both ends of a same-step link between two contexts list it, and '-->' at both ends is
++            # rejected as inconsistent by _set_link_assumptions: leave such a link unoriented.
++            link_assumptions_dummy[j].update({
++                parent: 'o?o' if parent[1] == 0 and j not in self.system_nodes else '-->'
++                for parent in self.observed_context_parents[j]})
+ 
+         return link_assumptions_dummy
+ 
