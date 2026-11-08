@@ -183,12 +183,16 @@ def test_any_long_label_places_all_labels_below_nodes(labels, dark) -> None:
     document = minidom.parseString(viz.draw(structure, dark=dark))
     nodes = document.getElementsByTagName("circle")
     texts = document.getElementsByTagName("text")
+    palette = viz.DARK if dark else viz.LIGHT
     assert {text.firstChild.data for text in texts} == set(labels)
     for text in texts:
         node = next(n for n in nodes if n.getAttribute("cx") == text.getAttribute("x"))
         bottom = float(node.getAttribute("cy")) + float(node.getAttribute("r"))
         assert float(text.getAttribute("y")) > bottom
-        assert text.getAttribute("fill") == (viz.DARK if dark else viz.LIGHT).muted
+        assert text.getAttribute("fill") == palette.muted
+        # An edge under the label never crosses its letters: an outline of the ground lies beneath.
+        assert text.getAttribute("stroke") == palette.paper
+        assert text.getAttribute("paint-order") == "stroke"
 
 
 @pytest.mark.parametrize("n,baseline", [(100, "central"), (101, "")])

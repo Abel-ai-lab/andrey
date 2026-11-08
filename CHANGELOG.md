@@ -131,6 +131,8 @@ names its pull request.
 - `calm`'s `metadata["h_final"]` is the acyclicity residual of the gates before the thresholds,
   the value its penalty rounds compare with `h_tol`, instead of that of the returned DAG, which was
   always `0`. ([#738])
+- `andrey.viz.draw` outlines each label below a node in the palette's `paper` color, so an edge that
+  passes under a label no longer crosses its letters. ([#791])
 
 ### New contributors
 
@@ -1992,3 +1994,4 @@ First alpha release.
 [#774]: https://github.com/Abel-ai-lab/andrey/pull/774
 [#775]: https://github.com/Abel-ai-lab/andrey/pull/775
 [#781]: https://github.com/Abel-ai-lab/andrey/pull/781
+[#791]: https://github.com/Abel-ai-lab/andrey/pull/791
