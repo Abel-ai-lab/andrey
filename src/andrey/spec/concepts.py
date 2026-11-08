@@ -23,7 +23,7 @@ from pydantic import model_validator
 
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
-from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -138,7 +138,7 @@ RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp")
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 #: The methods whose main loop a cap can stop early.
@@ -175,6 +175,7 @@ _CONCEPTS = (
         suitable=(
             *CI_SEARCHES,
             *PCMCI_FAMILY,
+            "jpcmciplus",
             "granger",
             *RESIDUAL,
             "cam",
@@ -205,6 +206,13 @@ _CONCEPTS = (
                 default=0.01,
                 reason="0.01 is the level of the method's published experiments (Runge 2020: "
                 "tau_max = 5 and alpha = 0.01).",
+            ),
+            Deviation(
+                method="jpcmciplus",
+                name="alpha",
+                default=0.01,
+                reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
+                "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
             ),
             Deviation(
                 method="rcd",
@@ -290,6 +298,16 @@ _CONCEPTS = (
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
                 "icp",
+            ),
+        ),
+        deviations=(
+            Deviation(
+                method="jpcmciplus",
+                name="indep_test",
+                default=None,
+                choices=CONTINUOUS_INDEP_TESTS,
+                reason="The dummies enter every test as numeric one-hot columns, so it takes the "
+                "tests of continuous data.",
             ),
         ),
     ),
@@ -478,7 +496,7 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus", "granger"),
+        suitable=("pcmci", "pcmciplus", "jpcmciplus", "granger"),
         exempt=_exempt(
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
@@ -500,7 +518,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
@@ -559,9 +577,9 @@ _CONCEPTS = (
                     fragment="pc1",
                     reason="It caps the PC1 step that selects the lagged parents; the later tests "
                     "condition on those parents, however many, which max_p_global caps in "
-                    "pcmciplus.",
+                    "pcmciplus and jpcmciplus.",
                 )
-                for m in ("pcmci", "pcmciplus")
+                for m in ("pcmci", "pcmciplus", "jpcmciplus")
             ),
         ),
     ),
@@ -579,7 +597,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="beyond the default condition",
-        suitable=("lpcmci", "pcmciplus"),
+        suitable=("lpcmci", "pcmciplus", "jpcmciplus"),
         exempt=_exempt(
             "MCI conditions on the default conditions alone, one test per link; PC1 has none "
             "(max_depth).",
@@ -618,7 +636,14 @@ _CONCEPTS = (
                 "dynotears",
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
-            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *RESIDUAL, "resit"),
+            *_exempt(
+                "No search over parent sets.",
+                *PCMCI_FAMILY,
+                "jpcmciplus",
+                "granger",
+                *RESIDUAL,
+                "resit",
+            ),
             *_exempt(
                 "The paper's search sets no cap on a variable's parents; max_depth caps the "
                 "candidates one sink test adds.",
@@ -660,7 +685,7 @@ _CONCEPTS = (
         summary="The largest lag; the smallest follows the method's theory.",
         param=_template("tau_max", "int", 1, "The largest lag, at least 1.", minimum=1),
         fragment="largest lag",
-        suitable=(*PCMCI_FAMILY, "granger", "longitudinal_lingam", "dynotears"),
+        suitable=(*PCMCI_FAMILY, "jpcmciplus", "granger", "longitudinal_lingam", "dynotears"),
         exempt=_exempt("order=(p, q) is the ARMA order, a different concept.", "varma_lingam"),
         others_exempt="i.i.d. data.",
     ),
@@ -681,7 +706,7 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *STARTS, "calm", "ica_lingam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
         exempt=(
             *_exempt(
                 "Deterministic.",
@@ -967,6 +992,7 @@ _CONCEPTS = (
                 "ut_igsp",
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
+            *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
     ),
     Concept(
@@ -1063,9 +1089,9 @@ _CONCEPTS = (
                 *("xges", "exact_search", "mmhc", "rsmax2"),
             ),
             *_exempt(
-                "Takes a list of datasets, one per group or per time point, in place of a label "
-                "per row.",
-                *("multi_group_direct_lingam", "longitudinal_lingam"),
+                "Takes a list of datasets, one per group, per time point, or per series, in place "
+                "of a label per row.",
+                *("multi_group_direct_lingam", "longitudinal_lingam", "jpcmciplus"),
             ),
             *_exempt(
                 "A time-series method: its rows are the steps of a series, read in order through "
@@ -1183,7 +1209,10 @@ _CONCEPTS = (
             choices=COLLIDER_RULES,
         ),
         fragment="collider",
-        suitable=("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci", "pcmciplus"),
+        suitable=(
+            *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+            *("pcmciplus", "jpcmciplus"),
+        ),
         exempt=(
             *_exempt(
                 "Its collider phase follows LPCMCI's own orientation rules, not yet compared with "
@@ -1200,16 +1229,17 @@ _CONCEPTS = (
             ),
         ),
         others_exempt="No separating-set orientation.",
-        deviations=(
+        deviations=tuple(
             Deviation(
-                method="pcmciplus",
+                method=m,
                 name="collider_rule",
                 default="majority",
                 choices=COLLIDER_RULES,
                 reason="majority orients the same-step links without regard to the order of the "
                 "variables, where sepsets reads the one separating set the skeleton phase stored, "
                 "which can change with it (Runge 2020).",
-            ),
+            )
+            for m in ("pcmciplus", "jpcmciplus")
         ),
     ),
     Concept(

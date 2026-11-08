@@ -217,15 +217,16 @@ that makes the same mistake on every resample gives it a frequency of 1.
 
 ### Time series and several datasets?
 
-Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, and
-`dynotears` learn graphs over time lags; `lpcmci` also allows hidden common causes, and `dynotears`
-fits a linear structural vector autoregression by continuous optimization. The
-[release cards](benchmarks.md) benchmark them against tigramite, lingam, causal-learn, and
-CausalNex. `multi_group_direct_lingam` fits several datasets that share one causal order, `cdnod`
-takes data from several domains, and {{ targets_names }} take data from several environments: `gies`
-and `igsp` with known interventions, `gnies` learning the variables whose noise variance changed,
-`ut_igsp` learning the targets it is not given, and `icp` the parents of one target. All are
-supported.
+Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`,
+and `dynotears` learn graphs over time lags; `jpcmciplus` reads several datasets with shared
+contexts, `lpcmci` also allows hidden common causes, and `dynotears` fits a linear structural vector
+autoregression by continuous optimization. The [release cards](benchmarks.md) benchmark all but
+`jpcmciplus` against tigramite, lingam, causal-learn, and CausalNex. `multi_group_direct_lingam`
+fits several datasets that share one causal order, `cdnod` takes data from several domains, and
+{{ targets_names }} take data from several environments: `gies` and `igsp` with known
+interventions, `gnies` learning the variables whose noise variance changed, `ut_igsp` learning the
+targets it is not given, and `icp` the parents of one target. All but `jpcmciplus`, which is
+experimental, are supported.
 
 ## Command line and agents
 

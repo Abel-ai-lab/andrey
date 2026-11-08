@@ -25,6 +25,7 @@ from .score import calm, exact_search, ges, gies, gnies, hc, tabu, xges
 from .temporal import (
     dynotears,
     granger,
+    jpcmciplus,
     longitudinal_lingam,
     lpcmci,
     pcmci,
@@ -76,6 +77,7 @@ __all__ = [
     "longitudinal_lingam",
     "pcmci",
     "pcmciplus",
+    "jpcmciplus",
     "lpcmci",
     "granger",
     "dynotears",

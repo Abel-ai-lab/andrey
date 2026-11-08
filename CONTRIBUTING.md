@@ -9,8 +9,26 @@ covers the website.
 ## Report a problem
 
 Open an issue with the bug or feature form in the
-[issue tracker](https://github.com/Abel-ai-lab/andrey/issues/new/choose). For a wrong result,
+[issue tracker](https://github.com/Abel-ai-lab/andrey/issues/new/choose); a new method has its own
+form (see below). For a wrong result,
 include the call, the shape of the data, and the output of `andrey config`.
+
+## Propose a method
+
+Andrey implements methods that are validated and peer-reviewed; it does not develop new ones. A new
+method is developed in its own repository, with its evidence and a paper, and joins Andrey after
+that. To propose one, open an issue with the
+[method form](https://github.com/Abel-ai-lab/andrey/issues/new?template=method.yml) and give its
+spec:
+
+- the peer-reviewed paper that defines the method;
+- the existing implementations, the authors' code first, with their licenses;
+- the setting the paper claims: the data, the assumptions, and the sizes;
+- the evidence the paper reports, and the task Andrey cannot do today without the method.
+
+A method joins Andrey as experimental and becomes supported once it is compared with its authors'
+implementation in that setting
+([`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/andrey/blob/main/DEVELOPMENT.md#test-a-method)).
 
 ## Set up
 
@@ -95,4 +113,10 @@ opened or reviewed, and a `feature` or `bug` pull request adds a bullet under `#
 maintainer (or an agent) lists the milestone's pull requests with
 `gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
 CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
-the notes GitHub generates by label (`.github/release.yml`).
+the notes GitHub generates by label (`.github/release.yml`). The same pass refreshes the stored
+intersphinx inventories that the docs build falls back on (`docs/DEVELOPMENT.md`) and commits any
+that changed:
+
+```shell
+uv run --group docs python scripts/refresh_intersphinx.py
+```

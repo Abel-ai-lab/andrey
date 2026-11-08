@@ -89,6 +89,13 @@ names its pull request.
   Causal Inference, Mooij, Magliacane, and Claassen 2020): it takes `env` as `cdnod` does,
   `confounded_index=False` when the environment is set from outside, and lists the environment's
   edges in `metadata["index_edges"]`. ([#739])
+- `jpcmciplus` (experimental) learns the links of time series from several datasets of the same
+  variables whose differences come from context variables, as J-PCMCI+ (Gunther, Ninad, and Runge
+  2023) does: it finds the links from the measured time and space contexts into the system
+  variables, stands in for the hidden contexts with one-hot dummies of the dataset and the time
+  step, and returns the temporal structure of `pcmciplus` over the system variables.
+  `andrey.data.sample_context_series` draws the model the paper describes; here each context drives
+  exactly one system variable, so no hidden context is a common cause of two. ([#796])
 - `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
   or GRaSP search, removing with tests the adjacencies whose endpoints are independent given some
   set of other variables and orienting the rest with FCI's rules, without GFCI's
@@ -143,6 +150,12 @@ names its pull request.
   always `0`. ([#738])
 - `andrey.viz.draw` outlines each label below a node in the palette's `paper` color, so an edge that
   passes under a label no longer crosses its letters. ([#791])
+- The homepage speed panel shows FCI-JCI, IAMB, MMPC, ICP, and CAM-UV. A speed chart groups a
+  method's comparisons only when they share a size and Andrey's times agree there, and draws
+  Andrey at every size they measure, instead of also grouping comparisons that share no size,
+  drawing Andrey from the first alone, and leaving the method off the panel. The panel's legend
+  names each package once, without its version or setting, so a package keeps one marker shape per
+  family; lingam's CAM-UV at its default set size stays on the 0.14.0 card. ([#797])
 
 ### New contributors
 
@@ -2005,3 +2018,5 @@ First alpha release.
 [#775]: https://github.com/Abel-ai-lab/andrey/pull/775
 [#781]: https://github.com/Abel-ai-lab/andrey/pull/781
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
+[#796]: https://github.com/Abel-ai-lab/andrey/pull/796
+[#797]: https://github.com/Abel-ai-lab/andrey/pull/797

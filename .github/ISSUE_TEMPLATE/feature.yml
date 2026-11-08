@@ -1,5 +1,5 @@
 name: Feature request
-description: A method, an option, or a data format Andrey should support.
+description: An option, a data format, or a speed-up Andrey should support; a new method has its own form.
 labels: [feature]
 body:
   - type: textarea
@@ -13,7 +13,7 @@ body:
     id: proposal
     attributes:
       label: What would help
-      description: For a method, the paper or an implementation that defines it; for an option, how you would call it.
+      description: For an option, how you would call it; for a data format, an example.
   - type: input
     id: size
     attributes:
