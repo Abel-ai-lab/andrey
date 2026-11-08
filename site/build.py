@@ -26,6 +26,7 @@ import statistics
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
+from collections import Counter
 from html import escape
 from pathlib import Path
 from typing import get_args
@@ -501,23 +502,38 @@ NOT_SHOWN_LANES = {
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
 # assumptions that match FCI-JCI's non-default confounded_index=False; an earlier Tetrad release,
-# 7.6.3 in causal-cmd 1.12.0, measured as context; and Tetrad 7.6.3 against the
-# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI.
+# 7.6.3 in causal-cmd 1.12.0, measured as context; Tetrad 7.6.3 against the
+# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI; and lingam's CAM-UV at its default
+# set size of 2, beside the paper's size of 3, Andrey's default.
 NOT_SHOWN_COMPARATORS = {
     "graphical-model-learning 0.1a8, patched to Definition 4.2",
     'pcalg 2.7-12, jci = "123"',
     "causal-cmd 1.12.0 bfci (tetrad-lib 7.6.3)",
     "causal-cmd 1.12.0 grasp-fci (tetrad-lib 7.6.3)",
     "Tetrad 7.6.3",
+    "lingam 1.13.0 at its default set size",
+}
+# The package each comparator names in the speed panel's legend, without the version or setting
+# its release card gives; every other comparator is a package's name already.
+PACKAGE_NAMES = {
+    "CAM 1.0": "CAM",
+    "InvariantCausalPrediction 0.8": "InvariantCausalPrediction",
+    "causal-learn 0.1.4.8": "causal-learn",
+    "lingam 1.13.0": "lingam",
+    "lingam RESIT": "lingam",
+    'pcalg 2.7-12, jci = "1"': "pcalg",
+    "tetrad-lib 7.6.10 BossFci": "Tetrad",
+    "tetrad-lib 7.6.10 GraspFci": "Tetrad",
 }
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear", "boss_grasp_fci"}
-# A method's line uses its shortest-named comparison by default. These settings override that
-# choice: BOSS and GRaSP with the BDeu score on categorical data, as measured in 0.8.0, each shown
-# under the method's name.
+# A method's line uses its first shortest-named comparison by default. These settings override that
+# choice, each shown under the method's name from its first comparison: BOSS and GRaSP with the
+# BDeu score on categorical data, as measured in 0.8.0, and ICP with its default approximate test.
 SHOWN_SETTINGS = {
     "BOSS on discrete data, BDeu score": "BOSS",
     "GRaSP on discrete data, BDeu score": "GRaSP",
+    "ICP, approximate test": "ICP",
 }
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
@@ -742,6 +758,7 @@ def comparisons(summary: dict) -> list[dict]:
 
     - ``d``: the size, in ``unit``: the variables the method gets, the observed ones on data with
       hidden variables, or a cause-effect pair's rows, since every pair has two variables;
+    - ``n``: the sample size, ``None`` where the summary records none;
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`;
@@ -764,6 +781,7 @@ def comparisons(summary: dict) -> list[dict]:
             rows.append(
                 {
                     "d": row["n"] if pairs else row.get("observed", row["d"]),
+                    "n": row.get("n"),
                     "andrey_s": row["andrey_s"],
                     "comparator_s": row["comparator_s"],
                     "ratio": ratio,
@@ -912,18 +930,28 @@ def family_intro() -> str:
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
     """The comparisons a chart each: a method's comparisons share one chart when they come from
-    the same runs (Andrey's times agree at every common size), otherwise one chart apiece."""
+    the same runs, otherwise one chart apiece. A comparison joins a chart when it measures a size
+    every comparison in the chart measures, and Andrey's times agree with each of them at every
+    size they share."""
+
+    def times(method: dict) -> dict[int, Counter]:
+        out: dict[int, Counter] = {}
+        for r in method["rows"]:
+            out.setdefault(r["d"], Counter())[r["andrey_s"]] += 1
+        return out
+
     groups: list[tuple[str, list[dict]]] = []
     for method in claimed_comparisons(summaries):
+        ours = times(method)
         same = [
             g
             for g in groups
             if g[0] == method["method"]
+            and set(ours).intersection(*(times(m).keys() for m in g[1]))
             and all(
-                a["andrey_s"] == b["andrey_s"]
-                for a in g[1][0]["rows"]
-                for b in method["rows"]
-                if a["d"] == b["d"]
+                theirs[d] == ours[d]
+                for theirs in map(times, g[1])
+                for d in theirs.keys() & ours.keys()
             )
         ]
         if same:
@@ -931,6 +959,16 @@ def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
         else:
             groups.append((method["method"], [method]))
     return groups
+
+
+def andrey_rows(methods: list[dict]) -> list[dict]:
+    """Andrey's rows across a chart's comparisons (:func:`time_groups`), smallest size first: each
+    size from the first comparison that measures it, since the chart's comparisons agree there."""
+    rows: list[dict] = []
+    for method in methods:
+        known = {r["d"] for r in rows}
+        rows += [r for r in method["rows"] if r["d"] not in known]
+    return sorted(rows, key=lambda r: r["d"])
 
 
 def log_scale(lo: float, hi: float, a: float, b: float):
@@ -965,7 +1003,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float]) -> str:
             f'<line x1="{left}" x2="{right}" y1="{y(d):.1f}" y2="{y(d):.1f}" class="tc-grid"/>'
             f'<text x="{left - 6}" y="{y(d) + 3:.1f}" text-anchor="end">{d:,}</text>'
         )
-    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in methods[0]["rows"]]
+    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in andrey_rows(methods)]
     series = [("Andrey", ours, "tc-andrey")]
     series += [
         (
@@ -2396,13 +2434,15 @@ DIALOG_TAIL = "</div></dialog>"
 
 # ---- a family's methods on one figure: fit time against errors ------------------------------
 # Each method uses its shortest-named comparison unless SHOWN_SETTINGS overrides it. Each line
-# covers sizes where Andrey and every compared package ran and were scored; its largest marker
-# shows the largest shared size. Errors are divided by the empty graph's error count: 0 means no
-# errors, and 1 means the same error count as the empty graph.
+# covers sizes where Andrey and every compared package ran and were scored, at the largest sample
+# size where a lane measures several; its largest marker shows the largest shared size. Errors are
+# divided by the empty graph's error count: 0 means no errors, and 1 means the same error count as
+# the empty graph.
 # Temporal methods use 1 minus link F1 instead: cross-variable links in the window graph, or
 # adjacencies for LPCMCI. Their lag windows can produce far more errors than the empty graph.
 F1_FAMILIES = {"temporal"}
-FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
+# A marker shape for each package in a family's figure.
+FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star", "triangle_down")
 FRONTIER_BAND = 0.25  # share of chart height for errors above the empty graph's
 
 
@@ -2412,23 +2452,24 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     Each line records ``method``, ``package``, ``ours``, ``unit``, and ``sizes``. Each size is
     ``(size, seconds, share)``, smallest first. The score is the error count divided by the empty
     graph's, or one minus link F1 for temporal methods. ``size``, ``seconds``, and ``share`` also
-    record the largest size's values.
+    record the largest size's values. Where a comparison measures a size at several sample sizes,
+    the line takes the row at the largest, the last listed among equal ones.
     """
     default: dict[str, tuple[str, list[dict]]] = {}
     for name, methods in time_groups(summaries):
         if not all(faster(m) for m in methods):
             continue
         shown = default.get(methods[0]["spec"])
-        if (
-            name in SHOWN_SETTINGS
-            or (shown is not None and shown[0] not in SHOWN_SETTINGS and len(name) < len(shown[0]))
-            or shown is None
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
         ):
             default[methods[0]["spec"]] = (name, methods)
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
         name = SHOWN_SETTINGS.get(name, name)
-        by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
+        by_size = [
+            {r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods
+        ]
         f1 = methods[0]["family"] in F1_FAMILIES
 
         def score(row: dict, who: str) -> float | None:
@@ -2486,6 +2527,8 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
             f"M{cx - r:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r:.1f}"
             f"M{cx + r:.1f} {cy - r:.1f}L{cx - r:.1f} {cy + r:.1f}"
         )
+    if kind == "triangle_down":
+        return f"M{cx:.1f} {cy + 1.2 * r:.1f}L{cx + r:.1f} {cy - 0.8 * r:.1f}H{cx - r:.1f}Z"
     tips = [math.pi / 2 + i * 4 * math.pi / 5 for i in range(5)]
     return (
         "M"
@@ -2494,6 +2537,15 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
         )
         + "Z"
     )
+
+
+def package_name(comparator: str) -> str:
+    """The package ``comparator`` names, without a version or setting, from ``PACKAGE_NAMES``;
+    a name that still holds a digit raises ``ValueError``."""
+    name = PACKAGE_NAMES.get(comparator, comparator)
+    if re.search(r"\d", name):
+        raise ValueError(f"name the package of {comparator!r} in PACKAGE_NAMES")
+    return name
 
 
 def method_key(name: str) -> str:
@@ -2594,7 +2646,10 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 
     Scores are errors divided by the empty graph's error count, or one minus link F1 for temporal
     methods. Each line spans the measured sizes, with a larger marker at the largest size.
-    Andrey's lines use the accent color; other packages use gray and distinct marker shapes.
+    Andrey's lines use the accent color; other packages use gray and a marker shape each, from
+    ``FRONTIER_SHAPES``, and a family with more packages than shapes raises ``ValueError``. The
+    legend names each package once, by :func:`package_name`; a tooltip keeps the comparator's
+    version and setting.
     Each method uses different data, so comparisons apply within a method. The shaded corner
     shares the position set by ``frontier_frame`` across families.
     """
@@ -2640,8 +2695,10 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         )
     if span >= 1 and not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
-    packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
-    shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
+    packages = list(dict.fromkeys(package_name(p["package"]) for p in points if not p["ours"]))
+    if len(packages) > len(FRONTIER_SHAPES):
+        raise ValueError(f"{title}: {len(packages)} packages, {len(FRONTIER_SHAPES)} marker shapes")
+    shapes = dict(zip(packages, FRONTIER_SHAPES, strict=False))
     ours = {p["method"]: p for p in points if p["ours"]}
     # The shaded region has the same position in every family's figure.
     mid_x, mid_y = x(frame["corner"][0]), shared(frame["corner"][1])
@@ -2671,7 +2728,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
                     f'r="{5 if last else 3}"{tip}/>'
                 )
             else:
-                kind = shapes[p["package"]]
+                kind = shapes[package_name(p["package"])]
                 body.append(
                     f'<path class="pf-other pf-{kind}" '
                     f'd="{shape(kind, cx, cy, 4.5 if last else 3)}"{tip}/>'

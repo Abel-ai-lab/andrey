@@ -140,6 +140,12 @@ names its pull request.
   always `0`. ([#738])
 - `andrey.viz.draw` outlines each label below a node in the palette's `paper` color, so an edge that
   passes under a label no longer crosses its letters. ([#791])
+- The homepage speed panel shows FCI-JCI, IAMB, MMPC, ICP, and CAM-UV. A speed chart groups a
+  method's comparisons only when they share a size and Andrey's times agree there, and draws
+  Andrey at every size they measure, instead of also grouping comparisons that share no size,
+  drawing Andrey from the first alone, and leaving the method off the panel. The panel's legend
+  names each package once, without its version or setting, so a package keeps one marker shape per
+  family; lingam's CAM-UV at its default set size stays on the 0.14.0 card. ([#797])
 
 ### New contributors
 
@@ -2003,3 +2009,4 @@ First alpha release.
 [#781]: https://github.com/Abel-ai-lab/andrey/pull/781
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
 [#796]: https://github.com/Abel-ai-lab/andrey/pull/796
+[#797]: https://github.com/Abel-ai-lab/andrey/pull/797
