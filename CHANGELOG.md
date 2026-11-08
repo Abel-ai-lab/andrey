@@ -89,6 +89,13 @@ names its pull request.
   Causal Inference, Mooij, Magliacane, and Claassen 2020): it takes `env` as `cdnod` does,
   `confounded_index=False` when the environment is set from outside, and lists the environment's
   edges in `metadata["index_edges"]`. ([#739])
+- `jpcmciplus` (experimental) learns the links of time series from several datasets of the same
+  variables whose differences come from context variables, as J-PCMCI+ (Gunther, Ninad, and Runge
+  2023) does: it finds the links from the measured time and space contexts into the system
+  variables, stands in for the hidden contexts with one-hot dummies of the dataset and the time
+  step, and returns the temporal structure of `pcmciplus` over the system variables.
+  `andrey.data.sample_context_series` draws the model the paper describes; here each context drives
+  exactly one system variable, so no hidden context is a common cause of two. ([#PR])
 - `boss_fci` and `grasp_fci` learn a PAG that allows hidden common causes from the CPDAG of a BOSS
   or GRaSP search, removing with tests the adjacencies whose endpoints are independent given some
   set of other variables and orienting the rest with FCI's rules, without GFCI's

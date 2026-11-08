@@ -1,7 +1,7 @@
 """Temporal-family facades: the LiNGAM, PCMCI, Granger, and DYNOTEARS time-series methods.
 
-VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, LPCMCI, Granger, and DYNOTEARS each run the
-native engine and return one uniform ``StructureOutput`` wrapping a
+VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, J-PCMCI+, LPCMCI, Granger, and DYNOTEARS each
+run the native engine and return one uniform ``StructureOutput`` wrapping a
 :class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
 weights for the LiNGAM, Granger, and DYNOTEARS methods). The mapping onto the public core contract
 lives in the private ``_temporal`` adapters.
@@ -9,14 +9,14 @@ lives in the private ``_temporal`` adapters.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
 from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import Knowledge, resolve_lagged
+from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
 
 from ._adapt import (
@@ -25,10 +25,12 @@ from ._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    column_mask,
     column_namer,
     copies_named,
     data_matrix,
     int_in_range,
+    label_of,
     shared_labels,
     with_labels,
 )
@@ -1040,6 +1042,289 @@ def pcmciplus(
     return with_labels(adapt_pcmciplus(result, metadata), labels)
 
 
+@method_spec("jpcmciplus")
+def jpcmciplus(
+    data: Sequence[npt.ArrayLike],
+    *,
+    time_contexts: Sequence[str | int] | None = None,
+    space_contexts: Sequence[str | int] | None = None,
+    time_dummy: bool | None = None,
+    tau_max: int = 1,
+    alpha: float = 0.01,
+    fdr_method: str = "fdr_bh",
+    collider_rule: str = "majority",
+    indep_test: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    max_p_global: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn the links of time series from several datasets with shared contexts with J-PCMCI+.
+
+    J-PCMCI+ [1]_ extends PCMCI+ [2]_ to datasets of the same variables, such as sites, subjects,
+    or regimes, whose differences come from context variables. A time context varies over time and
+    is the same in every dataset at each step; a space context is fixed within a dataset. A context
+    can be measured or not: a one-hot dummy for the dataset and one for the time step stand in for
+    the contexts nobody measured, so that a hidden context does not link the variables it drives.
+    The method finds the links from the contexts into the system variables, then the links between
+    the system variables, and returns the graph over the system variables.
+
+    Parameters
+    ----------
+    data : sequence of array-like, each of shape (n_samples, n_variables)
+        Two or more datasets over the same columns, one row per time step; their lengths may
+        differ. Each is coerced to ``float64``. DataFrames must name their columns alike; the names
+        of the system variables become the structure's ``labels``. The columns that
+        ``time_contexts`` and ``space_contexts`` do not list are the system variables.
+    time_contexts : sequence of str or int, or None, default=None
+        The columns that hold time contexts: column labels (strings) or 0-based positions. Each
+        must hold the same values in every dataset at each step, counted from each dataset's first
+        row. ``None`` lists none.
+    space_contexts : sequence of str or int, or None, default=None
+        The columns that hold space contexts, listed as in ``time_contexts``. Each must be constant
+        within a dataset. ``None`` lists none.
+    time_dummy : bool or None, default=None
+        Whether the fit adds the dummy of the time step, which stands in for hidden time contexts.
+        It needs datasets of one length, aligned in time, with more than one step after the first
+        ``2 * tau_max``. ``None``, the default, adds it when the datasets allow it; ``True``
+        requires it and raises ``ValueError`` when they do not; ``False`` leaves it out, for
+        datasets that are not aligned in time or to save its one column per step. The dummy of the
+        dataset is always used. ``metadata["time_dummy"]`` says whether the fit used it.
+    tau_max : int, default=1
+        The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
+    alpha : float, default=0.01
+        Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
+        p-value above ``alpha``. The default is :func:`~andrey.pcmciplus`'s; the published
+        experiments of the method use ``0.05`` [1]_.
+    fdr_method : {"none", "fdr_bh"}, default="fdr_bh"
+        How the p-values of the lagged links between system variables are corrected for the number
+        of links tested. ``"fdr_bh"`` replaces them with their Benjamini-Hochberg adjusted values
+        [3]_ over all those links together, as in :func:`~andrey.pcmciplus`, and ``"none"`` keeps
+        them as tested. The links do not change: the skeleton passes decide them at ``alpha``, so
+        ``fdr_method`` only changes ``metadata["p_values"]``.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
+        How an unshielded triple ``a - b - c`` with a same-step collider candidate ``b - c`` between
+        system variables is judged, as in :func:`~andrey.pcmciplus`; ``a`` can be a context or a
+        dummy. The default, ``"majority"``, gives orientations that do not depend on the order of
+        the variables.
+    indep_test : str or None, default=None
+        The conditional-independence test behind every p-value, a test of continuous data, as in
+        :func:`~andrey.pcmciplus`: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test
+        partial correlation, and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect
+        nonlinear dependence at a far higher cost per test. The dummies enter a test as numeric
+        columns, so a categorical or mixed-data test raises ``ValueError``. ``None`` picks
+        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test of the lagged
+        phase (PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no limit. It does
+        not cap the later passes, which add the parents of both ends to every conditioning set;
+        ``max_p_global`` caps those.
+    max_p_global : int or None, default=None
+        The most conditions a test of the skeleton passes and the collider phase takes beyond the
+        default conditions, at least ``0``: every such test conditions on the parents of both
+        ends, the default conditions, and on a subset of at most ``max_p_global`` same-step
+        neighbors; the cap also bounds the subsets the collider vote reads. ``None`` sets no limit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, over the system variables, read as
+        links between lagged variables as in :func:`~andrey.pcmciplus`: required and forbidden
+        links, the pairs allowed to be linked, and temporal tiers, all honored. A position counts
+        the system variables. The contexts bring their own knowledge: no system variable causes a
+        context, and no two contexts are linked.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` over the system variables, as
+        :func:`~andrey.pcmciplus` returns it: ``structure.lag(0)`` is a ``cpdag`` and
+        ``structure.lag(k)``, ``k >= 1``, a ``digraph``. ``metadata["p_values"]``,
+        ``metadata["statistics"]``, ``metadata["parents"]``, ``metadata["conflicts"]``, and
+        ``metadata["ambiguous_triples"]`` read as there, over the system variables by position.
+        ``metadata["context_links"]`` lists the links from contexts into system variables as
+        ``[context, lag, variable]``, a space context at lag ``0``, with a context by name or
+        position in ``data`` and a variable by name or position among the system variables.
+        ``metadata["index_edges"]`` lists the links from the dummy of the dataset as ``[variable,
+        "directed"]`` pairs: the variables that change with the dataset in a way the measured
+        contexts do not explain. ``metadata["time_index_edges"]`` does the same for the dummy of
+        the time step, and ``metadata["time_dummy"]`` says whether the fit used it. A dummy link is
+        not a causal link. There is no ``metadata["changing_variables"]``: the dummy links stand in
+        for the hidden contexts, and the links of the measured ones are in
+        ``metadata["context_links"]``. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is
+        ``"jpcmciplus"``. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``time_contexts`` or
+        ``space_contexts`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` holds fewer than two
+        datasets, a dataset is not a 2-D table, the datasets differ in their columns, or a dataset
+        has at most ``2 * tau_max`` rows; if ``time_dummy=True`` and the datasets differ in length
+        or have one step after the first ``2 * tau_max``; if a test conditions on so many columns of
+        lagged values, contexts, and dummy levels that the rows leave it no degree of freedom; if a
+        column is both a time and a space context or a context names a column ``data`` lacks, or
+        fewer than two system variables remain; if a time context differs between datasets at some
+        step, a space context varies within a dataset, or a space context repeats another up to
+        scale and shift, as any two do over two datasets; or if ``data`` holds ``NaN``. With
+        ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, also if a variable repeats another
+        up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, or a test
+        finds a system variable in the span of its conditions, as with one that sums others. Also if
+        ``knowledge`` names a column that is not a system variable, such as a context, contradicts
+        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links into
+        a directed cycle over the links the fit kept.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** J-PCMCI+ suits several datasets of the same variables, each a stationary time
+    series, that differ through context variables: no system variable causes a context, no hidden
+    variable causes two system variables except a context, and no hidden context stands between a
+    measured context and a system variable or causes both [1]_. Every context must be a function of
+    the dataset or of the time step that does not tell them all apart. The method suits few system
+    variables: its context and dummy passes keep every same-step link between system variables, so
+    their tests grow exponentially with those variables, and the dummies add a column per dataset
+    and per step. It returns the temporal structure of :func:`~andrey.pcmciplus` over the system
+    variables and lists the context and dummy links in ``metadata``. For one series, use
+    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci` when hidden common causes are not contexts;
+    for i.i.d. rows from several environments, :func:`~andrey.cdnod` or :func:`~andrey.fci_jci`.
+
+    The method runs PCMCI+'s lagged phase on the system variables and time contexts, then the
+    skeleton in three passes: the links from the contexts into the system, given the lagged parents;
+    the links from the dummies into the system, given those and the context parents; and the links
+    between system variables, given those and the dummy parents. Links from contexts and dummies
+    point into the system, and PCMCI+'s collider and rule phases use them to orient the same-step
+    links between system variables.
+
+    Every test reads the datasets' lagged rows stacked, so a test reads ``M * (T - 2 * tau_max)``
+    rows for ``M`` datasets of ``T`` steps, and no lag window crosses from one dataset into the
+    next. A dummy has one level per dataset or per step. A test of a dummy tests each level
+    against the rest and multiplies the smallest p-value by the number of levels, Bonferroni's
+    correction, so a dummy link needs one level that stands out; two levels are one test.
+    Conditioning on a dummy takes all its levels but one, which centers each variable within each
+    dataset or step, and a context is fixed given its dummy, so it leaves the conditions.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the stacked design reads every
+    step. Fill in the missing steps first, as dropping one would join the steps around it, or use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test.
+
+    **Limitations.** Not benchmarked yet; its tests run it on simulated linear-Gaussian series of up
+    to 5 system variables and 4 contexts, with up to 10 datasets of up to 300 steps. It assumes
+    faithfulness, so a dummy link it misses can leave the links a hidden context adds. A dataset
+    effect far larger than the noise can hide its dummy, as the lagged values stand in for it: with
+    10 datasets of 100 steps, the dummy link was found for effects of 1 and 2 noise standard
+    deviations and missed for 5, which left false lagged links. The lagged phase tests each
+    candidate without conditions first, so an autocorrelated target can hide a context link from it
+    for good: on data from :func:`~andrey.data.sample_context_series` with 10 datasets, at
+    ``alpha=0.01`` and ``tau_max=2``, it found 82% of the context links at 50 steps and 92% at 100.
+    With few steps against many datasets, false positives stay high as the datasets grow, a
+    finite-sample bias of the kind fixed-effects panels have [1]_. A time context that the lags of
+    the time contexts determine, such as a sine and cosine of one period, or a sine or a quadratic
+    trend alone from ``tau_max=2``, cannot be told apart from them: each of its links a test cannot
+    read stays, so ``context_links`` can name other lags of the context that has the effect, and
+    other time contexts that determine it at some lag, including ones with no effect. Only the
+    variables the context links reach can be trusted, not the context or the lag that reaches them.
+    Following the text of [1]_, it tests no same-step link between two contexts and reports no link
+    between contexts: the lagged parents of each time context, which the lagged phase selects among
+    the time contexts, serve only as conditions. A dummy link needs one level that stands out, so
+    the time dummy misses a smooth effect spread over the steps, and the links it adds stay: list
+    such a context if it is known. Under the ``"majority"`` and ``"conservative"`` rules, a context
+    cannot orient a link into a variable that has the context's dummy as a parent, so hidden
+    contexts leave same-step links undirected: on 10 datasets of 100 steps, with one measured
+    context and a hidden one on every variable, of 300 links 5 were oriented correctly, 5 wrongly,
+    and 290 not at all. Cost grows fastest with the system variables: on one core and 10 datasets of
+    100 steps, a fit took 0.1 s at 10 variables, 1.5 s at 15, and 47 s at 20, ran past 300 s at 30,
+    and ran out of 12 GB at 20 with the time dummy. The time dummy adds a column per step to the
+    conditions of every test that takes it: at 5 variables and 1,600 steps a fit took 7 s with it
+    and 0.05 s without. The nonlinear tests read the dummies' columns as any other. The numbers are
+    a reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
+
+    References
+    ----------
+    .. [1] Gunther, W., Ninad, U., and Runge, J. (2023). Causal discovery for time series from
+       multiple datasets with latent contexts. Proceedings of the 39th Conference on Uncertainty in
+       Artificial Intelligence (UAI), PMLR 216, 766-776.
+    .. [2] Runge, J. (2020). Discovering contemporaneous and lagged causal relations in
+       autocorrelated nonlinear time series datasets. Proceedings of the 36th Conference on
+       Uncertainty in Artificial Intelligence (UAI), PMLR 124, 1388-1397.
+    .. [3] Benjamini, Y., and Hochberg, Y. (1995). Controlling the false discovery rate: a
+       practical and powerful approach to multiple testing. Journal of the Royal Statistical
+       Society B 57(1), 289-300.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import jpcmciplus
+    >>> rng = np.random.default_rng(0)
+    >>> def dataset(level):
+    ...     x = level + rng.standard_normal(200)
+    ...     y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(200)
+    ...     return np.column_stack([x, y])
+    >>> out = jpcmciplus([dataset(level) for level in (0, 3, 6, 9)], time_dummy=False)
+    >>> out.structure.lag(1).oriented_edges()
+    [(0, 1, 'directed')]
+    >>> [variable for variable, _ in out.metadata["index_edges"]]
+    [0]
+    """
+    from andrey.temporal.jpcmciplus import jpcmciplus as _native
+    from andrey.temporal.pcmci import design_column_name
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    inputs = context_inputs(data, time_contexts, space_contexts, tau_max, time_dummy)
+    check_context_knowledge(knowledge, inputs)
+    constraints = resolve_lagged(
+        knowledge, len(inputs.system), inputs.system_labels, tau_max, method="jpcmciplus"
+    )
+    with copies_named(
+        inputs.series_labels,
+        design_column_name(inputs.series[0].shape[1], column_namer(inputs.series_labels)),
+    ):
+        result = _native(
+            inputs.series,
+            inputs.spaces,
+            len(inputs.system),
+            time_dummy=inputs.time_dummy,
+            tau_max=tau_max,
+            pc_alpha=alpha,
+            fdr_method=fdr_method,
+            collider_rule=collider_rule,
+            indep_test=indep_test,
+            constraints=constraints,
+            max_depth=max_depth,
+            max_p_global=max_p_global,
+            seed=seed,
+        )
+    context, variable = label_of(inputs.labels), label_of(inputs.system_labels)
+    metadata = {
+        "context_links": [
+            [context(inputs.contexts[k]), lag, variable(j)] for k, lag, j in result.context_links
+        ],
+        "index_edges": [[variable(j), "directed"] for j in result.space_links],
+        "time_index_edges": [[variable(j), "directed"] for j in result.time_links],
+        "time_dummy": inputs.time_dummy,
+    }
+    return with_labels(adapt_pcmciplus(result.system, metadata), inputs.system_labels)
+
+
 @method_spec("lpcmci")
 def lpcmci(
     data: npt.ArrayLike,
@@ -1807,6 +2092,158 @@ def series_inputs(
         knowledge, X.shape[1], labels, tau_max, method=method, contemporaneous=contemporaneous
     )
     return X, mask, labels, constraints
+
+
+class ContextInputs(NamedTuple):
+    """The checked inputs of :func:`jpcmciplus`.
+
+    ``series`` holds each dataset's system variables, then its time contexts, and ``spaces`` the
+    ``(n_datasets, n_space)`` values of the space contexts. ``system`` and ``contexts`` are column
+    positions in ``data``: the time contexts, then the space contexts. ``labels`` names every column
+    and ``system_labels`` and ``series_labels`` those of ``system`` and ``series``, or ``None``.
+    ``time_dummy`` says whether the fit adds the dummy of the time step.
+    """
+
+    series: list[np.ndarray]
+    spaces: np.ndarray
+    system: list[int]
+    contexts: list[int]
+    labels: tuple[str, ...] | None
+    system_labels: tuple[str, ...] | None
+    series_labels: tuple[str, ...] | None
+    time_dummy: bool
+
+
+def context_inputs(
+    data: Sequence[npt.ArrayLike],
+    time_contexts: Sequence[str | int] | None,
+    space_contexts: Sequence[str | int] | None,
+    tau_max: int,
+    time_dummy: bool | None,
+) -> ContextInputs:
+    """Check the datasets of :func:`jpcmciplus` and split their columns by kind.
+
+    The data check runs on the datasets stacked, as a space context is constant within a dataset.
+    ``time_dummy`` becomes whether the fit adds the dummy of the time step. Raises ``ValueError`` as
+    the facade's Raises entry lists, and ``TypeError`` when a context argument is not a list of
+    columns (:func:`~andrey.api._adapt.column_mask`).
+    """
+    tables = [np.asarray(X) for X in data]
+    if len(tables) < 2:
+        raise ValueError(f"data must hold at least two datasets, got {len(tables)}")
+    for k, table in enumerate(tables):
+        if table.ndim != 2:
+            raise ValueError(f"data[{k}] must be a 2-D table, got {table.ndim} dimensions")
+    if len({table.shape[1] for table in tables}) > 1:
+        widths = [table.shape[1] for table in tables]
+        raise ValueError(f"every dataset in data needs the same columns, got {widths}")
+    labels = shared_labels(column_labels(X) for X in data)
+    stacked = np.vstack(tables)
+    if labels is not None:  # the data check names the columns
+        import pandas as pd
+
+        stacked = pd.DataFrame(stacked, columns=list(labels))
+    stacked = data_matrix(stacked, method="jpcmciplus", fix=FILL_STEPS)
+    lengths = [len(table) for table in tables]
+    blocks = np.split(stacked, np.cumsum(lengths)[:-1])
+    d = stacked.shape[1]
+    in_time = column_mask(
+        [] if time_contexts is None else time_contexts, labels, d, "time_contexts"
+    )
+    in_space = column_mask(
+        [] if space_contexts is None else space_contexts, labels, d, "space_contexts"
+    )
+    if (in_time & in_space).any():
+        raise ValueError("a column is both a time context and a space context")
+    system = np.flatnonzero(~in_time & ~in_space).tolist()
+    time, space = np.flatnonzero(in_time).tolist(), np.flatnonzero(in_space).tolist()
+    if len(system) < 2:
+        raise ValueError(f"data needs at least 2 system variables, got {len(system)}")
+    steps = min(lengths) - 2 * tau_max
+    if steps < 1:
+        raise ValueError(
+            f"every dataset needs more than 2 * tau_max = {2 * tau_max} rows, got {min(lengths)}"
+        )
+    name = column_namer(labels)
+    longest = max(blocks, key=len)
+    for k, block in enumerate(blocks):
+        for j in time:
+            if not np.array_equal(block[:, j], longest[: len(block), j]):
+                raise ValueError(
+                    f"time context {name(j)} must hold the same values in every dataset at each "
+                    f"step, and data[{k}] differs"
+                )
+        for j in space:
+            if (block[:, j] != block[0, j]).any():
+                raise ValueError(f"space context {name(j)} varies within data[{k}]")
+    if len(space) > 1:
+        groups = copy_groups(np.corrcoef(stacked[:, space], rowvar=False), len(stacked))
+        if groups:
+            raise copies_error([[space[k] for k in group] for group in groups], name)
+    aligned = len(set(lengths)) == 1
+    if time_dummy and not (aligned and steps > 1):
+        needs = (
+            f"datasets of one length, got {lengths} rows"
+            if not aligned
+            else f"more than one step after the first 2 * tau_max = {2 * tau_max}, got {steps}"
+        )
+        raise ValueError(
+            f"time_dummy=True needs {needs}; pass time_dummy=None to add it only when the "
+            "datasets allow it"
+        )
+    time_dummy = (aligned and steps > 1) if time_dummy is None else time_dummy
+    series_columns = [*system, *time]
+
+    def named(columns: list[int]) -> tuple[str, ...] | None:
+        return None if labels is None else tuple(labels[j] for j in columns)
+
+    return ContextInputs(
+        series=[block[:, series_columns] for block in blocks],
+        spaces=np.array([block[0, space] for block in blocks]),
+        system=system,
+        contexts=[*time, *space],
+        labels=labels,
+        system_labels=named(system),
+        series_labels=named(series_columns),
+        time_dummy=time_dummy,
+    )
+
+
+def check_context_knowledge(knowledge: Knowledge | None, inputs: ContextInputs) -> None:
+    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when ``knowledge`` names a context.
+
+    The knowledge of :func:`jpcmciplus` is over the system variables, and a position counts them,
+    so a column label names a context and a position past the system variables names none.
+    """
+    if not isinstance(knowledge, Knowledge):
+        return
+    d = len(inputs.system)
+    n_time = inputs.series[0].shape[1] - d
+    labels = inputs.labels
+    kinds = (
+        {}
+        if labels is None
+        else {labels[j]: "time" if k < n_time else "space" for k, j in enumerate(inputs.contexts)}
+    )
+    parts = {
+        "required": [edge[:2] for edge in knowledge.required],
+        "forbidden": [edge[:2] for edge in knowledge.forbidden],
+        "allowed": list(knowledge.allowed or ()),
+        "tiers": list(knowledge.tiers),
+    }
+    for part, groups in parts.items():
+        for node in (node for nodes in groups for node in nodes):
+            if isinstance(node, str) and node in kinds:
+                raise KnowledgeError(
+                    f"knowledge names {node!r}, a {kinds[node]} context; jpcmciplus reads "
+                    "knowledge over the system variables, and the contexts bring their own: no "
+                    "system variable causes a context, and no two contexts are linked"
+                )
+            if isinstance(node, int) and not 0 <= node < d:
+                raise KnowledgeError(
+                    f"knowledge {part} lists column {node}, but jpcmciplus reads knowledge over "
+                    f"the {d} system variables, at positions 0 to {d - 1}"
+                )
 
 
 def check_series_rows(X: np.ndarray, tau_max: int, min_rows: int) -> None:

@@ -1023,6 +1023,9 @@ def prepare_call(
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
     if fkwargs.get("target") is not None:
         fkwargs = {**fkwargs, "target": column_positions([fkwargs["target"]], labels, "target")[0]}
+    contexts = [key for key in ("time_contexts", "space_contexts") if fkwargs.get(key) is not None]
+    for key in contexts:
+        fkwargs = {**fkwargs, key: column_positions(fkwargs[key], labels, key)}
     if fkwargs.get("knowledge") is not None:
         try:
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
@@ -1032,8 +1035,8 @@ def prepare_call(
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
         # metadata["categorical"]; knowledge names them too, in each group of a panel. A graph
-        # with latent nodes names its observed variables from the table, so no label is left to
-        # apply to the result.
+        # with latent nodes names its observed variables from the table, and a graph that leaves
+        # out the contexts names what it keeps, so no label is left to apply to the result.
         import pandas as pd
 
         first = positional[0]
@@ -1042,7 +1045,7 @@ def prepare_call(
         else:
             first = pd.DataFrame(first, columns=list(labels))
         positional = [first, *positional[1:]]
-        if spec.output.has_latents:
+        if spec.output.has_latents or contexts:
             labels = None
     return positional, fkwargs, labels
 
@@ -1192,8 +1195,10 @@ def execute_bootstrap(
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),
             (
-                block_length is None or (spec.family == "temporal" and not panel),
-                f"--block-length is for a time-series method on one series, not {spec.name}",
+                block_length is None
+                or (spec.family == "temporal" and (not panel or spec.data.steps)),
+                f"--block-length is for a time-series method on one series or jpcmciplus, not "
+                f"{spec.name}",
             ),
             (
                 block_length is None or resampling != "subsample",
@@ -2012,8 +2017,8 @@ def cmd_bootstrap(
         "--resampling",
         metavar="subsample|bootstrap",
         help="How a resample is drawn: a subsample (without replacement; one stretch of rows for a "
-        "time-series method on one series) or a bootstrap resample (with replacement; blocks of "
-        "rows for such a method).",
+        "time-series method on one series or jpcmciplus) or a bootstrap resample (with "
+        "replacement; blocks of rows for such a method).",
     ),
     sample_fraction: float = typer.Option(
         BOOTSTRAP_DEFAULTS["sample_fraction"],
@@ -2025,8 +2030,8 @@ def cmd_bootstrap(
         None,
         "--block-length",
         metavar="ROWS",
-        help="Block bootstrap of a time-series method on one series: rows per block. Default "
-        "max(ceil(rows ** (1/3)), 10 * tau_max), at most the rows.",
+        help="Block bootstrap of a time-series method on one series or jpcmciplus: rows per block. "
+        "Default max(ceil(rows ** (1/3)), 10 * tau_max), at most the rows.",
     ),
     config: ConfigOption = None,
     output: OutputOption = None,

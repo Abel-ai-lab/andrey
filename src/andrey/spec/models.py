@@ -71,6 +71,7 @@ class DataSpec(Spec):
     layout: str  # human/agent-readable shape, for example "(n_samples, n_variables), row = sample"
     notes: str = ""
     missing: bool = False  # accepts NaN as a missing value, its tests deleting rows per test
+    steps: bool = False  # a panel's rows are time steps, so a resample keeps them in order
 
 
 class ParamSpec(Spec):

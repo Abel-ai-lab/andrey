@@ -9,6 +9,7 @@ display the parameter defaults defined here.
 from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
+from andrey.core.ci import CONTINUOUS_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
@@ -2132,6 +2133,111 @@ _add(
 )
 _add(
     MethodSpec(
+        name="jpcmciplus",
+        family="temporal",
+        summary="J-PCMCI+ for time series from several datasets that differ through measured or "
+        "hidden contexts: lagged and same-step causal links between the system variables, and "
+        "the context links. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="panel",
+                    doc="One time series per dataset, same columns, row = step (repeat the flag).",
+                ),
+            ),
+            layout="each (n_samples, n_variables); one array per dataset, row = time step",
+            steps=True,
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max over the system variables; "
+            "p_values, statistics, the lagged parents, conflicting and ambiguous orientations, "
+            "context_links, and the dummies' links in metadata.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
+        params=(
+            ParamSpec(
+                name="time_contexts",
+                type="str_list",
+                default=None,
+                doc="The columns that hold time contexts, each the same in every dataset at each "
+                "step: column names or 0-based positions. null lists none.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="space_contexts",
+                type="str_list",
+                default=None,
+                doc="The columns that hold space contexts, each constant within a dataset: column "
+                "names or 0-based positions. null lists none.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="time_dummy",
+                type="bool",
+                default=None,
+                doc="Add the one-hot dummy of the time step, which stands in for hidden time "
+                "contexts and needs datasets of one length, aligned in time, with more than one "
+                "step after the first 2 * tau_max. null adds it when the datasets allow it, true "
+                "requires it and raises when they do not, and false leaves it out.",
+                nullable=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 0 to tau_max are tested.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this. The default is pcmciplus's.",
+            ),
+            concept_param(
+                "fdr_method",
+                doc="How the p-values of the lagged links between system variables are corrected "
+                "for the number of links tested: none keeps them as tested; fdr_bh replaces them "
+                "with their Benjamini-Hochberg adjusted values over all those links together. The "
+                "links do not change: the skeleton passes decide them at alpha.",
+            ),
+            concept_param(
+                "collider_rule",
+                default="majority",
+                doc="How a same-step collider between system variables is judged, as in "
+                "pcmciplus; a triple can open with a context or a dummy.",
+            ),
+            concept_param(
+                "indep_test",
+                choices=CONTINUOUS_INDEP_TESTS,
+                doc="Conditional-independence test, as in pcmciplus: a test of continuous data, as "
+                "the dummies enter it as numeric one-hot columns. null picks fisherz.",
+            ),
+            _TEST_SEED,
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a skeleton or collider test takes beyond the default "
+                "conditions, the parents of both ends, at least 0; max_depth caps the lagged "
+                "phase. null sets no limit. A cap bounds the number of tests and can keep links "
+                "that a larger conditioning set would remove.",
+            ),
+            concept_param(
+                "max_depth",
+                doc="The maximum conditioning-set size of every test of the lagged phase, PC1 as "
+                "in pcmci, at least 0: 0 runs only unconditional tests, and null sets no limit. "
+                "The later passes add the parents of both ends to every test, which max_p_global "
+                "caps.",
+            ),
+        ),
+        references=("Gunther et al. 2023", "Runge 2020"),
+    )
+)
+_add(
+    MethodSpec(
         name="lpcmci",
         family="temporal",
         summary="LPCMCI for a single multivariate time series with possible hidden common causes: "
@@ -2708,6 +2814,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
     "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
     "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "jpcmciplus": _LINK_RULE + "It reads the knowledge over the system variables, by name or by "
+    "position among them, as pcmciplus does; the contexts bring their own rule, that no system "
+    "variable causes a context and no two contexts are linked.",
     "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
     "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
     "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
@@ -2808,6 +2917,10 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "dynotears": ("h_final", "edges_removed"),
     "pcmci": ("p_values", "statistics", "parents"),
     "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
+    "jpcmciplus": (
+        *("p_values", "statistics", "parents", "conflicts"),
+        *("context_links", "index_edges", "time_index_edges", "time_dummy"),
+    ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "gin": ("clusters", "cluster_order", "unordered"),

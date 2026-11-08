@@ -1749,6 +1749,12 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+#: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
+CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
+    name
+    for name in SHIPPED_INDEP_TESTS
+    if name not in DISCRETE_INDEP_TESTS and name not in MIXED_INDEP_TESTS
+)
 _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,

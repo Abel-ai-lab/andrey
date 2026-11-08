@@ -185,10 +185,28 @@ def design_test(
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
     """
+    mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
+    return column_test(indep_test, design, data.shape[1], categorical=mask, seed=seed)
+
+
+def column_test(
+    indep_test: str,
+    design: np.ndarray,
+    n_vars: int,
+    *,
+    categorical: np.ndarray | None = None,
+    n_lagged: int | None = None,
+    seed: int | None = None,
+) -> LinkTest:
+    """The ``indep_test`` test over the columns of ``design``, as :func:`design_test` builds it.
+
+    ``categorical`` masks the columns of ``design``, and the copies error covers the groups that
+    hold one of its first ``n_vars`` columns, the lag-0 columns of a lagged design. ``n_lagged``
+    counts the columns of the lagged design when more follow it; the error ignores those.
+    """
     if indep_test not in PARTIAL_CORRELATION_TESTS:
-        mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
-        built = make_indep_test(indep_test, design, categorical=mask, seed=seed)
+        built = make_indep_test(indep_test, design, categorical=categorical, seed=seed)
         if not callable(getattr(built, "statistic_pvalues", None)):
             built = PValueTest(built)
         return cast("LinkTest", built)
@@ -208,8 +226,9 @@ def design_test(
         )
     else:
         test = PARTIAL_CORRELATION_TESTS[indep_test](design)
-    n_vars = data.shape[1]
-    groups = [group for group in test.copies() if group[0] < n_vars]
+    width = design.shape[1] if n_lagged is None else n_lagged
+    lagged = [tuple(column for column in group if column < width) for group in test.copies()]
+    groups = [group for group in lagged if len(group) > 1 and group[0] < n_vars]
     if groups:
         raise copies_error(groups, design_column_name(n_vars))
     return DesignTest(test, design)

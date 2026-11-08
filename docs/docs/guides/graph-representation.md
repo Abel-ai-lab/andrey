@@ -83,28 +83,32 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   under `output.metadata`, and a key means the same thing in every method but `score`.
   {{ score_methods }} report a `score`: the result's score, except for IGSP and UT-IGSP, whose
   `score` is the number of edges of the DAG found, plus its number of targets for UT-IGSP, not a
-  score of the data. CALM reports `objective`. Exact search reports the DAG it found as `dag`,
-  its `[i, j]` edges for `i -> j`. ANM and PNL report `p_values` and `statistics`, each with the
-  test of `x -> y` under `forward` and of `y -> x` under `backward`; each two-node graph holds the
-  direction they decide, by the rule the method's `alpha` parameter selects. PCMCI reports each
-  lagged link's MCI `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+
-  reports the same for every lag from 0, plus `conflicts` and `ambiguous_triples`. Granger reports
-  each lagged link's `p_values`. By default, `fdr_method="fdr_bh"`, all three report the
+  score of the data. CALM reports `objective`. Exact search reports the DAG it found as `dag`, its
+  `[i, j]` edges for `i -> j`. ANM and PNL report `p_values` and `statistics`, each with the test of
+  `x -> y` under `forward` and of `y -> x` under `backward`; each two-node graph holds the direction
+  they decide, by the rule the method's `alpha` parameter selects. PCMCI reports each lagged link's
+  MCI `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+ and J-PCMCI+
+  report the same for every lag from 0, plus `conflicts` and `ambiguous_triples`. Granger reports
+  each lagged link's `p_values`. By default, `fdr_method="fdr_bh"`, all four report the
   Benjamini-Hochberg adjusted lagged `p_values`; with `"none"` they report the p-values as tested.
   PC, CD-NOD, FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI with `collider_rule="conservative"` or
   `"majority"` report `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose middle
   node the vote left undecided. `conflicts` lists the links two colliders ask to orient both ways:
   `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`) in
-  PCMCI+ and LPCMCI, which also reports every link with all its marks as `links`, plus `p_values`,
-  `statistics`, and its preliminary `parents`. An order that is not a total order of the variables
-  has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in a list,
-  and GIN's `cluster_order` orders its latent clusters. CD-NOD and GnIES, and GES, hill climbing,
-  Tabu search, BOSS, and GRaSP with `env`, list the variables whose mechanism changes across the
-  environments as `changing_variables`, and all but GnIES also the environment index's edges into
-  them as `index_edges`, `[variable, "directed"]` pairs. FCI-JCI, and GFCI, BOSS-FCI, and
+  PCMCI+, J-PCMCI+, and LPCMCI; LPCMCI also reports every link with all its marks as `links`, plus
+  `p_values`, `statistics`, and its preliminary `parents`. An order that is not a total order of the
+  variables has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in
+  a list, and GIN's `cluster_order` orders its latent clusters. CD-NOD and GnIES, and GES, hill
+  climbing, Tabu search, BOSS, and GRaSP with `env`, list the variables whose mechanism changes
+  across the environments as `changing_variables`, and all but GnIES also the environment index's
+  edges into them as `index_edges`, `[variable, "directed"]` pairs. FCI-JCI, and GFCI, BOSS-FCI, and
   GRaSP-FCI with `env`, list the index's neighbors as `index_edges`, `[variable, kind]` pairs with
-  `kind` `"directed"`, `"partially_directed"`, or `"bidirected"`, and no `changing_variables`;
-  UT-IGSP reports the targets it learns for each environment as `targets`.
+  `kind` `"directed"`, `"partially_directed"`, or `"bidirected"`, and no `changing_variables`.
+  J-PCMCI+ lists the links from the measured contexts as `context_links`, `[context, lag, variable]`
+  triples, and those from the dummy of the dataset and the dummy of the time step as `index_edges`
+  and `time_index_edges`, `[variable, "directed"]` pairs, and no `changing_variables`, as the dummy
+  links stand in for the hidden contexts; UT-IGSP reports the targets it learns for each environment
+  as `targets`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results
@@ -112,17 +116,17 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
 `TemporalStructure` is a stack of `GraphStructure` objects, one per lag. `lags` lists the lag
 values, `lag(k)` selects a graph by lag value, and `lag_weights` holds the `(n_lags, n, n)`
 coefficients (`lag_weights_ma` adds the moving-average stack for VARMA); a `pcmci` result has lags 1
-to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. A `dynotears` result
-has lags 0 to `tau_max`, lag 0 a `dag`, with the coefficients as `lag_weights`. An `lpcmci` result
-has lag 0 as a `pag` and holds only the lagged links whose earlier end is a tail; a lagged link
-with a circle or an arrowhead at its earlier end is in `metadata["links"]`. An autoregressive
-edge `X(t-k) -> X(t)` is a self-loop in its lag graph. A panel result from `longitudinal_lingam`
-adds a time axis: `times`, `at(time, lag)`, and `time_weights`, where `NaN` marks a block that
-cannot be computed. `summary_graph()` merges the lags into one `digraph`, and its `lags_of(i, j)`
-returns the lags at which `i -> j` appears. For a panel, `lag(k)`, `lag_weights`, and
-`summary_graph()` refer to the **final occasion**; use `at(time, lag)` and `time_weights` to inspect
-earlier occasions. The [temporal diagrams](graph-types.md#temporal-graphs) show how collapsing time
-can create cycles.
+to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`, as a `jpcmciplus`
+result does over the system variables. A `dynotears` result has lags 0 to `tau_max`, lag 0 a `dag`,
+with the coefficients as `lag_weights`. An `lpcmci` result has lag 0 as a `pag` and holds only the
+lagged links whose earlier end is a tail; a lagged link with a circle or an arrowhead at its earlier
+end is in `metadata["links"]`. An autoregressive edge `X(t-k) -> X(t)` is a self-loop in its lag
+graph. A panel result from `longitudinal_lingam` adds a time axis: `times`, `at(time, lag)`, and
+`time_weights`, where `NaN` marks a block that cannot be computed. `summary_graph()` merges the lags
+into one `digraph`, and its `lags_of(i, j)` returns the lags at which `i -> j` appears. For a panel,
+`lag(k)`, `lag_weights`, and `summary_graph()` refer to the **final occasion**; use `at(time, lag)`
+and `time_weights` to inspect earlier occasions. The [temporal
+diagrams](graph-types.md#temporal-graphs) show how collapsing time can create cycles.
 
 ## Reading and converting
 
