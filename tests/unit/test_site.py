@@ -631,6 +631,21 @@ def test_the_theme_stylesheet_keeps_only_the_icons_a_page_names(conf, tmp_path):
     assert css == '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-sun{--fa:"\\f185"}'
 
 
+def test_every_intersphinx_inventory_falls_back_on_a_stored_copy(conf):
+    from sphinx.util.inventory import InventoryFile
+
+    # Without a timeout, a site that never answers holds the build forever.
+    assert conf["intersphinx_timeout"] > 0
+    # A download kept from an earlier build would otherwise stand in for the site on a rebuild.
+    assert conf["intersphinx_cache_limit"] == 0
+    for name, (site, locations) in conf["intersphinx_mapping"].items():
+        site_first, stored = locations
+        assert site_first is None, name  # None is the site's own objects.inv
+        assert "://" not in stored, name
+        raw = (ROOT / "docs" / stored).read_bytes()
+        assert InventoryFile.loads(raw, uri=site).data, name
+
+
 def _remeasured() -> tuple[dict, dict]:
     """``SUMMARY`` with DirectLiNGAM also measured against causal-learn, and a later summary that
     measures DirectLiNGAM against lingam again."""
