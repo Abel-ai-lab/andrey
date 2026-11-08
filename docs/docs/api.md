@@ -1078,9 +1078,10 @@ matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of 
 `andrey.viz` renders a `GraphStructure` to a self-contained SVG on the package palette; for a
 temporal result, draw one lag's graph or its `summary_graph()`. Graphviz places
 the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout otherwise. Latent
-variables are hollow, dashed circles. `draw(structure, targets=["x"])` marks the variables an
-experiment set: each is a square, and a bar crosses each edge into it. A hard intervention cuts
-those edges, and a soft one keeps them; the marks are the same.
+variables are hollow, dashed circles. `draw(structure, targets=["x"])` and
+`to_graphviz(structure, targets=["x"])` mark the variables an experiment set: each is a square,
+and a bar crosses each edge into it. A hard intervention cuts those edges, and a soft one keeps
+them; the marks are the same.
 
 ```{eval-rst}
 .. currentmodule:: andrey.viz
