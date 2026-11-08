@@ -1083,8 +1083,8 @@ def bootstrap(
     to the others. Only a resample that is a valid graph of the method's kind can be that fit: a
     ``cpdag`` with a consistent DAG extension, or a PAG that passes the steps above, because a
     method can return a graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting
-    orientations undirected), or one labeled ``pag`` that is not the PAG of any MAG (``fci`` when
-    test errors give separating sets that no MAG fits). A warning says so, and
+    orientations undirected), or one labeled ``pag`` from which Zhang's construction builds no MAG
+    (``fci`` when test errors give results that no MAG fits). A warning says so, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is ``"vote"`` otherwise. When no
     resample is valid, a warning says so, the averaged graph is the resample nearest the others, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample_invalid"``. ``strict=True`` raises in both

@@ -303,7 +303,7 @@ def test_fci_resamples_that_are_not_pags_do_not_become_the_averaged_graph():
     assert sum(not is_valid(fit.structure) for fit in out.fits) > 15  # most fits are not PAGs
     assert out.metadata["averaged_graph"] == "nearest_resample"
     assert is_valid(out.structure)
-    out.structure.m_separated(0, 4, [])  # a graph query raises on a pag that is not a PAG
+    out.structure.m_separated(0, 4, [])  # a graph query runs on the averaged graph
 
 
 @pytest.mark.parametrize("seed", range(4))

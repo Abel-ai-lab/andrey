@@ -12,12 +12,13 @@ names its pull request.
 
 ### Changed
 
-- `fci`'s **Limitations** paragraph says that test errors can give separating sets that no MAG
-  fits, and the `pag` it returns is then not the PAG of any MAG, so a graph query such as
-  `m_separated` can raise `ValueError`: of 200 simulated datasets with 10 variables, mean degree 3,
-  and 2,000 rows, 28 fits with `"fisherz"` and 29 with `"normal_scores"` returned one.
-  `bootstrap`'s Notes name such a fit among those its averaged graph passes over for the nearest
-  valid resample. ([#PR])
+- `fci`'s **Limitations** paragraph says that test errors can give results that no MAG fits,
+  and the `pag` it returns is then not the PAG of any MAG: of 200 simulated datasets with 10
+  variables, mean degree 3, and 2,000 rows, 36 fits with `"fisherz"` and 36 with `"normal_scores"`
+  returned one. On 28 and 29 of them, the MAG that Zhang's construction builds from the `pag` is
+  not ancestral, and a graph query such as `m_separated` raised `ValueError`. `bootstrap`'s Notes
+  name a `pag` from which Zhang's construction builds no MAG among the fits its averaged graph
+  passes over for the nearest valid resample. ([#PR])
 
 ## [0.15.0] - 2026-11-07
 
