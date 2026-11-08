@@ -15,7 +15,7 @@ names its pull request.
 - A release without its own art has a default release-card cover: the navy ground, the "Release
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
-  link preview, the wordmark and its release on navy. ([#PR])
+  link preview, the wordmark and its release on navy. ([#809])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2035,3 +2035,4 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#809]: https://github.com/Abel-ai-lab/andrey/pull/809
