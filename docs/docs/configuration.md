@@ -48,27 +48,36 @@ requested backend uses `auto`, without a warning.
   also use the worker processes for their skeleton search with the `fisherz`, `student_t`,
   `normal_scores`, and `rcot` tests on complete data, and send a conditioning-set size to them only
   when it has enough tests to repay them; with `rcot` the p-values are the same with any number of
-  workers. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same result
-  at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl` with one
-  worker leaves the BLAS threads unlimited and with several limits each thread to one, so on a
-  machine with several cores its p-values and statistics can differ in the last digits between one
-  worker and several. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask
-  for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
+  workers. FCI, FCI-JCI, and GFCI also send each large possible-d-separation search to them with the
+  `fisherz`, `student_t`, and `normal_scores` tests on complete data; the pairs are still searched
+  one at a time, in the serial order, and every graph is the serial one. `andrey.bootstrap` fits
+  its resamples on them, one fit per worker, with the same result at any number. `1` (the default)
+  and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads
+  unlimited and with several limits each thread to one, so on a machine with several cores its
+  p-values and statistics can differ in the last digits between one worker and several. Each `pnl`
+  thread holds three n x n float64 matrices; when the threads you ask for would hold more than 4
+  GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
   GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"` uses the workers only when it
   holds at least this many conditional-independence tests. The default is `500000`, measured on an
   AMD EPYC 9534 server running Linux; `0` always uses them.
+- `ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`: a possible-d-separation search of FCI, FCI-JCI, and
+  GFCI uses the workers only when its candidate set has at least this many subsets, counted over
+  every size it tests. The default is `250000`, measured on an AMD EPYC server running Linux with 4
+  and 8 workers; `0` always uses them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
   measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures all three for your
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all four for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
-alone, and `--method rcot` RCoT's. With more than one worker and a default cutoff, a fit warns once
-when a pass reaches a tenth of it; setting the variable, to any value, silences the warning.
+alone, `--method rcot` RCoT's, and `--method possible_dsep` the possible-d-separation search's.
+With more than one worker and a default cutoff, a fit warns once when a pass or a
+possible-d-separation search reaches a tenth of it; setting the variable, to any value, silences
+the warning.
 
 The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
 that directory is on a file system that rejects the socket, as some cluster file systems do, we

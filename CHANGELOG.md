@@ -122,6 +122,16 @@ names its pull request.
 - `grasp` adds or removes a parent only when it changes the score by more than the `1e-6`
   tolerance, as `boss` does, so its graph can differ on data whose scores tie within it. ([#749])
 - The `andrey` command needs Typer 0.12.4 or later. ([#755])
+- `fci`, `fci_jci`, and `gfci` run their possible-d-separation step faster, with the same graphs and
+  separating sets on any number of workers: a search of many subsets asks them in batched calls, the
+  second endpoint's search leaves out the subsets the first endpoint's search found dependent, and
+  with more than one worker a search of at least 250,000 subsets with the `fisherz`, `student_t`, or
+  `normal_scores` test runs on the worker processes (`ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK` sets
+  the cutoff). A fit with more than one worker warns once on the default when a search reaches a
+  tenth of it, and `andrey calibrate --method possible_dsep` measures the value for the machine it
+  runs on. On two-domain data with 80 to 100 variables, where the step takes most of the fit, the
+  step ran about 1.5 times faster on one core and up to 6 and 12 times faster on 4 and 8 workers; a
+  step of a few seconds gains little. ([#798])
 
 ### Fixed
 
@@ -2010,3 +2020,4 @@ First alpha release.
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
 [#796]: https://github.com/Abel-ai-lab/andrey/pull/796
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
+[#798]: https://github.com/Abel-ai-lab/andrey/pull/798

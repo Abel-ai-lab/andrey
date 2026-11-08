@@ -1,17 +1,21 @@
 """Measure the worker-pool cutoffs on this machine (``andrey calibrate``).
 
 A GES pass uses the pool when estimated candidate evaluations exceed
-``ANDREY_GES_PARALLEL_MIN_WORK``, and a conditioning-size pass of the PC, FCI, GFCI, and CD-NOD
+``ANDREY_GES_PARALLEL_MIN_WORK``, a conditioning-size pass of the PC, FCI, GFCI, and CD-NOD
 skeleton search when its tests reach ``ANDREY_SKELETON_PARALLEL_MIN_WORK``, or, with RCoT, when its
-tests times the rows reach ``ANDREY_RCOT_PARALLEL_MIN_WORK``. The crossover depends on the machine,
-worker count, and numerical libraries. Fits never calibrate automatically.
+tests times the rows reach ``ANDREY_RCOT_PARALLEL_MIN_WORK``, and a possible-d-separation search of
+FCI, FCI-JCI, and GFCI when its subsets reach ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK``. The
+crossover depends on the machine, worker count, and numerical libraries. Fits never calibrate
+automatically.
 
 GES is timed on whole fits of sparse linear-Gaussian data over ``d`` variables: serial against every
 pass pooled, pool start included. The skeleton search is timed on one pass over ``d`` variables, at
 each conditioning size in :data:`SKELETON_SIZES`, the pass scanned in this process against the same
 pass on a started pool, with the pool start included; the cutoff is the largest of the sizes'.
 RCoT's skeleton search is timed the same way on one pass at conditioning size 2 over ``d`` variables
-of :data:`RCOT_ROWS` rows (:func:`rcot_pass`).
+of :data:`RCOT_ROWS` rows (:func:`rcot_pass`). The possible-d-separation search is timed on one
+search over the ``d - 2`` candidates of ``d`` variables, which tests every subset
+(:func:`dsep_test`), in this process against a started pool, with the pool start included.
 :func:`bracket` finds sizes around the crossover, extending beyond the probe grid when needed. Each
 size's work is the largest estimated work of a pass in its pooled run, as the gate counts it: a
 cutoff below it sends that pass, and every pass after it, to the pool. The process's first pool
@@ -44,7 +48,9 @@ Timers = tuple[Callable[[int], float], Callable[[int], float], Callable[[int], i
 class Method:
     """A worker-pool cutoff: its environment variable, how the default-cutoff warning names the
     search, whether the gate sends a pass of exactly the cutoff's work to the pool, its built-in
-    cutoff, and the timers of the passes :func:`calibrate` measures with a number of workers.
+    cutoff, the timers of the passes :func:`calibrate` measures with a number of workers, and the
+    probe sizes ``d`` with the smallest and largest :func:`bracket` may reach (``None``:
+    :data:`GRID`, from 4 to 256).
 
     ``default`` and ``timers`` are functions, so they import the pool modules when called: those
     modules import this one.
@@ -55,6 +61,7 @@ class Method:
     at_cutoff: bool
     default: Callable[[], int]
     timers: Callable[[int], list[Timers]]
+    sizes: tuple[tuple[int, ...], int, int] | None = None
 
 
 def _constant(module: str, name: str) -> Callable[[], int]:
@@ -83,6 +90,15 @@ METHODS = {
         at_cutoff=True,
         default=_constant("andrey.constraint._parallel_skeleton", "MIN_POOL_RCOT_WORK"),
         timers=lambda workers: [rcot_timers(workers)],
+    ),
+    "possible_dsep": Method(
+        "ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK",
+        "The possible-d-separation search",
+        at_cutoff=True,
+        default=_constant("andrey.constraint._parallel_skeleton", "MIN_POOL_DSEP_SUBSETS"),
+        timers=lambda workers: [dsep_timers(workers)],
+        # 12 to 20 candidates, 4,095 to 1,048,575 subsets; the largest takes about 5 s serially.
+        sizes=((14, 16, 18, 20, 22), 6, 22),
     ),
 }
 NOTE = (
@@ -163,6 +179,8 @@ def bracket(
     *,
     work: Callable[[int], int] = lambda d: d * (d - 1),
     method: str = "ges",
+    smallest: int | None = None,
+    largest: int | None = None,
 ) -> Crossover:
     """Find the sizes around the serial/pooled crossover from timing functions of ``d``.
 
@@ -170,10 +188,12 @@ def bracket(
     ``method`` names the cutoff the result is for.
 
     Scans ``grid`` upward for the first size where the pooled pass is faster. If that is the first
-    grid size, halves ``d`` until the serial pass is faster (or ``d`` reaches 4); if no grid size
-    qualifies, doubles past the grid (up to 256). Then narrows the bracket by three bisections of
-    ``log d``.
+    grid size, halves ``d`` until the serial pass is faster (or ``d`` reaches ``smallest``, 4 when
+    not given); if no grid size qualifies, doubles past the grid (up to ``largest``, 256 when not
+    given). Then narrows the bracket by three bisections of ``log d``.
     """
+    lo = _MIN_D if smallest is None else smallest
+    hi = _MAX_D if largest is None else largest
     timings: dict[int, tuple[float, float]] = {}
 
     def faster_pooled(d: int) -> bool:
@@ -192,16 +212,16 @@ def bracket(
         below = d
     if above is not None and below is None:  # the crossover lies below the grid
         d = above
-        while d > _MIN_D:
-            d = max(_MIN_D, d // 2)
+        while d > lo:
+            d = max(lo, d // 2)
             if not faster_pooled(d):
                 below = d
                 break
             above = d
     elif above is None:  # the crossover lies above the grid
         d = sizes[-1]
-        while d < _MAX_D:
-            d = min(_MAX_D, d * 2)
+        while d < hi:
+            d = min(hi, d * 2)
             if faster_pooled(d):
                 above = d
                 break
@@ -458,6 +478,66 @@ def rcot_timers(workers: int, repeats: int = 3) -> Timers:
     return serial, pooled, lambda d: make(d).tests
 
 
+# The rows of the possible-d-separation probe's data.
+DSEP_ROWS = 1000
+
+
+def dsep_test(d: int) -> CITest:
+    """A Fisher-z test over ``d`` variables of :data:`DSEP_ROWS` rows: variable 1 is variable 0
+    plus noise and the others are independent, so no subset of the candidates 2 to ``d - 1``
+    separates 0 and 1, and a search over them tests all ``2 ** (d - 2) - 1`` subsets."""
+    from andrey.core.ci import make_indep_test
+
+    x = np.random.default_rng(d).standard_normal((DSEP_ROWS, d))
+    x[:, 1] += x[:, 0]
+    return make_indep_test("fisherz", x)
+
+
+def dsep_timers(workers: int) -> Timers:
+    """Serial and pooled timing functions for one possible-d-separation search of the pair 0 and 1
+    over the ``d - 2`` candidates of :func:`dsep_test`, every subset by increasing size.
+
+    The serial arm enumerates the subsets as arrays in this process on one BLAS thread, as a fit's
+    search below the cutoff does; the pooled arm starts a pool of ``workers`` processes and runs
+    the search on it, so its time includes starting and closing the pool. Times are as in
+    :func:`fit_timers`. The third function gives the search's subsets, the work the gate counts.
+    """
+    from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+    from andrey.constraint._skeleton import CHUNK, blocks, first_separating_subset
+    from andrey.core import backend
+
+    tests: dict[int, CITest] = {}
+
+    def make(d: int) -> CITest:
+        if d not in tests:
+            tests[d] = dsep_test(d)
+        return tests[d]
+
+    def serial(d: int) -> float:
+        test, candidates = make(d), list(range(2, d))
+
+        def search() -> None:
+            order = (block for size in range(1, d - 1) for block in blocks(d - 2, size, CHUNK))
+            with backend.one_blas_thread():
+                first_separating_subset(test, 0, 1, candidates, (0, 0, 0), order, _ALPHA)
+
+        return _time(search, _REPEATS)
+
+    def pooled(d: int) -> float:
+        test, candidates = make(d), list(range(2, d))
+
+        def search() -> None:
+            pool = SkeletonWorkerPool(test, workers)
+            try:
+                pool.first_separating(0, 1, candidates, (0, 0, 0), range(1, d - 1), _ALPHA)
+            finally:
+                pool.close()
+
+        return _time(search, _REPEATS)
+
+    return serial, pooled, lambda d: 2 ** (d - 2) - 1
+
+
 def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str, Crossover]:
     """Measure each method's crossover with ``workers`` pool processes."""
     import dataclasses
@@ -470,11 +550,14 @@ def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str
         warnings.simplefilter("ignore", andrey.AndreyWarning)
         for m in methods:
             timers = METHODS[m].timers(workers)
+            grid, smallest, largest = METHODS[m].sizes or (GRID, _MIN_D, _MAX_D)
             # A pooled run with next to no work times starting and closing the pool; its warm-up
             # call starts the process's first pool (the forkserver) before anything else is timed.
-            start = timers[0][1](GRID[0])
+            start = timers[0][1](grid[0])
             runs = [
-                bracket(serial, pooled, GRID, work=work, method=m)
+                bracket(
+                    serial, pooled, grid, work=work, method=m, smallest=smallest, largest=largest
+                )
                 for serial, pooled, work in timers
             ]
             widest = max(runs, key=lambda c: c.cutoff)

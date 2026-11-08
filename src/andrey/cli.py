@@ -1756,16 +1756,20 @@ def cmd_calibrate(
     method: list[str] | None = typer.Option(
         None,
         "--method",
-        help="Measure only this method (ges, skeleton, or rcot); repeatable. Default: all.",
+        help=(
+            "Measure only this method (ges, skeleton, rcot, or possible_dsep); repeatable. "
+            "Default: all."
+        ),
     ),
     as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
 ) -> None:
     """Measure the worker-pool cutoffs on this machine and print the settings to use.
 
-    Times serial runs against pooled ones for a few sizes, whole fits for GES and single passes for
-    the skeleton search of PC, FCI, GFCI, and CD-NOD, with Fisher-z and with RCoT, and sets
-    nothing. It takes a few minutes, and longer when the pool never wins (the search then runs up
-    to 256 variables).
+    Times serial runs against pooled ones for a few sizes, whole fits for GES, single passes for
+    the skeleton search of PC, FCI, GFCI, and CD-NOD, with Fisher-z and with RCoT, and single
+    searches for the possible-d-separation step of FCI, FCI-JCI, and GFCI, and sets nothing. It
+    takes a few minutes, and longer when the pool never wins (the search then runs up to 256
+    variables).
     """
     from andrey.core import backend
     from andrey.search import calibrate as cal

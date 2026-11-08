@@ -1134,7 +1134,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT) for this machine, as settings to export |
+| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation) for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or

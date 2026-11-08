@@ -150,14 +150,16 @@ accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-
 
 ### Can it use more CPU cores?
 
-GES, GFCI, and the skeleton search of PC and the methods built on it can spread their larger
-passes over worker processes: set `ANDREY_N_JOBS` above 1. They return the same graph as with one
-worker; [Configuration](configuration.md#parallel-search) lists the methods and tests that use
-them. A script that does this must put its entry point under `if __name__ == "__main__":`,
-because starting the workers re-imports the script;
-[Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
-workers only above a work cutoff. The defaults suit one fit per process; for a process that runs
-many fits, `andrey calibrate` measures the cutoffs on your machine and prints the settings.
+GES, GFCI, the skeleton search of PC and the methods built on it, and the possible-d-separation
+step of FCI, FCI-JCI, and GFCI can spread their larger passes over worker processes: set
+`ANDREY_N_JOBS` above 1. They return the same graph as with one worker;
+[Configuration](configuration.md#parallel-search) lists the methods and tests that use them. A
+script that does this must put its entry point under `if __name__ == "__main__":`, because
+starting the workers re-imports the script;
+[Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass or search
+uses the workers only above a work cutoff. The defaults suit one fit per process; for a process
+that runs many fits, `andrey calibrate` measures the cutoffs on your machine and prints the
+settings.
 
 ## Data
 

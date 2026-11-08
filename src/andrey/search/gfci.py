@@ -107,10 +107,10 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
-    ``workers`` worker processes share the GES passes and the adjacency search's larger
-    conditioning-size passes, each above its own work threshold; ``None`` reads
-    ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
-    the triples the pattern shields by the vote of
+    ``workers`` worker processes share the GES passes, the adjacency search's larger
+    conditioning-size passes, and the larger possible-d-sep searches, each above its own work
+    threshold; ``None`` reads ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or
+    ``"majority"`` decides the triples the pattern shields by the vote of
     :func:`~andrey.constraint._skeleton.vote_triples` after the possible-d-sep step. ``seed`` fixes
     the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
     ``None`` uses ``ANDREY_SEED``. ``context``, the column of an environment index, is a source of
@@ -377,6 +377,7 @@ def fci_from_pattern(
             max_depth=max_depth,
             constraints=constraints,
             keep=untested,
+            workers=workers,
         )
     if context is not None:
         mark_index(marks, context, confounded_index)

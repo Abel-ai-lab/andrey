@@ -19,6 +19,13 @@ same closed forms and the skeleton is bit-identical to the serial oracle. A work
 start-of-size neighborhood from the adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 
+FCI's possible-d-sep step sends a search of at least :data:`MIN_POOL_DSEP_SUBSETS` subsets, or the
+``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` that overrides it, to a second
+:class:`SkeletonWorkerPool`, started after the skeleton search's pool has closed
+(:meth:`SkeletonWorkerPool.takes_search`, :meth:`SkeletonWorkerPool.first_separating`). Each task
+covers a contiguous run of the subsets in the serial order and returns the first that separates the
+pair, and the caller reads the tasks in that order, so the subset found is the serial one.
+
 An RCoT test runs on a pool of its own (:class:`RCoTWorkerPool`), with its own cutoff in RCoT tests
 times rows, :data:`MIN_POOL_RCOT_WORK` or the ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it,
 since a test's cost grows with the rows and is about a thousand times a Fisher-z test's. The
@@ -31,15 +38,23 @@ in-process p-value bit for bit, whichever worker computes it.
 
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor
+from collections import deque
+from collections.abc import Iterable, Iterator, Sequence
+from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
 from andrey.constraint._skeleton import (
+    CHUNK,
+    Block,
     Removal,
+    block_subsets,
+    blocks,
     canonical_capable,
+    first_separating_subset,
     is_rcot,
     pair_queries,
     scan_pairs,
@@ -61,6 +76,20 @@ if TYPE_CHECKING:
 #: (0 sends every pass to the pool), and a fit with workers warns once on the default when a pass
 #: nears it; ``andrey calibrate --method skeleton`` measures the value for a machine.
 MIN_POOL_QUERIES: int = 500_000
+
+#: The default for the fewest subsets, counted over every size it tests, a possible-d-sep search of
+#: FCI or GFCI needs to run on the worker pool; a smaller search runs in the caller's process.
+#: ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` overrides it (0 sends every search to the pool), and a
+#: fit with workers warns once on the default when a search nears it; ``andrey calibrate --method
+#: possible_dsep`` measures the value for a machine. On an AMD EPYC server with 4 and 8 workers, a
+#: search on a pool started for it, the start included, beat the search in process from 65,535
+#: subsets, and at 262,143 took 0.39 to 0.49 s against 1.2 s. That pool was not the process's
+#: first: a later pool starts in about 0.11 s, the first in about 1.5 s. The default stays above the
+#: crossover.
+MIN_POOL_DSEP_SUBSETS: int = 250_000
+
+#: The most subsets one task of a possible-d-sep search holds.
+DSEP_TASK_SUBSETS: int = 8192
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.
 _WORKER_TEST: PartialCorrelationTest | None = None
@@ -102,6 +131,33 @@ def _scan_task(payload: tuple) -> list[Removal]:
     return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha, record_pvalues=record_pvalues)
 
 
+def dsep_tasks(n: int, sizes: Iterable[int], most: int) -> Iterator[list[Block]]:
+    """The blocks of ``n`` candidates at each of ``sizes``, in order, grouped into tasks of at most
+    ``most`` subsets."""
+    task: list[Block] = []
+    held = 0
+    for size in sizes:
+        for block in blocks(n, size, most):
+            count = block_subsets(n, block)
+            if task and held + count > most:
+                yield task
+                task, held = [], 0
+            task.append(block)
+            held += count
+    if task:
+        yield task
+
+
+def _separating_task(payload: tuple) -> tuple[int, ...] | None:
+    """Worker side of one possible-d-sep task: the first of its subsets that separates the pair,
+    or ``None`` (:func:`~andrey.constraint._skeleton.first_separating_subset`)."""
+    x, y, candidates, within, task, alpha, run_token = payload
+    if run_token != _WORKER_TOKEN:
+        raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
+    assert _WORKER_TEST is not None  # _init_worker runs before any task
+    return first_separating_subset(_WORKER_TEST, x, y, candidates, within, task, alpha, CHUNK)
+
+
 class SkeletonWorkerPool:
     """Persistent worker pool for the skeleton size passes; created lazily, reused across sizes.
 
@@ -111,7 +167,8 @@ class SkeletonWorkerPool:
     concatenates the per-chunk removals. The correlation bytes tag a run token every task
     re-checks, so a stale pool can never mix a prior run's numbers in. The caller passes a
     :func:`~andrey.constraint._skeleton.canonical_capable` test. A bad override raises when the pool
-    is created, before any pass.
+    is created, before any pass. FCI's possible-d-sep step runs its larger searches on a pool of
+    its own (:meth:`first_separating`).
     """
 
     def __init__(self, test: CITest, workers: int) -> None:
@@ -123,6 +180,9 @@ class SkeletonWorkerPool:
         self._min_queries = par.min_work(env.SKELETON_PARALLEL_MIN_WORK, MIN_POOL_QUERIES)
         # Warn once a pass comes near the default cutoff (only a fit that can fan out).
         self._warn = self._workers > 1 and calibrate.cutoff_is_default("skeleton")
+        # The possible-d-sep cutoff is read at the first search (takes_search), so a PC fit never
+        # parses it.
+        self._warn_dsep = self._workers > 1
         self._pool: ProcessPoolExecutor | None = None
         self._token: object = None
 
@@ -176,6 +236,62 @@ class SkeletonWorkerPool:
             for chunk in _balanced_chunks(weights, self._workers)
         ]
         return [removal for chunk in _collect(futures, ordered=True) for removal in chunk]
+
+    @cached_property
+    def min_dsep_subsets(self) -> int:
+        """The fewest subsets a possible-d-sep search needs to run on the pool:
+        :data:`MIN_POOL_DSEP_SUBSETS`, or the ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` that
+        overrides it."""
+        return par.min_work(env.POSSIBLE_DSEP_PARALLEL_MIN_WORK, MIN_POOL_DSEP_SUBSETS)
+
+    def takes_search(self, subsets: int) -> bool:
+        """Whether a possible-d-sep search of ``subsets`` subsets, counted over every size it
+        tests, runs on the pool: whether they reach :attr:`min_dsep_subsets`. With more than one
+        worker and the default cutoff, the first search that reaches a tenth of it warns once."""
+        cutoff = self.min_dsep_subsets
+        if self._warn_dsep and subsets >= calibrate.WARN_FRACTION * cutoff:
+            self._warn_dsep = False
+            if calibrate.cutoff_is_default("possible_dsep"):
+                calibrate.warn_default_cutoff("possible_dsep", cutoff)
+        return subsets >= cutoff
+
+    def first_separating(
+        self,
+        x: int,
+        y: int,
+        candidates: Sequence[int],
+        within: Sequence[int],
+        sizes: Iterable[int],
+        alpha: float,
+    ) -> tuple[int, ...] | None:
+        """The first subset of ``candidates`` that separates ``x`` and ``y`` (``p > alpha``), or
+        ``None``, from each of ``sizes`` in turn in ``combinations`` order, leaving out a subset
+        whose positions all lie in one of the bit masks ``within``.
+
+        The subsets go to the workers in tasks of up to :data:`DSEP_TASK_SUBSETS`, at most two per
+        worker at a time, and the tasks are read in order: the first that finds a subset decides,
+        and the queued tasks after it are canceled, though a running one finishes. A task whose
+        test raises raises here when no task before it found a subset, the error the serial order
+        meets first. The pool starts on the first task.
+        """
+        members = tuple(candidates)
+        masks = tuple(within)
+        tasks = dsep_tasks(len(members), sizes, DSEP_TASK_SUBSETS)
+        pending: deque[Future] = deque()
+        try:
+            while True:
+                while len(pending) < 2 * self._workers and (task := next(tasks, None)):
+                    pool, token = self._ensure()
+                    payload = (x, y, members, masks, task, alpha, token)
+                    pending.append(pool.submit(_separating_task, payload))
+                if not pending:
+                    return None
+                found = _collect([pending.popleft()])[0]
+                if found is not None:
+                    return found
+        finally:
+            for future in pending:
+                future.cancel()
 
     def close(self) -> None:
         if self._pool is not None:

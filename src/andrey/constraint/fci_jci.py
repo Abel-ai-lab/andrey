@@ -109,6 +109,7 @@ def fci_jci(
     padded = None if constraints is None else constraints.padded(d + 1)
     test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
     allowed, keep, apart = knowledge_masks(padded)
+    workers = backend.worker_count(workers)
     skeleton, sepsets, _ = adjacency_search(
         test,
         d + 1,
@@ -117,7 +118,7 @@ def fci_jci(
         keep=keep,
         apart=apart,
         max_depth=max_depth,
-        workers=backend.worker_count(workers),
+        workers=workers,
     )
 
     marks = circle_pag(skeleton)
@@ -138,6 +139,7 @@ def fci_jci(
         seed=seed,
         max_depth=max_depth,
         constraints=padded,
+        workers=workers,
     )
     mark_index(marks, d, confounded_index)
     ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
