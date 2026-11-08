@@ -122,14 +122,24 @@ napoleon_numpy_docstring = True
 always_use_bars_union = True
 
 # ---- intersphinx -----------------------------------------------------------------------------
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
-    "sklearn": ("https://scikit-learn.org/stable", None),
-    "networkx": ("https://networkx.org/documentation/stable", None),
-    "matplotlib": ("https://matplotlib.org/stable", None),
+# Each inventory comes from its project's site, or from its stored copy in `_intersphinx/` when the
+# site does not answer within `intersphinx_timeout` seconds (a limit on each connection attempt and
+# each read). `scripts/refresh_intersphinx.py` downloads the copies again. A cache limit of 0 days
+# makes every build ask each site again; with a longer limit, a rebuild that finds an earlier
+# download still fresh skips the site and reads the stored copy.
+INTERSPHINX_SITES = {
+    "python": "https://docs.python.org/3",
+    "numpy": "https://numpy.org/doc/stable",
+    "scipy": "https://docs.scipy.org/doc/scipy",
+    "sklearn": "https://scikit-learn.org/stable",
+    "networkx": "https://networkx.org/documentation/stable",
+    "matplotlib": "https://matplotlib.org/stable",
 }
+intersphinx_mapping = {
+    name: (site, (None, f"_intersphinx/{name}.inv")) for name, site in INTERSPHINX_SITES.items()
+}
+intersphinx_timeout = 5
+intersphinx_cache_limit = 0
 
 # ---- notebooks -------------------------------------------------------------------------------
 EXAMPLES = HERE / "docs" / "examples"
