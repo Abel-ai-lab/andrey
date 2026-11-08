@@ -457,6 +457,11 @@ def test_to_graphviz_draws_a_self_loop_as_one_directed_edge() -> None:
     looped = GraphStructure.from_numpy(m, kind="digraph", allow_self_loops=True)
     loop = viz.to_graphviz(looped).get_edge("0", "0")
     assert loop.attr.get("dir") in (None, "")
+    # As in draw, a target's loop takes no bar, so the target gets the barred stub.
+    marked = viz.to_graphviz(looped, targets=[0])
+    assert marked.get_edge("0", "0").attr.get("arrowhead") in (None, "")
+    assert marked.has_edge("do 0", "0")
+    assert '<g class="intervention">' in viz.draw(looped, targets=[0], engine="builtin")
 
 
 def test_without_pygraphviz_the_default_is_the_builtin_layout(monkeypatch) -> None:
@@ -583,8 +588,67 @@ def test_a_latent_target_keeps_its_dashed_ring() -> None:
     assert re.search(r'<rect class="intervened"[^>]*stroke-dasharray', viz.draw(g, targets=[1]))
 
 
+@pytest.mark.parametrize("render", [viz.draw, viz.to_graphviz])
 @pytest.mark.parametrize("target", ["q", 2, -1, True])
-def test_targets_must_name_a_variable(target) -> None:
+def test_targets_must_name_a_variable(render, target) -> None:
+    if render is viz.to_graphviz:
+        pytest.importorskip("pygraphviz")
     g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
     with pytest.raises(ValueError, match="targets names"):
-        viz.draw(g, targets=[target])
+        render(g, targets=[target])
+
+
+def test_to_graphviz_bars_an_arrowtail_into_a_target_and_never_a_circle() -> None:
+    pytest.importorskip("pygraphviz")
+    # x <-> y and y o-o w: x's end is an arrowhead, w's only end is a circle.
+    pag = _from({(0, 1): (ARROW, ARROW), (1, 3): (CIRCLE, CIRCLE)}, 4, "pag")
+    graph = viz.to_graphviz(pag, targets=[0, 3])
+    edges = {(a, b): dict(graph.get_edge(a, b).attr) for a, b in graph.edges()}
+    assert (edges[("0", "1")]["arrowtail"], edges[("0", "1")]["arrowhead"]) == (
+        "normaltee",
+        "normal",
+    )
+    assert (edges[("1", "3")]["arrowtail"], edges[("1", "3")]["arrowhead"]) == ("odot", "odot")
+    assert edges[("do 3", "3")]["arrowhead"] == "normaltee"
+    assert len(edges) == 3  # x gets no stub
+
+
+_MARK_PAIRS = {
+    "dag": [(TAIL, ARROW)],
+    "cpdag": [(TAIL, ARROW), (ARROW, TAIL), (TAIL, TAIL)],
+    "pag": [(a, b) for a in (TAIL, ARROW, CIRCLE) for b in (TAIL, ARROW, CIRCLE)],
+    "digraph": [(TAIL, ARROW), (ARROW, TAIL), (ARROW, ARROW)],
+}
+
+
+@pytest.mark.parametrize("kind", list(_MARK_PAIRS))
+@pytest.mark.parametrize("seed", range(4))
+def test_to_graphviz_marks_the_targets_draw_marks(kind, seed) -> None:
+    pytest.importorskip("pygraphviz")
+    rng = np.random.default_rng(seed)
+    choices = _MARK_PAIRS[kind]
+    pairs = {}
+    for a in range(8):
+        for b in range(a + 1, 8):
+            if rng.random() < 0.3:
+                pairs[(a, b)] = choices[rng.integers(len(choices))]
+    g = _from(pairs, 8, kind, labels=[f"v{k}" for k in range(8)])
+    targets = sorted(rng.choice(8, size=3, replace=False).tolist())
+    graph = viz.to_graphviz(g, targets=[f"v{k}" for k in targets])
+    svg = viz.draw(g, targets=targets, engine="builtin")
+    nodes = {str(k) for k in range(8)}
+    squares = [int(v) for v in graph.nodes() if v in nodes and v.attr["shape"] == "square"]
+    assert sorted(squares) == targets
+    # A bar at an arrowhead sits at the edge's head, one at an arrowtail at its tail.
+    bars = [
+        end
+        for a, b in graph.edges()
+        for end, key in ((b, "arrowhead"), (a, "arrowtail"))
+        if "tee" in (graph.get_edge(a, b).attr.get(key) or "")
+    ]
+    assert all(int(end) in targets for end in bars)
+    assert len(bars) == len(_intervention_bars(svg))  # stubs included
+    assert sum(v not in nodes for v in graph.nodes()) == svg.count('<g class="intervention">')
+    plain = viz.to_graphviz(g).to_string()
+    assert viz.to_graphviz(g, targets=()).to_string() == plain
+    assert "square" not in plain and "tee" not in plain

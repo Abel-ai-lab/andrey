@@ -126,7 +126,8 @@ post or a release card gets the tint and the bold at build time (`_comparison_ta
 - An intervened node (`targets=`) is a square, the shape of a regime or decision node in
   influence diagrams, and a bar crosses each arrowhead into it: the edges an intervention cuts. A
   target no arrowhead points into gets a short barred arrow from outside. Shape alone carries the
-  mark, so it reads without color, and a latent target keeps its dashed ring.
+  mark, so it reads without color, and a latent target keeps its dashed ring. `to_graphviz` writes
+  the square, the bars, and the stub in DOT: `shape=square` and `normaltee` arrowheads.
 - A 2-cycle is two parallel curved edges, distinct from one bidirected edge.
 - An edge that would cross a node it does not join bends around it, so a drawing never suggests an
   edge the graph lacks.

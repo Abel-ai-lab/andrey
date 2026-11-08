@@ -7,8 +7,10 @@ for the labels.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from andrey.core.structure import GraphStructure
 
@@ -30,8 +32,30 @@ def available() -> bool:
     return True
 
 
+def intervened(targets: Iterable[int | str], labels: list[str]) -> frozenset[int]:
+    """Return the positions of ``targets``, each named by label or by 0-based position."""
+    marked = set()
+    for name in targets:
+        if isinstance(name, str) and name in labels:
+            marked.add(labels.index(name))
+        elif (
+            isinstance(name, (int, np.integer))
+            and not isinstance(name, bool)
+            and 0 <= int(name) < len(labels)
+        ):
+            marked.add(int(name))
+        else:
+            raise ValueError(
+                f"targets names {name!r}, which is not a variable's label or position."
+            )
+    return frozenset(marked)
+
+
 def to_graphviz(
-    structure: GraphStructure, options: Mapping[str, object] | None = None
+    structure: GraphStructure,
+    options: Mapping[str, object] | None = None,
+    *,
+    targets: Iterable[int | str] = (),
 ) -> pygraphviz.AGraph:
     """Return ``structure`` as a Graphviz graph.
 
@@ -44,6 +68,12 @@ def to_graphviz(
     options : mapping of str to object or None, default=None
         Graphviz graph attributes, such as ``{"rankdir": "TB", "nodesep": 0.5}``. Causes run left
         to right (``rankdir="LR"``) unless ``options`` says otherwise.
+    targets : iterable of int or str, default=()
+        The intervened variables, named by label or by 0-based position, marked as
+        :func:`~andrey.viz.draw` marks them. Each is a ``square`` node, and each arrowhead into it
+        is ``normaltee``, an arrowhead with a bar behind it. A target no arrowhead points into gets
+        a barred arrow from an invisible ``point`` node named ``"do k"``, which a layout places as
+        it places any other node. The default marks none.
 
     Returns
     -------
@@ -55,6 +85,8 @@ def to_graphviz(
 
     Raises
     ------
+    ValueError
+        If ``targets`` names a variable the structure does not have.
     ImportError
         If pygraphviz is not installed.
     """
@@ -64,14 +96,27 @@ def to_graphviz(
         raise ImportError(INSTALL) from err
     n = int(structure.n_nodes)
     labels = list(structure.labels) if structure.labels is not None else [str(k) for k in range(n)]
+    marked = intervened(targets, labels)
     graph = pygraphviz.AGraph(directed=True, strict=False)
     graph.graph_attr["rankdir"] = "LR"
     graph.graph_attr.update({key: str(value) for key, value in (options or {}).items()})
     graph.node_attr["shape"] = "circle"
     for k in range(n):
-        graph.add_node(str(k), label=labels[k])
+        graph.add_node(str(k), label=labels[k], **({"shape": "square"} if k in marked else {}))
+    barred = set()  # the targets an arrowhead points into
     for i, j, attrs in structure._dot_edges():
+        # j holds an arrowhead unless the edge is undirected; i holds one only with dir="both".
+        head = attrs.get("arrowhead", "none" if attrs.get("dir") == "none" else "normal")
+        if i != j and j in marked and head == "normal":
+            attrs["arrowhead"] = "normaltee"
+            barred.add(j)
+        if i != j and i in marked and attrs.get("arrowtail") == "normal":
+            attrs["arrowtail"] = "normaltee"
+            barred.add(i)
         graph.add_edge(str(i), str(j), **attrs)
+    for k in sorted(marked - barred):
+        graph.add_node(f"do {k}", shape="point", style="invis")
+        graph.add_edge(f"do {k}", str(k), arrowhead="normaltee")
     return graph
 
 

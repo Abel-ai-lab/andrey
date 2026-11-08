@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `andrey.viz.to_graphviz(structure, targets=)` marks the intervened variables as `draw` does,
+  named by label or by position: each is a `square` node, each arrowhead into it is `normaltee`, an
+  arrowhead with a bar behind it, and a target no arrowhead points into gets a barred arrow from an
+  invisible `point` node. ([#PR])
+
 ## [0.15.0] - 2026-11-07
 
 ### Highlights
