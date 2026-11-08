@@ -744,6 +744,7 @@ def comparisons(summary: dict) -> list[dict]:
 
     - ``d``: the size, in ``unit``: the variables the method gets, the observed ones on data with
       hidden variables, or a cause-effect pair's rows, since every pair has two variables;
+    - ``n``: the sample size, ``None`` where the summary records none;
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`;
@@ -766,6 +767,7 @@ def comparisons(summary: dict) -> list[dict]:
             rows.append(
                 {
                     "d": row["n"] if pairs else row.get("observed", row["d"]),
+                    "n": row.get("n"),
                     "andrey_s": row["andrey_s"],
                     "comparator_s": row["comparator_s"],
                     "ratio": ratio,
@@ -2418,13 +2420,15 @@ DIALOG_TAIL = "</div></dialog>"
 
 # ---- a family's methods on one figure: fit time against errors ------------------------------
 # Each method uses its shortest-named comparison unless SHOWN_SETTINGS overrides it. Each line
-# covers sizes where Andrey and every compared package ran and were scored; its largest marker
-# shows the largest shared size. Errors are divided by the empty graph's error count: 0 means no
-# errors, and 1 means the same error count as the empty graph.
+# covers sizes where Andrey and every compared package ran and were scored, at the largest sample
+# size where a lane measures several; its largest marker shows the largest shared size. Errors are
+# divided by the empty graph's error count: 0 means no errors, and 1 means the same error count as
+# the empty graph.
 # Temporal methods use 1 minus link F1 instead: cross-variable links in the window graph, or
 # adjacencies for LPCMCI. Their lag windows can produce far more errors than the empty graph.
 F1_FAMILIES = {"temporal"}
-FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
+# A marker shape for each package in a family's figure.
+FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star", "triangle_down")
 FRONTIER_BAND = 0.25  # share of chart height for errors above the empty graph's
 
 
@@ -2434,7 +2438,8 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     Each line records ``method``, ``package``, ``ours``, ``unit``, and ``sizes``. Each size is
     ``(size, seconds, share)``, smallest first. The score is the error count divided by the empty
     graph's, or one minus link F1 for temporal methods. ``size``, ``seconds``, and ``share`` also
-    record the largest size's values.
+    record the largest size's values. Where a comparison measures a size at several sample sizes,
+    the line takes the row at the largest, the last listed among equal ones.
     """
     default: dict[str, tuple[str, list[dict]]] = {}
     for name, methods in time_groups(summaries):
@@ -2448,7 +2453,9 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
         name = SHOWN_SETTINGS.get(name, name)
-        by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
+        by_size = [
+            {r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods
+        ]
         f1 = methods[0]["family"] in F1_FAMILIES
 
         def score(row: dict, who: str) -> float | None:
@@ -2506,6 +2513,8 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
             f"M{cx - r:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r:.1f}"
             f"M{cx + r:.1f} {cy - r:.1f}L{cx - r:.1f} {cy + r:.1f}"
         )
+    if kind == "triangle_down":
+        return f"M{cx:.1f} {cy + 1.2 * r:.1f}L{cx + r:.1f} {cy - 0.8 * r:.1f}H{cx - r:.1f}Z"
     tips = [math.pi / 2 + i * 4 * math.pi / 5 for i in range(5)]
     return (
         "M"
@@ -2614,7 +2623,8 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 
     Scores are errors divided by the empty graph's error count, or one minus link F1 for temporal
     methods. Each line spans the measured sizes, with a larger marker at the largest size.
-    Andrey's lines use the accent color; other packages use gray and distinct marker shapes.
+    Andrey's lines use the accent color; other packages use gray and a marker shape each, from
+    ``FRONTIER_SHAPES``, and a family with more packages than shapes raises ``ValueError``.
     Each method uses different data, so comparisons apply within a method. The shaded corner
     shares the position set by ``frontier_frame`` across families.
     """
@@ -2661,7 +2671,9 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     if span >= 1 and not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
-    shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
+    if len(packages) > len(FRONTIER_SHAPES):
+        raise ValueError(f"{title}: {len(packages)} packages, {len(FRONTIER_SHAPES)} marker shapes")
+    shapes = dict(zip(packages, FRONTIER_SHAPES, strict=False))
     ours = {p["method"]: p for p in points if p["ours"]}
     # The shaded region has the same position in every family's figure.
     mid_x, mid_y = x(frame["corner"][0]), shared(frame["corner"][1])

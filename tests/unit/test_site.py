@@ -294,6 +294,45 @@ def test_a_chart_joins_only_comparisons_from_the_same_runs():
     assert [(p["method"], [d for d, _, _ in p["sizes"]]) for p in ours] == [("PC", [20, 50])]
 
 
+def test_a_setting_shown_under_its_method_name_comes_from_its_first_chart():
+    # ICP's default test in two runs: first in the method's claim, then outside it.
+    claimed = [_row(5, 0.004, 0.04, 10.0, 1, 1, 2), _row(10, 0.013, 1.2, 92.3, 1, 1, 3)]
+    outside = [_row(5, 0.003, 0.04, 13.3, 1, 1, 2), _row(10, 0.008, 1.1, 137.5, 1, 1, 3)]
+    summary = {
+        **SUMMARY,
+        "methods": [
+            {**_method("ICP, approximate test", "constraint", "R", claimed, "icp_appendix_g"),
+             "solution": "andrey.icp.approximate"},
+            {**_method("ICP, approximate test", "constraint", "R", outside,
+                       "icp_appendix_g_target"), "solution": "andrey.icp.approximate"},
+        ],
+    }  # fmt: skip
+    assert len(build.time_groups([summary])) == 2
+    (andrey,) = [p for p in build.frontier_points([summary])["constraint"] if p["ours"]]
+    assert andrey["method"] == "ICP"
+    assert [(d, t) for d, t, _ in andrey["sizes"]] == [(r["d"], r["andrey_s"]) for r in claimed]
+
+
+def test_a_panel_line_takes_the_largest_sample_size_at_each_size():
+    # PC at two sample sizes per graph size, the larger listed first.
+    rows = [
+        dict(_row(20, 0.3, 3.0, 10.0, 5, 6, 20), n=5000),
+        dict(_row(20, 0.1, 0.5, 5.0, 7, 7, 20), n=1000),
+        dict(_row(50, 0.9, 12.0, 13.3, 12, 13, 50), n=5000),
+        dict(_row(50, 0.4, 2.0, 5.0, 15, 15, 50), n=1000),
+    ]
+    summary = {**SUMMARY, "methods": [_method("PC", "constraint-based", "causal-learn", rows)]}
+    lines = build.frontier_points([summary])["constraint"]
+    larger = [r for r in rows if r["n"] == 5000]
+    for p in lines:
+        who = "andrey" if p["ours"] else "comparator"
+        assert [(d, t) for d, t, _ in p["sizes"]] == [(r["d"], r[f"{who}_s"]) for r in larger]
+    # Every published comparison that repeats a size records each row's sample size.
+    for m in build.claimed_comparisons(placeholder_summaries()):
+        repeated = {d for d, k in Counter(r["d"] for r in m["rows"]).items() if k > 1}
+        assert all(r["n"] is not None for r in m["rows"] if r["d"] in repeated), m["method"]
+
+
 def test_every_chart_draws_its_comparisons_and_every_scored_method_reaches_the_panel():
     summaries = placeholder_summaries()
     groups = build.time_groups(summaries)
@@ -368,22 +407,26 @@ def test_the_panel_number_follows_the_chosen_method():
 
 
 def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
-    summaries = build.release_summaries(SUMMARY)
-    every = build.frontier_points(summaries)
+    every = build.frontier_points(placeholder_summaries())
     frame = build.frontier_frame([p for family in every.values() for p in family])
+    for family, points in every.items():
+        figure = build.frontier_chart(family, points, frame)
+        ours = [p for p in points if p["ours"]]
+        sizes = sum(len(p["sizes"]) for p in ours)
+        assert figure.count('class="pf-andrey"') == sizes + 1  # plus the legend marker
+        packages = {p["package"] for p in points if not p["ours"]}
+        shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
+        assert len(shapes) == len(packages), family
+        assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
+        assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
+        # Each method's name appears once.
+        for p in ours:
+            assert figure.count(f">{build.escape(p['method'])}</text>") == 1
+    # A figure with more packages than shapes is refused rather than drawn with a shape twice.
     points = every["constraint"]
-    figure = build.frontier_chart("Constraint-based", points, frame)
-    ours = [p for p in points if p["ours"]]
-    sizes = sum(len(p["sizes"]) for p in ours)
-    assert figure.count('class="pf-andrey"') == sizes + 1  # plus the legend marker
-    packages = {p["package"] for p in points if not p["ours"]}
-    shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
-    assert len(shapes) == len(packages)
-    assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
-    assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
-    # Each method's name appears once.
-    for p in ours:
-        assert figure.count(f">{build.escape(p['method'])}</text>") == 1
+    extra = [dict(p, package=f"package {k}") for k, p in enumerate(points) if not p["ours"]]
+    with pytest.raises(ValueError, match="marker shapes"):
+        build.frontier_chart("constraint", points + extra, frame)
 
 
 def test_errors_compare_as_a_share_rounded_against_andrey():
