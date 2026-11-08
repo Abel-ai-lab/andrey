@@ -6,31 +6,32 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
 from itertools import combinations, islice, permutations
+from math import comb
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import skeleton_pool
+from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
-    adjacent_pairs,
+    CHUNK,
+    MASK_BITS,
+    blocks,
+    canonical_capable,
     check_collider_rule,
-    first_order_removals,
-    marginal_removals,
-    prescreen_capable,
-    scan_pairs,
-    separate_apart,
+    first_separating_subset,
     unseparated_triples,
     vote_triples,
 )
-from andrey.constraint.pc import check_knowledge_cycle
+from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.search.hc import tie_ranks
+from andrey.core.orient import separating_set
+from andrey.core.ties import tie_mask, tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -63,206 +64,93 @@ def fci(
     the conservative and majority collider rules also count equality as a separating vote.
     ``collider_rule`` (``"sepsets"``, ``"conservative"``, or ``"majority"``) decides the unshielded
     triples after the possible-d-sep step: by the recorded separating sets, or by a vote over the
-    subsets of either endpoint's neighbors (:func:`_vote_sepsets`), which leaves some triples
-    ambiguous.
+    subsets of either endpoint's neighbors (:func:`~andrey.constraint._skeleton.vote_triples`),
+    which leaves some triples ambiguous.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
-    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`_fci_orient`).
+    of in order-free rounds (:func:`fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
     possible-d-sep subsets, the collider votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
-    (:func:`_fast_adjacency_search`), and :func:`_knowledge_marks` sets their endpoints before the
-    orientation rules, which change circles only. A triple over a non-adjacent pair with no
-    separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`).
-    An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
-    ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
-    ``workers`` worker processes share the adjacency search's larger conditioning-size passes
-    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes
-    the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
-    ``None`` uses ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle
-    marks and all). The private ``_ambiguous`` sink receives the triples no orientation rule reads
-    as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
+    endpoints before the orientation rules, which change circles only. A triple over a non-adjacent
+    pair with no separating set is neither a collider nor a non-collider to any rule
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An arrowhead the knowledge puts at
+    ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
+    ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes share the adjacency
+    search's larger conditioning-size passes (:func:`~andrey.constraint.pc.adjacency_search`) and
+    the larger possible-d-sep searches (:func:`possible_dsep_step`); ``None`` reads
+    ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic
+    ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
+    ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and
+    all). The private ``_ambiguous`` sink receives the triples no orientation rule reads as a
+    collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
+    workers = backend.worker_count(workers)
 
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
-    allowed = keep = apart = None
-    if constraints is not None:
-        allowed = constraints.support()
-        keep = constraints.required | constraints.required.T
-        apart = ~allowed
-    support, sepsets = _fast_adjacency_search(
-        X,
+    allowed, keep, apart = knowledge_masks(constraints)
+    skeleton, sepsets, _ = adjacency_search(
         test,
+        X.shape[1],
         alpha,
-        workers=backend.worker_count(workers),
         support=allowed,
         keep=keep,
         apart=apart,
         max_depth=max_depth,
+        workers=workers,
     )
 
-    marks = _circle_pag(support)
-    _knowledge_marks(marks, constraints)
-    _orient_colliders(marks, sepsets)
-    if possible_dsep == "fast":
-        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
-    else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
-        _remove_by_possible_dsep(
-            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
-        )
-    marks = _circle_pag(marks != NULL)
-    _knowledge_marks(marks, constraints)
-    if constraints is not None:
-        check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
+    marks = circle_pag(skeleton)
+    knowledge_marks(marks, constraints)
+    orient_colliders(marks, sepsets)
+    marks = possible_dsep_step(
+        marks,
+        X,
+        test,
+        alpha,
+        sepsets,
+        possible_dsep=possible_dsep,
+        indep_test=indep_test,
+        categorical=categorical,
+        seed=seed,
+        max_depth=max_depth,
+        constraints=constraints,
+        workers=workers,
+    )
     ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
-        ambiguous |= _vote_sepsets(
-            marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth, skip=ambiguous
+        ambiguous |= vote_triples(
+            marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(
+    orient_colliders(marks, sepsets, ambiguous)
+    fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
 
-# ---- skeleton (fast adjacency search) -----------------------------------------------------------
-
-
-def _fast_adjacency_search(
-    X: np.ndarray,
-    test: CITest,
-    alpha: float,
-    *,
-    workers: int = 1,
-    support: np.ndarray | None = None,
-    keep: np.ndarray | None = None,
-    apart: np.ndarray | None = None,
-    max_depth: int | None = None,
-) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
-    """Learn the undirected skeleton and every removed pair's separating set (stable, FAS-style).
-
-    Grows the conditioning size from zero, up to ``max_depth`` when one is given, over a complete
-    graph, or over the boolean adjacency ``support`` when one is given; at each size, every
-    still-adjacent pair ``(x, y)`` is tested against subsets of a start-of-size snapshot of *either*
-    endpoint's neighborhood, and pairs found independent are removed together after the size
-    completes. A pair marked in the boolean ``keep`` (the required edges, both ways) is never
-    tested, so it stays; it still conditions the tests of other pairs.
-    A removed pair's separating set is the union of every conditioning set that made it independent.
-    After the last size, a pair marked in the boolean ``apart`` (the pairs background knowledge
-    makes non-adjacent, outside ``support``) that shares a neighbor gets its separating set the same
-    way, from the final neighborhoods (:func:`~andrey.constraint._skeleton.separate_apart`); a pair
-    no tested conditioning set separates gets none.
-
-    Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
-    it lives and the skeleton does not depend on how the caller ordered the columns.
-
-    When the test exposes the vectorized marginal and first-order paths, the size-0 and size-1
-    passes take them instead of the dense scalar scan -- same removals and separating sets. With
-    ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
-    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
-    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
-    per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
-    stays identical to the serial scan. With ``workers > 1`` and an RCoT test, a pass whose tests
-    times rows reach :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_RCOT_WORK`, or the
-    ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it, runs each conditioning set's queries in one
-    worker process, with the serial scan's p-values bit for bit.
-    """
-    d = X.shape[1]
-    support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
-    np.fill_diagonal(support, False)
-    sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
-
-    can_prescreen = prescreen_capable(test)
-    pool = skeleton_pool(test, workers)
-    try:
-        size = -1
-        while True:
-            degrees = support.sum(axis=1)
-            if int(degrees.max(initial=0)) - 1 <= size:
-                break
-            size += 1
-            if max_depth is not None and size > max_depth:
-                break
-            neighbors = [np.flatnonzero(support[i]) for i in range(d)]
-            testable = support if keep is None else support & ~keep
-            remove: list[tuple[int, int]] = []
-            if can_prescreen and size == 0:
-                upper = np.triu(testable, 1)
-                for x, y, _ in marginal_removals(test, upper, alpha, record_pvalues=False):
-                    remove.append((x, y))
-                    sepsets[(x, y)] = ()
-                    sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
-            elif can_prescreen and size == 1:
-                pairs = adjacent_pairs(testable)
-                for x, y, separating, _ in first_order_removals(
-                    test, pairs, neighbors, alpha, record_pvalues=False
-                ):
-                    remove.append((x, y))
-                    sepsets[(x, y)] = separating
-                    sepsets[(y, x)] = separating
-            else:
-                pairs = adjacent_pairs(testable)
-                pooled = (
-                    None
-                    if pool is None
-                    else pool.scan(
-                        pairs, neighbors, support.copy(), size, alpha, record_pvalues=False
-                    )
-                )
-                if pooled is not None:
-                    removals = pooled
-                else:
-                    # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
-                    # match the (1-thread) parallel skeleton workers, where it has them, whatever
-                    # the host thread count.
-                    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-                        removals = scan_pairs(
-                            test, pairs, neighbors, size, alpha, record_pvalues=False
-                        )
-                for x, y, separating, _ in removals:
-                    remove.append((x, y))
-                    sepsets[(x, y)] = separating
-                    sepsets[(y, x)] = separating
-            for x, y in remove:
-                support[x, y] = False
-                support[y, x] = False
-    finally:
-        if pool is not None:
-            pool.close()
-
-    if apart is not None:
-        for x, y, separating, _ in separate_apart(
-            test, support, apart, alpha, max_depth=max_depth, record_pvalues=False
-        ):
-            sepsets[(x, y)] = separating
-            sepsets[(y, x)] = separating
-    return support, sepsets
-
-
 # ---- mark-matrix helpers ------------------------------------------------------------------------
 # ``marks[i, j]`` is the mark at node ``i`` on edge ``i-j``, as in :mod:`andrey.core.structure`.
 
 
-def _circle_pag(support: np.ndarray) -> np.ndarray:
+def circle_pag(support: np.ndarray) -> np.ndarray:
     """An all-circle PAG over the given adjacency support (every present edge becomes ``o-o``)."""
     marks = np.where(support != NULL, np.int8(CIRCLE), np.int8(NULL))
     np.fill_diagonal(marks, np.int8(NULL))
     return marks
 
 
-def _knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
+def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
     """Set the endpoints ``constraints`` decide on the adjacent pairs, in place.
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
@@ -313,21 +201,6 @@ def _into(marks: np.ndarray, b: int, mark: int) -> list[int]:
     return np.flatnonzero(marks[b] == mark).tolist()
 
 
-def _sepset(
-    sepsets: Mapping[tuple[int, int], tuple[int, ...]], a: int, c: int
-) -> frozenset[int] | None:
-    """Return the separating set for ``(a, c)`` from either key order.
-
-    An empty tuple is a recorded set. ``None`` means neither key order is present.
-    """
-    value = sepsets.get((a, c))
-    if value is None:
-        value = sepsets.get((c, a))
-    if value is None:
-        return None
-    return frozenset(int(v) for v in value)
-
-
 def _largest_size(candidates: int, max_depth: int | None) -> int:
     """The largest conditioning-set size drawn from ``candidates`` nodes under ``max_depth``."""
     return candidates if max_depth is None else min(candidates, max_depth)
@@ -341,7 +214,7 @@ def _fits(cond: list[int], max_depth: int | None) -> bool:
 # ---- R0: unshielded colliders -------------------------------------------------------------------
 
 
-def _validate_possible_dsep(possible_dsep: str) -> None:
+def validate_possible_dsep(possible_dsep: str) -> None:
     if possible_dsep not in ("order_free", "fast"):
         raise ValueError(f"possible_dsep must be 'order_free' or 'fast', got {possible_dsep!r}")
 
@@ -351,39 +224,20 @@ def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
     return (a, b, c) if a < c else (c, b, a)
 
 
-def _vote_sepsets(
-    marks: np.ndarray,
-    test: Callable[..., float],
-    alpha: float,
-    sepsets: dict[tuple[int, int], tuple[int, ...]],
-    *,
-    rule: str,
-    max_depth: int | None = None,
-    skip: frozenset[tuple[int, int, int]] = frozenset(),
-) -> frozenset[tuple[int, int, int]]:
-    """Decide every unshielded triple of ``marks`` by ``rule``, ``"conservative"`` or
-    ``"majority"``; rewrite ``sepsets`` to match and return the ambiguous triples.
-
-    The vote of :func:`~andrey.constraint._skeleton.vote_triples`, on the final skeleton. A pair no
-    subset of either endpoint's neighbors separates makes its triples colliders: no separating
-    subset holds the middle node, and the recorded sets do not vote.
-    """
-    return vote_triples(
-        marks, test, alpha, sepsets, rule, unseparated="collider", max_depth=max_depth, skip=skip
-    )
-
-
-def _orient_colliders(
+def orient_colliders(
     marks: np.ndarray,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    pattern: np.ndarray | None = None,
 ) -> None:
     """Orient every unshielded collider ``a *-> b <-* c`` from the separating sets.
 
     For each node ``b`` and each non-adjacent pair ``(a, c)`` of its neighbors (visited in
     ascending order), ``b`` is a collider iff a separating set for ``a`` and ``c`` is recorded and
-    does not contain ``b``; the endpoint at ``b`` on both edges is then set to an arrowhead. An
-    already-directed tail at ``b`` blocks the orientation.
+    does not contain ``b``, and the triple is not ``ambiguous``. With ``pattern``, the CPDAG of a
+    score search, a pair the pattern leaves non-adjacent is decided by the pattern instead: ``b``
+    is a collider iff the pattern has ``a -> b <- c``. The endpoint at ``b`` on both edges is then
+    set to an arrowhead; an already-directed tail at ``b`` blocks the orientation.
     """
     for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
@@ -391,12 +245,18 @@ def _orient_colliders(
                 a, c = adj[i], adj[k]
                 if _adjacent(marks, a, c) or _is_def_collider(marks, a, b, c):
                     continue
-                if _triple(a, b, c) in ambiguous:
-                    continue
-                sep = _sepset(sepsets, a, c)
-                if sep is None or b in sep:
-                    continue
-                if not _arrow_allowed(marks, a, b) or not _arrow_allowed(marks, c, b):
+                if pattern is not None and not _adjacent(pattern, a, c):
+                    collider = pattern[b, a] == ARROW and pattern[b, c] == ARROW
+                else:
+                    sep = separating_set(sepsets, a, c)
+                    collider = (
+                        _triple(a, b, c) not in ambiguous and sep is not None and b not in sep
+                    )
+                if (
+                    not collider
+                    or not _arrow_allowed(marks, a, b)
+                    or not _arrow_allowed(marks, c, b)
+                ):
                     continue
                 marks[b, a] = ARROW
                 marks[b, c] = ARROW
@@ -510,29 +370,41 @@ def _possible_dsep(
     return sorted(dsep, key=lambda v: f"X{v + 1}", reverse=True)
 
 
-# The most subsets one possible-d-sep run asks a test for at once (see _try_remove_by_dsep).
+# The most subsets one possible-d-sep run asks a test for at once (see _separating_choice).
 _DSEP_RUN = 256
 
 
 def _iter_dsep_choices(
-    dsep: list[int], adj_a: set[int], adj_b: set[int], max_depth: int | None = None
+    dsep: list[int],
+    adj_a: set[int],
+    adj_b: set[int],
+    max_depth: int | None = None,
+    tested: Collection[int] = (),
 ) -> Iterator[tuple[int, ...]]:
     """Every non-empty subset of ``dsep``, of at most ``max_depth`` members when one is given, that
-    lies inside neither endpoint's adjacency.
+    lies inside neither endpoint's adjacency nor inside ``tested``.
 
     Subsets come by increasing size, each size in ``combinations`` order, one at a time. The
     adjacency search already tested the empty set and every subset of either endpoint's
     neighbors: those neighborhoods only shrink, so each such subset was a candidate at its size
-    and left the pair dependent. Testing it again cannot remove the edge.
+    and left the pair dependent. Testing it again cannot remove the edge. ``tested`` is the pair's
+    other possible-d-sep set when its search found no separating subset: that search tested every
+    subset of it outside both adjacencies and found each dependent.
     """
-
+    within = (adj_a, adj_b, tested) if tested else (adj_a, adj_b)
     for size in range(1, _largest_size(len(dsep), max_depth) + 1):
-        yield from (c for c in combinations(dsep, size) if _outside(c, adj_a, adj_b))
+        yield from (c for c in combinations(dsep, size) if _outside(c, within))
 
 
-def _outside(values: tuple[int, ...], adj_a: set[int], adj_b: set[int]) -> bool:
-    """``values`` lie inside neither endpoint's adjacency."""
-    return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
+def _outside(values: tuple[int, ...], within: Iterable[Collection[int]]) -> bool:
+    """``values`` lie inside none of the sets ``within``."""
+    return not any(all(v in nodes for v in values) for nodes in within)
+
+
+# The fewest subsets, counted over every size a search tests, of a search a FisherZ, StudentT, or
+# NormalScores test asks as arrays (see _first_separating); a smaller one asks tuples, which costs
+# less there.
+_ARRAY_MIN_SUBSETS = 2048
 
 
 def _try_remove_by_dsep(
@@ -546,33 +418,87 @@ def _try_remove_by_dsep(
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     max_depth: int | None = None,
+    pool: SkeletonWorkerPool | None = None,
+    tested: Collection[int] = (),
 ) -> bool:
     """Remove edge ``x-y`` if some subset of ``dsep``, of at most ``max_depth`` members when one is
     given, makes ``x`` and ``y`` independent.
 
-    The subsets are tested in :func:`_iter_dsep_choices` order and the first that separates the
-    pair is recorded. A test with ``separating_prefix`` answers them in runs of 1, 2, 4, ... up to
-    ``_DSEP_RUN`` subsets, each run cut at its first separating subset, so it answers the queries
-    the one-at-a-time loop asks, in its order, and no more; another test takes one call per
-    subset.
+    The subsets are tested in :func:`_iter_dsep_choices` order, less those inside ``tested``, and
+    the first that separates the pair is recorded (:func:`_first_separating`).
     """
-    choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth)
-    prefix = getattr(test, "separating_prefix", None)
-    if prefix is None:
-        found = next((cond for cond in choices if test(x, y, cond) > alpha), None)
-    else:
-        found, run = None, 1
-        while found is None and (chunk := list(islice(choices, run))):
-            pvalues = prefix(x, y, chunk, alpha)
-            if pvalues and pvalues[-1] > alpha:
-                found = chunk[len(pvalues) - 1]
-            run = min(2 * run, _DSEP_RUN)
+    found = _first_separating(test, x, y, dsep, adj_a, adj_b, alpha, max_depth, tested, pool)
     if found is None:
         return False
     marks[x, y] = NULL
     marks[y, x] = NULL
     sepsets[(x, y)] = tuple(int(v) for v in found)
     return True
+
+
+def _first_separating(
+    test: CITest,
+    x: int,
+    y: int,
+    dsep: list[int],
+    adj_a: set[int],
+    adj_b: set[int],
+    alpha: float,
+    max_depth: int | None,
+    tested: Collection[int],
+    pool: SkeletonWorkerPool | None,
+) -> tuple[int, ...] | None:
+    """The first subset in :func:`_iter_dsep_choices` order that separates ``x`` and ``y``, or
+    ``None``.
+
+    With a FisherZ, StudentT, or NormalScores test
+    (:func:`~andrey.constraint._skeleton.canonical_capable`) and at most
+    :data:`~andrey.constraint._skeleton.MASK_BITS` candidates, a search whose subsets, counted over
+    every size it tests, number at least the ``pool``'s cutoff
+    (:meth:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.takes_search`, which warns
+    once on the default cutoff) runs on the pool
+    (:meth:`~andrey.constraint._parallel_skeleton.SkeletonWorkerPool.first_separating`),
+    and one of at least ``_ARRAY_MIN_SUBSETS`` enumerates its subsets as arrays in this process
+    (:func:`~andrey.constraint._skeleton.first_separating_subset`). Another search asks them as
+    tuples (:func:`_separating_choice`). Every path tests the subsets in the same order and stops
+    at the first that separates the pair; on the pool, tests after it may run, but the subset found
+    is the serial one.
+    """
+    sizes = range(1, _largest_size(len(dsep), max_depth) + 1)
+    if canonical_capable(test) and len(dsep) <= MASK_BITS:
+        subsets = sum(comb(len(dsep), size) for size in sizes)
+        within = tuple(
+            sum(1 << i for i, v in enumerate(dsep) if v in nodes)
+            for nodes in (adj_a, adj_b, tested)
+        )
+        if pool is not None and pool.takes_search(subsets):
+            return pool.first_separating(x, y, dsep, within, sizes, alpha)
+        if subsets >= _ARRAY_MIN_SUBSETS:
+            order = (block for size in sizes for block in blocks(len(dsep), size, CHUNK))
+            return first_separating_subset(test, x, y, dsep, within, order, alpha)
+    choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth, tested)
+    return _separating_choice(test, x, y, choices, alpha)
+
+
+def _separating_choice(
+    test: CITest, x: int, y: int, choices: Iterator[tuple[int, ...]], alpha: float
+) -> tuple[int, ...] | None:
+    """The first of ``choices`` given which ``x`` and ``y`` test independent, or ``None``.
+
+    A test with ``separating_prefix`` answers them in runs of 1, 2, 4, ... up to ``_DSEP_RUN``
+    subsets, each run cut at its first separating subset, so it answers the queries the
+    one-at-a-time loop asks, in its order, and no more; another test takes one call per subset.
+    """
+    prefix = getattr(test, "separating_prefix", None)
+    if prefix is None:
+        return next((cond for cond in choices if test(x, y, cond) > alpha), None)
+    found, run = None, 1
+    while found is None and (chunk := list(islice(choices, run))):
+        pvalues = prefix(x, y, chunk, alpha)
+        if pvalues and pvalues[-1] > alpha:
+            found = chunk[len(pvalues) - 1]
+        run = min(2 * run, _DSEP_RUN)
+    return found
 
 
 def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:
@@ -586,6 +512,63 @@ def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:
     return i, j
 
 
+def possible_dsep_step(
+    marks: np.ndarray,
+    X: np.ndarray,
+    test: CITest,
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    *,
+    possible_dsep: str,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None,
+    max_depth: int | None,
+    constraints: Constraints | None,
+    keep: np.ndarray | None = None,
+    workers: int = 1,
+) -> np.ndarray:
+    """Remove the pairs a possible-d-sep subset separates; return the PAG re-circled for the
+    orientation rules.
+
+    The step FCI, FCI-JCI, and GFCI run after their first collider pass, on ``marks`` in place
+    (:func:`_remove_by_possible_dsep`). ``possible_dsep="fast"`` visits the nodes in column order
+    with ``test``; ``"order_free"`` visits them in the :func:`~andrey.core.ties.tie_ranks` order,
+    with an ``indep_test`` test over ``X``'s columns in that order (:func:`_test_in_rank_order`).
+    The pairs the required edges of ``constraints`` join, and those marked in the boolean ``keep``
+    (both ways), are never tested. ``workers`` worker processes share the larger searches. Every
+    kept edge then becomes ``o-o``, and
+    :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An arrowhead the knowledge
+    puts at ``x`` on a kept edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
+    :class:`~andrey.core.knowledge.KnowledgeError`
+    (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
+    """
+    required = knowledge_masks(constraints)[1]
+    if required is not None:
+        keep = required if keep is None else keep | required
+    if possible_dsep == "fast":
+        _remove_by_possible_dsep(
+            marks, test, alpha, sepsets, keep=keep, max_depth=max_depth, workers=workers
+        )
+    else:
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
+        _remove_by_possible_dsep(
+            marks,
+            ranked_test,
+            alpha,
+            sepsets,
+            by_rank,
+            keep=keep,
+            max_depth=max_depth,
+            workers=workers,
+        )
+    marks = circle_pag(marks != NULL)
+    knowledge_marks(marks, constraints)
+    if constraints is not None:
+        check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
+    return marks
+
+
 def _remove_by_possible_dsep(
     marks: np.ndarray,
     test: CITest,
@@ -595,6 +578,7 @@ def _remove_by_possible_dsep(
     *,
     keep: np.ndarray | None = None,
     max_depth: int | None = None,
+    workers: int = 1,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
@@ -602,19 +586,41 @@ def _remove_by_possible_dsep(
     conditioning subset outside either endpoint's adjacency, of at most ``max_depth`` members when
     one is given; the first subset found removes the pair at once, so each removal changes the sets
     of the pairs after it, and is stored under the endpoint order returned by ``_edge_order``. A
-    pair marked in the boolean ``keep`` (the required edges, both ways) is never tested. The pairs,
-    their endpoints, and the nodes of each set are visited in column order. ``by_rank``, when given,
-    is the column order of ``test``'s data, as :func:`_test_in_rank_order` returns them: the step
-    then runs on the nodes in that order, with ``keep`` permuted the same way, and maps its removals
-    and separating sets back to the column labels once.
+    pair marked in the boolean ``keep`` (the required edges and, under GFCI's
+    ``edge_removal="triangles"``, the edges in no triangle of its CPDAG; both ways) is never tested.
+    The pairs, their endpoints, and the nodes of each set are visited in column order. ``by_rank``,
+    when given, is the column order of ``test``'s data, as :func:`_test_in_rank_order` returns them:
+    the step then runs on the nodes in that order, with ``keep`` permuted the same way, and maps its
+    removals and separating sets back to the column labels once.
+
+    When the first endpoint's search finds no separating subset, the second endpoint's leaves out
+    the subsets of the first endpoint's set: each was tested there and left the pair dependent.
+
+    With ``workers > 1`` and a FisherZ, StudentT, or NormalScores test
+    (:func:`~andrey.constraint._skeleton.canonical_capable`), a pair's search whose subsets, counted
+    over every size it tests, reach
+    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_DSEP_SUBSETS`, or the
+    ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK`` that overrides it, runs on that many worker processes
+    (:func:`_first_separating`), started on the first such search. The pairs are still visited one
+    at a time, in the same order: a removal changes the possible-d-sep sets and adjacencies of the
+    pairs after it, so their searches cannot run at once. The workers test a pair's subsets in the
+    serial order and the first that separates it removes it, so the removals, their order, and the
+    separating sets are the serial ones. The step runs with BLAS pinned to one thread, as on the
+    workers, for a test built on matrix algebra (:func:`~andrey.core.ci.pins_blas`).
     """
-    if by_rank is None:
-        _remove_in_node_order(marks, test, alpha, sepsets, keep, max_depth)
-        return
-    ranked = marks[np.ix_(by_rank, by_rank)]
-    ranked_keep = None if keep is None else keep[np.ix_(by_rank, by_rank)]
-    found: dict[tuple[int, int], tuple[int, ...]] = {}
-    _remove_in_node_order(ranked, test, alpha, found, ranked_keep, max_depth)
+    pool = SkeletonWorkerPool(test, workers) if workers > 1 and canonical_capable(test) else None
+    try:
+        with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+            if by_rank is None:
+                _remove_in_node_order(marks, test, alpha, sepsets, keep, max_depth, pool)
+                return
+            ranked = marks[np.ix_(by_rank, by_rank)]
+            ranked_keep = None if keep is None else keep[np.ix_(by_rank, by_rank)]
+            found: dict[tuple[int, int], tuple[int, ...]] = {}
+            _remove_in_node_order(ranked, test, alpha, found, ranked_keep, max_depth, pool)
+    finally:
+        if pool is not None:
+            pool.close()
     position = np.argsort(by_rank)
     marks[:] = ranked[np.ix_(position, position)]
     label = by_rank.tolist()
@@ -625,12 +631,14 @@ def _remove_by_possible_dsep(
 def _test_in_rank_order(
     X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None = None
 ) -> tuple[np.ndarray, CITest]:
-    """The column order that sorts ``X`` by :func:`~andrey.search.hc.tie_ranks`, and the
+    """The column order that sorts ``X`` by :func:`~andrey.core.ties.tie_ranks`, and the
     ``indep_test`` test, seeded by ``seed``, over ``X``'s columns in that order.
 
-    Each rank moves with its column, so every column order of ``X`` gives the same test.
+    The columns the test reads as categories rank as categories
+    (:func:`~andrey.core.ties.tie_mask`), so relabeling a column's categories keeps the order. Each
+    rank moves with its column, so every column order of ``X`` gives the same test.
     """
-    by_rank = np.argsort(tie_ranks(X, categorical))
+    by_rank = np.argsort(tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])))
     mask = None if categorical is None else np.asarray(categorical)[by_rank]
     return by_rank, make_indep_test(
         indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask, seed=seed
@@ -644,6 +652,7 @@ def _remove_in_node_order(
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     keep: np.ndarray | None,
     max_depth: int | None,
+    pool: SkeletonWorkerPool | None = None,
 ) -> None:
     """:func:`_remove_by_possible_dsep` in the order of the node indices."""
     n = marks.shape[0]
@@ -654,13 +663,15 @@ def _remove_in_node_order(
         if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
         adj_a, adj_b = set(neighbors[na]), set(neighbors[nb])
+        tested: set[int] = set()
         for a, b in ((na, nb), (nb, na)):
             dsep = _possible_dsep(marks, a, b, neighbors, reach)
             if _try_remove_by_dsep(
-                marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth
+                marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth, pool, tested
             ):
                 neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
                 break
+            tested = set(dsep)
 
 
 # ---- FCI orientation rules ----------------------------------------------------------------------
@@ -689,7 +700,7 @@ class _Implied:
         return changed
 
 
-def _fci_orient(
+def fci_orient(
     marks: np.ndarray,
     test: CITest,
     alpha: float,
@@ -698,11 +709,12 @@ def _fci_orient(
     *,
     max_depth: int | None = None,
     in_column_order: bool = False,
+    selection_bias: bool = True,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
     Circles become tails or arrowheads only where the current marks force it; no rule changes a
-    tail or an arrowhead, so one present when the rules start, such as one :func:`_knowledge_marks`
+    tail or an arrowhead, so one present when the rules start, such as one :func:`knowledge_marks`
     set, stays. ``max_depth`` caps the conditioning sets of R4's tests (:func:`_do_ddp`). The rules
     run in rounds. In a round, every rule reads the marks as they stand when the round starts and
     records the marks it implies (:class:`_Implied`). A circle then takes the mark the rules imply
@@ -719,6 +731,9 @@ def _fci_orient(
     R4 discriminating-path rule) followed by the tail and possibly-directed-path rules R5-R10, each
     rule setting its marks at once and visiting the nodes in column order, so of two firings that
     conflict the first decides; sweeps repeat until no endpoint changes.
+
+    ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
+    Zhang's complete set for PAGs without selection bias.
     """
     if not in_column_order:
         test = _memoized(test)  # R4 repeats its tests in every round
@@ -727,9 +742,10 @@ def _fci_orient(
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
             _rule_r3(marks, sepsets, False, ambiguous, out=implied)
             _rule_r4(marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied)
-            _rule_r5(marks, False, ambiguous, out=implied)
-            _rule_r6(marks, False, out=implied)
-            _rule_r7(marks, False, ambiguous, out=implied)
+            if selection_bias:
+                _rule_r5(marks, False, ambiguous, out=implied)
+                _rule_r6(marks, False, out=implied)
+                _rule_r7(marks, False, ambiguous, out=implied)
             _rule_r8(marks, False, out=implied)
             _rule_r9(marks, False, ambiguous, out=implied)
             _rule_r10(marks, False, ambiguous, out=implied)
@@ -742,9 +758,10 @@ def _fci_orient(
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
         change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth)
-        change = _rule_r5(marks, change, ambiguous)
-        change = _rule_r6(marks, change)
-        change = _rule_r7(marks, change, ambiguous)
+        if selection_bias:
+            change = _rule_r5(marks, change, ambiguous)
+            change = _rule_r6(marks, change)
+            change = _rule_r7(marks, change, ambiguous)
         change = _rule_r8(marks, change)
         change = _rule_r9(marks, change, ambiguous)
         change = _rule_r10(marks, change, ambiguous)
@@ -843,7 +860,7 @@ def _rule_r3(
                         continue
                     if _triple(a, d, c) in ambiguous:
                         continue
-                    sep = _sepset(sepsets, a, c)
+                    sep = separating_set(sepsets, a, c)
                     if sep is None or d not in sep:
                         continue
                     if marks[d, a] != CIRCLE or marks[d, c] != CIRCLE:
@@ -1025,7 +1042,7 @@ def _do_ddp(
     ind2 = _fits(path2, max_depth) and test(d, c, tuple(path2)) > alpha
 
     if not ind and not ind2:
-        sep = _sepset(sepsets, d, c)
+        sep = separating_set(sepsets, d, c)
         if sep is None:
             return False, change
         ind = b in sep

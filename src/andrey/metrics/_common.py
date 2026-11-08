@@ -10,9 +10,10 @@ Accepted graph inputs, all reduced to ``(M, kind)``:
 
 - a :class:`~andrey.core.GraphStructure`, or a :class:`~andrey.core.StructureOutput` wrapping one;
 - a raw directed adjacency ``ndarray`` -- a nonzero ``A[i, j]`` reads as a directed edge ``i -> j``,
-  a symmetric nonzero pair as one undirected edge. To avoid a silent misread, an *integer* array
-  carrying a ``2`` or ``3`` (the ``ARROW`` / ``CIRCLE`` codes) is rejected: pass endpoint marks
-  through ``GraphStructure.from_numpy(..., kind=...)``, not as a bare array.
+  a symmetric nonzero pair as one undirected edge, and directed edges that form a cycle as a
+  ``digraph``. To avoid a silent misread, an *integer* array carrying a ``2`` or ``3`` (the
+  ``ARROW`` / ``CIRCLE`` codes) is rejected: pass endpoint marks through
+  ``GraphStructure.from_numpy(..., kind=...)``, not as a bare array.
 """
 
 from __future__ import annotations
@@ -20,9 +21,14 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core.output import StructureOutput
-from andrey.core.structure import ARROW, TAIL, GraphStructure, Kind, Structure, _directed_support
+from andrey.core.structure import ARROW, TAIL, GraphStructure, Kind, Structure, has_cycle
 
-__all__ = ["as_marks", "two_marks", "prf", "directed_adjacency"]
+__all__ = ["as_marks", "two_marks", "prf", "prf_masks", "unwrap"]
+
+
+def unwrap(x: object) -> object:
+    """The structure a :class:`~andrey.core.StructureOutput` wraps; any other input as it is."""
+    return x.structure if isinstance(x, StructureOutput) else x
 
 
 def as_marks(graph: object) -> tuple[np.ndarray, Kind]:
@@ -37,8 +43,7 @@ def as_marks(graph: object) -> tuple[np.ndarray, Kind]:
     >>> kind
     'dag'
     """
-    if isinstance(graph, StructureOutput):
-        graph = graph.structure
+    graph = unwrap(graph)
     if isinstance(graph, GraphStructure):
         return graph.to_numpy(dtype=np.int8), graph.kind
     if isinstance(graph, Structure):  # TemporalStructure
@@ -49,7 +54,11 @@ def as_marks(graph: object) -> tuple[np.ndarray, Kind]:
 
 
 def _marks_from_adjacency(a: np.ndarray) -> tuple[np.ndarray, Kind]:
-    """Endpoint marks + kind from a raw directed adjacency (nonzero ``A[i, j]`` is edge i -> j)."""
+    """Endpoint marks + kind from a raw directed adjacency (nonzero ``A[i, j]`` is edge i -> j).
+
+    The kind is ``cpdag`` when a pair is joined both ways, else ``digraph`` when the directed
+    edges form a cycle, else ``dag``.
+    """
     if a.ndim != 2 or a.shape[0] != a.shape[1]:
         raise ValueError(f"expected a square adjacency matrix, got shape {a.shape}")
     if np.issubdtype(a.dtype, np.integer) and np.isin(a, (ARROW, 3)).any():
@@ -67,13 +76,14 @@ def _marks_from_adjacency(a: np.ndarray) -> tuple[np.ndarray, Kind]:
     m[fi, fj] = TAIL
     m[fj, fi] = ARROW
     m[undirected] = TAIL
-    return m, ("cpdag" if undirected.any() else "dag")
+    if undirected.any():
+        return m, "cpdag"
+    return m, ("digraph" if has_cycle(directed) else "dag")
 
 
 def _labels(x: object) -> tuple[str, ...] | None:
     """Node labels of an input, or ``None`` for a raw array / unlabeled structure."""
-    if isinstance(x, StructureOutput):
-        x = x.structure
+    x = unwrap(x)
     return x.labels if isinstance(x, Structure) else None
 
 
@@ -107,17 +117,12 @@ def prf(tp: int, fp: int, fn: int) -> dict[str, float]:
     return {"precision": precision, "recall": recall, "f1": f1}
 
 
+def prf_masks(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
+    """Precision/recall/f1 between two boolean masks over the same index set (:func:`prf`)."""
+    tp = int((est & true_).sum())
+    return prf(tp, int((est & ~true_).sum()), int((~est & true_).sum()))
+
+
 def _offdiag(n: int) -> np.ndarray:
     """Boolean ``(n, n)`` mask that is ``True`` off the diagonal."""
     return ~np.eye(n, dtype=bool)
-
-
-def directed_adjacency(m: np.ndarray) -> np.ndarray:
-    """Boolean ``(n, n)`` directed support of a mark matrix: ``D[i, j]`` is the edge ``i -> j``.
-
-    A plain directed edge (arrowhead at ``j``) sets ``D[i, j]``; a bidirected / 2-cycle pair sets
-    both directions; an autoregressive self-loop (``m[i, i] == ARROW``) sets ``D[i, i]``. Undirected
-    and circle marks carry no direction and are ignored. Delegates to the core projection so the
-    temporal-scoring collapse and ``TemporalStructure.summary_graph()`` share one definition.
-    """
-    return _directed_support(m)

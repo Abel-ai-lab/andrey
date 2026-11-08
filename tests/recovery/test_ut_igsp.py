@@ -18,9 +18,10 @@ import andrey
 import andrey.data as data
 from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard, soft
-from andrey.search.gies import cut_pairs, replace_unprotected
+from andrey.metrics import shd
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.essential import essential
+from tests.recovery.helpers.harness import assert_recorded_output
 
 P, K = 20, 5
 INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}
@@ -48,33 +49,18 @@ def paper_dataset(seed: int, n: int, off: int, kind: str):
     return ds, known
 
 
-def essential(dag: np.ndarray, targets: dict[int, list[int]]) -> np.ndarray:
-    """The interventional essential graph of the DAG's marks under the observational setting and
-    each setting's targets."""
-    family = np.zeros((len(targets) + 1, dag.shape[0]), dtype=bool)
-    for row, variables in enumerate(targets.values(), start=1):
-        family[row, variables] = True
-    return replace_unprotected(dag.astype(np.int8), cut_pairs(family))
-
-
-def shd(a: np.ndarray, b: np.ndarray) -> int:
-    """The variable pairs whose endpoint marks differ."""
-    upper = np.triu_indices(a.shape[0], 1)
-    return int(((a[upper] != b[upper]) | (a.T[upper] != b.T[upper])).sum())
-
-
 @pytest.mark.parametrize("kind", list(INTERVENTIONS))
 @pytest.mark.parametrize("off", [0, 3])
 @pytest.mark.parametrize("seed", range(3))
 def test_ut_igsp_recovers_the_paper_setting(seed, off, kind):
     ds, known = paper_dataset(seed, 5000, off, kind)
     out = andrey.ut_igsp(ds.data, ds.env, targets=known)
-    truth = essential(ds.graph.to_numpy(), {k: t for k, t in ds.targets.items() if k})
+    truth = essential(ds.graph.to_numpy(), [t for k, t in ds.targets.items() if k])
     found = out.metadata["targets"]
     target_errors = sum(len(set(found[k]) ^ set(ds.targets[k])) for k in range(1, K + 1))
-    errors = shd(out.structure.to_numpy(), truth)
+    errors = shd(out.structure, truth)
     recorded_shd, recorded_targets = RECORDED[seed, off, kind]
-    assert errors < int((truth != 0).sum() // 2)  # the empty graph's SHD
+    assert errors < len(truth.oriented_edges())  # the empty graph's SHD
     assert errors <= recorded_shd + 1
     assert target_errors <= recorded_targets + 1
 

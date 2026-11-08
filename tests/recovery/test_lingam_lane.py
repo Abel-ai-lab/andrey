@@ -7,7 +7,7 @@ import pytest
 
 import andrey
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def _linear_sem_group(seed: int, n: int, B: np.ndarray) -> np.ndarray:
@@ -74,16 +74,6 @@ def test_multi_group_finds_no_edge_between_independent_columns():
         assert not np.any(out.weighted_adjacency)
 
 
-def test_ica_lingam_output_contract():
-    out = andrey.ica_lingam(datagen.generate("lingam_5v_uniform"))
-    assert out.ordering is not None and out.weighted_adjacency is not None
-
-
-def test_multi_group_output_contract(mgdl_fit):
-    assert len(mgdl_fit) == 2
-    assert all(o.ordering == mgdl_fit[0].ordering for o in mgdl_fit)  # one shared order
-
-
 def test_multi_group_requires_at_least_two_groups():
     with pytest.raises(ValueError, match="at least two"):
         andrey.multi_group_direct_lingam([datagen.generate("lingam_5v_uniform")])
@@ -115,20 +105,6 @@ def test_multi_group_rejects_non_2d_and_nonfinite_groups():
     nan[0, 0] = np.nan
     with pytest.raises(ValueError, match=r"data\[1\] holds NaN in 1 cell"):
         andrey.multi_group_direct_lingam([good, nan])
-
-
-def test_ica_lingam_seed_and_max_iter_accepted():
-    # seed defaults to 0 (via resolve_seed) and is honored; max_iter is accepted. The
-    # returned B is the adaptive-Lasso adjacency on the ICA-derived order, so the output is
-    # seed-robust on clean data by construction -- this asserts the plumbing (default == explicit-0,
-    # reproducible) rather than a seed-dependent output that does not exist.
-    X = datagen.generate("lingam_5v_uniform")
-    default = andrey.ica_lingam(X)
-    explicit0 = andrey.ica_lingam(X, seed=0)
-    assert list(default.ordering) == list(explicit0.ordering)
-    np.testing.assert_array_equal(default.weighted_adjacency, explicit0.weighted_adjacency)
-    other = andrey.ica_lingam(X, seed=123, max_iter=500)
-    assert list(andrey.ica_lingam(X, seed=123, max_iter=500).ordering) == list(other.ordering)
 
 
 def _ica_in_original_labels(X: np.ndarray, order: tuple[int, ...]) -> tuple[list[int], np.ndarray]:

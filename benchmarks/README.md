@@ -32,8 +32,9 @@ Packages:
   [CAM and RESIT](comparisons/cam-resit.md)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](comparisons/categorical.md)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
-  [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md), and
-  [Tetrad on continuous data](comparisons/tetrad-continuous.md)
+  [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md),
+  [Tetrad on continuous data](comparisons/tetrad-continuous.md), and
+  [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
   [GnIES](comparisons/gnies.md)
@@ -92,7 +93,9 @@ benchmarks/start_tigramite.sh
 export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
 ```
 
-Its adapter calls the package's public API only.
+Its adapters call the package's public API only. The J-PCMCI+ lane's adapter applies
+`patches/tigramite-jpcmciplus-context-links.patch` to `JPCMCIplus` in memory, which leaves the
+installed package unchanged.
 
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
 lingam's MultiGroupDirectLiNGAM and CAM-UV, and causal-learn's CAM-UV, which fits with pygam too,

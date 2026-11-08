@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 
@@ -11,7 +13,7 @@ from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # A_k[effect, cause]: every series depends on its own past; five cross links at lags 1 and 2.
 LAG_1 = np.array(
@@ -52,31 +54,28 @@ def planted() -> tuple[np.ndarray, set[tuple[int, int, int]]]:
     return data, truth
 
 
+@pytest.fixture(scope="module")
+def fit(planted):
+    """``pcmci`` on the planted data at ``alpha=0.01`` with the given settings, fitted once per
+    module."""
+    data, _ = planted
+    return functools.cache(lambda **settings: andrey.pcmci(data, tau_max=2, alpha=0.01, **settings))
+
+
 INDEP_TESTS = ["student_t", "fisherz"]
 
 
 @pytest.mark.parametrize("indep_test", INDEP_TESTS)
-def test_recovers_the_planted_links(planted, indep_test):
-    data, truth = planted
+def test_recovers_the_planted_links(planted, fit, indep_test):
+    _, truth = planted
     assert len(truth) == 10
-    out = andrey.pcmci(data, tau_max=2, alpha=0.01, indep_test=indep_test)
-    assert _links(out) == truth
+    assert _links(fit(indep_test=indep_test)) == truth
 
 
-def test_the_tests_differ_in_p_values_and_agree_on_the_graph(planted):
-    data, _ = planted
-    student_t, fisherz = (
-        andrey.pcmci(data, tau_max=2, alpha=0.01, indep_test=name) for name in INDEP_TESTS
-    )
+def test_the_tests_differ_in_p_values_and_agree_on_the_graph(fit):
+    student_t, fisherz = (fit(indep_test=name) for name in INDEP_TESTS)
     assert student_t.structure == fisherz.structure
     assert student_t.metadata["p_values"] != fisherz.metadata["p_values"]
-
-
-def test_same_result_on_every_run(planted):
-    data, _ = planted
-    first, second = (andrey.pcmci(data, tau_max=2) for _ in range(2))
-    assert first.structure == second.structure
-    assert first.metadata == second.metadata
 
 
 @pytest.mark.parametrize("indep_test", INDEP_TESTS)

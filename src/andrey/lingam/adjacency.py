@@ -13,7 +13,7 @@ import numpy as np
 
 from andrey.core.units import least_squares
 from andrey.core.warning_policy import convergence_as_search_limit
-from andrey.lingam.pwling import _COPY_TOL
+from andrey.lingam.pwling import COPY_TOL
 
 #: Above this standard deviation of the target, LARS's float32 tiny number (``2**-126``), which
 #: it adds to its step denominators, can reach the steps' size, so the first fit is skipped.
@@ -131,6 +131,31 @@ def predict_with_required(
     return weights[: len(required)], coef
 
 
+def fit_target(
+    X: np.ndarray,
+    forced: list[int],
+    free: list[int],
+    target: int,
+    *,
+    refit: bool = False,
+    ols_coef: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Weights on ``target`` of the ``forced`` columns, which knowledge requires, and of ``free``.
+
+    With ``forced``, :func:`predict_with_required` fits both; otherwise the adaptive Lasso of
+    :func:`predict_adaptive_lasso` selects among ``free``, with ``refit``. ``ols_coef``, the
+    least-squares weights of ``[*forced, *free]`` when the caller has them, saves that fit; only
+    the Lasso without ``forced`` reads them. Returns the two weight arrays, empty for an empty list.
+    """
+    if forced:
+        return predict_with_required(X, forced, free, target)
+    if not free:
+        return np.zeros(0), np.zeros(0)
+    if ols_coef is None:
+        ols_coef, _ = least_squares(X[:, free], X[:, target])
+    return np.zeros(0), _adaptive_lasso(X, free, target, ols_coef, refit=refit)
+
+
 def estimate(
     X: np.ndarray,
     order: list[int],
@@ -142,7 +167,7 @@ def estimate(
     """Weighted adjacency ``B`` from a fixed order: each vertex regressed on its predecessors.
 
     A vertex that its kept predecessors determine, so that a least-squares fit leaves at most
-    ``_COPY_TOL`` of its variance (a copy of another column, up to scale), takes the
+    ``COPY_TOL`` of its variance (a copy of another column, up to scale), takes the
     least-squares weights, without the ones whose contribution is rounding-sized, and is left out
     of later regressions, where it would split its effect with the column it copies by rounding.
     Every other vertex is kept and takes :func:`predict_adaptive_lasso` weights, with ``refit``.
@@ -172,15 +197,14 @@ def estimate(
         y, P = X[:, target], X[:, columns]
         ols_coef, intercept = least_squares(P, y)
         residual = y - intercept - P @ ols_coef
-        if np.var(residual) > _COPY_TOL * np.var(y):
-            if forced:
-                B[target, forced], B[target, free] = predict_with_required(X, forced, free, target)
-            else:
-                B[target, free] = _adaptive_lasso(X, free, target, ols_coef, refit=refit)
+        if np.var(residual) > COPY_TOL * np.var(y):
+            B[target, forced], B[target, free] = fit_target(
+                X, forced, free, target, refit=refit, ols_coef=ols_coef
+            )
             kept.append(target)
         else:
             coef = ols_coef
-            small = np.abs(coef) * P.std(axis=0) <= _COPY_TOL**0.5 * y.std()
+            small = np.abs(coef) * P.std(axis=0) <= COPY_TOL**0.5 * y.std()
             small[: len(forced)] = False
             coef[small] = 0.0
             B[target, columns] = coef

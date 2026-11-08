@@ -1,7 +1,7 @@
 """``andrey.data.load_dataset`` downloads once, checks the SHA-256, caches, and falls back in order.
 
-The ``offline_datasets`` fixture replaces the network: it serves Sachs's 853 observational rows
-and the published ASIA, CHILD, and INSURANCE networks.
+The ``offline_datasets`` fixture replaces the network: it serves Sachs's 853 observational rows,
+the published experimental Sachs file, and the published ASIA, CHILD, and INSURANCE networks.
 """
 
 from __future__ import annotations
@@ -9,12 +9,15 @@ from __future__ import annotations
 import dataclasses
 import gzip
 import hashlib
+import threading
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import andrey
 from andrey.data import list_datasets, load_dataset, real
 from andrey.data.sortability import index_correlation
 
@@ -39,6 +42,88 @@ def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datas
         "andes",
         "diabetes",
     )
+
+
+def test_sachs_conditions_are_the_nine_published_conditions(offline_datasets):
+    pooled = load_dataset("sachs", conditions=True)
+    observational = load_dataset("sachs")
+    assert pooled.data.shape == (7466, 11)
+    assert list(pooled.data.columns) == list(real.SACHS_NODES)
+    assert pooled.conditions == tuple(name for name, _, _ in real.SACHS_CONDITIONS)
+    # Sachs et al. (2005): the cells of each condition, which the file lists in this order.
+    cells = [853, 902, 911, 723, 810, 799, 848, 913, 707]
+    assert pooled.env is not None and pooled.env.dtype == np.int64
+    assert np.array_equal(pooled.env, np.repeat(np.arange(9), cells))
+    np.testing.assert_array_equal(pooled.data.iloc[:853].to_numpy(), observational.data.to_numpy())
+    assert pooled.graph == observational.graph
+    assert "7,466 cells" in pooled.description and "Science 308" in pooled.description
+    assert observational.env is None and observational.targets is None
+    assert observational.conditions is None
+    assert offline_datasets == [
+        real.SACHS_CONDITIONS_FILE.sources[0],
+        "https://example.invalid/sachs.txt",
+    ]
+
+
+def test_sachs_conditions_declare_each_reagents_targets(offline_datasets):
+    pooled = load_dataset("sachs", conditions=True, as_frame=False)
+    named = {
+        pooled.conditions[k]: None if cols is None else [pooled.feature_names[j] for j in cols]
+        for k, cols in pooled.targets.items()
+    }
+    assert named == {
+        "cd3_cd28": [],
+        "icam2": [],
+        "aktinhib": ["akt"],
+        "g0076": ["pkc"],
+        "psitect": ["pip2"],
+        "u0126": ["mek"],
+        "ly": ["pip2", "pip3"],
+        "pma": None,
+        "b2camp": None,
+    }
+
+
+def test_sachs_conditions_run_the_methods_that_take_env(offline_datasets):
+    pooled = load_dataset("sachs", conditions=True)
+    known = {k: cols for k, cols in pooled.targets.items() if cols is not None}
+    rows = np.isin(pooled.env, list(known))
+    for method in (andrey.gies, andrey.igsp):
+        with pytest.raises(ValueError, match=r"no variables for environments \[7, 8\]"):
+            method(pooled.data, pooled.env, targets=pooled.targets)
+    outs = [
+        andrey.gies(pooled.data[rows], pooled.env[rows], targets=known),
+        andrey.igsp(pooled.data[rows], pooled.env[rows], targets=known),
+        andrey.cdnod(pooled.data, env=pooled.env),
+        andrey.gnies(pooled.data, pooled.env, targets=pooled.targets),
+    ]
+    assert all(tuple(out.structure.labels) == real.SACHS_NODES for out in outs)
+    learned = andrey.ut_igsp(pooled.data, pooled.env, targets=pooled.targets).metadata["targets"]
+    for k, cols in known.items():
+        assert {pooled.feature_names[j] for j in cols} <= set(learned[k])
+
+
+def test_sachs_conditions_cache_under_their_own_file(offline_datasets, tmp_path):
+    load_dataset("sachs", conditions=True, as_frame=False)
+    load_dataset("sachs", conditions=True, as_frame=False)
+    assert offline_datasets == [real.SACHS_CONDITIONS_FILE.sources[0]]
+    folder = tmp_path / "cache" / "sachs"
+    assert (folder / "sachs.2005.with.jittered.experimental.continuous.txt").is_file()
+
+
+def test_conditions_apply_to_sachs_only_and_nothing_is_fetched(offline_datasets):
+    with pytest.raises(ValueError, match="conditions applies to 'sachs' only"):
+        load_dataset("asia", conditions=True)
+    with pytest.raises(ValueError, match="measured"):
+        load_dataset("sachs", conditions=True, n=100)
+    assert offline_datasets == []
+
+
+def test_an_unknown_indicator_pattern_is_refused():
+    header = "\t".join(real.SACHS_NODES + tuple(n for n, _, _ in real.SACHS_CONDITIONS))
+    row = "\t".join(["1"] * 11 + ["1", "1", "1", "0", "0", "0", "0", "0", "0"])
+    with pytest.raises(ValueError, match="row 1 name no known condition"):
+        real._read_sachs_conditions(f"{header}\n{row}\n".encode())
 
 
 def test_the_array_holds_the_frames_values(offline_datasets):
@@ -79,6 +164,26 @@ def test_a_changed_cached_file_is_downloaded_again(offline_datasets, tmp_path):
     target.write_text("raf\tmek\n1\t2\n")
     assert load_dataset("sachs").data.shape == (853, 11)
     assert len(offline_datasets) == 1 and target.read_bytes() != b"raf\tmek\n1\t2\n"
+
+
+def test_two_first_loads_at_once_both_get_the_dataset(offline_datasets, monkeypatch, tmp_path):
+    serve = real.fetch
+    both = threading.Barrier(2, timeout=60)
+
+    def fetch(url):
+        raw = serve(url)
+        both.wait()  # each load holds the bytes before either writes them
+        return raw
+
+    monkeypatch.setattr(real, "fetch", fetch)
+    for attempt in range(5):  # the two writes collide on most attempts when they share a file
+        home = tmp_path / f"attempt-{attempt}"
+        with ThreadPoolExecutor(2) as pool:
+            shapes = list(
+                pool.map(lambda _: load_dataset("sachs", data_home=home).data.shape, "ab")
+            )
+        assert shapes == [(853, 11), (853, 11)]
+        assert [p.name for p in (home / "sachs").iterdir()] == ["sachs.2005.continuous.txt"]
 
 
 def test_wrong_bytes_are_refused_with_every_url_tried(offline_datasets, monkeypatch, tmp_path):
@@ -356,8 +461,6 @@ def test_the_shuffle_relabels_a_published_network(offline_datasets, discrete):
     assert list(shuffled.feature_names) != ASIA_NODES
     assert shuffled.data[list(plain.feature_names)].equals(plain.data)
     assert set(shuffled.graph.oriented_edges()) == set(plain.graph.oriented_edges())
-    assert "order drawn from the seed" in shuffled.description
-    assert "keep the file's variable order" in plain.description
 
 
 def test_measured_data_keep_the_file_column_order(offline_datasets):

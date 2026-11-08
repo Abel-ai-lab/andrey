@@ -46,11 +46,13 @@ class Scripted:
 
 def test_lagged_design_puts_variable_i_at_lag_k_in_column_k_n_plus_i():
     data = np.arange(30.0).reshape(10, 3)
-    design = lagged_design(data, tau_max=2)
+    design = lagged_design(data, 4)
     assert design.shape == (10 - 4, 3 * 5)
     for lag in range(5):
         for i in range(3):
             np.testing.assert_array_equal(design[:, lag * 3 + i], data[4 - lag : 10 - lag, i])
+    # From lag 2 on: the same rows, without the blocks of lags 0 and 1.
+    np.testing.assert_array_equal(lagged_design(data, 4, first=2), design[:, 2 * 3 :])
 
 
 def test_pc1_conditions_on_the_strongest_others_and_drops_after_each_round():
@@ -139,7 +141,7 @@ def _partial_correlation(design, x, y, conditions):
 def test_default_p_values_are_the_student_t_tail_of_each_links_partial_correlation():
     data, tau_max, n_vars = _chain(300), 2, 3
     result = pcmci(data, tau_max=tau_max, pc_alpha=0.2)
-    design = lagged_design(data, tau_max)
+    design = lagged_design(data, 2 * tau_max)
     for lag in range(1, tau_max + 1):
         for i in range(n_vars):
             for j in range(n_vars):
@@ -248,7 +250,7 @@ _EQUIVALENCE_CASES = [
 @pytest.mark.parametrize(("data", "tau_max", "pc_alpha"), _EQUIVALENCE_CASES)
 def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, tau_max, pc_alpha):
     n_vars = data.shape[1]
-    test = PARTIAL_CORRELATION_TESTS[indep_test](lagged_design(data, tau_max))
+    test = PARTIAL_CORRELATION_TESTS[indep_test](lagged_design(data, 2 * tau_max))
     ranks = range(n_vars)
     parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
     assert parents == tuple(
@@ -276,7 +278,7 @@ def _repeated_series(steps: int = 400, seed: int = 0) -> np.ndarray:
 
 
 def test_a_design_test_returns_its_tests_results_when_nothing_is_singular():
-    design = lagged_design(np.random.default_rng(0).standard_normal((300, 3)), 2)
+    design = lagged_design(np.random.default_rng(0).standard_normal((300, 3)), 4)
     test = StudentT(design)
     wrapped = DesignTest(test, design)
     x, y, conditions = np.array([3, 4]), np.array([0, 1]), np.array([[6, 7], [6, 8]])
@@ -289,7 +291,7 @@ def test_a_design_test_returns_its_tests_results_when_nothing_is_singular():
 def test_a_design_test_answers_a_singular_query_from_the_residuals():
     # Columns lag * 4 + i: variable 3 repeats variable 0, so conditioning on both at lag 1 (columns
     # 4 and 7) makes the submatrix singular; the residuals are those of the fit on one of them.
-    design = lagged_design(_repeated_series(), 1)
+    design = lagged_design(_repeated_series(), 2)
     test = StudentT(design)
     x, y = np.array([1, 2]), np.array([5, 6])
     conditions = np.array([[4, 7], [4, 7]])

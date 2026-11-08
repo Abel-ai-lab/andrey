@@ -7,10 +7,10 @@ meta:
 
 # Andrey
 
-Andrey is a Python package for causal discovery: from observational data, it learns a graph of
-which variables drive which. It runs PC, FCI, GES, BOSS, GRaSP, the LiNGAM family, and more, each
-as one function call, on CPU cores or a GPU. It is for people who use these methods on more
-variables than the usual packages handle quickly, or from a script or a coding agent.
+Andrey is a Python package for causal discovery: from data, observational or from experiments, it
+learns a graph of which variables drive which. It runs PC, FCI, GES, BOSS, GRaSP, the LiNGAM family,
+and more, each as one function call, on CPU cores or a GPU. It is for people who use these methods
+on more variables than the usual packages handle quickly, or from a script or a coding agent.
 
 **The fastest causal discovery package.**
 The [release cards](benchmarks.md) give each measured speedup compared with other packages,
@@ -30,8 +30,8 @@ pip install andrey-core
 
 The first call downloads 853 cells' measurements of 11 proteins, and PC learns a graph over them;
 [Getting started](guides/getting-started.md#learn-a-graph) reads the result. Andrey needs Python
-3.11 or later. Linux is fully supported; macOS and Windows install and run on the CPU, with no
-guarantee yet.
+3.11 or later. Linux is supported; macOS and Windows install and run on the CPU, with no guarantee
+yet ([Testing](ci.md)).
 
 ::::{grid} 1 2 3 3
 :gutter: 3
@@ -74,6 +74,11 @@ What changed in each release.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
 - [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.
+- [Column order and machines](guides/column-order.md): what each method keeps when you reorder the
+  columns or change machines.
+- [Upgrading](guides/upgrading.md): what to change in your code for a new release.
+- [Contributing](guides/contributing.md): report a problem, set up a development environment, and
+  run the checks before a pull request.
 - [Release cards](benchmarks.md): each release's timings, accuracy, and known limits.
 
 ## More

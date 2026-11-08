@@ -17,11 +17,11 @@ from threadpoolctl import threadpool_limits
 from andrey.core import ARROW, TAIL, backend
 from andrey.core import score as score_module
 from andrey.core.knowledge import Constraints, Knowledge, resolve
-from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near, dag2cpdag
+from andrey.core.orient import cpdag_of_pdag, cpdag_of_pdag_near, dag2cpdag
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search.ges import _reachable, ges
+from andrey.search.ges import ges, reachability
 from tests.unit.ges_chunks import forward_inprocess, ges_inprocess
 from tests.unit.ges_reference import insert_candidates, reference_paths
 
@@ -191,7 +191,7 @@ def _valid_moves(adj: np.ndarray) -> list[tuple[str, int, int, tuple[int, ...]]]
     """Every valid Insert and Delete of the CPDAG ``adj``, as GES enumerates them."""
     n = adj.shape[0]
     state = pg.neighborhood_state(adj)
-    reachable = _reachable(adj)
+    reachable = reachability(adj)
     moves = []
     for y in range(n):
         for x, _t_index, T, clique in insert_candidates(y, adj, state):
@@ -243,7 +243,7 @@ def test_cpdag_after_a_move_matches_a_full_rebuild(
         moved = adj.copy()
         apply = ops.apply_insert if kind == "insert" else ops.apply_delete
         apply(moved, x, y, subset)
-        expected = _cpdag_of_pdag(moved)
+        expected = cpdag_of_pdag(moved)
         change = ops.insert_cpdag if kind == "insert" else ops.delete_cpdag
         adj = change(adj, x, y, subset)
         assert np.array_equal(adj, expected), (kind, x, y, subset)
@@ -256,9 +256,9 @@ def test_cpdag_rewrite_declines_a_region_past_its_limit() -> None:
     for a, b in [(0, 1), (1, 2), (2, 3), (3, 4)]:
         adj[a, b] = adj[b, a] = TAIL
     before = adj.copy()
-    assert _cpdag_of_pdag_near(adj, [0], 2) is None
+    assert cpdag_of_pdag_near(adj, [0], 2) is None
     assert np.array_equal(adj, before)
-    assert _cpdag_of_pdag_near(adj, [0], 5) is adj
+    assert cpdag_of_pdag_near(adj, [0], 5) is adj
 
 
 @pytest.mark.parametrize("seed,d,n,p,penalty_discount", [_SCAN_GRID[2], _SCAN_GRID[4]])

@@ -6,19 +6,16 @@ the final skeleton and decides the middle node from the share of separating subs
 
 from __future__ import annotations
 
-import importlib
-
 import networkx as nx
 import numpy as np
 import pytest
 
 import andrey
 from andrey import data
+from andrey.constraint._skeleton import vote_triples
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, ci
+from andrey.core.orient import separating_set
 from andrey.metrics import to_cpdag
-
-pc_module = importlib.import_module("andrey.constraint.pc")
-fci_module = importlib.import_module("andrey.constraint.fci")
 
 VOTING = ("conservative", "majority")
 RULES = ("sepsets", *VOTING)
@@ -43,10 +40,10 @@ VOTES = {
 }
 
 
-@pytest.mark.parametrize("engine", ["pc", "fci"])
+@pytest.mark.parametrize("mark", [TAIL, CIRCLE], ids=["skeleton", "pag"])
 @pytest.mark.parametrize("rule", VOTING)
 @pytest.mark.parametrize("case", sorted(VOTES))
-def test_vote_decides_the_middle_node_by_its_share(engine, rule, case):
+def test_vote_decides_the_middle_node_by_its_share(mark, rule, case):
     passing, conservative, majority = VOTES[case]
     expected = conservative if rule == "conservative" else majority
     edges = [(0, 1), (1, 2), (0, 3), (2, 4)]
@@ -56,14 +53,9 @@ def test_vote_decides_the_middle_node_by_its_share(engine, rule, case):
     def test(a, c, subset=()):
         return float((a, c) == (0, 2) and tuple(subset) in passing)
 
-    if engine == "pc":
-        ambiguous = pc_module.vote_colliders(_skeleton(5, edges, TAIL), test, 0.5, sepsets, rule)
-    else:
-        ambiguous = fci_module._vote_sepsets(
-            _skeleton(5, edges, CIRCLE), test, 0.5, sepsets, rule=rule
-        )
+    ambiguous = vote_triples(_skeleton(5, edges, mark), test, 0.5, sepsets, rule)
     assert ((0, 1, 2) in ambiguous) == (expected == "ambiguous")
-    held = {fci_module._sepset(sepsets, 0, 2), fci_module._sepset(sepsets, 2, 0)}
+    held = {separating_set(sepsets, 0, 2), separating_set(sepsets, 2, 0)}
     if expected == "collider":
         assert held == {frozenset({3})}
     elif expected == "non-collider":
@@ -74,19 +66,13 @@ def test_vote_decides_the_middle_node_by_its_share(engine, rule, case):
 
 @pytest.mark.parametrize("rule", VOTING)
 def test_no_separating_subset(rule):
-    """PC leaves the triple ambiguous; FCI makes it a collider, as the recorded sets do not vote."""
-    edges = [(0, 1), (1, 2)]
+    """The triple is ambiguous, and the recorded set, which does not vote, stays as it is."""
     sepsets = {(0, 2): (1,)}
-    ambiguous = pc_module.vote_colliders(
-        _skeleton(3, edges, TAIL), lambda *args: 0.0, 0.5, dict(sepsets), rule
+    ambiguous = vote_triples(
+        _skeleton(3, [(0, 1), (1, 2)], CIRCLE), lambda *args: 0.0, 0.5, sepsets, rule
     )
     assert ambiguous == {(0, 1, 2)}
-    fci_sepsets = dict(sepsets)
-    ambiguous = fci_module._vote_sepsets(
-        _skeleton(3, edges, CIRCLE), lambda *args: 0.0, 0.5, fci_sepsets, rule=rule
-    )
-    assert not ambiguous
-    assert fci_sepsets == {(0, 2): (), (2, 0): ()}
+    assert sepsets == {(0, 2): (1,)}
 
 
 def _scripted(name: str, separations: dict[tuple[int, int], set[tuple[int, ...]]]):
@@ -107,6 +93,26 @@ def _scripted(name: str, separations: dict[tuple[int, int], set[tuple[int, ...]]
 # and given (2,), so node 2 is in half of their separating subsets: ambiguous under both voting
 # rules. The skeleton removes those pairs given (), so the standard rule makes 3 -> 2 a collider.
 BLOCKED = {(0, 1): {()}, (0, 3): {(), (2,)}, (1, 3): {(), (2,)}}
+
+
+# The triple 0 - 1 - 2, where only (3,) separates 0 and 2, and 3 is separated from 1 and 2 given ()
+# and from 0 given (1,): the search removes 0 - 2 and 0 - 3 at size 1, so on the final skeleton no
+# subset of either end's neighbors, {1}, separates 0 and 2.
+OUT_OF_REACH = {(1, 3): {()}, (2, 3): {()}, (0, 2): {(3,)}, (0, 3): {(1,)}}
+
+
+@pytest.mark.parametrize("method", ["pc", "fci"])
+@pytest.mark.parametrize("rule", VOTING)
+def test_a_pair_no_neighbor_subset_separates_leaves_its_triple_ambiguous(monkeypatch, method, rule):
+    monkeypatch.setitem(ci._CI_REGISTRY, *_scripted("scripted-out-of-reach", OUT_OF_REACH))
+    x = np.random.default_rng(0).standard_normal((50, 4))
+    out = getattr(andrey, method)(x, indep_test="scripted-out-of-reach", collider_rule=rule)
+    marks = out.structure.to_numpy()
+    assert out.metadata["ambiguous_triples"] == [[0, 1, 2]]
+    assert marks[1, 0] != ARROW and marks[1, 2] != ARROW
+    # The recorded set, (3,), leaves out 1, so the standard rule orients the collider.
+    standard = getattr(andrey, method)(x, indep_test="scripted-out-of-reach").structure.to_numpy()
+    assert standard[1, 0] == standard[1, 2] == ARROW
 
 
 @pytest.mark.parametrize("rule", RULES)
@@ -161,7 +167,9 @@ def _ambiguous_back(triples: list[list[int]], order: np.ndarray) -> list[tuple[i
     return sorted((min(a, c), b, max(a, c)) for a, b, c in back)
 
 
-@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize(
+    "method", ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"]
+)
 @pytest.mark.parametrize("rule", VOTING)
 def test_results_do_not_depend_on_the_column_order(method, rule):
     """Five column orders give the same graph and the same ambiguous triples once mapped back."""
@@ -170,7 +178,7 @@ def test_results_do_not_depend_on_the_column_order(method, rule):
     x[:75, 0] += 1.5  # the index shifts one column, so CD-NOD keeps an edge out of it
 
     def fit(columns):
-        args = (x[:, columns], domain) if method == "cdnod" else (x[:, columns],)
+        args = (x[:, columns], domain) if method in ("cdnod", "fci_jci") else (x[:, columns],)
         return getattr(andrey, method)(*args, collider_rule=rule)
 
     reference = fit(np.arange(8))
@@ -197,13 +205,13 @@ def test_cdnod_index_is_never_an_ambiguous_middle_node(rule):
     assert all(b != 6 for _, b, _ in out.metadata["ambiguous_triples"])
 
 
-@pytest.mark.parametrize("rule", VOTING)
+@pytest.mark.parametrize("rule", RULES)
 def test_cdnod_with_one_domain_is_pc(rule):
     x = data.sample_scm(d=8, n=150, density=3.0, seed=11).data
     out = andrey.cdnod(x, np.zeros(150), collider_rule=rule)
     reference = andrey.pc(x, collider_rule=rule)
     np.testing.assert_array_equal(out.structure.to_numpy(), reference.structure.to_numpy())
-    assert out.metadata["ambiguous_triples"] == reference.metadata["ambiguous_triples"]
+    assert out.metadata.get("ambiguous_triples") == reference.metadata.get("ambiguous_triples")
 
 
 @pytest.mark.parametrize("method", ["pc", "cdnod"])

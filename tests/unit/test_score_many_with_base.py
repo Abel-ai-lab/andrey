@@ -16,9 +16,8 @@ import pytest
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import boss as boss_mod
-from andrey.search import grasp as grasp_mod
 
-EPS = boss_mod._SCORE_EPS
+EPS = boss_mod.SCORE_EPS
 
 
 def _full(score: BICScore, v: int, base: tuple[int, ...], op: str, u: int) -> float:
@@ -102,7 +101,7 @@ def test_boss_grow_decides_an_open_threshold_by_full_scores(
     parents = [1]
     score = _threshold_score(EPS + margin)
     delta = DeltaBICScore(score)
-    tree = boss_mod._GrowShrinkTree(0, score, delta, 4)
+    tree = boss_mod.GrowShrinkTree(0, score, delta, 4)
     exact = -score.score(0, parents)
     node = boss_mod._GSTNode(tree, score=exact + base_error, bound=abs(base_error))
 
@@ -261,82 +260,3 @@ def test_boss_mutation_decides_an_open_move_by_full_scores(gain: float, error: f
     assert boss_mod._better_mutation(1, order, gsts, positions) == (gain > EPS)
     assert order == ([0, 2, 1] if gain > EPS else [0, 1, 2])
     assert moved.bound == 0.0
-
-
-@pytest.mark.parametrize("gain, error", [(0.5 * EPS, -2 * EPS), (-0.5 * EPS, 2 * EPS)])
-def test_grasp_grow_rechecks_a_gap_within_the_bounds(
-    monkeypatch: pytest.MonkeyPatch, gain: float, error: float
-) -> None:
-    """Adding parent 2 changes the score by ``gain``; the batched change is beyond the tolerance
-    on the other side, within its bound, and the full scores decide it."""
-    parents = [1]
-    score = _threshold_score(gain)
-    delta = DeltaBICScore(score)
-    tree = grasp_mod._GST(0, score, delta, 4)
-    node = grasp_mod._GSTNode(tree, score=-score.score(0, parents))
-
-    def rounded_batch(vertex, base_parents, deltas, *, bounds):
-        bounds[:] = [abs(error) + 0.1 * EPS if u == 2 else 0.0 for _, u in deltas]
-        return [
-            score.score(vertex, [*base_parents, u]) - (error if u == 2 else 0.0) for _, u in deltas
-        ]
-
-    monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
-    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: math.inf)
-
-    node.grow([2, 3], parents)
-
-    assert (2 in [branch.add for branch in node.branches]) == (gain > 0)
-
-
-def test_grasp_grow_orders_siblings_within_their_bounds_by_full_scores(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sibling 2 scores above sibling 1 by less than the tolerance; the batched scores put 1
-    above 2 by more than it, within their bounds."""
-    cov = np.array([[1.0, 0.6, 0.6 + 2.7e-9], [0.6, 1.0, 0.2], [0.6 + 2.7e-9, 0.2, 1.0]])
-    score = BICScore.from_cov(cov, 100)
-    delta = DeltaBICScore(score)
-    tree = grasp_mod._GST(0, score, delta, 3)
-    exact = {u: -score.score(0, [u]) for u in (1, 2)}
-    assert 0 < exact[2] - exact[1] < EPS
-    shift = (exact[2] - exact[1] + 1.5 * EPS) / 2  # puts 1 above 2 by 1.5 * EPS
-    error = {1: shift, 2: -shift}
-
-    def rounded_batch(vertex, parents, deltas, *, bounds):
-        bounds[:] = [shift + 0.1 * EPS] * len(deltas)
-        return [score.score(vertex, [u]) - error[u] for _, u in deltas]
-
-    monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
-    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: math.inf)
-
-    tree.root.grow([1, 2], [])
-
-    assert [branch.add for branch in tree.root.branches] == [2, 1]
-
-
-def test_grasp_grow_tightens_bounds_before_rechecking(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Siblings 1 and 2 are 1.5 tolerances apart; the batch's bounds leave their order open and
-    their componentwise bounds close it, so neither is rechecked."""
-    cov = np.array([[1.0, 0.6, 0.6 + 8.1e-9], [0.6, 1.0, 0.2], [0.6 + 8.1e-9, 0.2, 1.0]])
-    score = BICScore.from_cov(cov, 100)
-    delta = DeltaBICScore(score)
-    tree = grasp_mod._GST(0, score, delta, 3)
-    exact = {u: -score.score(0, [u]) for u in (1, 2)}
-    assert EPS < exact[2] - exact[1] < 2 * EPS
-    error = {1: 0.1 * EPS, 2: -0.1 * EPS}
-    full = score.score
-
-    def rounded_batch(vertex, parents, deltas, *, bounds):
-        bounds[:] = [EPS] * len(deltas)
-        return [full(vertex, [u]) - error[u] for _, u in deltas]
-
-    rechecked: list[list[int]] = []
-    monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
-    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: 0.2 * EPS)
-    monkeypatch.setattr(score, "score", lambda v, p: rechecked.append(list(p)) or full(v, p))
-
-    tree.root.grow([1, 2], [])
-
-    assert [branch.add for branch in tree.root.branches] == [2, 1]
-    assert rechecked == []

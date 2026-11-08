@@ -144,11 +144,11 @@ def test_ties_are_exercised_by_the_sweep():
     x = _gaussian_sem(0, 600, 10, 0.4)
     n = x.shape[1]
     score = BICScore(x, penalty_discount=1.0)
-    from andrey.search.ges import _reachable
+    from andrey.search.ges import reachability
 
     adj = np.zeros((n, n), dtype=np.int8)
     state = pg.neighborhood_state(adj)
-    reachable = _reachable(adj)
+    reachable = reachability(adj)
     deltas: list[float] = []
     for y in range(n):
         for xx in range(n):
@@ -275,7 +275,7 @@ def test_spawn_context_parity(monkeypatch):
     x = _gaussian_sem(1, 600, 10, 0.4)
     serial_struct, serial_score = ges(x)
     monkeypatch.setattr(
-        pg, "_pick_context", lambda: __import__("multiprocessing").get_context("spawn")
+        par, "pick_context", lambda: __import__("multiprocessing").get_context("spawn")
     )
     par_struct, par_score = _parallel(x, 2)
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
@@ -484,20 +484,18 @@ def test_pool_created_once_spans_passes(monkeypatch):
     assert sum(calls) == 1  # created lazily once, reused -> not re-spawned per pass
 
 
-# --- transitive parity (GIES / GFCI delegate to ges()) --------------------------------------------
+# --- transitive parity (GFCI delegates to ges()) --------------------------------------------------
 
 
-@pytest.mark.parametrize("facade_name", ["gies", "gfci"])
-def test_gies_gfci_transitive_parity(facade_name):
-    """Worker count does not change the GIES or GFCI output structure."""
+def test_gfci_transitive_parity():
+    """Worker count does not change the GFCI output structure."""
     import andrey
 
-    facade = getattr(andrey, facade_name)
     x = _gaussian_sem(0, 600, 10, 0.4)
-    serial = facade(x)
+    serial = andrey.gfci(x)
     with _force_pool(), backend.config(n_jobs=4):
-        parallel = facade(x)
-    assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy()), facade_name
+        parallel = andrey.gfci(x)
+    assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy())
     assert serial.structure.kind == parallel.structure.kind
 
 

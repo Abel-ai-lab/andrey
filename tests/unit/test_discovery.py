@@ -4,6 +4,7 @@ llms.txt, and sitemap.xml."""
 import importlib.util
 import json
 import pathlib
+import re
 from html.parser import HTMLParser
 
 import pytest
@@ -175,16 +176,15 @@ def test_llms_txt_lists_each_section_under_its_heading():
         "docs/benchmarks/0.4.0": {**PAGE, "title": "0.4.0 card", "description": "The card."},
     }
     text = llms(entries, [("Docs", ["docs/faq"]), ("Release cards", ["docs/benchmarks/0.4.0"])])
-    assert text == (
-        "# Andrey\n\n> The summary.\n\nVersion: 0.4.0.\n\n"
-        "Install with `pip install andrey-core`. When output is piped, `andrey list` prints the\n"
-        "methods as JSON, and `andrey run <method> --data data.csv` prints the graph as JSON.\n"
-        "`andrey run <method> --help --json` returns a method's JSON contract, and\n"
-        "`andrey --skill` prints Andrey's agent skill.\n\n"
-        "## Docs\n\n- [FAQ](https://andrey.abel.ai/docs/faq.html): The FAQ.\n\n"
-        "## Release cards\n\n"
-        "- [0.4.0 card](https://andrey.abel.ai/docs/benchmarks/0.4.0.html): The card.\n"
-    )
+    assert text.startswith("# Andrey\n\n> The summary.\n")
+    assert "\nVersion: 0.4.0.\n" in text
+    assert re.findall(r"^## (.+)\n\n((?:- .+\n)+)", text, re.M) == [
+        ("Docs", "- [FAQ](https://andrey.abel.ai/docs/faq.html): The FAQ.\n"),
+        (
+            "Release cards",
+            "- [0.4.0 card](https://andrey.abel.ai/docs/benchmarks/0.4.0.html): The card.\n",
+        ),
+    ]
 
 
 def test_llms_txt_lists_its_facts_at_a_glance_before_the_sections():

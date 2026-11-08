@@ -3,7 +3,8 @@
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.orient`. An Insert is valid when ``NA union T`` is a clique and every
 semi-directed path from ``y`` to ``x`` meets it; a Delete is valid when ``NA`` without ``H`` is a
-clique.
+clique. :func:`check_parent_cap` checks the required edges of every score search against its
+``max_parents``.
 
 References
 ----------
@@ -20,7 +21,7 @@ from itertools import chain, combinations
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near
+from andrey.core.orient import cpdag_of_pdag, cpdag_of_pdag_near
 
 
 def adjacent(adj: np.ndarray, node: int) -> np.ndarray:
@@ -77,6 +78,9 @@ def max_parents_in_class(adj: np.ndarray) -> np.ndarray:
     two of those neighbors that are not adjacent would add a v-structure, so the subset is a clique,
     and some DAG of the class directs the largest clique into the node. A node's most parents are
     so its directed parents plus the size of the largest clique among its undirected neighbors.
+
+    The search calls :func:`exceeds_parent_cap`, which decides ``max_parents_in_class(adj).max() >
+    cap`` in less work; this function is the reference that check is tested against.
     """
     out = (adj == ARROW).sum(axis=1)
     lines = (adj == TAIL) & (adj.T == TAIL)
@@ -102,6 +106,30 @@ def exceeds_parent_cap(adj: np.ndarray, cap: float) -> bool:
         if _undirected_clique(lines, node, int(room) + 1) > room:
             return True
     return False
+
+
+def check_parent_cap(
+    graph: np.ndarray | None, max_parents: float | None, *, in_class: bool
+) -> None:
+    """Raise ``ValueError`` when the required edges give a node more than ``max_parents`` parents.
+
+    ``graph`` holds the required edges as a boolean matrix, ``graph[u, v]`` for ``u -> v``; with
+    ``in_class`` it is the mark matrix of the class a search starts from, and the check covers
+    every DAG of that class (:func:`exceeds_parent_cap`). ``None`` for either argument checks
+    nothing.
+    """
+    if graph is None or max_parents is None:
+        return
+    if not in_class:
+        if (graph.sum(axis=0) > max_parents).any():
+            raise ValueError(
+                f"the required edges give a node more than max_parents={max_parents} parents"
+            )
+    elif exceeds_parent_cap(graph, max_parents):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
 
 
 def subsets(elements: Sequence[int]) -> Iterable[tuple[int, ...]]:
@@ -329,8 +357,8 @@ def _shared_children(adj: np.ndarray, x: int, y: int) -> list[int]:
 
 def _reform(adj: np.ndarray, touched: list[int]) -> np.ndarray:
     """The CPDAG of ``adj``, a CPDAG changed by one move that touched the nodes ``touched``."""
-    out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
-    return _cpdag_of_pdag(adj) if out is None else out
+    out = cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
+    return cpdag_of_pdag(adj) if out is None else out
 
 
 def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarray:
@@ -338,7 +366,7 @@ def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarra
 
     ``adj`` is rewritten in place and returned unless the whole CPDAG is rebuilt. The result is
     the CPDAG of the extension of :func:`apply_insert`'s graph; only the edges the move can reach
-    are derived again (:func:`~andrey.core.orient._cpdag_of_pdag_near`).
+    are derived again (:func:`~andrey.core.orient.cpdag_of_pdag_near`).
     """
     T = tuple(T)
     shared = _shared_children(adj, x, y)

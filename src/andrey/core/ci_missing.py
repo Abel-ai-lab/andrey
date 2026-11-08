@@ -42,9 +42,9 @@ import numpy.typing as npt
 
 from . import backend
 from .ci import (
-    _BOUND_MARGIN,
-    _ONE_MINUS_EPS,
-    _SINGULAR_RTOL,
+    BOUND_MARGIN,
+    ONE_MINUS_EPS,
+    SINGULAR_RTOL,
     CGTest,
     ChiSquare,
     CITest,
@@ -589,7 +589,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
                 inverse, singular = _inverse(stack, flagged)
                 flagged |= singular
                 r = -inverse[:, 0, 1] / np.sqrt(np.abs(inverse[:, 0, 0] * inverse[:, 1, 1]))
-            r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+            r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
             p = np.asarray(self._kind._pvalue(r, rows - size - self._offset), dtype=np.float64)
         flagged |= ~(np.isfinite(r) & np.isfinite(p))
         return r, p, rows, flagged
@@ -793,7 +793,7 @@ def _inverse(stack: np.ndarray, skip: np.ndarray) -> tuple[np.ndarray, np.ndarra
     A matrix is near singular when an entry of its inverse reaches ``1 / _MARGIN`` of the bound
     :func:`~andrey.core.ci._invert_nonsingular` settles a matrix by, or, when the stack has an
     exactly singular matrix, when its smallest eigenvalue is at most ``_MARGIN`` times
-    ``_SINGULAR_RTOL`` of its largest. The rows ``skip`` marks are inverted as the identity. Each
+    ``SINGULAR_RTOL`` of its largest. The rows ``skip`` marks are inverted as the identity. Each
     inverse is that of its matrix alone.
     """
     k = stack.shape[-1]
@@ -803,10 +803,10 @@ def _inverse(stack: np.ndarray, skip: np.ndarray) -> tuple[np.ndarray, np.ndarra
         inverse = np.linalg.inv(stack)
     except np.linalg.LinAlgError:
         w = np.linalg.eigvalsh(stack)
-        singular = ~(w[:, 0] > w[:, -1] * _MARGIN * _SINGULAR_RTOL)
+        singular = ~(w[:, 0] > w[:, -1] * _MARGIN * SINGULAR_RTOL)
         stack[singular] = np.eye(k)
         inverse = np.linalg.inv(stack)
-    limit = 1.0 / (_MARGIN * _BOUND_MARGIN * _SINGULAR_RTOL * k * k)
+    limit = 1.0 / (_MARGIN * BOUND_MARGIN * SINGULAR_RTOL * k * k)
     return inverse, singular | ~(np.abs(inverse).max(axis=(1, 2)) < limit)
 
 
@@ -819,7 +819,7 @@ def _shipped_class(factory: Callable[..., CITest]) -> type | None:
     if isinstance(factory, partial) and factory.func is ChiSquare:
         return ChiSquare
     if isinstance(factory, partial) and factory.func is ci._nonlinear:
-        module, cls = ci._NONLINEAR_CLASSES[factory.args[0]]
+        module, cls = ci.NONLINEAR_CLASSES[factory.args[0]]
         import importlib
 
         return getattr(importlib.import_module(f"{__package__}.{module}"), cls)
@@ -834,9 +834,9 @@ def _pins_blas(test_class: type | None, n: int) -> bool:
         return True
     pin = getattr(test_class, "pin_blas", None)
     if isinstance(pin, property):  # KCI: unpinned from a row count on
-        from .ci_kernel import _KCI_BLAS_THREADS_FROM
+        from .ci_kernel import KCI_BLAS_THREADS_FROM
 
-        return n < _KCI_BLAS_THREADS_FROM
+        return n < KCI_BLAS_THREADS_FROM
     if pin is not None:
         return bool(pin)
     return issubclass(test_class, (PartialCorrelationTest, DGTest, CGTest))

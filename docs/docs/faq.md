@@ -17,7 +17,8 @@ which {{ n_supported }} are supported and benchmarked and the rest experimental,
 categorical, and mixed data; independent samples and time series; linear and nonlinear
 relationships; data with hidden common causes; and data from interventions or several domains.
 Most take background knowledge: edges that must or cannot exist, and the order of tiers in time.
-The constraint-based methods accept missing values, and `andrey.bootstrap` gives each edge's
+Most methods that test conditional independence accept
+[missing values](#does-it-handle-missing-values), and `andrey.bootstrap` gives each edge's
 frequency over refits on resampled data. The methods include PC, FCI, GFCI, GES, XGES, BOSS,
 GRaSP, the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and
 some run on a GPU. A command line that answers in JSON and an agent skill make it usable by AI
@@ -36,8 +37,8 @@ uv add andrey-core
 pip install andrey-core
 ```
 
-[Getting started](guides/getting-started.md#install) covers the optional extras, the development
-version, and building from source.
+[Getting started](guides/getting-started.md#install) covers the optional extras, installing from
+GitHub, and building from source.
 
 ### Which operating systems does it support?
 
@@ -45,11 +46,11 @@ version, and building from source.
 |---|:---:|:---:|:---:|
 | Installs and runs on the CPU | ✓ | ✓ | ✓ |
 | Full test suite | ✓ | ✗ | ✗ |
-| GPU speedups (CUDA / MPS) | ✓ | ✗ | ✗ |
+| GPU speedups (CUDA) | ✓ | ✗ | ✗ |
 
-Linux is fully supported; macOS and Windows can run Andrey, with no guarantee yet. On macOS and
-Windows, CI checks the install, the command line, and small fits on the CPU, and on macOS the unit
-tests; the rest of the test suite there is planned.
+Linux is supported; macOS and Windows install and run on the CPU, with no guarantee yet
+([Testing](ci.md)). On demand, CI checks the install, the command line, and small fits on macOS and
+Windows on the CPU, and the unit tests on macOS; the rest of the test suite there is planned.
 
 The defaults of the speed cutoffs, such as how large a pass must be to use the worker processes, are
 measured on Linux servers. On another machine, run `andrey calibrate` once and set the values it
@@ -73,8 +74,7 @@ them with their status.
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
 method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process. Every method is supported now; a new method starts as
-experimental.
+first time it runs in a process. A new method starts as experimental.
 
 ### Which method should I start with?
 
@@ -127,9 +127,10 @@ work that cannot change the result, and uses GPU code where that helps.
 ### Do I need a GPU?
 
 No. The default install uses NumPy on the CPU. The `torch` extra adds a PyTorch backend, which
-CALM needs. With a CUDA GPU, DirectLiNGAM's entropy computations move to the GPU once they are
-large enough to repay the transfer; correlation matrices move too when you set
-`ANDREY_BACKEND=cuda`. Apple GPUs are not supported in the alpha.
+CALM needs. A CUDA GPU speeds up covariance and correlation, the entropy terms of DirectLiNGAM and
+the methods built on it, the KCI and CMIknn tests, and the tests of PNL;
+[Configuration](configuration.md#gpu-dispatch) says when each moves. Apple GPUs are not supported
+in the alpha.
 
 ### What do the optional extras add?
 
@@ -144,20 +145,21 @@ each method at growing sizes against the packages that implement it. A few publi
 PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
 search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
 BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
-takes eight minutes. Finishing is not the same as being accurate:
-see [Are the classic methods accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+takes eight minutes. Finishing is not the same as being accurate: see [Are the classic methods
+accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
 
 ### Can it use more CPU cores?
 
-GES and GFCI (in its GES phase) can spread each pass over worker processes: set
-`ANDREY_N_JOBS` above 1. GES's parallel result is identical to its serial one. PC, FCI, GFCI,
-and CD-NOD spread the larger passes of their skeleton search over worker processes with the
-`fisherz` and `student_t` tests, from the same setting, and return the same graph as with one
-worker. A script that does this must put its entry point under `if __name__ == "__main__":`,
-because starting the workers re-imports the script;
-[Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
-workers only above a work cutoff. The defaults suit one fit per process; for a process that runs
-many fits, `andrey calibrate` measures the cutoffs on your machine and prints the settings.
+GES, GFCI, the skeleton search of PC and the methods built on it, and the possible-d-separation
+step of FCI, FCI-JCI, and GFCI can spread their larger passes over worker processes: set
+`ANDREY_N_JOBS` above 1. They return the same graph as with one worker;
+[Configuration](configuration.md#parallel-search) lists the methods and tests that use them. A
+script that does this must put its entry point under `if __name__ == "__main__":`, because
+starting the workers re-imports the script;
+[Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass or search
+uses the workers only above a work cutoff. The defaults suit one fit per process; for a process
+that runs many fits, `andrey calibrate` measures the cutoffs on your machine and prints the
+settings.
 
 ## Data
 
@@ -170,37 +172,36 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
-RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GIES,
-XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
+text, booleans, or a pandas `category`. {{ indep_test_methods }} test independence on categorical
+data with `indep_test="chisq"` or `"gsq"`, and {{ score_func_methods }} score it with
 `score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
-the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
-the column types you declare, with `categorical` or a DataFrame's `category` columns: `gsq` and
-`bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
-numbers that you have not declared reads as numbers, with a warning. The
-[release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
-Tetrad, bnlearn, and pgmpy; GIES and XGES are not benchmarked on those data yet.
-[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods
-assume continuous non-Gaussian noise.
+the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or
+`"cond_gauss"`. By default they pick the test and the score from the column types you declare, with
+`categorical` or a DataFrame's `category`, `bool`, or text columns: `gsq` and `bdeu` when every
+column is categorical, `cond_gauss` when some are. A column of a few whole numbers that you have not
+declared reads as numbers, with a warning. The [release cards](benchmarks.md) benchmark PC, FCI,
+IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, GES, hill climbing, BOSS, and GRaSP on categorical data, and
+PC, GES, and hill climbing on mixed data, against causal-learn, Tetrad, bnlearn, pgmpy, or an
+earlier Andrey release; the other methods are not benchmarked on those data yet.
+[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods assume
+continuous non-Gaussian noise.
 
 ### Does it handle missing values?
 
-Yes, in PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, LPCMCI, ANM, and PNL. Mark a
-missing value with `NaN` or pandas' `NA`, or leave its field empty in a CSV file. Each
-conditional-independence test then reads only the samples where all of its variables are observed
-(test-wise deletion), so the fit keeps the samples that dropping every incomplete one would lose.
-The other methods refuse missing values with an error that says what to do instead. Test-wise
-deletion is sound when values are missing completely at random; when whether a value is missing
-depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure it
-against dropping incomplete samples, and
+Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
+empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
+variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
+incomplete one would lose. The other methods refuse missing values with an error that says what to
+do instead. Test-wise deletion is sound when values are missing completely at random; when whether a
+value is missing depends on the variables, a test can be biased. The [release cards](benchmarks.md)
+measure it against dropping incomplete samples, and
 [Missing values](guides/getting-started.md#missing-values) explains it.
 
 ### Can I tell it what I already know?
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except ANM, PNL, and GIN.
+takes it except {{ no_knowledge_methods }}.
 
 ### How sure is each edge?
 
@@ -216,15 +217,15 @@ that makes the same mistake on every resample gives it a frequency of 1.
 
 ### Time series and several datasets?
 
-Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, and
-`dynotears` learn graphs over time lags; `lpcmci` also allows hidden common causes, and `dynotears`
-fits a linear structural vector autoregression by continuous optimization. The
-[release cards](benchmarks.md) benchmark them against tigramite, lingam, causal-learn, and
-CausalNex. `multi_group_direct_lingam` fits several datasets that share one causal order, `cdnod`
-takes data from several domains, and `gies`, `gnies`, `igsp`, `ut_igsp`, and `icp` take data from
-several environments: `gies` and `igsp` with known interventions, `gnies` learning the variables
-whose noise variance changed, `ut_igsp` learning the targets it is not given, and `icp` the parents
-of one target. All are supported.
+Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`,
+and `dynotears` learn graphs over time lags; `jpcmciplus` reads several datasets with shared
+contexts, `lpcmci` also allows hidden common causes, and `dynotears` fits a linear structural vector
+autoregression by continuous optimization. The [release cards](benchmarks.md) benchmark them
+against tigramite, lingam, causal-learn, and CausalNex. `multi_group_direct_lingam` fits several
+datasets that share one causal order, `cdnod` takes data from several domains, and
+{{ targets_names }} take data from several environments: `gies` and `igsp` with known
+interventions, `gnies` learning the variables whose noise variance changed, `ut_igsp` learning the
+targets it is not given, and `icp` the parents of one target. All are supported.
 
 ## Command line and agents
 
@@ -305,7 +306,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.14.0},
+  version = {0.15.0},
   url = {https://andrey.abel.ai},
 }
 ```

@@ -22,10 +22,12 @@ from andrey.irregular import rcd as rcd_engine
 from andrey.search import gfci as gfci_engine
 from andrey.search.operators import max_parents_in_class
 from andrey.spec import REGISTRY
+from andrey.temporal import jpcmciplus as jpcmciplus_engine
 from andrey.temporal import lpcmci as lpcmci_engine
 from andrey.temporal import pcmci as pcmci_engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
 from andrey.temporal import varma as varma_engine
+from tests.unit.methods import domains
 
 CAPS = (0, 1, 2)
 
@@ -80,7 +82,7 @@ def inputs(method: str) -> list:
     """The data, and a two-context index for a method that also requires one (cdnod)."""
     data = linear_data(0)
     extra = [inp for inp in REGISTRY[method].data.inputs[1:] if inp.required]
-    return [data] + [np.repeat([0.0, 1.0], len(data) // 2).reshape(-1, 1) for _ in extra]
+    return [data] + [domains(len(data)) for _ in extra]
 
 
 def pc1_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
@@ -102,10 +104,18 @@ def pc1_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
 
     monkeypatch.setattr(pcmci_engine, "pc1", pc1)
     monkeypatch.setattr(pcmciplus_engine, "pc1", pc1)
+    monkeypatch.setattr(jpcmciplus_engine, "pc1", pc1)
+    fit_series(method, series(0), tau_max=2, max_depth=cap)
+    return sizes
+
+
+def fit_series(method: str, x: np.ndarray, **kwargs):
+    """Fit ``method`` on the series ``x``; a method that reads several datasets gets its thirds."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        getattr(andrey, method)(series(0), tau_max=2, max_depth=cap)
-    return sizes
+        if REGISTRY[method].data.inputs[0].kind == "panel":
+            return getattr(andrey, method)(np.array_split(x, 3), time_dummy=False, **kwargs)
+        return getattr(andrey, method)(x, **kwargs)
 
 
 def rcd_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
@@ -149,7 +159,11 @@ def camuv_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
     return sizes
 
 
-RECORDERS = {"pcmci": pc1_sizes, "pcmciplus": pc1_sizes, "rcd": rcd_sizes, "camuv": camuv_sizes}
+RECORDERS = {
+    **dict.fromkeys(("pcmci", "pcmciplus", "jpcmciplus"), pc1_sizes),
+    "rcd": rcd_sizes,
+    "camuv": camuv_sizes,
+}
 
 
 @pytest.mark.parametrize("method", methods_with("max_depth"))
@@ -182,7 +196,7 @@ def same_step_series(seed: int, *, n_vars: int = 6, steps: int = 500) -> np.ndar
 def subset_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
     """The size of every subset of same-step neighbors a test searches, in whichever phase."""
     sizes: list[int] = []
-    if method == "pcmciplus":
+    if method in ("pcmciplus", "jpcmciplus"):
         original = pcmciplus_engine._test_subsets
 
         def tested(test, n_vars, parents, i, lag, j, subsets):
@@ -191,16 +205,14 @@ def subset_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
 
         monkeypatch.setattr(pcmciplus_engine, "_test_subsets", tested)
     else:
-        search = lpcmci_engine._Search.separating_subsets
+        search = lpcmci_engine.LPCMCISearch.separating_subsets
 
         def searched(self, a, b, found, sdef, p):
             sizes.append(p)
             return search(self, a, b, found, sdef, p)
 
-        monkeypatch.setattr(lpcmci_engine._Search, "separating_subsets", searched)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        getattr(andrey, method)(same_step_series(0), tau_max=1, max_p_global=cap)
+        monkeypatch.setattr(lpcmci_engine.LPCMCISearch, "separating_subsets", searched)
+    fit_series(method, same_step_series(0), tau_max=1, max_p_global=cap)
     return sizes
 
 

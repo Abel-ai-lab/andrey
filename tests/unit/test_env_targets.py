@@ -2,9 +2,9 @@
 
 Every accepted form of ``env`` and ``targets`` gives the same fit as the 0/1 intervention matrix
 it describes, each former form warns once and gives the same fit as its replacement, and every
-form that cannot say which variables an environment intervened on raises. Data given as each
-environment's rows apart fit, in every method that takes ``env``, what the table they stack into
-fits.
+form that cannot say which variables an environment intervened on raises. Every method that takes
+``env`` refuses a label that is not finite. Data given as each environment's rows apart fit, in
+every method that takes ``env``, what the table they stack into fits.
 """
 
 from __future__ import annotations
@@ -19,9 +19,8 @@ import pytest
 import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
-from andrey.core import warning_policy
-from andrey.resample import _job
-from andrey.spec import get_spec
+from andrey.resample import build_job
+from andrey.spec import REGISTRY, get_spec
 
 N = 900
 #: Each row's environment: observational rows, then rows that set x1, then rows that set x2.
@@ -67,40 +66,15 @@ def test_the_reference_fit_orients_the_chain(reference):
     ]
 
 
-# --- gies: every form of env and targets ----------------------------------------------------------
-
-
-def _positions_or_nan() -> np.ndarray:
-    """Each row's target as a 0-based position, ``NaN`` on an observational row."""
-    cells = np.full(N, np.nan, dtype=object)
-    cells[ENV == "set x1"], cells[ENV == "set x2"] = 1, 2
-    return cells
+# --- gies: env and targets as columns of the data -------------------------------------------------
 
 
 GIES_FORMS = {
-    "mapping by name": lambda: andrey.gies(DATA, ENV, targets=TARGETS),
-    "mapping by position": lambda: andrey.gies(
-        DATA, ENV, targets={"observed": [], "set x1": [1], "set x2": 2}
-    ),
-    "number labels": lambda: andrey.gies(
-        DATA, np.repeat([7, 3, 5], [500, 200, 200]), targets={7: [], 3: ["x1"], 5: ["x2"]}
-    ),
     "env column": lambda: andrey.gies(DATA.assign(e=ENV), "e", targets=TARGETS),
     "targets column": lambda: andrey.gies(
         DATA.assign(t=np.select([ENV == "set x1", ENV == "set x2"], ["x1", "x2"], "")),
         targets="t",
     ),
-    "targets column of lists": lambda: andrey.gies(
-        DATA.assign(t=[[] if e == "observed" else [e[-2:]] for e in ENV]), targets="t"
-    ),
-    "targets column of NaN and positions": lambda: andrey.gies(
-        DATA.assign(t=_positions_or_nan()), targets="t"
-    ),
-    "env and targets columns": lambda: andrey.gies(
-        DATA.assign(e=ENV, t=[[] if e == "observed" else e[-2:] for e in ENV]), "e", targets="t"
-    ),
-    "matrix with env": lambda: andrey.gies(DATA, ENV, targets=MASK),
-    "matrix as a table": lambda: andrey.gies(DATA, targets=pd.DataFrame(MASK.astype(int))),
 }
 
 
@@ -124,20 +98,9 @@ def test_one_observational_environment_is_observational_data():
     assert none.structure == andrey.gies(DATA).structure
 
 
-@pytest.mark.parametrize(
-    "call",
-    [
-        pytest.param(lambda: andrey.gies(DATA, interventions=MASK), id="interventions="),
-        pytest.param(lambda: andrey.gies(DATA, MASK), id="the matrix as the second argument"),
-    ],
-)
-def test_a_former_form_warns_once_and_fits_the_same(call, reference):
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        assert _same(call(), reference)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        call()  # the message warns once
+def test_the_matrix_as_the_second_argument_is_refused_with_its_place_now():
+    with pytest.raises(ValueError, match=r"matrix .* goes in targets since 0\.14\.0"):
+        andrey.gies(DATA, MASK)
 
 
 GIES_ERRORS = {
@@ -177,7 +140,6 @@ GIES_ERRORS = {
     "the matrix as the second argument and targets": lambda: andrey.gies(
         DATA, MASK, targets=TARGETS
     ),
-    "interventions and targets": lambda: andrey.gies(DATA, interventions=MASK, targets=MASK),
 }
 
 
@@ -205,14 +167,6 @@ def test_a_bootstrap_resample_keeps_every_environment():
         "gies", DATA, n_resamples=20, env=env, targets={**TARGETS, "one row": []}
     )
     assert out.n_resamples == 20
-
-
-def test_bootstrap_resamples_a_targets_matrix_without_env_with_the_rows():
-    matrix = andrey.bootstrap("gies", DATA, n_resamples=2, targets=MASK)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        former = andrey.bootstrap("gies", DATA, n_resamples=2, interventions=MASK)
-    assert np.array_equal(former.frequency("->"), matrix.frequency("->"))
 
 
 # --- cdnod: env as numbers, labels, and a column -----------------------------------------------
@@ -273,22 +227,6 @@ def test_each_form_of_env_fits_what_its_numbers_fit(form):
     assert _same(CDNOD_FORMS[form](), andrey.cdnod(X, DOMAIN))
 
 
-def test_cdnod_with_one_domain_is_pc():
-    one = andrey.cdnod(X, np.zeros(600))
-    assert np.array_equal(one.structure.to_numpy(), andrey.pc(X).structure.to_numpy())
-
-
-def test_the_former_domain_index_warns_once_and_fits_the_same():
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        assert _same(andrey.cdnod(X, domain_index=DOMAIN), andrey.cdnod(X, DOMAIN))
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        andrey.cdnod(X, domain_index=DOMAIN)  # the message warns once
-    with pytest.raises(ValueError):
-        andrey.cdnod(X, env=DOMAIN, domain_index=DOMAIN)
-
-
 @pytest.mark.parametrize(
     "env",
     [
@@ -315,18 +253,54 @@ def test_bootstrap_carries_a_column_of_env_with_its_rows():
     assert np.array_equal(by_column.frequency("->"), by_values.frequency("->"))
 
 
-def test_bootstrap_draws_cdnod_rows_whole_for_numbers_and_within_domains_for_text():
-    """A numeric index, which cdnod reads as numbers, draws rows as a whole, as under its former
-    name; text labels draw within each domain."""
+def test_bootstrap_draws_cdnod_rows_within_domains_for_text():
     frame = pd.DataFrame(X, columns=["x", "y"])
-    numbers = andrey.bootstrap("cdnod", frame, n_resamples=4, env=DOMAIN)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        former = andrey.bootstrap("cdnod", frame, n_resamples=4, domain_index=DOMAIN)
-    assert np.array_equal(numbers.frequency("->"), former.frequency("->"))
     one_row = np.array(["a", "b", "c"])[DOMAIN.astype(int)]
     one_row[0] = "d"  # a domain of one row stays in every subsample
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
+
+
+# --- every method that takes env -----------------------------------------------------------------
+
+#: What each method that takes ``env`` needs besides ``DATA`` and ``env``, where ``set x2``'s rows
+#: carry the label ``bad``: its targets, keyed by the labels, or ICP's target.
+ENV_SETTINGS = {
+    "cdnod": lambda bad: {},
+    "fci_jci": lambda bad: {},
+    "icp": lambda bad: {"target": "x2"},
+    "gies": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "gnies": lambda bad: {},
+    "igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: ["x2"]}},
+    "ut_igsp": lambda bad: {"targets": {0.0: [], 1.0: ["x1"], bad: None}},
+    "ges": lambda bad: {},
+    "hc": lambda bad: {},
+    "tabu": lambda bad: {},
+    "boss": lambda bad: {},
+    "grasp": lambda bad: {},
+    "gfci": lambda bad: {},
+    "boss_fci": lambda bad: {},
+    "grasp_fci": lambda bad: {},
+}
+
+
+def test_every_method_that_takes_env_has_settings():
+    takes = {m for m, spec in REGISTRY.items() if any(i.name == "env" for i in spec.data.inputs)}
+    assert set(ENV_SETTINGS) == takes
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["inf", "-inf in a column"])
+@pytest.mark.parametrize("method", list(ENV_SETTINGS))
+def test_every_method_refuses_an_env_label_that_is_not_finite(method, bad):
+    """The label ``inf`` or ``-inf`` raises one ``ValueError`` before the fit, naming the method
+    and the first row that holds it, whether ``env`` holds the labels or names their column."""
+    env = np.select([ENV == "observed", ENV == "set x1"], [0.0, 1.0], bad)
+    data, env = (DATA, env) if bad > 0 else (DATA.assign(site=env), "site")
+    with (
+        warnings.catch_warnings(),
+        pytest.raises(ValueError, match=rf"^{method}: env contains {bad} at row 700; "),
+    ):
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        getattr(andrey, method)(data, env, **ENV_SETTINGS[method](bad))
 
 
 # --- data as each environment's rows apart -------------------------------------------------------
@@ -403,6 +377,38 @@ APART_FITS = {
         lambda: andrey.cdnod(
             pd.DataFrame(X, columns=["x", "y"]), np.array(["a", "b", "c"])[DOMAIN.astype(int)]
         ),
+    ),
+    "boss, a mapping of DataFrames": (
+        lambda: andrey.boss(APART),
+        lambda: andrey.boss(DATA, ENV),
+    ),
+    "grasp, a list of arrays": (
+        lambda: andrey.grasp([t.to_numpy() for t in APART.values()]),
+        lambda: andrey.grasp(DATA.to_numpy(), POSITIONS),
+    ),
+    "boss_fci, a list of DataFrames": (
+        lambda: andrey.boss_fci(list(APART.values())),
+        lambda: andrey.boss_fci(DATA, POSITIONS),
+    ),
+    "grasp_fci, a mapping of DataFrames": (
+        lambda: andrey.grasp_fci(APART, confounded_index=False),
+        lambda: andrey.grasp_fci(DATA, ENV, confounded_index=False),
+    ),
+    "ges, a mapping of DataFrames": (
+        lambda: andrey.ges(APART),
+        lambda: andrey.ges(DATA, ENV),
+    ),
+    "hc, a list of arrays": (
+        lambda: andrey.hc([t.to_numpy() for t in APART.values()]),
+        lambda: andrey.hc(DATA.to_numpy(), POSITIONS),
+    ),
+    "tabu, a list of DataFrames": (
+        lambda: andrey.tabu(list(APART.values())),
+        lambda: andrey.tabu(DATA, POSITIONS),
+    ),
+    "gfci, a mapping of DataFrames": (
+        lambda: andrey.gfci(APART, confounded_index=False),
+        lambda: andrey.gfci(DATA, ENV, confounded_index=False),
     ),
 }
 
@@ -486,13 +492,6 @@ def test_categories_join_across_environments():
     assert _same(apart, pooled)
 
 
-def test_the_former_targets_name_meets_the_same_refusal_in_bootstrap():
-    """``interventions``, gies's former name of ``targets``, as a column of data apart."""
-    apart = {k: t.assign(t="") for k, t in APART.items()}
-    with pytest.raises(ValueError, match="targets maps each environment"):
-        andrey.bootstrap("gies", apart, n_resamples=2, interventions="t")
-
-
 def test_bootstrap_resamples_environments_apart_as_their_stacked_rows():
     apart = andrey.bootstrap("gies", APART, n_resamples=2, targets=TARGETS)
     pooled = andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS)
@@ -511,10 +510,12 @@ def test_bootstrap_draws_within_each_domain_given_apart(form):
     """Tables apart are one domain each, so cdnod's numbered positions draw within each domain,
     as text labels do, where a numeric index of one table draws its rows as a whole."""
     data = DOMAINS if form == "list" else dict(enumerate(DOMAINS))
-    job = _job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
+    job = build_job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
     assert job.strata is not None
     assert [len(rows) for rows in job.strata] == [len(t) for t in DOMAINS]
-    assert _job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
+    assert (
+        build_job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
+    )
 
 
 # --- the command line ---------------------------------------------------------------------------
@@ -528,17 +529,20 @@ def _run(argv, capsys):
 
 @pytest.fixture
 def files(tmp_path):
-    """The chain's data with its environment as a numeric column, the environment alone, its
-    targets as JSON, and its intervention matrix."""
+    """The chain's data with its environment as a numeric column, the environment alone, and its
+    targets as JSON."""
     codes = pd.factorize(ENV)[0]
-    paths = {name: tmp_path / name for name in ("data.csv", "env.csv", "t.json", "mask.csv")}
+    paths = {name: tmp_path / name for name in ("data.csv", "env.csv", "t.json")}
     DATA.assign(e=codes).to_csv(paths["data.csv"], index=False)
     pd.DataFrame({"e": codes}).to_csv(paths["env.csv"], index=False)
     paths["t.json"].write_text(json.dumps({"0": [], "1": ["x1"], "2": ["x2"]}))
-    np.savetxt(paths["mask.csv"], MASK.astype(int), delimiter=",")
     DATA.to_csv(tmp_path / "plain.csv", index=False)
     paths["plain.csv"] = tmp_path / "plain.csv"
     return paths
+
+
+#: The methods that read ``env``, when given, as an index no data variable causes.
+OPTIONAL_ENV = ["boss", "grasp", "boss_fci", "grasp_fci", "ges", "hc", "tabu", "gfci"]
 
 
 def _edges(out: str) -> list[tuple[int, int, str]]:
@@ -570,39 +574,55 @@ def test_cli_env_column_file_and_config_targets_fit_alike(files, tmp_path, capsy
     assert found[0] == [(0, 1, "directed"), (1, 2, "directed")]
 
 
-def test_cli_former_flags_warn_and_fit_alike(files, capsys):
-    new = ["--data", str(files["plain.csv"]), "--env", str(files["env.csv"])]
-    _, out, _ = _run(["run", "gies", *new, f"targets={files['t.json']}", "--json"], capsys)
-    warning_policy._warned.clear()
-    former = ["--data", str(files["plain.csv"]), "--interventions", str(files["mask.csv"])]
-    code, out_former, _ = _run(["run", "gies", *former, "--json"], capsys)
-    assert code == 0 and _edges(out_former) == _edges(out)
-    warned = json.loads(out_former)["run"]["warnings"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
-
-    _, out, _ = _run(["run", "cdnod", *new, "--json"], capsys)
-    warning_policy._warned.clear()
-    former = ["--data", str(files["plain.csv"]), "--domain-index", str(files["env.csv"])]
-    code, out_former, _ = _run(["run", "cdnod", *former, "--json"], capsys)
-    assert code == 0 and _edges(out_former) == _edges(out)
-    warned = json.loads(out_former)["run"]["warnings"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
+@pytest.mark.parametrize(
+    ("method", "flag", "now"),
+    [
+        ("gies", "--interventions", "`--env` with `targets=`"),
+        ("cdnod", "--domain-index", "`--env`"),
+    ],
+)
+def test_cli_former_flags_are_refused_with_their_current_names(files, capsys, method, flag, now):
+    argv = ["run", method, "--data", str(files["plain.csv"]), flag, str(files["env.csv"])]
+    code, _, err = _run(argv, capsys)
+    message = json.loads(err)["error"]["message"]
+    assert code == 2 and f"{now} in 0.14.0" in message
 
 
-def test_cli_cdnod_needs_env(files, capsys):
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_cli_needs_env(method, files, capsys):
     """One data file cannot hold the environments apart, so the command line needs ``--env``, and
     the help schema says so."""
-    code, _, err = _run(["run", "cdnod", "--data", str(files["plain.csv"]), "--json"], capsys)
+    code, _, err = _run(["run", method, "--data", str(files["plain.csv"]), "--json"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "missing_input"
-    code, out, _ = _run(["run", "cdnod", "--help", "--json"], capsys)
+    code, out, _ = _run(["run", method, "--help", "--json"], capsys)
     inputs = json.loads(out)["method"]["data"]["inputs"]
     assert code == 0 and all(i["required"] for i in inputs)
 
 
-def test_cli_bootstrap_takes_an_env_column(files, capsys):
-    argv = ["bootstrap", "cdnod", "--data", str(files["data.csv"]), "--env", "e"]
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci", *OPTIONAL_ENV])
+def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
+    argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
+
+
+@pytest.mark.parametrize("method", OPTIONAL_ENV)
+def test_cli_env_column_and_file_fit_alike_and_name_the_index_edges(method, files, capsys):
+    """``env`` is optional for the score searches and their FCI hybrids: as a column of ``--data``
+    or a file it fits the same graph, and the index's edges name the variables."""
+    fits = []
+    for argv in (
+        ["--data", str(files["data.csv"]), "--env", "e"],
+        ["--data", str(files["plain.csv"]), "--env", str(files["env.csv"])],
+    ):
+        code, out, _ = _run(["run", method, *argv, "--json"], capsys)
+        assert code == 0
+        fits.append(json.loads(out))
+    assert fits[0]["structure"] == fits[1]["structure"]
+    assert fits[0]["metadata"]["index_edges"] == fits[1]["metadata"]["index_edges"]
+    assert {variable for variable, _ in fits[0]["metadata"]["index_edges"]} <= {"x0", "x1", "x2"}
+    code, out, _ = _run(["run", method, "--data", str(files["plain.csv"]), "--json"], capsys)
+    assert code == 0 and "index_edges" not in json.loads(out)["metadata"]
 
 
 def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkeypatch):
@@ -612,18 +632,9 @@ def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkey
     usage = [
         ["run", "gies", "--data", data, "--env", "e", f"targets={files['t.json']}"],
         ["run", "gies", "--data", data, "--env", "missing.csv", f"targets={files['t.json']}"],
-        [
-            "run",
-            "gies",
-            "--data",
-            data,
-            "--interventions",
-            str(files["mask.csv"]),
-            f"targets={files['t.json']}",
-        ],
-        ["run", "cdnod", "--data", data, "--env", env, "--domain-index", env],
         ["run", "gies", "--data", data, "--env", env, "targets=[1, 2]"],
         ["run", "pc", "--data", data, "--domain-index", env],
+        ["run", "fci_jci", "--data", data, "--domain-index", env],
     ]
     for argv in usage:
         code, _, err = _run(argv, capsys)

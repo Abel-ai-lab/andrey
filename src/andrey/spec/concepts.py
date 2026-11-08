@@ -6,36 +6,33 @@ method its theory makes suitable. Each concept lists:
 - its template :class:`~andrey.spec.models.ParamSpec` (name, type, default, choices, bounds), or
   none for a behavior such as a warning or a metadata key;
 - the suitable methods, and the exempt ones with the reason;
-- the recorded deviations: each cell that differs today (another name, default, meaning, or
-  choices, or the parameter missing) with today's value, the release that removes it, and the
-  former names or values that the change keeps working for one release.
+- the recorded deviations: each cell that differs (another name, default, meaning, or choices, or
+  the parameter missing), its value, and why, with the former names or values that a change keeps
+  working for one release.
 
-A cell with two differences has one record, for the change that comes first; that change deletes
-the record or rewrites it to the difference that remains. A deviation with ``fixed_in=None`` is
-kept, and its reason says why. The registry takes each conforming cell's parameter from here, and
-``tests/unit/test_concepts.py`` checks every concept against every method: a new method fails
-there until each concept lists it as suitable or exempt.
+A cell with two differences has one record. The registry takes each conforming cell's parameter
+from here, and ``tests/unit/test_concepts.py`` checks every concept against every method: a new
+method fails there until each concept lists it as suitable or exempt.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import model_validator
 
+from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
-from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import SCORES
 from andrey.core.structure import Kind
+from andrey.search.gfci import EDGE_REMOVALS
 
 from .models import ParamSpec, ParamType, Spec
 
-Release = Literal["0.11.0", "0.12.0"]
-
-#: The score names every score search takes.
-SCORE_NAMES = SCORES
 #: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
 #: each.
 BLANKET_STRUCTURES: dict[str, Kind] = {
@@ -43,8 +40,6 @@ BLANKET_STRUCTURES: dict[str, Kind] = {
     "skeleton": "undirected",
     "moral": "undirected",
 }
-#: The largest seed NumPy and torch accept.
-SEED_MAX = 2**32 - 1
 
 
 class Exemption(Spec):
@@ -55,15 +50,13 @@ class Exemption(Spec):
 
 
 class Deviation(Spec):
-    """One cell that differs from its concept today."""
+    """One cell that differs from its concept, and why."""
 
     method: str
     reason: str
-    fixed_in: Release | None  # None: kept, for the reason given
-    name: str | None = None  # today's parameter or input name; None: absent
-    default: Any = None  # today's default
-    choices: tuple[str, ...] | None = None  # today's choices
-    observed: str | None = None  # a behavior concept's value today
+    name: str | None = None  # the parameter or input name; None: absent
+    default: Any = None  # its default
+    choices: tuple[str, ...] | None = None  # its choices
     aliases: tuple[str, ...] = ()  # former names or values kept for one release by the change
     fragment: str | None = None  # the docstring phrase when the meaning differs; "" checks none
 
@@ -111,12 +104,11 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
     return tuple(Exemption(method=m, reason=reason) for m in methods)
 
 
-def _absent(fixed_in: Release, reason: str, *methods: str) -> tuple[Deviation, ...]:
-    return tuple(Deviation(method=m, fixed_in=fixed_in, reason=reason) for m in methods)
-
-
 # Method groups the rules below name.
-CI_SEARCHES = ("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2")
+CI_SEARCHES = (
+    *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+    *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+)
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
     "ges",
@@ -130,40 +122,39 @@ SCORE_SEARCHES = (
     "mmhc",
     "rsmax2",
     "gfci",
+    "boss_fci",
+    "grasp_fci",
 )
-_PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
-_CONTINUOUS = ("notears", "dagma")
-_LINGAM = (
+PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
+CONTINUOUS = ("notears", "dagma")
+LINGAM = (
     "direct_lingam",
     "ica_lingam",
     "multi_group_direct_lingam",
     "varma_lingam",
     "longitudinal_lingam",
 )
-_RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
-_STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
+STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
+#: The methods that take a conditional-independence test.
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-_NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
-ALL_METHODS = (
-    *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
-    *_PURE_SCORE,
-    "gnies",
-    "calm",
-    *_CONTINUOUS,
-    "cam",
-    "resit",
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
+#: The methods whose main loop a cap can stop early.
+CAPPED_LOOPS = (
+    "hc",
+    "tabu",
     "mmhc",
     "rsmax2",
-    "igsp",
-    "ut_igsp",
-    *_LINGAM,
-    *PCMCI_FAMILY,
-    "granger",
+    *CONTINUOUS,
+    "calm",
+    "ica_lingam",
+    "varma_lingam",
     "dynotears",
-    *_RESIDUAL,
-    "camuv",
 )
+#: Every method, in ``andrey.api.__all__`` order.
+ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
 
 _CONCEPTS = (
     Concept(
@@ -184,8 +175,9 @@ _CONCEPTS = (
         suitable=(
             *CI_SEARCHES,
             *PCMCI_FAMILY,
+            "jpcmciplus",
             "granger",
-            *_RESIDUAL,
+            *RESIDUAL,
             "cam",
             "resit",
             "camuv",
@@ -194,10 +186,8 @@ _CONCEPTS = (
             "ut_igsp",
         ),
         exempt=(
-            *_exempt("A score search: no test decides an edge.", *_PURE_SCORE, "gnies"),
-            *_exempt(
-                "Continuous optimization: no test decides an edge.", *_CONTINUOUS, "dynotears"
-            ),
+            *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies"),
+            *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
                 "level, screen_alpha.",
@@ -206,7 +196,7 @@ _CONCEPTS = (
             *_exempt(
                 "The order comes from an independence measure and the edges from the adaptive "
                 "Lasso by BIC: no test at a level.",
-                *_LINGAM,
+                *LINGAM,
             ),
         ),
         deviations=(
@@ -214,15 +204,20 @@ _CONCEPTS = (
                 method="pcmciplus",
                 name="alpha",
                 default=0.01,
-                fixed_in=None,
                 reason="0.01 is the level of the method's published experiments (Runge 2020: "
                 "tau_max = 5 and alpha = 0.01).",
+            ),
+            Deviation(
+                method="jpcmciplus",
+                name="alpha",
+                default=0.01,
+                reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
+                "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
             ),
             Deviation(
                 method="rcd",
                 name="alpha",
                 default=0.01,
-                fixed_in=None,
                 reason="0.01 is the level of the method's published experiments (Maeda and Shimizu "
                 "2020 set every level to 0.01).",
             ),
@@ -231,7 +226,6 @@ _CONCEPTS = (
                     method=m,
                     name="alpha",
                     default=None,
-                    fixed_in=None,
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
@@ -241,7 +235,6 @@ _CONCEPTS = (
                 method="cam",
                 name="alpha",
                 default=0.001,
-                fixed_in=None,
                 reason="0.001 is the paper's cutoff of the pruning tests, at every sample size "
                 "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
             ),
@@ -249,7 +242,6 @@ _CONCEPTS = (
                 method="camuv",
                 name="alpha",
                 default=0.01,
-                fixed_in=None,
                 reason="0.01 is the level of the method's published experiments (Maeda and Shimizu "
                 "2021 set every level to 0.01).",
             ),
@@ -257,28 +249,23 @@ _CONCEPTS = (
                 method="igsp",
                 name="alpha",
                 default=None,
-                fixed_in=None,
                 reason="None is one over the number of observational rows, for both tests, as for "
                 "ut_igsp. On simulated data in the settings of Wang et al. (2017) and Yang, "
                 "Katcoff and Uhler (2018), 1e-3 had the fewest errors of the levels its authors "
-                "swept, 1e-4 to 0.05; then, on fresh datasets, against the authors' reference "
-                "implementation at 1e-3, one over the observational rows and 1e-3 were each worse "
-                "in none of 114 comparisons and had fewer errors in 17, with interval ends "
-                "that are floating-point residue of 0 read as 0, a tie that a rule written before "
-                "the run gives to one over the observational rows.",
+                "swept, 1e-4 to 0.05. The default equals 1e-3 at 1,000 observational rows, and in "
+                "the 50 groups at 10,000 and 100,000 rows per setting it had fewer SHD errors "
+                "than 1e-3 in 1, by 0.28 edges, and more in none.",
             ),
             Deviation(
                 method="ut_igsp",
                 name="alpha",
                 default=None,
-                fixed_in=None,
                 reason="None is one over the number of observational rows, for both tests. On "
-                "simulated data in the paper's setting, against the paper's reference "
-                "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
-                "was worse in none of 112 comparisons and better in 1 on fresh datasets, and lower "
-                "in 17 more on the datasets that chose it. In the run that chose it, "
-                "on datasets of its own, it had fewer errors in 20 and more in none, where 0.001 "
-                "had fewer in 15 and more in 3, none of which repeated on a rerun.",
+                "simulated data in the paper's setting, with 5 starts, 0.001 had fewer SHD errors "
+                "than the paper's level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), in 7 of "
+                "15 groups and more in 2, those by about 0.3 edges at 3,000 rows per setting; on "
+                "56 further groups, the default had fewer SHD errors than 0.001 in 4 comparisons, "
+                "all at 5,000 rows per setting, and more in none.",
             ),
         ),
     ),
@@ -294,16 +281,16 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="conditional-independence test",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp"),
+        suitable=TESTED,
         exempt=(
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
-                *_RESIDUAL,
+                *RESIDUAL,
                 "resit",
                 "camuv",
             ),
             *_exempt(
-                "No conditional-independence test.", *_PURE_SCORE, "gnies", *_CONTINUOUS, *_LINGAM
+                "No conditional-independence test.", *PURE_SCORE, "gnies", *CONTINUOUS, *LINGAM
             ),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
@@ -311,6 +298,16 @@ _CONCEPTS = (
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
                 "icp",
+            ),
+        ),
+        deviations=(
+            Deviation(
+                method="jpcmciplus",
+                name="indep_test",
+                default=None,
+                choices=CONTINUOUS_INDEP_TESTS,
+                reason="The dummies enter every test as numeric one-hot columns, so it takes the "
+                "tests of continuous data.",
             ),
         ),
     ),
@@ -339,7 +336,6 @@ _CONCEPTS = (
                 name="invariance_test",
                 default="approximate",
                 choices=("approximate", "exact"),
-                fixed_in=None,
                 reason="Its tests are the paper's two, which compare every environment with the "
                 "others' rows, two or more of them; the two-group tests compare two environments.",
             ),
@@ -353,7 +349,7 @@ _CONCEPTS = (
             "str",
             None,
             "Local score; null picks one from the declared column types.",
-            choices=SCORE_NAMES,
+            choices=SCORES,
             nullable=True,
         ),
         fragment="score",
@@ -402,9 +398,18 @@ _CONCEPTS = (
                 method="gfci",
                 name="ebic_gamma",
                 default=0.0,
-                fixed_in=None,
                 reason="The standard BIC: the extended term lowered its errors only slightly and "
                 "raised them on some dense graphs; its docstring gives the measurements.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="ebic_gamma",
+                    default=0.0,
+                    reason="The standard BIC, as in gfci, the same pipeline with GES, and in the "
+                    "published method.",
+                )
+                for m in ("boss_fci", "grasp_fci")
             ),
         ),
     ),
@@ -440,7 +445,7 @@ _CONCEPTS = (
         ),
         fragment="l1 penalty",
         default_rule="Each paper's default.",
-        suitable=(*_CONTINUOUS, "calm", "dynotears"),
+        suitable=(*CONTINUOUS, "calm", "dynotears"),
         others_exempt="No continuous objective.",
     ),
     Concept(
@@ -454,13 +459,29 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="weight magnitude",
-        suitable=(*_CONTINUOUS, "calm", "dynotears"),
+        suitable=(*CONTINUOUS, "calm", "dynotears"),
         others_exempt="No weighted continuous fit to threshold.",
     ),
     Concept(
+        key="standardize",
+        summary="Scale each column to unit variance before a continuous fit whose penalty and "
+        "weight thresholds read the data's units; its weights are then those of the scaled "
+        "columns.",
+        param=_template(
+            "standardize",
+            "bool",
+            False,
+            "Scale each column to unit variance first, so the fit does not read the columns' "
+            "units; the weights are then those of the scaled columns.",
+        ),
+        fragment="unit variance",
+        suitable=(*CONTINUOUS, "calm", "dynotears"),
+        others_exempt="Not a continuous-optimization fit.",
+    ),
+    Concept(
         key="fdr_method",
-        summary="The correction of the lagged links' p-values for the number of links tested "
-        "(tigramite's name): fdr_bh, the default, replaces them with their Benjamini-Hochberg "
+        summary="The correction of the lagged links' p-values for the number of links tested: "
+        "fdr_bh, the default, replaces them with their Benjamini-Hochberg "
         "adjusted values over all the lagged links together, and none leaves them as tested. A "
         "method whose graph is thresholded on those p-values (pcmci, granger) thresholds the "
         "adjusted ones; a method that decides its links before it reports them (pcmciplus) "
@@ -475,9 +496,8 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus", "granger"),
+        suitable=("pcmci", "pcmciplus", "jpcmciplus", "granger"),
         exempt=_exempt(
-            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
             "lpcmci",
@@ -498,7 +518,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
@@ -507,13 +527,13 @@ _CONCEPTS = (
             ),
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
-                *_PURE_SCORE,
+                *PURE_SCORE,
                 "gnies",
                 "calm",
                 "cam",
                 "resit",
-                *_CONTINUOUS,
-                *_LINGAM,
+                *CONTINUOUS,
+                *LINGAM,
                 "granger",
                 "dynotears",
                 "gin",
@@ -536,7 +556,6 @@ _CONCEPTS = (
                 method="rcd",
                 name="max_depth",
                 default=2,
-                fixed_in=None,
                 reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
                 "one when there are fewer rows than variables; the minimum is 1, since the "
                 "smallest ancestor test regresses one variable on another.",
@@ -545,7 +564,6 @@ _CONCEPTS = (
                 method="camuv",
                 name="max_depth",
                 default=2,
-                fixed_in=None,
                 reason="It caps the variables a sink test adds together as candidate parents; each "
                 "test also regresses on the variable's candidates found so far, however many. "
                 "Maeda and Shimizu 2021 search sets of at most 3 variables in their experiments, a "
@@ -556,20 +574,19 @@ _CONCEPTS = (
                     method=m,
                     name="max_depth",
                     default=None,
-                    fixed_in=None,
                     fragment="pc1",
-                    reason="It caps the PC1 step that selects the lagged parents, as tigramite's "
-                    "max_conds_dim does; the later tests condition on those parents, however "
-                    "many, which max_p_global caps in pcmciplus.",
+                    reason="It caps the PC1 step that selects the lagged parents; the later tests "
+                    "condition on those parents, however many, which max_p_global caps in "
+                    "pcmciplus and jpcmciplus.",
                 )
-                for m in ("pcmci", "pcmciplus")
+                for m in ("pcmci", "pcmciplus", "jpcmciplus")
             ),
         ),
     ),
     Concept(
         key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes (tigramite's LPCMCI name).",
+        "includes.",
         param=_template(
             "max_p_global",
             "int",
@@ -580,7 +597,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="beyond the default condition",
-        suitable=("lpcmci", "pcmciplus"),
+        suitable=("lpcmci", "pcmciplus", "jpcmciplus"),
         exempt=_exempt(
             "MCI conditions on the default conditions alone, one test per link; PC1 has none "
             "(max_depth).",
@@ -607,6 +624,7 @@ _CONCEPTS = (
                 "pc",
                 "fci",
                 "cdnod",
+                "fci_jci",
                 "iamb",
                 "inter_iamb",
                 "mmpc",
@@ -614,11 +632,18 @@ _CONCEPTS = (
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
                 "calm",
-                *_CONTINUOUS,
+                *CONTINUOUS,
                 "dynotears",
             ),
-            *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
-            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL, "resit"),
+            *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
+            *_exempt(
+                "No search over parent sets.",
+                *PCMCI_FAMILY,
+                "jpcmciplus",
+                "granger",
+                *RESIDUAL,
+                "resit",
+            ),
             *_exempt(
                 "The paper's search sets no cap on a variable's parents; max_depth caps the "
                 "candidates one sink test adds.",
@@ -645,34 +670,14 @@ _CONCEPTS = (
         fragment="at least 1",
         default_rule="None where the loop ends on its own (a score search's moves); the method's "
         "own count where it may not (an optimizer's steps). The docstring names the unit.",
-        suitable=(
-            "hc",
-            "tabu",
-            "mmhc",
-            "rsmax2",
-            *_CONTINUOUS,
-            "calm",
-            "ica_lingam",
-            "varma_lingam",
-            "dynotears",
-        ),
+        suitable=CAPPED_LOOPS,
         others_exempt="No iterative loop that a cap stops early.",
     ),
     Concept(
         key="cap_warning",
         summary="Stopping on max_iter rather than on the method's own rule warns "
         "SearchLimitWarning.",
-        suitable=(
-            "hc",
-            "tabu",
-            "mmhc",
-            "rsmax2",
-            *_CONTINUOUS,
-            "calm",
-            "ica_lingam",
-            "varma_lingam",
-            "dynotears",
-        ),
+        suitable=CAPPED_LOOPS,
         others_exempt="No iterative loop that a cap stops early.",
     ),
     Concept(
@@ -680,25 +685,9 @@ _CONCEPTS = (
         summary="The largest lag; the smallest follows the method's theory.",
         param=_template("tau_max", "int", 1, "The largest lag, at least 1.", minimum=1),
         fragment="largest lag",
-        suitable=(*PCMCI_FAMILY, "granger", "longitudinal_lingam", "dynotears"),
-        exempt=(
-            *_exempt("order=(p, q) is the ARMA order, a different concept.", "varma_lingam"),
-            *_exempt(
-                "i.i.d. data.",
-                *(
-                    m
-                    for m in ALL_METHODS
-                    if m
-                    not in (
-                        *PCMCI_FAMILY,
-                        "granger",
-                        "longitudinal_lingam",
-                        "varma_lingam",
-                        "dynotears",
-                    )
-                ),
-            ),
-        ),
+        suitable=(*PCMCI_FAMILY, "jpcmciplus", "granger", "longitudinal_lingam", "dynotears"),
+        exempt=_exempt("order=(p, q) is the ARMA order, a different concept.", "varma_lingam"),
+        others_exempt="i.i.d. data.",
     ),
     Concept(
         key="seed",
@@ -717,13 +706,13 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *_STARTS, "calm", "ica_lingam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
         exempt=(
             *_exempt(
                 "Deterministic.",
-                *(m for m in _PURE_SCORE if m not in _STARTS),
+                *(m for m in PURE_SCORE if m not in STARTS),
                 "gnies",
-                *_CONTINUOUS,
+                *CONTINUOUS,
                 "cam",
                 "resit",
                 "direct_lingam",
@@ -732,7 +721,7 @@ _CONCEPTS = (
                 "longitudinal_lingam",
                 "granger",
                 "dynotears",
-                *_RESIDUAL,
+                *RESIDUAL,
                 "camuv",
                 "icp",
             ),
@@ -741,9 +730,10 @@ _CONCEPTS = (
     Concept(
         key="n_starts",
         summary="The number of searches a fit runs, each later one from a start drawn from seed: "
-        "a random order (boss, grasp), a minimum-degree order with ties drawn from seed "
-        "(igsp, ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, "
-        "tabu); the best-scoring one is returned, and 1, the default, runs one search.",
+        "a random order (boss, grasp, boss_fci, grasp_fci), a minimum-degree order with ties "
+        "drawn from seed (igsp, ut_igsp), or the best DAG so far after n_perturbations random edge "
+        "changes (hc, tabu); the best-scoring one is returned, and 1, the default, runs one "
+        "search.",
         param=_template(
             "n_starts",
             "int",
@@ -755,14 +745,13 @@ _CONCEPTS = (
             minimum=1,
         ),
         fragment="best-scoring search",
-        suitable=_STARTS,
+        suitable=STARTS,
         others_exempt="Runs one search per fit.",
         deviations=(
             Deviation(
                 method="igsp",
                 name="n_starts",
                 default=10,
-                fixed_in=None,
                 reason="Further searches from minimum-degree orders whose ties are drawn from "
                 "seed guard against a poor first order; each one runs the paper's Algorithm 1, "
                 "which restarts its depth-first search within one run from a single starting "
@@ -774,7 +763,6 @@ _CONCEPTS = (
                 method="ut_igsp",
                 name="n_starts",
                 default=10,
-                fixed_in=None,
                 reason="Restarts are part of the method's search (Squires, Wang and Uhler 2020); "
                 "on 15 groups of simulated datasets, 12 in the paper's setting, 10 searches had "
                 "fewer SHD errors than 5 in 4 groups, by 0.17 to 0.42, 2 of them in that setting, "
@@ -903,7 +891,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="background knowledge",
-        suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
+        suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
@@ -919,11 +907,11 @@ _CONCEPTS = (
         summary="Every required edge is in the output, whatever its estimated weight, its test "
         "result, or its score: a required edge whose least-squares weight is 0, or whose "
         "variables look independent, is in the graph all the same.",
-        suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
+        suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in _NO_KNOWLEDGE if m != "icp"),
+                *(m for m in NO_KNOWLEDGE if m != "icp"),
             ),
             *_exempt("Takes no knowledge (the knowledge concept).", "icp"),
         ),
@@ -973,6 +961,7 @@ _CONCEPTS = (
             "pc",
             "fci",
             "cdnod",
+            "fci_jci",
             "iamb",
             "inter_iamb",
             "mmpc",
@@ -981,16 +970,19 @@ _CONCEPTS = (
             "pnl",
         ),
         exempt=(
-            *_exempt("Its score phase reads every column.", "gfci", "mmhc", "rsmax2"),
+            *_exempt(
+                "Its score phase reads every column.",
+                *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
+            ),
             *_exempt(
                 "A score or a regression reads every column.",
-                *_PURE_SCORE,
+                *PURE_SCORE,
                 "gnies",
                 "calm",
-                *_CONTINUOUS,
+                *CONTINUOUS,
                 "cam",
                 "resit",
-                *_LINGAM,
+                *LINGAM,
                 "gin",
                 "rcd",
                 "bottom_up_parce_lingam",
@@ -1000,6 +992,7 @@ _CONCEPTS = (
                 "ut_igsp",
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
+            *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
     ),
     Concept(
@@ -1007,7 +1000,7 @@ _CONCEPTS = (
         summary="Rescaling a column changes no graph and no order: a numerical step that would "
         "read the data's units runs on unit-scale columns (andrey.core.units).",
         suitable=tuple(
-            m for m in ALL_METHODS if m not in ("ica_lingam", *_CONTINUOUS, "calm", "dynotears")
+            m for m in ALL_METHODS if m not in ("ica_lingam", *CONTINUOUS, "calm", "dynotears")
         ),
         exempt=(
             *_exempt(
@@ -1019,7 +1012,7 @@ _CONCEPTS = (
                 "The least-squares score with an l1 penalty and a weight threshold reads the "
                 "data's units (Zheng et al. 2018; Bello et al. 2022), and so do the quasi-MCP "
                 "penalty and the weight threshold of robust=True (Deng et al. 2024).",
-                *_CONTINUOUS,
+                *CONTINUOUS,
             ),
             *_exempt(
                 "The least-squares score with an l1 penalty and weight thresholds on the same-step "
@@ -1050,6 +1043,104 @@ _CONCEPTS = (
         suitable=ALL_METHODS,
     ),
     Concept(
+        key="env",
+        summary="Each row's environment, one input with one meaning: one label per row, text or "
+        "finite numbers, or the name of a column of a DataFrame data, which is then not a "
+        "variable; or, with env left out, data given as one table per environment, labeled by "
+        "position or key. A method reads it one of two ways: as interventions, each distinct "
+        "label one environment that changes the mechanisms of its targets, known or learned "
+        "(gies, gnies, igsp, ut_igsp), or of any variables as long as it leaves the target's "
+        "mechanism alone (icp); or as a context variable that no data variable causes, the "
+        "environment index, which joins the search as one more variable (cdnod, fci_jci, ges, "
+        "hc, tabu, boss, grasp, gfci, boss_fci, grasp_fci).",
+        fragment="one label per row",
+        suitable=(
+            "cdnod",
+            "fci_jci",
+            "ges",
+            "hc",
+            "tabu",
+            "boss",
+            "grasp",
+            "gfci",
+            "boss_fci",
+            "grasp_fci",
+            "icp",
+            "gies",
+            "gnies",
+            "igsp",
+            "ut_igsp",
+        ),
+        exempt=(
+            *_exempt(
+                "cdnod is PC with env, the environment index tested as a context variable "
+                "(Huang et al. 2020).",
+                "pc",
+            ),
+            *_exempt(
+                "fci_jci is FCI with env, the environment index added as a context variable "
+                "(Mooij, Magliacane, and Claassen 2020).",
+                "fci",
+            ),
+            *_exempt(
+                "Not taken yet: env suits it as a context variable that no data variable causes, "
+                "which its knowledge could hold as forbidden edges into the index, but it does not "
+                "read env.",
+                *("xges", "exact_search", "mmhc", "rsmax2"),
+            ),
+            *_exempt(
+                "Takes a list of datasets, one per group, per time point, or per series, in place "
+                "of a label per row.",
+                *("multi_group_direct_lingam", "longitudinal_lingam", "jpcmciplus"),
+            ),
+            *_exempt(
+                "A time-series method: its rows are the steps of a series, read in order through "
+                "its lags, and it takes no context variable here.",
+                *PCMCI_FAMILY,
+                *("granger", "varma_lingam", "dynotears"),
+            ),
+            *_exempt(
+                "Continuous optimization of a least-squares or Gaussian likelihood loss, which "
+                "reads every column as a continuous variable; an environment label is not one.",
+                *CONTINUOUS,
+                "calm",
+            ),
+            *_exempt(
+                "A Markov-blanket search, with no place for a context variable; cdnod is the "
+                "test-based search that takes env.",
+                *("iamb", "inter_iamb", "mmpc"),
+            ),
+            *_exempt(
+                "Its model reads the noise of continuous variables, which an environment label "
+                "does not have; multi_group_direct_lingam takes one dataset per environment.",
+                *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
+            ),
+            *_exempt(
+                "Its regressions fit smooth functions of continuous causes, which an environment "
+                "label is not.",
+                *("cam", "resit", "camuv", "anm", "pnl"),
+            ),
+        ),
+    ),
+    Concept(
+        key="confounded_index",
+        summary="With an environment index, whether a hidden variable may cause both the index and "
+        "a data variable (FCI-JCI1, the default), or the index is set from outside, as in a "
+        "randomized experiment, so every edge it keeps points out of it (FCI-JCI123).",
+        param=_template(
+            "confounded_index",
+            "bool",
+            True,
+            "Whether a hidden variable may cause both the index and a data variable (FCI-JCI1). "
+            "false assumes the index is set from outside, as in a randomized experiment, so every "
+            "edge it keeps points out of it (FCI-JCI123).",
+        ),
+        fragment="hidden variable may cause both the index and a data variable",
+        suitable=("fci_jci", "gfci", "boss_fci", "grasp_fci"),
+        others_exempt="Not an FCI-JCI search: only those choose between JCI's assumptions on the "
+        "index.",
+    ),
+    Concept(
         key="measure",
         summary="The pairwise likelihood-ratio measure of a DirectLiNGAM order search.",
         param=_template(
@@ -1072,12 +1163,11 @@ _CONCEPTS = (
     ),
     Concept(
         key="structure",
-        summary="The graph a Markov-blanket search returns without a target. The default follows "
-        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
-        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
-        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
-        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
-        "Markov blankets.",
+        summary="The graph a Markov-blanket search returns without a target: iamb and inter_iamb "
+        "return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its sets of "
+        "parents and children give. cpdag is the CPDAG of the Grow-Shrink structure learner "
+        "(Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the Markov "
+        "blankets.",
         param=_template(
             "structure",
             "str",
@@ -1097,9 +1187,8 @@ _CONCEPTS = (
                 name="structure",
                 default="skeleton",
                 choices=("skeleton", "cpdag"),
-                fixed_in=None,
-                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
-                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                reason="The skeleton is the graph MMPC's sets give (Tsamardinos, Brown and "
+                "Aliferis 2006); cpdag stays available. MMPC learns parents and children, which "
                 "hold no child's other parents, so it has no moral graph to return.",
             ),
         ),
@@ -1113,14 +1202,17 @@ _CONCEPTS = (
             "sepsets",
             "How colliders are decided on x - z - y: sepsets = z is a collider when it is not in "
             "the separating set of x and y; conservative and majority = test x and y given every "
-            "subset of each one's neighbors, and z is a collider when none (conservative) or fewer "
-            "than half (majority) of the separating subsets contain it, a non-collider when all or "
-            "more than half do, and ambiguous otherwise, never oriented through. Both cost up to "
-            "2**degree tests per pair.",
+            "subset of each one's neighbors and, if at least one subset separates them, z is a "
+            "collider when none (conservative) or fewer than half (majority) of the separating "
+            "subsets contain it, a non-collider when all or more than half do, and ambiguous "
+            "otherwise, never oriented through. Both cost up to 2**degree tests per pair.",
             choices=COLLIDER_RULES,
         ),
         fragment="collider",
-        suitable=("pc", "fci", "gfci", "cdnod", "pcmciplus"),
+        suitable=(
+            *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+            *("pcmciplus", "jpcmciplus"),
+        ),
         exempt=(
             *_exempt(
                 "Its collider phase follows LPCMCI's own orientation rules, not yet compared with "
@@ -1135,40 +1227,39 @@ _CONCEPTS = (
                 "inter_iamb",
                 "mmpc",
             ),
-            *_exempt(
-                "No separating-set orientation.",
-                *(
-                    m
-                    for m in ALL_METHODS
-                    if m
-                    not in (
-                        "pc",
-                        "fci",
-                        "gfci",
-                        "cdnod",
-                        "pcmciplus",
-                        "lpcmci",
-                        "iamb",
-                        "inter_iamb",
-                        "mmpc",
-                    )
-                ),
-            ),
         ),
-        deviations=(
+        others_exempt="No separating-set orientation.",
+        deviations=tuple(
             Deviation(
-                method="pcmciplus",
+                method=m,
                 name="collider_rule",
                 default="majority",
                 choices=COLLIDER_RULES,
-                fixed_in=None,
-                aliases=("none",),
-                reason="majority is tigramite's default (contemp_collider_rule) and orients the "
-                "same-step links without regard to the order of the variables, where sepsets reads "
-                "the one separating set the skeleton phase stored, which can change with it "
-                "(Runge 2020).",
-            ),
+                reason="majority orients the same-step links without regard to the order of the "
+                "variables, where sepsets reads the one separating set the skeleton phase stored, "
+                "which can change with it (Runge 2020).",
+            )
+            for m in ("pcmciplus", "jpcmciplus")
         ),
+    ),
+    Concept(
+        key="edge_removal",
+        summary="Which edges of a score search's CPDAG the tests of an FCI hybrid may remove: "
+        "every edge (all), or only those in a triangle of the CPDAG (triangles), as Section 5 of "
+        "Ogarrio, Spirtes and Ramsey (2016) does to save time.",
+        param=_template(
+            "edge_removal",
+            "str",
+            "all",
+            "Which edges of the score search's CPDAG the adjacency search may remove: all = every "
+            "edge; triangles = only the edges in a triangle of the CPDAG, whose ends share a "
+            "neighbor in it (Ogarrio, Spirtes and Ramsey 2016, Section 5). An edge in no triangle "
+            "then stays and still conditions the tests of the other pairs.",
+            choices=EDGE_REMOVALS,
+        ),
+        fragment="triangle",
+        suitable=("gfci", "boss_fci", "grasp_fci"),
+        others_exempt="No tests that prune a score search's CPDAG.",
     ),
     Concept(
         key="graph_kind",
@@ -1205,9 +1296,7 @@ _CONCEPTS = (
         "registered test records its registered name. A score search records the penalties its "
         "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
         "equivalent_sample_size for bdeu.",
-        suitable=tuple(
-            m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
-        ),
+        suitable=tuple(m for m in ALL_METHODS if m in (*TESTED, *SCORE_SEARCHES)),
         others_exempt="Neither a conditional-independence test nor a score to choose.",
     ),
     Concept(

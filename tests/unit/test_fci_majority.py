@@ -10,7 +10,9 @@ import pytest
 import andrey
 from andrey import data
 from andrey.constraint import fci as fci_module
+from andrey.constraint._skeleton import vote_triples
 from andrey.core import ARROW, CIRCLE, TAIL
+from andrey.core.orient import separating_set
 
 
 def circle_graph(n, edges):
@@ -23,7 +25,7 @@ def circle_graph(n, edges):
 @pytest.mark.parametrize(
     "separating,decision",
     [
-        ([], "collider"),
+        ([], "ambiguous"),
         ([()], "collider"),
         ([(1,)], "noncollider"),
         ([(), (1, 3)], "collider"),
@@ -34,7 +36,8 @@ def circle_graph(n, edges):
 )
 @pytest.mark.parametrize("batched", [False, True])
 def test_majority_decisions(separating, decision, batched):
-    """Shared subsets count twice; p == alpha passes; recorded sets never vote."""
+    """Shared subsets count twice; p == alpha passes; recorded sets never vote; no separating
+    subset leaves the triple ambiguous."""
     marks = circle_graph(5, [(0, 1), (1, 2), (0, 3), (2, 4)])
     before = marks.copy()
     sepsets = {(0, 2): (1, 3), (2, 0): (4,)}
@@ -55,7 +58,7 @@ def test_majority_decisions(separating, decision, batched):
 
         oracle.batched_call = batch
 
-    ambiguous = fci_module._vote_sepsets(marks, oracle, 0.05, sepsets, rule="majority")
+    ambiguous = vote_triples(marks, oracle, 0.05, sepsets, "majority")
     queried = [subset for a, c, subset in calls if (a, c) == (0, 2)]
     assert queried == [(), (1,), (3,), (1, 3), (), (1,), (4,), (1, 4)]
     assert ((0, 1, 2) in ambiguous) == (decision == "ambiguous")
@@ -64,7 +67,7 @@ def test_majority_decisions(separating, decision, batched):
         assert sepsets[2, 0] == (4,)
     elif decision == "noncollider":
         assert sepsets[0, 2] == (1, 3)
-        assert sepsets[2, 0] == (4, 1)
+        assert sepsets[2, 0] == (1, 4)
     else:
         assert sepsets[0, 2] == (1, 3)
         assert sepsets[2, 0] == (4,)
@@ -74,8 +77,8 @@ def test_majority_decisions(separating, decision, batched):
 def test_majority_has_no_conditioning_size_cap():
     marks = circle_graph(6, [(0, 1), (1, 2), (0, 3), (0, 4), (0, 5)])
     sepsets = {}
-    fci_module._vote_sepsets(
-        marks, lambda a, c, subset: float(subset == (1, 3, 4, 5)), 0.05, sepsets, rule="majority"
+    vote_triples(
+        marks, lambda a, c, subset: float(subset == (1, 3, 4, 5)), 0.05, sepsets, "majority"
     )
     assert sepsets[0, 2] == sepsets[2, 0] == (1,)
 
@@ -95,13 +98,13 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
     )
     events = []
     snapshots = {}
-    for name, event in [
-        ("_orient_colliders" if engine == "fci" else "_orient_colliders_from_pattern", "colliders"),
-        ("_remove_by_possible_dsep", "possible_dsep"),
-        ("_vote_sepsets", "majority"),
-        ("_fci_orient", "orient"),
+    for owner, name, event in [
+        (module, "orient_colliders", "colliders"),
+        (fci_module, "_remove_by_possible_dsep", "possible_dsep"),
+        (module, "vote_triples", "majority"),
+        (module, "fci_orient", "orient"),
     ]:
-        original = getattr(module, name)
+        original = getattr(owner, name)
 
         def wrap(marks, *args, original=original, event=event, **kwargs):
             events.append(event)
@@ -114,7 +117,7 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
                 snapshots[event] = marks != 0
             return result
 
-        monkeypatch.setattr(module, name, wrap)
+        monkeypatch.setattr(owner, name, wrap)
     arr = data.sample_scm(
         graph="scale_free", d=6, n=500, seed=5, density=2.0, latents=1, scale="raw"
     ).data
@@ -173,7 +176,7 @@ def test_rules_skip_ambiguous_triple(rule, reverse_labels):
 
     def orient(m, ties):
         if rule == "r0":
-            fci_module._orient_colliders(m, sepsets, ties)
+            fci_module.orient_colliders(m, sepsets, ties)
         elif rule == "r1":
             fci_module._rule_r1r2_cycle(m, False, ties)
         elif rule == "r3":
@@ -250,12 +253,12 @@ def test_r4_reads_rewritten_separating_set(middle_in_set):
     sepsets = {(0, 3): () if middle_in_set else (2,)}
     # For the triple 0-1-3, node 2 is unrelated; create the 0-2-3 adjacency for voting.
     vote_graph = circle_graph(4, [(0, 2), (2, 3)])
-    fci_module._vote_sepsets(
+    vote_triples(
         vote_graph,
         lambda a, c, subset: float((2 in subset) == middle_in_set),
         0.05,
         sepsets,
-        rule="majority",
+        "majority",
     )
     oriented, changed = fci_module._do_ddp(
         marks, 0, 1, 2, 3, {0: 1, 1: 2}, lambda *args: 0.0, 0.05, sepsets, False
@@ -282,19 +285,21 @@ def test_orientation_rules_without_ambiguity_guard(rule):
             marks[2, 0] = ARROW
             expected_endpoint = (0, 2)
             expected_mark = TAIL
-    fci_module._fci_orient(marks, lambda *args: 0.0, 0.05, {}, frozenset([(0, 1, 2)]))
+    fci_module.fci_orient(marks, lambda *args: 0.0, 0.05, {}, frozenset([(0, 1, 2)]))
     assert marks[expected_endpoint] == expected_mark
 
 
-@pytest.mark.parametrize("pvalue", [0.0, 1.0])
-def test_missing_recorded_sets(pvalue):
+@pytest.mark.parametrize("separating", ["empty set", "every subset"])
+def test_missing_recorded_sets(separating):
     marks = circle_graph(3, [(0, 1), (1, 2)])
     sepsets = {}
-    ambiguous = fci_module._vote_sepsets(
-        marks, lambda *args: pvalue, 0.05, sepsets, rule="majority"
-    )
-    fci_module._orient_colliders(marks, sepsets, ambiguous)
-    if pvalue == 0.0:
+
+    def oracle(a, c, subset):
+        return float(separating == "every subset" or not subset)
+
+    ambiguous = vote_triples(marks, oracle, 0.05, sepsets, "majority")
+    fci_module.orient_colliders(marks, sepsets, ambiguous)
+    if separating == "empty set":
         assert sepsets == {(0, 2): (), (2, 0): ()}
         assert not ambiguous
         assert marks[1, 0] == marks[1, 2] == ARROW
@@ -314,25 +319,26 @@ def test_majority_preserves_members_of_one_way_recorded_set(pair, decision):
     def oracle(a, c, subset):
         if decision == "ambiguous":
             return 1.0
-        return float(decision == "noncollider" and 1 in subset)
+        return float((1 in subset) == (decision == "noncollider"))
 
-    ambiguous = fci_module._vote_sepsets(marks, oracle, 0.05, sepsets, rule="majority")
+    ambiguous = vote_triples(marks, oracle, 0.05, sepsets, "majority")
     if decision == "ambiguous":
         assert (0, 1, 2) in ambiguous
         assert sepsets[pair] == recorded
         assert pair[::-1] not in sepsets
     else:
         expected = frozenset([1, 3] if decision == "noncollider" else [3])
-        assert fci_module._sepset(sepsets, 0, 2) == expected
-        assert fci_module._sepset(sepsets, 2, 0) == expected
+        assert separating_set(sepsets, 0, 2) == expected
+        assert separating_set(sepsets, 2, 0) == expected
 
 
 @pytest.mark.parametrize("pair", [(0, 3), (3, 0)])
 def test_r4_preserves_unvoted_member_from_one_way_separating_set(pair):
     marks = circle_graph(4, [(0, 1), (1, 2), (2, 3), (1, 3)])
-    # Node 2 is not a common neighbor of 0 and 3, so their vote only decides node 1.
+    # Node 2 is not a common neighbor of 0 and 3, so their vote only decides node 1: only the
+    # empty set separates them, which makes 1 a collider.
     sepsets = {pair: (2,)}
-    fci_module._vote_sepsets(marks, lambda *args: 0.0, 0.05, sepsets, rule="majority")
+    vote_triples(marks, lambda a, c, subset: float(not subset), 0.05, sepsets, "majority")
     marks[1, 0] = marks[1, 2] = marks[3, 1] = ARROW
     marks[1, 3] = TAIL
     done, changed = fci_module._do_ddp(

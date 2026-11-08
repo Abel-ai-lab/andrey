@@ -38,7 +38,42 @@ logger = logging.getLogger(__name__)
 
 # Per-op auto-preference orders (best first) and the CPU fallback.
 _TORCH_PINNABLE = ("numpy", "cpu", "cuda", "mps")
-_TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
+TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
+
+# Each GPU op's smallest size, per device, at which `auto` runs it there; `None` means never. The
+# op's `ANDREY_*_GPU_THRESHOLD` replaces its `cuda` entry. `auto` never reaches `mps`
+# (`TORCH_AUTO`); its entries stay `None` because no Metal crossover has been measured, and
+# `qa/gpu_calibration_validate.py` reads them. Re-measure after a change to the timed path: the
+# torch or numpy kernels, `to_numpy`, or the probe.
+#
+# `cov` (also `corrcoef`) gates on `n*d` and `entropy` on `n*B`: element counts, because compute
+# and host-to-device transfer scale with them. DirectLiNGAM uses tall `n` by `B <= ~2d` batches, so
+# a column count alone is unsuitable. Five `qa/gpu_calibration_validate.py` runs on A100-SXM4-80GB
+# GPUs produced these brackets:
+#
+#   entropy   7,433   7,433   6,250   7,433   7,433
+#   cov     148,651 125,000  88,388  37,163 250,000
+#
+# Each result is a lattice point within `stats._BRACKET_TOL`, not an exact crossover. Defaults are
+# at the low end of each band. A cutoff that is too low costs bounded overhead near the cutoff. A
+# cutoff that is too high forfeits the speedup. Entropy forms a narrow band. Cov spans nearly `7x`.
+# Its minimum is one noisy draw of five, so its default is above that minimum. The liveness rule,
+# not this value, keeps one-shot calls off a cold device.
+#
+# `kci` gates on the kernel matrix (rows squared) of a query with a conditioning set. The same tool
+# on an A100-SXM4-80GB against 8 CPU threads found 31,250 (177 rows); per query with two
+# conditioning variables, the GPU took 0.52x the CPU's speed at 100 rows, 1.4x at 200, and 9.5x at
+# 1,000. `cmiknn` gates on the distance matrix (rows squared); the tool on an A100-SXM4-80GB found
+# its probe floor, 1,024 (32 rows); per query with 500 shuffles, the GPU was 8x the CPU's speed at
+# 100 rows and 40x at 1,000. `pnl` gates on the kernel matrix (rows squared) of a table's tests. KCI
+# and PNL compute in float64, so `mps` (float32) is never used for them.
+GPU_THRESHOLDS: dict[str, dict[str, int | None]] = {
+    "cov": {"cuda": 90_000, "mps": None},
+    "entropy": {"cuda": 6_250, "mps": None},
+    "kci": {"cuda": 31_250, "mps": None},
+    "cmiknn": {"cuda": 1_024, "mps": None},
+    "pnl": {"cuda": 26_278, "mps": None},
+}
 
 # What to install when a pinned-but-unavailable backend falls back (surfaced in the warning).
 _UNAVAILABLE_HINT = {
@@ -61,14 +96,6 @@ _tie_break_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 def _warn_once(message: str) -> None:
     warning_policy.warn_once(message, warning_policy.BackendFallbackWarning)
-
-
-def _warn_former(old: str, new: str) -> None:
-    """Warn once that the setting ``old`` is now ``new``."""
-    warning_policy.warn_once(
-        f"{old} is now {new}; the former name stops working in the next release",
-        warning_policy.DeprecatedArgumentWarning,
-    )
 
 
 # ---- optional accelerators ----------------------------------------------------------------------
@@ -128,7 +155,8 @@ class _Config:
 
     Assigning ``andrey.config.backend``, ``andrey.config.n_jobs``, or
     ``andrey.config.tie_break`` changes the default for later calls; assigning ``None`` returns to
-    ``ANDREY_BACKEND``, ``ANDREY_N_JOBS``, and ``ANDREY_TIE_BREAK``.
+    ``ANDREY_BACKEND``, ``ANDREY_N_JOBS``, and ``ANDREY_TIE_BREAK``; assigning any other name
+    raises ``AttributeError``.
     ``with andrey.config(backend=..., n_jobs=..., tie_break=...):`` changes them inside the
     block only, and does not reach threads started inside it. The order, most specific first:
     ``with`` block, these attributes, the environment variables, the defaults.
@@ -137,10 +165,11 @@ class _Config:
     runtime-startup requirements and a compatible GPU is available; otherwise it uses ``"numpy"``.
     ``"numpy"`` uses NumPy on the CPU in float64. The ``torch`` extra provides ``"cpu"`` for
     PyTorch on the CPU, ``"cuda"`` for a CUDA-compatible GPU, and ``"mps"`` for an Apple GPU in
-    unvalidated float32. ``"none"`` means ``"cpu"`` and ``"metal"`` means ``"mps"``. An explicit
-    choice bypasses the size and startup requirements. An operation without the requested backend
-    uses ``"auto"``; a supported but unavailable backend also warns once with
-    ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
+    float32; Apple GPUs are not supported in the alpha. ``"none"`` means ``"cpu"`` and ``"metal"``
+    means ``"mps"``. An explicit choice bypasses the size and startup requirements. An operation
+    without the requested backend uses ``"auto"``; a supported but unavailable backend also warns
+    once with ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise
+    ``ValueError``.
 
     ``n_jobs`` counts worker processes (threads for ``pnl``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
@@ -148,22 +177,25 @@ class _Config:
 
     ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
     equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from the
-    data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the result.
+    data (:func:`andrey.core.ties.tie_ranks`), so reordering the columns relabels the result.
     ``"position"`` orders them by column position instead, which skips computing the ranks, and the
     result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
-    ``collider_order``, and ``fci`` and ``gfci`` their ``possible_dsep``, from it when the call
-    gives none: ``"p_value"`` and ``"order_free"`` under ``"rank"``, ``"column"`` and ``"fast"``
-    under ``"position"``. ``pc``, ``cdnod``, ``fci``, and ``gfci`` also fire their orientation rules
-    one at a time in column order under ``"position"``, where ``"rank"`` runs them in order-free
-    rounds. The speed difference is small, except for ``fci`` and ``gfci`` on large dense graphs.
-    Each fit reads the setting once, when it starts. The
-    :doc:`column-order guide </docs/guides/column-order>` gives the numbers and lists the methods
-    it reaches.
+    ``collider_order``, and ``fci``, ``gfci``, and ``fci_jci`` their ``possible_dsep``, from it when
+    the call gives none: ``"p_value"`` and ``"order_free"`` under ``"rank"``, ``"column"`` and
+    ``"fast"`` under ``"position"``. ``pc``, ``cdnod``, ``fci``, ``gfci``, ``boss_fci``,
+    ``grasp_fci``, and ``fci_jci`` also fire their orientation rules one at a time in column order
+    under ``"position"``, where ``"rank"`` runs them in order-free rounds. The speed difference is
+    small, except for ``fci`` and ``gfci`` on large dense graphs. Each fit reads the setting once,
+    when it starts. The :doc:`column-order guide </docs/guides/column-order>` gives the numbers and
+    lists the methods it reaches.
     """
 
-    _backend: str | None = None
-    _n_jobs: int | None = None
-    _tie_break: str | None = None
+    __slots__ = ("_backend", "_n_jobs", "_tie_break")
+
+    def __init__(self) -> None:
+        self._backend: str | None = None
+        self._n_jobs: int | None = None
+        self._tie_break: str | None = None
 
     @property
     def backend(self) -> str:
@@ -184,17 +216,6 @@ class _Config:
         self._n_jobs = None if value is None else env.parse_n_jobs(value, "config.n_jobs")
 
     @property
-    def num_workers(self) -> int:
-        """The former name of :attr:`n_jobs`, kept for one release with a warning."""
-        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
-        return self.n_jobs
-
-    @num_workers.setter
-    def num_workers(self, value: int | None) -> None:
-        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
-        self.n_jobs = value
-
-    @property
     def tie_break(self) -> str:
         """The tie-break rule in effect; assigning an unknown name raises ``ValueError``."""
         return _resolve_tie_break()
@@ -209,7 +230,7 @@ class _Config:
         backend: str | None = None,
         n_jobs: int | None = None,
         tie_break: str | None = None,
-        num_workers: int | None = None,
+        **unknown: object,
     ):
         """Return a context manager that sets the given settings for a ``with`` block.
 
@@ -221,9 +242,6 @@ class _Config:
             Worker count for the block, ``-1`` or more; ``None`` keeps the current one.
         tie_break : {"rank", "position"} or None, default=None
             Tie-break rule for the block; ``None`` keeps the current one.
-        num_workers : int or None, default=None
-            The former name of ``n_jobs``, kept for one release with a
-            :class:`~andrey.DeprecatedArgumentWarning`.
 
         Returns
         -------
@@ -235,13 +253,15 @@ class _Config:
         ValueError
             On entering the block, if ``backend`` or ``tie_break`` is not a known name or
             ``n_jobs`` is not an integer of at least ``-1``; the message lists the accepted
-            values. At once, if the call passes both ``n_jobs`` and ``num_workers``.
+            values.
+        TypeError
+            At once, for any other keyword; for ``num_workers``, the message gives ``n_jobs``, its
+            name since 0.12.0.
         """
-        if num_workers is not None:
-            if n_jobs is not None:
-                raise ValueError("num_workers is the former name of n_jobs; pass only n_jobs")
-            _warn_former("andrey.config(num_workers=...)", "andrey.config(n_jobs=...)")
-            n_jobs = num_workers
+        if unknown:
+            key = next(iter(unknown))
+            hint = "; it was renamed `n_jobs` in 0.12.0" if key == "num_workers" else ""
+            raise TypeError(f"andrey.config() got an unexpected keyword argument {key!r}{hint}")
         return _scope(backend, n_jobs, tie_break)
 
 
@@ -292,10 +312,6 @@ def _resolve_n_jobs(kwarg: int | None) -> int:
     if config._n_jobs is not None:
         return config._n_jobs
     n = env.N_JOBS.read()
-    if n is None:
-        n = env.NUM_WORKERS.read()
-        if n is not None:
-            _warn_former("ANDREY_NUM_WORKERS", "ANDREY_N_JOBS")
     return 1 if n is None else n
 
 
@@ -417,6 +433,23 @@ def select(
     return _record_dispatch(op, "numpy")
 
 
+def select_by_size(op: str, setting: env.Setting[int], metric: int, *, amortized: bool) -> str:
+    """Pick ``numpy``, or torch on ``cpu`` or ``cuda``, for the op ``op`` of size ``metric``.
+
+    ``auto`` takes ``cuda`` from the op's cutoff in :data:`GPU_THRESHOLDS`, or from ``setting``
+    when it is set. ``mps`` (float32) is never taken. ``amortized`` is as in :func:`select`.
+    """
+    manual = setting.read()
+    return select(
+        ("numpy", "cpu", "cuda"),
+        ("cuda", "numpy"),
+        metric=metric,
+        thresholds=GPU_THRESHOLDS[op] if manual is None else {"cuda": manual},
+        amortized=amortized,
+        op=op,
+    )
+
+
 def resolve(
     metric: int,
     threshold: int | dict[str, int | None],
@@ -434,11 +467,11 @@ def resolve(
     thresholds: dict[str, int | None] = (
         threshold
         if isinstance(threshold, dict)
-        else {b: threshold for b in _TORCH_AUTO if b != "numpy"}
+        else {b: threshold for b in TORCH_AUTO if b != "numpy"}
     )
     dev = select(
         _TORCH_PINNABLE,
-        _TORCH_AUTO,
+        TORCH_AUTO,
         metric=metric,
         thresholds=thresholds,
         amortized=amortized,

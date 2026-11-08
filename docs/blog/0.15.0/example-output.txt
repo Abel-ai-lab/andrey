@@ -1,0 +1,8 @@
+pc, observational:   8 edges, 8 in the consensus network,  2 directed,  2 with an arrowhead
+pc, pooled:         25 edges, 12 in the consensus network, 22 directed, 22 with an arrowhead
+cdnod:              10 edges, 8 in the consensus network,  4 directed,  4 with an arrowhead, 11 index edges
+ges:                10 edges, 9 in the consensus network,  0 directed,  0 with an arrowhead, 11 index edges
+boss:               10 edges, 9 in the consensus network,  0 directed,  0 with an arrowhead, 11 index edges
+fci_jci:            10 edges, 8 in the consensus network,  0 directed,  6 with an arrowhead, 11 index edges
+boss_fci:            9 edges, 8 in the consensus network,  0 directed,  2 with an arrowhead, 11 index edges
+changing variables: ['raf', 'mek', 'plc', 'pip2', 'pip3', 'erk', 'akt', 'pka', 'pkc', 'p38', 'jnk']

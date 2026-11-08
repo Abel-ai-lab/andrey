@@ -11,15 +11,15 @@ import pytest
 
 from andrey import data
 from andrey.constraint.fci import (
-    _circle_pag,
     _exists_uncovered_pd_path,
-    _fci_orient,
     _neighbor_lists,
-    _orient_colliders,
     _r10_connects,
     _rule_r7,
     _rule_r9,
     _rule_r10,
+    circle_pag,
+    fci_orient,
+    orient_colliders,
 )
 from andrey.core.structure import ARROW, CIRCLE, TAIL
 from andrey.data.latent import marginal
@@ -42,13 +42,13 @@ def test_rules_leave_an_endpoint_two_firings_mark_differently_a_circle():
     marks = _circle_graph(4, [(0, 1), (1, 2), (2, 3)])
     marks[1, 0] = marks[2, 3] = ARROW
     expected = marks.copy()
-    _fci_orient(marks, _no_test, 0.5, {(0, 2): (), (1, 3): ()})
+    fci_orient(marks, _no_test, 0.5, {(0, 2): (), (1, 3): ()})
     np.testing.assert_array_equal(marks, expected)
     # One firing at a time, the firing at node 1 comes first.
     expected[1, 2], expected[2, 1] = TAIL, ARROW
     marks = _circle_graph(4, [(0, 1), (1, 2), (2, 3)])
     marks[1, 0] = marks[2, 3] = ARROW
-    _fci_orient(marks, _no_test, 0.5, {(0, 2): (), (1, 3): ()}, in_column_order=True)
+    fci_orient(marks, _no_test, 0.5, {(0, 2): (), (1, 3): ()}, in_column_order=True)
     np.testing.assert_array_equal(marks, expected)
 
 
@@ -63,9 +63,9 @@ def _named_test(names: np.ndarray):
 
 
 def _orient(skeleton, sepsets, names, in_column_order):
-    marks = _circle_pag(skeleton)
-    _orient_colliders(marks, sepsets)
-    _fci_orient(marks, _named_test(names), 0.5, sepsets, in_column_order=in_column_order)
+    marks = circle_pag(skeleton)
+    orient_colliders(marks, sepsets)
+    fci_orient(marks, _named_test(names), 0.5, sepsets, in_column_order=in_column_order)
     return marks
 
 
@@ -111,7 +111,7 @@ def test_rules_complete_the_true_pag_as_one_firing_at_a_time(monkeypatch):
     ]
     rounds = [marginal(truth, "pag").to_numpy() for truth in truths]
     fci = importlib.import_module("andrey.constraint.fci")
-    monkeypatch.setattr(fci, "_fci_orient", functools.partial(_fci_orient, in_column_order=True))
+    monkeypatch.setattr(fci, "fci_orient", functools.partial(fci_orient, in_column_order=True))
     for truth, want in zip(truths, rounds):
         np.testing.assert_array_equal(marginal(truth, "pag").to_numpy(), want)
 

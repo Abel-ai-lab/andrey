@@ -17,7 +17,7 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 
-from ._common import two_marks
+from ._common import two_marks, unwrap
 from .graph import (
     _confounder,
     _orientation,
@@ -38,10 +38,18 @@ def score(output: object, truth: object) -> dict[str, object]:
     """Score an estimated result against ground truth with the family-appropriate metrics.
 
     ``output`` and ``truth`` may each be a StructureOutput, a Structure, or a raw adjacency, and
-    must index the same variables in the same order (a label or node-count mismatch raises). A
-    latent structure is scored on its clustering alone, since latent node indices are not aligned
-    across the two graphs; CDNOD's appended domain node and similar extra variables must be dropped
-    by the caller first.
+    must index the same variables in the same order (a label or node-count mismatch raises). A raw
+    adjacency whose directed edges form a cycle reads as a ``digraph``. A latent structure is scored
+    on its clustering alone, since latent node indices are not aligned across the two graphs;
+    CDNOD's appended domain node and similar extra variables must be dropped by the caller first.
+
+    Parameters
+    ----------
+    output : StructureOutput, Structure, or array-like of shape (n, n)
+        The estimated result. A raw array is a directed adjacency: a nonzero ``A[i, j]`` is the
+        edge ``i -> j``.
+    truth : StructureOutput, Structure, or array-like of shape (n, n)
+        The true structure, over the same variables in the same order.
 
     Returns
     -------
@@ -99,8 +107,7 @@ def score(output: object, truth: object) -> dict[str, object]:
 
 def _structure(x: object) -> Structure | None:
     """The underlying Structure of an input, or ``None`` for a raw adjacency."""
-    if isinstance(x, StructureOutput):
-        return x.structure
+    x = unwrap(x)
     return x if isinstance(x, Structure) else None
 
 

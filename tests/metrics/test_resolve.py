@@ -124,17 +124,21 @@ def test_latent_single_observed_scores_are_json_safe():
     g = GraphStructure.from_numpy(marks, kind="dag", node_types=types)
     result = score(g, g)
     assert result["latent_cluster_ari"] == 1.0
-    json.dumps(result)  # nan would break strict JSON
+    json.dumps(result, allow_nan=False)  # strict JSON: NaN or infinity raises
 
 
 def test_cyclic_input_keeps_directed_scores_and_omits_mec():
-    # a thresholded cyclic estimate has no CPDAG: score() still returns the directed metrics.
+    # A cycle has no CPDAG: score() returns the directed metrics alone. A raw cyclic array reads
+    # as a digraph; a structure that declares a cyclic graph a dag, which from_numpy does not
+    # check, scores as a dag without the MEC pair.
     cycle = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])  # 0 -> 1 -> 2 -> 0
-    result = score(cycle, cycle)
-    assert result["family"] == "dag"
-    assert result["shd"] == 0
-    assert result["skeleton_f1"] == 1.0
-    assert "mec_shd" not in result  # canonicalization skipped, not crashed
+    declared = GraphStructure.from_numpy(cycle + ARROW * cycle.T, kind="dag")
+    for graph, family in ((cycle, "digraph"), (declared, "dag")):
+        result = score(graph, graph)
+        assert result["family"] == family
+        assert result["shd"] == 0
+        assert result["skeleton_f1"] == 1.0
+        assert "mec_shd" not in result  # canonicalization skipped, not crashed
 
 
 def test_result_is_json_safe(dag_of):
@@ -145,7 +149,8 @@ def test_result_is_json_safe(dag_of):
     rich = StructureOutput.new(
         GraphStructure.from_numpy(marks, kind="dag"), ordering=[0, 1], weighted_adjacency=w
     )
-    json.dumps(score(rich, rich))  # raises if any value is a numpy scalar / non-serializable
+    # strict JSON: a NumPy integer or bool, NaN, or infinity raises
+    json.dumps(score(rich, rich), allow_nan=False)
 
 
 # ---- validation ---------------------------------------------------------------------------------

@@ -15,7 +15,7 @@ from scipy.linalg import solve_discrete_lyapunov
 
 import andrey
 import andrey.temporal.lpcmci as engine
-from andrey.api._temporal import _adapt_lpcmci
+from andrey.api._temporal import adapt_lpcmci
 from andrey.core import ARROW, CIRCLE, NULL, TAIL
 from andrey.temporal.lpcmci import CONFLICT, LPCMCIResult, lpcmci, run
 from andrey.temporal.pcmci import PARTIAL_CORRELATION_TESTS, lagged_design
@@ -149,7 +149,7 @@ def _fixed_result() -> LPCMCIResult:
 
 
 def test_the_adapter_maps_a_conflict_to_a_circle_and_keeps_definite_lagged_causes():
-    out = _adapt_lpcmci(_fixed_result())
+    out = adapt_lpcmci(_fixed_result())
     assert out.structure.lags == (0, 1)
     assert out.structure.lag(0).kind == "pag"
     assert out.structure.lag(0).oriented_edges() == [(0, 1, "partially_directed")]
@@ -172,7 +172,7 @@ def test_an_empty_result_has_no_links():
         {},
         ((), ()),
     )
-    out = _adapt_lpcmci(empty)
+    out = adapt_lpcmci(empty)
     assert all(not out.structure.lag(k).oriented_edges() for k in (0, 1))
     assert out.metadata["conflicts"] == []
     assert (empty.adjacency == (empty.start_marks != NULL)).all()
@@ -240,13 +240,13 @@ def test_a_depth_above_every_search_returns_the_uncapped_graph():
 @pytest.mark.parametrize("max_p_global", [0, 1, 2])
 def test_a_depth_cap_bounds_every_removal_search(monkeypatch, max_p_global):
     sizes = []
-    searched = engine._Search.separating_subsets
+    searched = engine.LPCMCISearch.separating_subsets
 
     def recorded(self, a, b, search, sdef, p):
         sizes.append(p)
         return searched(self, a, b, search, sdef, p)
 
-    monkeypatch.setattr(engine._Search, "separating_subsets", recorded)
+    monkeypatch.setattr(engine.LPCMCISearch, "separating_subsets", recorded)
     lpcmci(_related_series(), tau_max=1, pc_alpha=0.05, max_p_global=max_p_global)
     assert sizes and max(sizes) == max_p_global
 
@@ -281,11 +281,11 @@ class Counting:
         return self.test.statistic_pvalues(x, y, conditions)
 
 
-def _data_search(test_wrapper=lambda test: test) -> engine._Search:
+def _data_search(test_wrapper=lambda test: test) -> engine.LPCMCISearch:
     """A search over four variables of white noise, ``tau_max=1``, with the Student-t test."""
     data = np.random.default_rng(0).standard_normal((300, 4))
-    test = PARTIAL_CORRELATION_TESTS["student_t"](lagged_design(data, 1))
-    return engine._Search(test_wrapper(test), 4, 1, 0.05, range(4))
+    test = PARTIAL_CORRELATION_TESTS["student_t"](lagged_design(data, 2))
+    return engine.LPCMCISearch(test_wrapper(test), 4, 1, 0.05, range(4))
 
 
 # The pair X0_{t-1}, X0_t and the 15 two-node sets of the other window nodes.
@@ -326,16 +326,16 @@ class HashTest:
 
 
 def test_a_split_search_finds_the_same_separating_set(monkeypatch):
-    unbounded = engine._Search(HashTest(), 4, 1, 0.85, range(4))
+    unbounded = engine.LPCMCISearch(HashTest(), 4, 1, 0.85, range(4))
     expected = unbounded.separating(*PAIR, iter(SETS))
     monkeypatch.setattr(engine, "BATCH", 2)
-    split = engine._Search(HashTest(), 4, 1, 0.85, range(4))
+    split = engine.LPCMCISearch(HashTest(), 4, 1, 0.85, range(4))
     assert split.separating(*PAIR, iter(SETS)) == expected
     assert SETS.index(expected) >= 2  # found after the first batch
     assert (split.imin, split.best) == (unbounded.imin, unbounded.best)
 
 
-def _listed_vote(search: engine._Search, key) -> list[frozenset]:
+def _listed_vote(search: engine.LPCMCISearch, key) -> list[frozenset]:
     """Every distinct separating set of the pair ``key`` for the vote, as one list."""
     i, j, lag = key
     start, end = (i, lag), (j, 0)
@@ -352,7 +352,7 @@ def _listed_vote(search: engine._Search, key) -> list[frozenset]:
     return found
 
 
-def _listed_share(search: engine._Search, a, b, c) -> float:
+def _listed_share(search: engine.LPCMCISearch, a, b, c) -> float:
     key, _ = engine._key(a, c)
     found = _listed_vote(search, key)
     frame = min(a[1], c[1])
@@ -363,13 +363,13 @@ def _listed_share(search: engine._Search, a, b, c) -> float:
 OUTER = [((0, 0), (1, 0)), ((0, 1), (1, 1)), ((0, 1), (2, 0))]
 
 
-def _shares(search: engine._Search, listed: bool) -> list[float]:
+def _shares(search: engine.LPCMCISearch, listed: bool) -> list[float]:
     share = (lambda a, b, c: _listed_share(search, a, b, c)) if listed else search.share
     return [share(a, b, c) for a, c in OUTER for b in search.window if b not in (a, c)]
 
 
 def test_the_counted_vote_matches_the_listed_vote_before_and_after_a_change():
-    search = engine._Search(HashTest(), 4, 1, 0.5, range(4))
+    search = engine.LPCMCISearch(HashTest(), 4, 1, 0.5, range(4))
     search.initialize()
     for a, c in OUTER[::2]:
         search.remove(engine._key(a, c)[0])
@@ -430,7 +430,7 @@ def test_rule_r0a_stores_the_separating_set_of_every_triple(relabel):
     # X0 - X1 - X2 and X0 - X1 - X3 are unshielded; X0 and X1 are separated given the stored set
     # of either outer pair, {X3} for (X0, X2) and {X2} for (X0, X3), and not given nothing.
     table = {frozenset({3}): 0.5, frozenset({2}): 0.4}
-    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05, range(4))
+    search = engine.LPCMCISearch(TableTest(table, relabel), 4, 0, 0.05, range(4))
     search.initialize()
     for outer, sepset in (((0, 2, 0), {(3, 0)}), ((0, 3, 0), {(2, 0)})):
         i, j, _ = outer
@@ -447,7 +447,7 @@ def test_weakly_minimal_drops_the_node_that_leaves_the_largest_p_value(relabel):
     # {X2, X3} separates X0 and X1; dropping X2 leaves p = 0.6, dropping X3 leaves p = 0.3, and
     # dropping both leaves a dependence, so X2 goes whatever the variables are called.
     table = {frozenset({2, 3}): 0.9, frozenset({3}): 0.6, frozenset({2}): 0.3}
-    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05, range(4))
+    search = engine.LPCMCISearch(TableTest(table, relabel), 4, 0, 0.05, range(4))
     search.initialize()
     found = search.weakly_minimal((0, 0), (1, 0), frozenset({(2, 0), (3, 0)}))
     assert _relabeled([found], relabel) == {frozenset({(3, 0)})}

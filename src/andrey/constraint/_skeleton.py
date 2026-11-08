@@ -20,8 +20,8 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
-from functools import partial
-from itertools import chain, combinations, islice
+from functools import cache, partial
+from itertools import chain, combinations, groupby, islice
 from math import comb
 from typing import TYPE_CHECKING
 
@@ -30,6 +30,7 @@ import numpy as np
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
 from andrey.core.ci_missing import GaussianDeletion
+from andrey.core.orient import separating_set
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -43,13 +44,13 @@ _Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
 # One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
 # is computed independently, so the chunk boundary never changes a result.
-_CHUNK = 4096
+CHUNK = 4096
 
 # Conditioning sets per test call in a collider vote (:func:`vote_triples`). A vote keeps only the
 # separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
 _VOTE_CHUNK = 64
 
-#: How PC, CD-NOD, FCI, and GFCI decide an unshielded triple (:func:`vote_triples`).
+#: How the PC and FCI families and PCMCI+ decide an unshielded triple (:func:`vote_triples`).
 COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
@@ -107,7 +108,7 @@ def scan_conditioning_sets(
     found = False
     top = 0.0
     while True:
-        chunk = list(islice(subsets, _CHUNK))
+        chunk = list(islice(subsets, CHUNK))
         if not chunk:
             break
         pvalues = batched(a, b, chunk)
@@ -231,7 +232,7 @@ def separating_subsets(
 ) -> list[tuple[int, ...]]:
     """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
 
-    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``_CHUNK``
+    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``CHUNK``
     canonical queries, in order. A chunk whose evaluation raises is tested again subset by subset
     with scalar ``test`` calls, so the error is the one the scalar loop raises, after the same
     queries. Another test makes one scalar call per subset.
@@ -240,7 +241,7 @@ def separating_subsets(
     if canonical is None:
         return [cond for cond in subsets if test(x, y, cond) > alpha]
     found: list[tuple[int, ...]] = []
-    while chunk := list(islice(subsets, _CHUNK)):
+    while chunk := list(islice(subsets, CHUNK)):
         try:
             pvalues = _canonical_chunk(canonical, size, x, y, chunk)
         except Exception:
@@ -412,13 +413,13 @@ def scan_pairs(
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
     and the parallel workers share it, so they stay identical. A FisherZ, StudentT, RCoT, or
     degenerate Gaussian test evaluates the chunks of consecutive pairs in one stack
-    (:func:`_stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
+    (:func:`stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
     test the same subsets in the same order. With ``trace`` given, every test is recorded in the
     order it runs.
     """
     stacked = _stacked_route(test)
     if stacked is not None:
-        return _stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
+        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -449,7 +450,7 @@ def _sides(
             yield a, b, candidates, seen
 
 
-def _stacked_scan(
+def stacked_scan(
     pvalues: Callable[..., np.ndarray],
     pairs: list[tuple[int, int]],
     neighbors: list[np.ndarray],
@@ -496,7 +497,7 @@ def _pair_chunks(
         x, y = min(a, b), max(a, b)
         for _, _, candidates, seen in _sides(neighbors, a, b, size):
             subsets = _subsets(candidates, size, seen)
-            while chunk := list(islice(subsets, _CHUNK)):
+            while chunk := list(islice(subsets, CHUNK)):
                 yield i, x, y, chunk
 
 
@@ -553,6 +554,127 @@ def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
     return (
         comb(neighbors[x].size - 1, size) + comb(neighbors[y].size - 1, size) - comb(shared, size)
     )
+
+
+# ---- possible-d-sep subsets ---------------------------------------------------------------------
+#
+# FCI's possible-d-sep step searches the subsets of a pair's candidate set by increasing size, each
+# size in ``combinations`` order, for the first that separates the pair. The subsets are cut into
+# blocks of positions in the candidate list, enumerated as arrays, and asked in batched calls.
+
+#: A block ``(prefix, rest)`` of a size holds every subset of the candidates that starts with the
+#: candidates at the positions ``prefix`` and takes its ``rest`` other members from the positions
+#: after the last of them, in ``combinations`` order.
+Block = tuple[tuple[int, ...], int]
+
+#: The most candidates a search enumerates as arrays: a subset's positions form a non-negative
+#: int64 bit mask.
+MASK_BITS = 63
+
+
+def block_subsets(n: int, block: Block) -> int:
+    """The subsets ``block`` holds of ``n`` candidates."""
+    prefix, rest = block
+    return comb(n - (prefix[-1] + 1 if prefix else 0), rest)
+
+
+def blocks(n: int, size: int, most: int) -> Iterator[Block]:
+    """``combinations(range(n), size)`` cut into contiguous blocks of at most ``most`` subsets, in
+    order: a block too large is split by the position its next member takes."""
+
+    def split(prefix: tuple[int, ...], start: int, rest: int) -> Iterator[Block]:
+        if comb(n - start, rest) <= most:
+            yield prefix, rest
+            return
+        for i in range(start, n - rest + 1):
+            yield from split((*prefix, i), i + 1, rest - 1)
+
+    return split((), 0, size)
+
+
+@cache
+def _combination_table(m: int, r: int) -> np.ndarray:
+    """``combinations(range(m), r)`` as a ``(comb(m, r), r)`` array. A block holds at most a few
+    thousand subsets, and ``m`` is at most :data:`MASK_BITS`, so the tables stay small."""
+    count = comb(m, r)
+    flat = np.fromiter(chain.from_iterable(combinations(range(m), r)), np.intp, count * r)
+    return flat.reshape(count, r)
+
+
+def block_positions(n: int, block: Block) -> np.ndarray:
+    """The subsets of ``block`` of ``n`` candidates as rows of positions, in order."""
+    prefix, rest = block
+    start = prefix[-1] + 1 if prefix else 0
+    tail = _combination_table(n - start, rest)
+    rows = np.empty((len(tail), len(prefix) + rest), dtype=np.intp)
+    rows[:, : len(prefix)] = prefix
+    rows[:, len(prefix) :] = tail + start
+    return rows
+
+
+def _runs(groups: Iterable[Iterable[np.ndarray]], first: int, most: int) -> Iterator[np.ndarray]:
+    """The rows of each group's arrays, in order, in runs of ``first``, twice that, and so on up to
+    ``most`` rows. A run holds the rows of one group, and a group's last run the rest of them."""
+    run = first
+    for arrays in groups:
+        held: list[np.ndarray] = []
+        count = 0
+        for array in arrays:
+            held.append(array)
+            count += len(array)
+            while count >= run:
+                rows = np.concatenate(held)
+                yield rows[:run]
+                held, count = [rows[run:]], count - run
+                run = min(2 * run, most)
+        if count:
+            yield np.concatenate(held)
+            run = min(2 * run, most)
+
+
+def first_separating_subset(
+    test: CITest,
+    x: int,
+    y: int,
+    candidates: Sequence[int],
+    within: Sequence[int],
+    subsets: Iterable[Block],
+    alpha: float,
+    first: int = 1,
+) -> tuple[int, ...] | None:
+    """The first subset of ``candidates`` in ``subsets`` that separates ``x`` and ``y``
+    (``p > alpha``), or ``None``.
+
+    ``subsets`` are blocks of positions in ``candidates`` (:data:`Block`), in the order they are
+    tested; a subset whose positions all lie in one of the bit masks ``within`` is left out. There
+    are at most :data:`MASK_BITS` candidates. Each size's subsets are enumerated as arrays and
+    asked in runs of ``first``, twice that, and so on up to :data:`CHUNK` subsets, each run one
+    ``separating_prefix`` call over the sorted members, which answers it up to its first separating
+    subset with the p-values of scalar calls, as :func:`~andrey.core.ci._separating_prefix` does. A
+    test raises only from a subset that comes before every separating one. The subset returned
+    lists its members in ``candidates`` order.
+    """
+    labels = np.asarray(candidates, dtype=np.intp)
+    n = len(labels)
+    bits = np.left_shift(np.int64(1), np.arange(n, dtype=np.int64))
+    outside = [np.int64(~mask) for mask in within if mask]
+
+    def kept(block: Block) -> np.ndarray:
+        rows = block_positions(n, block)
+        if outside:
+            masks = bits[rows].sum(axis=1)
+            keep = np.logical_and.reduce([(masks & mask) != 0 for mask in outside])
+            rows = rows[keep]
+        return rows
+
+    groups = (map(kept, same) for _, same in groupby(subsets, key=lambda b: len(b[0]) + b[1]))
+    for rows in _runs(groups, first, CHUNK):
+        pvalues = test.separating_prefix(  # ty: ignore[unresolved-attribute]  # gated by the type
+            x, y, np.sort(labels[rows], axis=1), alpha
+        )
+        if pvalues and pvalues[-1] > alpha:
+            return tuple(labels[rows[len(pvalues) - 1]].tolist())
+    return None
 
 
 def separate_apart(
@@ -655,29 +777,35 @@ def vote_triples(
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     rule: str,
     *,
-    unseparated: str,
     max_depth: int | None = None,
     skip: Collection[tuple[int, int, int]] = frozenset(),
 ) -> frozenset[tuple[int, int, int]]:
-    """Decide every unshielded triple of ``marks`` by ``rule``; rewrite ``sepsets`` to match and
-    return the ambiguous triples.
+    """Decide every unshielded triple of ``marks`` by ``rule``, ``"conservative"`` or
+    ``"majority"``; rewrite ``sepsets`` to match and return the ambiguous triples.
 
     ``marks`` is the final skeleton, a pair adjacent where its entry is not ``NULL``. For each
     unshielded triple ``(a, b, c)``, ``a < c``, the pair ``(a, c)`` is tested given every subset of
     ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
     members when one is given: a subset both endpoints offer is tested and counted twice. A subset
     separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
-    triple from the separating subsets; a pair no subset separates takes the verdict
-    ``unseparated``, ``"collider"`` or ``"ambiguous"``. A collider removes ``b`` from the pair's
-    separating sets and a non-collider adds it, under both key orders, a missing order taking the
-    other's set first; an ambiguous triple leaves them as they are. The separating sets already
-    recorded do not vote. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither
-    voted nor returned.
+    triple from the separating subsets, and a pair no subset separates leaves its triples ambiguous:
+    the conservative and majority rules call a triple unambiguous only when at least one subset of
+    its ends' neighbors separates them [1]_ (Section 4.2), in PC and, after the
+    possible-d-separation step, in FCI (Section 4.4). The separating sets already recorded do not
+    vote. A collider removes ``b`` from the pair's separating sets and a non-collider adds it, under
+    both key orders, a missing order taking the other's set first; an ambiguous triple leaves them
+    as they are. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither voted nor
+    returned.
 
     Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
     subsets, through the test's ``batched_call`` when it has one. The chunks do not depend on the
     middle node, so every middle node counts the p-values one test of the pair gives. The cost
     grows as ``2**degree`` per pair.
+
+    References
+    ----------
+    .. [1] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
     """
     neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
     votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
@@ -688,19 +816,14 @@ def vote_triples(
                 continue
             if (a, c) not in votes:
                 votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-            separating = votes[a, c]
-            verdict = collider_verdict(separating, b, rule) if separating else unseparated
+            verdict = collider_verdict(votes[a, c], b, rule)
             if verdict == "ambiguous":
                 ambiguous.add((a, b, c))
                 continue
             for pair in ((a, c), (c, a)):
-                recorded = sepsets.get(pair)
-                if recorded is None:
-                    recorded = sepsets.get(pair[::-1], ())
-                if verdict == "non-collider":
-                    sepsets[pair] = recorded if b in recorded else (*recorded, b)
-                else:
-                    sepsets[pair] = tuple(node for node in recorded if node != b)
+                recorded = separating_set(sepsets, *pair) or frozenset()
+                updated = recorded | {b} if verdict == "non-collider" else recorded - {b}
+                sepsets[pair] = tuple(sorted(updated))
     return frozenset(ambiguous)
 
 

@@ -25,9 +25,10 @@ import andrey
 import andrey.data as data
 from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard
-from andrey.search.gies import cut_pairs, replace_unprotected
+from andrey.metrics import shd
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.essential import essential
+from tests.recovery.helpers.harness import assert_recorded_output
 
 P = 10
 #: Each paper's weights, intervention, and settings: (number of settings, targets per setting).
@@ -57,21 +58,6 @@ def paper_dataset(paper: str, seed: int, n: int):
     return ds, {0: [], **{k + 1: t for k, t in enumerate(chosen)}}
 
 
-def essential(dag: np.ndarray, family: list[set[int]]) -> np.ndarray:
-    """The interventional essential graph of the DAG's marks under the observational setting and
-    each setting's targets in ``family``."""
-    rows = np.zeros((len(family) + 1, dag.shape[0]), dtype=bool)
-    for row, variables in enumerate(family, start=1):
-        rows[row, sorted(variables)] = True
-    return replace_unprotected(dag.astype(np.int8), cut_pairs(rows))
-
-
-def shd(a: np.ndarray, b: np.ndarray) -> int:
-    """The variable pairs whose endpoint marks differ."""
-    upper = np.triu_indices(a.shape[0], 1)
-    return int(((a[upper] != b[upper]) | (a.T[upper] != b.T[upper])).sum())
-
-
 def effective(ds, targets: dict[int, list[int]], keeps_root_noise: bool) -> list[set[int]]:
     """Each setting's targets whose distribution the intervention changes: all of them, less the
     roots when a perfect intervention keeps their noise."""
@@ -86,8 +72,8 @@ def test_igsp_recovers_the_paper_setting(paper, seed):
     ds, targets = paper_dataset(paper, seed, 10_000)
     out = andrey.igsp(ds.data, ds.env, targets=targets)
     truth = essential(ds.graph.to_numpy(), effective(ds, targets, paper == "yang"))
-    errors = shd(out.structure.to_numpy(), truth)
-    assert errors < int((truth != 0).sum() // 2)  # the empty graph's SHD
+    errors = shd(out.structure, truth)
+    assert errors < len(truth.oriented_edges())  # the empty graph's SHD
     # Recorded: 0 on every dataset. One pair of slack for a test decision at the level that the
     # last bits of another machine's arithmetic move.
     assert errors <= 1
@@ -105,7 +91,7 @@ def test_igsp_recovers_the_dag_where_gies_is_not_consistent(family):
     ds = scm.sample(n=[100_000] * 2, seed=0, scale="raw", envs=[{}, setting], shuffle=False)
     out = andrey.igsp(ds.data, ds.env, targets={0: [], 1: sorted(setting)})
     truth = essential(ds.graph.to_numpy(), [set(setting)])
-    assert np.array_equal(out.structure.to_numpy(), truth)
+    assert np.array_equal(out.structure.to_numpy(), truth.to_numpy())
 
 
 def test_recorded_baseline():

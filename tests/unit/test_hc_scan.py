@@ -19,8 +19,8 @@ import pytest
 import andrey
 from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
-from andrey.search.hc import MoveScanner, _apply_move, _key_after, hc, tie_ranks
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
+from andrey.search.hc import MoveScanner, _key_after, apply_move, hc
 from andrey.search.tabu import tabu
 from qa import identity
 
@@ -46,7 +46,7 @@ def _reference_scan(score, adj_int, parents_of, d, floor, tabu, ranks):
     def offer(value, u, v, rank, op):
         nonlocal best
         if value < floor and _key_after(adj_int, (op, u, v)) not in tabu:
-            cand = (round(value * inv_n, _KEY_DP), u, v, rank, (op, u, v))
+            cand = (round(value * inv_n, KEY_DP), u, v, rank, (op, u, v))
             key = (cand[0], ranks[u], ranks[v], rank)
             if best is None or key < (best[0], ranks[best[1]], ranks[best[2]], best[3]):
                 best = cand
@@ -107,16 +107,16 @@ def test_scanner_picks_as_full_rescan(seed: int) -> None:
     for step in range(90):
         recent = [*recent[-5:], tuple(adj_int)]
         tabu = set(recent)
-        for floor in (-_EPS_IMPROVE, math.inf):
+        for floor in (-EPS_IMPROVE, math.inf):
             want = _reference_scan(reference, adj_int, parents_of, d, floor, tabu, ranks)
             assert scanner.best(adj_int, parents_of, floor=floor, tabu=tabu) == want
         move = want
         edges = [(u, v) for v in range(d) for u in parents_of[v]]
         if step % 3 == 2 and edges:
             u, v = edges[rng.integers(len(edges))]
-            _apply_move(adj_int, parents_of, ("remove", u, v))
+            apply_move(adj_int, parents_of, ("remove", u, v))
         elif move is not None:
-            _apply_move(adj_int, parents_of, move[4])
+            apply_move(adj_int, parents_of, move[4])
     assert sum(len(p) for p in parents_of.values()) > 0
 
 
@@ -126,7 +126,7 @@ def test_reversing_a_covered_edge_ties_at_zero(seed: int) -> None:
 
     On the complete DAG ``0 -> 1 -> 2, 0 -> 2`` with nearly collinear ``0`` and ``1``, every removal
     loses a strong effect and both legal reverses are covered. Their Schur deltas carry rounding
-    noise far above ``_EPS_IMPROVE``, so only an exact zero leaves no improving move.
+    noise far above ``EPS_IMPROVE``, so only an exact zero leaves no improving move.
     """
     rng = np.random.default_rng(seed)
     n = 100_000
@@ -175,7 +175,7 @@ def test_exact_ties_break_independently_of_column_order(search, score_func) -> N
     first = MoveScanner(delta, d, ranks=tie_ranks(x)).best(adj_int, parents_of)
     assert first is not None and first[4][0] == "add"
     _, u, v = first[4]
-    assert round((score.score(u, [v]) - score.score(u, [])) / score.n, _KEY_DP) == first[0]
+    assert round((score.score(u, [v]) - score.score(u, [])) / score.n, KEY_DP) == first[0]
 
     rng = np.random.default_rng(0)
     orders = [np.arange(d)[::-1], *(rng.permutation(d) for _ in range(3))]
@@ -200,6 +200,13 @@ def test_tie_ranks_move_with_the_columns() -> None:
     near = x[:, [2, 2]] + np.column_stack([np.zeros(50), 1e-11 * np.sin(np.arange(50))])
     for data, order in ((copies, [1, 0]), (swapped, [1, 0, 2]), (near, [1, 0])):
         np.testing.assert_array_equal(tie_ranks(data[:, order]), tie_ranks(data)[order])
+
+
+def test_tie_ranks_stay_importable_from_hc() -> None:
+    """Code written against earlier builds imports ``tie_ranks`` from ``andrey.search.hc``."""
+    from andrey.search.hc import tie_ranks as from_hc
+
+    assert from_hc is tie_ranks
 
 
 _COPIED = np.r_[0, np.random.default_rng(10).integers(-10, 11, 127), 0].astype(np.float64)

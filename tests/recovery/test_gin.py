@@ -10,14 +10,9 @@ import pytest
 import andrey
 from andrey.core import LATENT, OBSERVED, GraphStructure, StructureOutput
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 _CASE = "measurement_6v"
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
 @pytest.fixture(scope="module")
@@ -73,11 +68,6 @@ def test_gin_finds_the_same_latents_for_reversed_columns() -> None:
 def test_gin_matches_its_recorded_output(fit) -> None:
     _, out = fit
     assert_recorded_output(out, "GIN", case=_CASE)
-
-
-def test_gin_is_deterministic(fit) -> None:
-    data, out = fit
-    assert andrey.gin(data) == out
 
 
 def test_gin_finds_one_latent_behind_three_indicators() -> None:

@@ -8,9 +8,10 @@ DataFrame or a NumPy array of one row per sample and one column per variable::
     out = andrey.pc(data)  # a StructureOutput; the graph is out.structure
     print(out)
 
-Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns one ``StructureOutput`` wrapping a
-first-class ``Structure`` (a ``GraphStructure`` or ``TemporalStructure``). The public graph types
-are re-exported here (``andrey.GraphStructure``) alongside ``andrey.core.*``.
+Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns a ``StructureOutput``
+(``multi_group_direct_lingam``, one per group) wrapping a first-class ``Structure`` (a
+``GraphStructure`` or ``TemporalStructure``). The public graph types are re-exported here
+(``andrey.GraphStructure``) alongside ``andrey.core.*``.
 
 For a coding agent, the command line carries the same methods: ``andrey --skill`` prints the guide
 to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's contract as JSON.
@@ -19,6 +20,7 @@ to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's 
 from .api import (
     anm,
     boss,
+    boss_fci,
     bottom_up_parce_lingam,
     calm,
     cam,
@@ -29,6 +31,7 @@ from .api import (
     dynotears,
     exact_search,
     fci,
+    fci_jci,
     ges,
     gfci,
     gies,
@@ -36,12 +39,14 @@ from .api import (
     gnies,
     granger,
     grasp,
+    grasp_fci,
     hc,
     iamb,
     ica_lingam,
     icp,
     igsp,
     inter_iamb,
+    jpcmciplus,
     longitudinal_lingam,
     lpcmci,
     mmhc,
@@ -78,7 +83,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
 
 __all__ = [
     "__version__",
@@ -115,6 +120,7 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    "fci_jci",
     "icp",
     "iamb",
     "inter_iamb",
@@ -133,6 +139,8 @@ __all__ = [
     "rsmax2",
     "boss",
     "grasp",
+    "boss_fci",
+    "grasp_fci",
     "igsp",
     "ut_igsp",
     "direct_lingam",
@@ -148,6 +156,7 @@ __all__ = [
     "longitudinal_lingam",
     "pcmci",
     "pcmciplus",
+    "jpcmciplus",
     "lpcmci",
     "granger",
     "dynotears",

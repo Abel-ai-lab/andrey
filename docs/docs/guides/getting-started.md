@@ -22,7 +22,7 @@ With [uv](https://docs.astral.sh/uv/), add it to your project (`uv init` creates
 
 ```shell
 uv add andrey-core            # base (pure NumPy)
-uv add "andrey-core[torch]"   # torch backend: GPU primitives
+uv add "andrey-core[torch]"   # torch backend: GPU primitives and CALM
 uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
@@ -31,7 +31,7 @@ With pip:
 
 ```shell
 pip install andrey-core            # base (pure NumPy)
-pip install "andrey-core[torch]"   # torch backend: GPU primitives
+pip install "andrey-core[torch]"   # torch backend: GPU primitives and CALM
 pip install "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 pip install "andrey-core[all]"     # every extra
 ```
@@ -52,9 +52,9 @@ pip install "andrey-core[torch]"
 For ROCm, install the matching PyTorch build yourself, then `andrey-core`. Andrey has no backend
 for Intel GPUs.
 
-### The development version
+### From GitHub
 
-The latest `main` from GitHub, ahead of the next release:
+The `main` branch on GitHub holds the latest release:
 
 ```shell
 uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
@@ -323,10 +323,10 @@ holds and keep weak links more often than they do on the data.
 ### Checking a result against the data
 
 A graph implies independences: PC's graph has no link between p38 and jnk, so given the right
-variables the two must look independent in the data. `andrey.markov_check` tests every
-independence the graph implies and asks whether the p-values are uniform, as they are when all of
-them hold. The cells that learned the graph would flatter it, so learn on a random half of the
-cells and check on the other half:
+variables the two must look independent in the data. `andrey.markov_check` tests the ordered local
+Markov independences, each variable and each earlier non-parent given its parents, and asks whether
+the p-values are uniform, as they are when all of them hold. The cells that learned the graph would
+flatter it, so learn on a random half of the cells and check on the other half:
 
 ```{code-cell} ipython3
 cells = np.random.default_rng(0).permutation(len(sachs.data))
@@ -351,18 +351,19 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 ## Your own data
 
-Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
-per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes `env`, each row's environment, `gies` and `igsp` also take
+Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row per
+sample and one column per variable. Most methods take that one argument and return the same kind of
+result; `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`, `hc`, `tabu`,
+`boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies` and `igsp` also take
 `env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
-learns which variables each environment's interventions changed, `icp` takes `env` and `target`,
-the variable whose parents it finds, and `multi_group_direct_lingam` and `longitudinal_lingam` take
-a list of datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph
-each one returns.
+learns which variables each environment's interventions changed, `icp` takes `env` and `target`, the
+variable whose parents it finds, and `multi_group_direct_lingam`, `longitudinal_lingam`, and
+`jpcmciplus` take a list of datasets. `andrey list` names the methods, and {doc}`graph-types`
+explains which graph each one returns.
 
-`ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. Map an
-observational environment to `[]`, a setting to the targets you know, and a setting whose targets
-you do not know to `None`:
+`ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. It calls the rows
+of one environment of `env` a setting. Map an observational environment to `[]`, a setting to the
+targets you know, and a setting whose targets you do not know to `None`:
 
 ```python
 from andrey import ut_igsp
@@ -410,8 +411,11 @@ The result honors every part: a required edge is there and directed, a forbidden
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
 of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
-graphs: a required edge is there without a direction, and tiers and edges forbidden one way, which
-constrain orientation, do not change them. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
+graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
+`structure="moral"`, a choice of `iamb` and `inter_iamb`: a required edge is there without a
+direction, and tiers and edges forbidden one way, which constrain orientation, do not change them.
+With `structure="cpdag"`, the default of `iamb` and `inter_iamb`, they direct the edges the
+knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
 and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
 earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
 directions close a cycle over the edges the search kept raises one after the adjacency search.
@@ -420,12 +424,11 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
-PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
-lagged variables. A third entry
-gives an edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`,
-and lag `0` is the same step. A forbidden pair without a lag holds at every lag, and a required
-link names its lag. Tiers and `allowed` hold at every lag, and a variable's links to its own past
-stay allowed:
+The time-series methods read the knowledge as links between lagged variables. A third entry gives an
+edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
+is the same step, except in PCMCI and Granger, which learn no same-step links. A forbidden pair
+without a lag holds at every lag, and a required link names its lag. Tiers and `allowed` hold at
+every lag, and a variable's links to its own past stay allowed:
 
 ```python
 from andrey import Knowledge, pcmciplus
@@ -448,78 +451,85 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
-`ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and
-`exact_search` take every score; `gies` scores each variable on the rows without an intervention on
-it. `gfci`, `mmhc`, and `rsmax2` take a score and a test
-that read the same kind of data, such as
+{{ indep_test_names }} take the tests; {{ score_func_names }} take every score; `gies` scores each
+variable on the rows without an intervention on it. `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and
+`rsmax2` take a score and a test that read the same kind of data, such as
 `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
-**Categorical data.** Each distinct value of a column is one category. A column may hold whole
-numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
+### Categorical data
 
-**The default test and score.** `indep_test=None` and `score_func=None`, the defaults, pick from
-the column types you declare: a column is categorical when `categorical=[...]` names it, by label
-or 0-based position, or when it is a DataFrame's `category`, `bool`, or text column. When every
-column is categorical, the tests default to `gsq` and the scores to `bdeu`; when some are, both
-default to `cond_gauss`, the conditional Gaussian; otherwise to `fisherz` and `bic`. Values never
-decide: a column of counts or ratings stays numbers until you declare it. An `indep_test` or
-`score_func` you pass is always the one used. The result's `metadata["indep_test"]` and
-`metadata["score_func"]` name the test and the score the fit used, the one picked for `None`
-included.
+Each distinct value of a column is one category. A column may hold whole numbers, which need not
+start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
 
-**Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
-`andrey.pc(data, indep_test="cond_gauss")` or
-`andrey.ges(data, score_func="cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
-turns each categorical column into indicator columns and treats every column as Gaussian, so it
-suits effects that are linear and add up across categories. The conditional Gaussian
-(`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
-variable's spread as well as its mean; it needs several rows for each combination of categories it
-conditions on. Both are experimental. With either score, `hc` gives no categorical column a
-continuous parent.
+### Default test and score
 
-**Marking the categorical columns.** Name them with `categorical`, by label (the column name as
-text) or 0-based position:
+`indep_test=None` and `score_func=None`, the defaults, pick from the column types you declare: a
+column is categorical when `categorical=[...]` names it, by label or 0-based position, or when it is
+a DataFrame's `category`, `bool`, or text column. When every column is categorical, the tests
+default to `gsq` and the scores to `bdeu`; when some are, both default to `cond_gauss`, the
+conditional Gaussian; otherwise to `fisherz` and `bic`. Values never decide: a column of counts or
+ratings stays numbers until you declare it. An `indep_test` or `score_func` you pass is always the
+one used. The result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the
+score the fit used, the one picked for `None` included.
+
+### Mixed data
+
+With continuous and categorical columns, choose a mixed-data test or score, such as
+`andrey.pc(data, indep_test="cond_gauss")` or `andrey.ges(data, score_func="cond_gauss")`. The
+degenerate Gaussian (`degen_gauss`) turns each categorical column into indicator columns and treats
+every column as Gaussian, so it suits effects that are linear and add up across categories. The
+conditional Gaussian (`cond_gauss`) gives each combination of categories its own Gaussian, so a
+category can change a variable's spread as well as its mean; it needs several rows for each
+combination of categories it conditions on. Both are experimental. With either score, `hc` and
+`tabu`, and so the score phase of `mmhc` and `rsmax2`, give no categorical column a continuous
+parent.
+
+### Marking the categorical columns
+
+Name them with `categorical`, by label (the column name as text) or 0-based position:
 `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
 a mixed-data setting reads a DataFrame's `category`, `bool`, and text columns as categorical, since
-their type declares them. Values never declare a column: a column of whole numbers that you have
-not declared is continuous, so `andrey.pc(df, indep_test="cond_gauss")` reads the same columns as
+their type declares them. Values never declare a column: a column of whole numbers that you have not
+declared is continuous, so `andrey.pc(df, indep_test="cond_gauss")` reads the same columns as
 `andrey.pc(df)` does when it picks `cond_gauss`. Pass `categorical=[]` for no categorical column.
 The result's `metadata["categorical"]` lists the categorical columns it read.
 
-**A declared column needs a test or score that reads categories.** A test or score for continuous
+A declared column needs a test or score that reads categories. A test or score for continuous
 data, such as `fisherz` or `bic`, raises `ValueError` on a column you declare categorical, whether
 `categorical` names it or its type does, since it would read the categories as numbers. Leave the
 setting as `None` to pick a categorical or mixed-data one, or pass `categorical=[]` to read every
 column as numbers. A categorical test or score, such as `chisq` or `bdeu`, reads every column as
 categorical, declared or not.
 
-**No categorical column.** A mixed-data setting that finds no categorical column, or gets
-`categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
-form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
-the BIC.
+A mixed-data setting that finds no categorical column, or gets `categorical=[]`, warns and runs as
+its linear-Gaussian form: both tests become the likelihood-ratio form of the partial-correlation
+test, close to `fisherz`, and the degenerate Gaussian score becomes the BIC.
 
-**Integer-coded columns.** Every method that reads columns as numbers, the default test and the
-linear-Gaussian BIC included, reads a column of codes such as 0, 1, 2 as numbers, which assumes
-the categories are ordered and evenly spaced. When columns of at most 10 distinct whole numbers
-reach such a method, or the continuous part of a mixed-data setting, a one-time `DataTypeWarning`
-names those columns; if they are categories, declare them with `categorical=[...]` or a pandas
-`category`, and the default test or score switches to a categorical or mixed-data one.
+### Integer-coded columns
 
-From the command line, the same settings are `key=value` arguments, such as
+Every method that reads columns as numbers, the default test and the linear-Gaussian BIC included,
+reads a column of codes such as 0, 1, 2 as numbers, which assumes the categories are ordered and
+evenly spaced. When columns of at most 10 distinct whole numbers reach such a method, or the
+continuous part of a mixed-data setting, a one-time `DataTypeWarning` names those columns; if they
+are categories, declare them with `categorical=[...]` or a pandas `category`, and the default test
+or score switches to a categorical or mixed-data one.
+
+### From the command line
+
+The same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'`. The data file
-holds numbers only, so code each category as a whole number and name those columns in
-`categorical`. The JSON result lists the categorical columns under `metadata.categorical` and the
-warnings under `run.warnings`.
+holds numbers only, so code each category as a whole number and name those columns in `categorical`.
+The JSON result lists the categorical columns under `metadata.categorical` and the warnings under
+`run.warnings`.
 
 ## Missing values
 
 Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
-write `NA` or `N/A` in the data file. PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and
-LPCMCI accept missing values: each conditional-independence test reads only the rows where all of
-its variables are observed (test-wise deletion), so it keeps the rows that deleting every incomplete
-row first would drop. The pair tests ANM and PNL read the rows where both columns are observed,
-which for a pair is the same deletion. Here a tenth of the Sachs measurements go missing at random:
+write `NA` or `N/A` in the data file. {{ missing_methods }} accept missing values: each
+conditional-independence test reads only the rows where all of its variables are observed
+(test-wise deletion), so it keeps the rows that deleting every incomplete row first would drop, and
+the pair tests of ANM and PNL read the rows where both columns are observed, which for a pair is the
+same deletion. Here a tenth of the Sachs measurements go missing at random:
 
 ```{code-cell} ipython3
 gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
@@ -552,17 +562,17 @@ Every other method raises a `ValueError` that names it: its score or loss reads 
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
 methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM and Granger, fill in the missing steps first.
+VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, fill in the missing steps first.
 
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_N_JOBS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
-serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
-processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
-with one worker.
+worker, GES, GFCI, the skeleton search of PC and the methods built on it, and the
+possible-d-separation step of FCI, FCI-JCI, and GFCI run their larger passes in worker processes
+and return the same graph as with one worker;
+[Parallel search](../configuration.md#parallel-search) lists the methods and tests that use them.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_N_JOBS` above 1, or `-1` for every core) must put its entry

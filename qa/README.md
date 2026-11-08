@@ -46,10 +46,12 @@ one manifest only, or has a count that rose. Two more options refit each draw an
 whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out.
-- `--workers N` refits PC, FCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, Granger, and PNL
-  on `N` workers, with every GES pass and every skeleton pass of conditioning size two or more sent
-  to the worker pool.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
+  IGSP, FCI-JCI, and J-PCMCI+ are not refit: their data hold each row's environment in one column,
+  ICP's target is the last variable, and J-PCMCI+'s contexts follow the system variables.
+- `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
+  on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
+  every possible-d-sep search sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.
@@ -152,18 +154,19 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP, XGES,
-HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
-MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI,
-VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each
-method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn,
-and GPDC, on nonlinear data, and the targets UT-IGSP learns:
+The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
+XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP,
+DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL,
+PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the
+datasets whose assumptions each method needs, PC with each supported nonlinear
+conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
+UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
-| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
+| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
@@ -171,6 +174,7 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `icp_do` at `d = 6, 10`, `n = 200` per environment, every other variable intervened | 10 seeds each | ICP |
 | `known_targets_one_setting_gauss_er`, `known_targets_two_settings_gauss_er` at `d = 20`, `n = 1000` per environment | 10 seeds each | IGSP |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
+| `fci_jci_s4`, `fci_jci_l10`: 4 and 10 variables, two regimes of `n = 500` | 10 seeds each | FCI-JCI |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
@@ -181,13 +185,14 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
+| `jpcmciplus_all_m10_t100`, `jpcmciplus_half_m10_t100`: 5 system variables, 10 datasets of 100 steps | 10 seeds each | J-PCMCI+ |
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
-| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
+| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | PC, FCI, GFCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -202,6 +207,12 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   and two hidden intermediates; and `latent_anm_er_tenth`, `anm_er`'s additive noise with one node
   in ten hidden, 20 observed. Both have 1,000 rows, and `d` counts the hidden nodes. A seed whose
   graph cannot hide its nodes is skipped and the next one taken, as the driver does.
+- **Environments with hidden common causes.** FCI-JCI's published regimes, drawn by its benchmark
+  driver (`benchmarks/fci_jci_cpu.py`) as its comparison's two in-claim cells of mechanism changes,
+  the simulation of Mooij, Magliacane, and Claassen (2020): `fci_jci_s4`, 4 variables with edge and
+  hidden-confounder probabilities 0.5, and `fci_jci_l10`, 10 variables with 0.25, each with one
+  context variable that changes one variable's mechanism and 500 rows in each of its two regimes.
+  The context variable, the environment, is the last column, and FCI-JCI runs at its defaults.
 - **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
   parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
   partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
@@ -226,6 +237,14 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   split the groups. GIN's number of tests grows combinatorially with the indicator count, so it runs
   at the two smaller sizes. A test keeps the domain, group, and measurement draws in step with the
   harness.
+- **Several datasets with contexts.** J-PCMCI+'s published cells, drawn by its benchmark driver
+  (`benchmarks/jpcmciplus_cpu.py`) from the model of the J-PCMCI+ authors' experiment script
+  (Gunther, Ninad, and Runge 2023): 5 system variables with lagged links, 2 time and 2 space
+  contexts, and 10 datasets of 100 steps, with every context observed and with one of each kind
+  observed. A draw where a hidden context confounds an observed context and a system variable
+  (Assumption 3 broken) is skipped and the next seed taken, as the driver's claimed rows leave it
+  out. J-PCMCI+ runs with both dummies at the benchmark's claimed setting, `tau_max=2` and
+  `alpha=0.05`.
 - **Unknown targets.** UT-IGSP's published regime, drawn by its benchmark driver
   (`benchmarks/ut_igsp_cpu.py`) as two of its comparison's cells: 20 variables at mean degree 1.5,
   an observational environment and five settings of 1,000 rows, each setting with one target it is
@@ -273,11 +292,13 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
-endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
-essential graph of the true DAG under the rows' targets, IGSP against the one under the settings'
-targets, GnIES and UT-IGSP against the one under the true targets, and CD-NOD against the CPDAG in
-which the domain index orients the edges it reaches. UT-IGSP's targets are scored apart, as
+ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI,
+BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables. GIES is scored
+against the interventional essential graph of the true DAG under the rows' targets, IGSP against the
+one under the settings' targets, GnIES and UT-IGSP against the one under the true targets, and
+CD-NOD against the CPDAG in which the domain index orients the edges it reaches. FCI-JCI is scored
+by endpoint SHD over the variables and the environment against its PAG at the true distribution, the
+truth its benchmark driver builds. UT-IGSP's targets are scored apart, as
 `UT-IGSP targets`, by the target error: the false plus the missed targets over the settings,
 against the given targets alone in place of the empty graph. GIN's
 errors are the latents it misses: the true latents whose indicators it does not return as one
@@ -285,9 +306,10 @@ cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the late
 edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
 nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
 time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
-endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
-series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the
-missing and extra lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
+endpoint SHD over the window of lags, J-PCMCI+ by endpoint SHD over the window of lags of the
+system variables, LPCMCI by endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM
+and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the missing and extra
+lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
 scored by its directed edges against the edges between observed variables that no hidden causal or
 backdoor path joins, the edges it can identify as direct: an edge in one set and not the other
 counts 1, a reversed one 2. A method that estimates a set of variables is scored by the set's false

@@ -1,4 +1,4 @@
-"""Validate seeded inputs and capture wiring independently of the committed baselines."""
+"""Validate the seeded inputs independently of the committed baselines."""
 
 from __future__ import annotations
 
@@ -6,12 +6,10 @@ import numpy as np
 import pytest
 
 from andrey.data.sortability import index_correlation
-from qa import capture_baselines as capture
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.tolerances import SPEC
 
 # Temporal / irregular cases, with their expected (n_samples, d) shape.
-NEW_CASES = {
+SHAPES = {
     "var_4v_stable": (500, 4),
     "svar_4v_gauss": (500, 4),
     "varma_3v": (500, 3),
@@ -21,8 +19,8 @@ NEW_CASES = {
 }
 
 
-@pytest.mark.parametrize(("case_id", "shape"), NEW_CASES.items(), ids=list(NEW_CASES))
-def test_new_case_shape(case_id, shape):
+@pytest.mark.parametrize(("case_id", "shape"), SHAPES.items(), ids=list(SHAPES))
+def test_a_case_has_its_shape(case_id, shape):
     X = datagen.generate(case_id)
     assert X.shape == shape
     assert X.dtype == np.float64
@@ -44,20 +42,6 @@ def test_confounder_is_dropped():
     spec = datagen.CASES["confounded_6v"]
     assert 0 not in spec["observed"], "latent column 0 must not be observed"
     assert datagen.generate("confounded_6v").shape[1] == len(spec["observed"])
-
-
-# --- capture <-> tolerances wiring ---------------------------------------------
-
-
-def test_every_algorithm_has_a_spec_and_case():
-    for name, (_runner, case) in capture.ALGORITHMS.items():
-        assert name in SPEC, f"{name} missing a tolerances.SPEC entry"
-        assert case in datagen.CASES, f"{name} references unknown case {case!r}"
-
-
-def test_every_spec_entry_compares_something():
-    for name, spec in SPEC.items():
-        assert set(spec["structural"]) or set(spec["numeric"]), f"{name} would compare nothing"
 
 
 # --- column order ------------------------------------------------------------------------------

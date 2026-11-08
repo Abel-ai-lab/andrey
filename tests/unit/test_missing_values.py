@@ -379,7 +379,7 @@ def test_cdnod_reads_a_complete_domain_index_and_refuses_the_independent_change_
 
 def test_a_lagged_design_reads_the_steps_its_lagged_variables_share():
     x = _gaps(_continuous(400), 0.05)
-    design = lagged_design(x, 2)
+    design = lagged_design(x, 4)
     test = design_test("student_t", x, 2)
     columns = [0, 6, 13]  # variable 0 now, variable 1 one step back, variable 3 two steps back
     rows = ~np.isnan(design[:, columns]).any(axis=1)
@@ -395,7 +395,7 @@ def test_a_lagged_design_reads_the_steps_its_lagged_variables_share():
 
 def _fit(name: str, x, **kwargs):
     fit = getattr(andrey, name)
-    if name == "cdnod":
+    if name in ("cdnod", "fci_jci"):
         return fit(x, np.repeat([0.0, 1.0], len(x) // 2 + 1)[: len(x)], **kwargs)
     if REGISTRY[name].family == "pairwise":  # a pair test reads two columns
         return fit(x.iloc[:, :2] if isinstance(x, pd.DataFrame) else x[:, :2], **kwargs)
@@ -474,7 +474,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
         assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
     else:
         assert "drop the rows that hold one" in str(error.value)
-        assert "pc, fci, cdnod, iamb, inter_iamb, or mmpc" in str(error.value)
+        assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
 
 
 def test_a_refused_text_category_names_the_method():

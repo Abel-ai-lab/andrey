@@ -12,7 +12,7 @@ repository's conventions.
 - `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
-- `apps/`: the interactive examples.
+- `apps/`: the demos.
 - `docs/` and `site/`: the website, one Sphinx project in `docs/` (the documentation in
   `docs/docs/`), with the homepage's template and content generators in `site/`.
 
@@ -33,7 +33,7 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/concepts.py` | The package-wide parameter rules: one `Concept` per shared parameter or behavior, with its template `ParamSpec`, the suitable and exempt methods, and each cell that still differs. |
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
-| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
+| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, the exit codes, and each command's invocation. |
 | `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, `bootstrap`, and `markov-check`; `run` and `bootstrap` validate `<method>` and its `key=value` overrides (and `--config`) against the registry. |
 | `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph, a valid graph of the method's kind. |
 | `src/andrey/markov.py` | `andrey.markov_check` and `MarkovCheckOutput`: the independences a DAG or CPDAG implies, tested against the data. |
@@ -44,8 +44,12 @@ A page that states a fact about the methods, such as how many there are, how man
 or which ones a family holds, computes it from the registry when it is built; no page types it in.
 A typed count goes stale without failing anything when a method is added or promoted.
 
-- `docs/conf.py` gives the documentation pages substitutions (`{{ method_count }}`,
-  `{{ n_supported }}`) from `_methods_text`.
+- `docs/conf.py` gives the documentation pages substitutions from `_methods_text`:
+  `{{ method_count }}`, `{{ n_supported }}`, `{{ supported_methods }}`, and the methods each
+  predicate of `METHOD_LISTS` selects, such as those that take `indep_test`, as
+  `{{ indep_test_methods }}` in prose names and `{{ indep_test_names }}` in code names. A page
+  that lists such methods uses the substitution; a method without a prose name in `PROSE_NAMES`
+  stops the build.
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
   methods (`COUNTED_WITH` names the methods that count with the one they extend).
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
@@ -61,7 +65,7 @@ was read.
 the command-line loop, reading a result (every edge type and its symbol), choosing a method (one
 line per method), the `ANDREY_*` variables, and the exit codes. `render_skill` builds it from the
 specs, so a new method or variable reaches it without an edit. To install it for an agent:
-`andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
+`mkdir -p ~/.claude/skills/andrey && andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
 
 An agent that has only run `pip install andrey-core` finds it from `help(andrey)`, whose docstring
 (`src/andrey/__init__.py`) holds a quick start and names `andrey --skill` and
@@ -101,26 +105,45 @@ repository.
 ## Docstring standard
 
 Public `andrey.api` facades carry a NumPy-style docstring (`ruff.toml` pins `convention = "numpy"`
-and enforces the `D` rules on `src/andrey/api/**`). Autodoc renders it; machine-readable metadata
-lives in the registry. Every facade docstring has, in order:
+and enforces the `D` rules on `src/andrey/api/**` and the other public modules: `data`, `viz`,
+`resample.py`, and `markov.py`). Autodoc renders it; machine-readable metadata lives in the
+registry. Every facade docstring has, in order:
 
 - **Summary**: one imperative line naming what it learns and the graph kind ("Learn a CPDAG ...").
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: always `StructureOutput`, naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
-  and the contents of `.metadata`, `.ordering`, and `.weighted_adjacency`.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
+  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
+  `.weighted_adjacency` when the method sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
+- **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
+  the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
+  boundary ended on a cap. A warning from a layer many methods share, such as a CI test's
+  `SampleSizeWarning`, a worker pool's `PerformanceWarning`, `BackendFallbackWarning`, or a
+  dependency's convergence warning raised again as `SearchLimitWarning`, is listed in the warnings
+  table of `docs/docs/api.md`.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
   series; observational, interventional, or multi-domain), the model assumptions that matter
   to a user, the scale it is designed for, what it returns, and the method to use outside that
-  setting. A **Limitations.** paragraph follows with the measured failures
-  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); the two do not
-  repeat each other.
+  setting. A **Missing values.** paragraph says whether a `NaN` is read or raises, why, and what
+  to do instead. A **Limitations.** paragraph follows with the measured failures
+  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); it and
+  **When to use.** do not repeat each other. Limitations is the last paragraph of Notes.
+- **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
-  shape, `ordering`), never a repr. Stochastic methods are seeded (`seed=0`); `[torch]`-only ones
-  carry `# doctest: +SKIP`.
+  shape, `ordering`), never a repr. An example whose result depends on the seed at its settings
+  passes `seed=0`; `[torch]`-only ones carry `# doctest: +SKIP`.
+
+A facade has no `See Also`: its **When to use.** paragraph names the methods to use instead.
+
+The sentences that state one rule for many methods come from one table, `SHARED` in
+`scripts/docstring_text.py`: the openers of the Raises entries, the `seed`, `knowledge`, and `env`
+entries, the closing sentences of **Missing values.** and **Limitations.**, the `tie_break` record
+in Returns, and the shared Warns entries. To change one, edit the table and run
+`uv run python scripts/docstring_text.py`, which rewrites every copy and names a method that should
+hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
 `TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their
@@ -131,11 +154,22 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 
 ### Add a method
 
+Start from the method's spec (`CONTRIBUTING.md`, "Propose a method"): the peer-reviewed paper that
+defines it, the existing implementations, and the setting the paper claims.
+
 1. Implement the facade in `src/andrey/api/<family>.py`, decorated with `@method_spec("<name>")`,
-   and add its name to `andrey.api.__all__`. The wrapper (`src/andrey/api/_method.py`) checks every
-   argument against the method's `ParamSpec`, resolves a seeded method's seed, gives the
-   experimental warning, and sets `metadata["algorithm"]` and `metadata["seed"]`, so the facade
-   holds only the method's own logic.
+   add its name to `andrey.api.__all__`, and re-export it as `andrey.<name>` in
+   `src/andrey/__init__.py`, in its imports and its `__all__`. The wrapper
+   (`src/andrey/api/_method.py`) checks every argument against the method's `ParamSpec`, resolves
+   a seeded method's seed, gives the experimental warning, picks the `indep_test` or `score_func` a
+   call leaves `None` from the declared column types, and sets `metadata["algorithm"]` and
+   `metadata["seed"]`, so the facade holds only the method's own logic. A facade with a test or a
+   score reads its data, column labels, and knowledge with `fit_inputs` in
+   `src/andrey/api/_adapt.py`, and PCMCI, PCMCI+, and LPCMCI with `series_inputs`; one that checks
+   another setting between those steps, as `igsp` checks its environments, calls the steps itself
+   in that order. A score search that takes an optional `env`, the environment index as a variable
+   no data variable causes, runs through `cpdag_search` there, and a score search followed by FCI's
+   tests and rules through `fci_hybrid` in `src/andrey/api/constraint.py`.
    Open the docstring's Notes with a **When to use.** paragraph, as the
    [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
    paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and
@@ -149,7 +183,7 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
-   `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
+   `andrey.core.ties.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
    `tests/unit/test_column_labels.py` checks both fields on every method.
    List the method in `src/andrey/spec/concepts.py` under each concept, as suitable (taking the
    template with `concept_param`, or a recorded deviation) or exempt with the reason;
@@ -182,11 +216,11 @@ removed after a release goes in `MethodSpec.dropped_args` for one release: the w
 with the same warning. Bounds go in the `ParamSpec`, which the wrapper checks; a facade checks only
 what depends on the data or on another parameter.
 
-A method that draws random numbers sets `seeded=True` and takes `seed` (`concept_param("seed")`),
-and the wrapper resolves it and records `metadata["seed"]`. A search that tests independence
-passes the seed to `make_indep_test`, which gives it to the tests in `STOCHASTIC_INDEP_TESTS` and
-only to them, at every place the search builds a test. A method takes no execution setting such as
-`n_jobs`; it reads them from `andrey.config`.
+A method that draws random numbers takes `seed` (`concept_param("seed")`), which makes its spec
+`seeded` and `stochastic`, and the wrapper resolves it and records `metadata["seed"]`. A search
+that tests independence passes the seed to `make_indep_test`, which gives it to the tests in
+`STOCHASTIC_INDEP_TESTS` and only to them, at every place the search builds a test. A method takes
+no execution setting such as `n_jobs`; it reads them from `andrey.config`.
 
 ### Publish a boundary lane
 
@@ -282,7 +316,7 @@ on a machine with CUDA or MPS and a device torch build
 ANDREY_REQUIRE_GPU=1 uv run --no-sync pytest tests/gpu -ra
 ```
 
-It compares each device with the numpy result within per-device tolerances;
+It compares each device with the NumPy result within per-device tolerances;
 `ANDREY_REQUIRE_GPU=1` fails, rather than skips, without an accelerator. No hosted runner has a
 GPU, so CI does not run it.
 
@@ -356,8 +390,9 @@ from the Typer app. A change keeps this contract:
   (`SCHEMA_VERSION`), versioned apart from a saved graph's `format_version`; changes within a
   version are additive, and consumers check it first. Help and configuration reports carry
   `andrey_version`; results carry it under `run.versions.andrey`.
-- A non-interactive stdout (a pipe, an agent, CI) gets JSON on success, a terminal a human summary,
-  and `--json` forces JSON; diagnostics and the error envelope go to stderr.
+- `run`, `list`, `bootstrap`, `markov-check`, and `calibrate` give a non-interactive stdout (a pipe,
+  an agent, CI) JSON on success and a terminal a human summary; `--json` forces JSON, also from
+  `config`. Diagnostics and the error envelope go to stderr.
 - A large graph's inline `edges` are capped (`edges_truncated`); `n_edges` and the `edge_types`
   breakdown stay complete, and `--full` or `-o <file>` keep every edge.
 - Result envelope: `{schema_version, method, status, structure|results, metadata, run}`, where `run`

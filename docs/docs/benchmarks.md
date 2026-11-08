@@ -17,40 +17,72 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.14.0
+:link: benchmarks/0.15.0
 :link-type: doc
-:link-alt: The 0.14.0 release card: interventional data
-:class-card: release-cover release-art release-art-0-14-0
+:link-alt: The 0.15.0 release card: multi-domain data
+:class-card: release-cover release-art release-art-0-15-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Interventional data
+Multi-domain data
 
-0.14.0
+0.15.0
 :::
 
 ::::{div} release-tldr
 
-0.14.0 is here: interventional data. The card measures the methods it makes supported against
-their authors' code: GnIES and UT-IGSP, which learn the targets of experiments they are not told,
-IGSP, ICP, CAM-UV, and DYNOTEARS.
+0.15.0 is here: multi-domain data. The card measures the methods it makes supported against their
+authors' code: FCI-JCI, which learns from data collected in several environments, against pcalg;
+BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes; and J-PCMCI+, which
+learns from time series of several datasets, against tigramite.
 
 :::{div} release-stats
 
-- **6 methods** newly supported: GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS
-- **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
-- **34x** GnIES's median speed over the authors' gnies package
+- **4 methods** newly supported: FCI-JCI, BOSS-FCI, GRaSP-FCI, and J-PCMCI+
+- **0 of 186** comparisons where pcalg, Tetrad 7.6.10, or tigramite makes significantly fewer errors
+- **72x to 79x** FCI-JCI's median speed over pcalg at 10 variables
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.14.0.md)
+[Read the release card](benchmarks/0.15.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.14.0
+:link-type: doc
+:link-alt: The 0.14.0 release card: interventional data
+:class-card: release-tile release-art-0-14-0
+:shadow: none
+:margin: 0
+
+0.14.0
+:::
+
+:::{div} release-body
+<h3>Interventional data</h3>
+
+GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS against their authors' code; GnIES and UT-IGSP
+learn the targets of experiments they are not told.
+
+- **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
+- GnIES **34x** faster than the authors' gnies package in the median
+:::
+
+:::{div} release-meta
+Released November 5, 2026
+
+- [Release card<span class="visually-hidden"> 0.14.0</span>](benchmarks/0.14.0.md)
+- [Post: Interventional data](../blog/20261105-andrey-0-14-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -377,7 +409,7 @@ Released October 15, 2026
 :::{div} release-body
 <h3>Score-based search</h3>
 
-XGES, compared with xges, and Tabu search and hill climbing, compared with bnlearn, on
+XGES, compared with xges, and tabu search and hill climbing, compared with bnlearn, on
 linear-Gaussian data.
 
 - **3** methods
@@ -458,6 +490,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.15.0: multi-domain data <benchmarks/0.15.0>
 0.14.0: interventional data <benchmarks/0.14.0>
 0.13.0: functional causal models <benchmarks/0.13.0>
 0.12.0: calibration <benchmarks/0.12.0>

@@ -18,16 +18,20 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.14.0
+## ⭐ What's new in 0.15.0
 
-Interventional data: rows from experiments, where a variable was changed from outside. Where
-observation leaves the direction of an edge open, an experiment on either end can settle it. IGSP
-learns graphs from experiments with known targets, GnIES and UT-IGSP from experiments whose targets
-they are not told, and ICP finds the causes of one variable, all as accurately as their authors'
-code. CAM-UV and DYNOTEARS are supported too.
+Multi-domain data come from several environments, such as sites, batches, or the conditions of an
+experiment, that share one causal structure and differ in the mechanisms of some variables. With
+each row's environment recorded as an environment index, a method can tell a dependence that
+changing mechanisms create from a causal edge, and it can orient edges that one environment leaves
+undirected. FCI-JCI learns from these data while allowing hidden common causes, BOSS-FCI and
+GRaSP-FCI allow them too, and J-PCMCI+ learns from time series of several datasets. In our
+comparisons with their authors' code, in the settings their papers study, none of the four made
+significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
+BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
 
-**[Read the post](https://andrey.abel.ai/blog/20261105-andrey-0-14-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.14.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261108-andrey-0-15-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html)**
 
 ---
 
@@ -38,7 +42,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 40 supported methods, each one function call.
+- **One API**: 44 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -54,9 +58,10 @@ pip install andrey-core
 
 You install andrey-core and then `import andrey`.
 
-- **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
-  layouts
-- **Development version**: `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
+- **Optional extras**: `andrey-core[torch]` for GPUs and CALM, `andrey-core[viz]` for charts and
+  graph layouts
+- **From GitHub**, the latest release:
+  `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 
@@ -67,11 +72,11 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 40 supported methods. Data types: continuous,
+    <img alt="Andrey: accelerated, accurate, agentic. 44 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
-      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability:
-      NetworkX, pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
+      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
+      pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
       src=".github/readme/package-card-light.svg" width="100%">
   </picture>
 </p>
@@ -87,11 +92,11 @@ You install andrey-core and then `import andrey`.
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, UNDIRECTED |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`fci_jci`](https://andrey.abel.ai/docs/api/andrey.fci_jci.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, Undirected graph |
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html)\*, [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html)\*, [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
-| Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG |
+| Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`boss_fci`](https://andrey.abel.ai/docs/api/andrey.boss_fci.html), [`grasp_fci`](https://andrey.abel.ai/docs/api/andrey.grasp_fci.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG, PAG |
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html) | DAG |
-| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
+| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html), [`camuv`](https://andrey.abel.ai/docs/api/andrey.camuv.html) | DAG, PAG |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html) | Two-node DAG |
 
@@ -140,7 +145,8 @@ pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
 
 PC finds 8 edges, all among the known network's 17. The structural Hamming distance (SHD) counts
 the edges to add, remove, or reorient to reach the known network: 11 here (9 edges are missing, and
-2 are oriented that the known network leaves undirected), and 17 for a graph with no edges.
+2 are oriented where the known network's CPDAG leaves them undirected), and 17 for a graph with no
+edges.
 
 <!-- QUICKSTART:END -->
 
@@ -171,9 +177,9 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
   [changelog](https://andrey.abel.ai/docs/changelog.html).
 - [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, stage by stage.
 
-Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
-tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups
-(CUDA / MPS) are not tested there yet.
+Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is
+supported; macOS and Windows install and run on the CPU, with no guarantee yet
+([Testing](https://andrey.abel.ai/docs/ci.html)). Apple GPUs are not supported in the alpha.
 
 ## Citing, license, contributing
 
@@ -185,7 +191,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.14.0},
+  version = {0.15.0},
   url = {https://andrey.abel.ai},
 }
 ```

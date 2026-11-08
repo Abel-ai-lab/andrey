@@ -18,10 +18,11 @@ its edges join two variables without a claim about direction or, for a moral gra
 from __future__ import annotations
 
 import dataclasses
+import heapq
 import itertools
 from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import numpy as np
 
@@ -59,7 +60,7 @@ EDGE_DTYPE = np.dtype([("i", "i4"), ("j", "i4"), ("mark_i", "i1"), ("mark_j", "i
 
 # ``oriented_edges`` type by mark pair on edge ``i-j``, and whether ``(i, j)`` is already
 # ``(source, target)``. The source is the tail or circle end; for ``-o`` it is the tail end.
-_EDGE_TYPES: dict[tuple[int, int], tuple[str, bool]] = {
+EDGE_TYPES: dict[tuple[int, int], tuple[str, bool]] = {
     (TAIL, ARROW): ("directed", True),
     (ARROW, TAIL): ("directed", False),
     (CIRCLE, ARROW): ("partially_directed", True),
@@ -82,8 +83,8 @@ EDGE_GLYPHS = {
 # Index into ``_TYPE_NAMES`` by mark-pair code ``mark_i * 4 + mark_j``; -1 for no type.
 _TYPE_NAMES = tuple(EDGE_GLYPHS)
 _TYPE_CODE = np.full(16, -1, dtype=np.int64)
-_TYPE_CODE[[a * 4 + b for a, b in _EDGE_TYPES]] = [
-    _TYPE_NAMES.index(t) for t, _ in _EDGE_TYPES.values()
+_TYPE_CODE[[a * 4 + b for a, b in EDGE_TYPES]] = [
+    _TYPE_NAMES.index(t) for t, _ in EDGE_TYPES.values()
 ]
 SUMMARY_EDGES = 30  # edges a printed summary lists before "... and N more"
 # Graphviz arrow shape per endpoint mark.
@@ -607,9 +608,11 @@ class GraphStructure(Structure):
 
         A ``pag`` or ``mag`` is written as pcalg's ``amat.pag``: ``amat[a, b]`` is the mark at the
         column node ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2``
-        arrowhead, ``3`` tail. A ``dag`` or ``cpdag`` is written as ``amat.cpdag``: ``a -> b`` is
-        ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's row, and ``a -- b`` is ``1`` in
-        both cells. ``from_pcalg`` reads the result back. Each call builds a new array.
+        arrowhead, ``3`` tail. A ``dag``, ``cpdag``, or ``undirected`` graph is written as
+        ``amat.cpdag``: ``a -> b`` is ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's
+        row, and ``a -- b`` is ``1`` in both cells. ``from_pcalg`` reads the result back with the
+        graph's ``kind``; it has no ``"undirected"`` kind, so an undirected graph reads back with
+        ``kind="cpdag"``, as a CPDAG. Each call builds a new array.
 
         Returns
         -------
@@ -951,11 +954,12 @@ class GraphStructure(Structure):
         -------
         np.ndarray of int32
             The adjacent node indices, ascending and read-only; includes ``i`` if it has a
-            self-loop.
+            self-loop. They are positions even when the graph has labels, by which
+            :meth:`parents` and the other graph queries name their nodes.
         """
-        from ._convert import _positions
+        from . import _queries
 
-        i = _positions(self, [i], "i")[0]
+        i = _queries.node(self, i, "i")
         if self._layout == "sym":
             return self._indices[self._indptr[i] : self._indptr[i + 1]]
         # compact: out-edges (row i) plus in-edges (i appearing as a column in another row).
@@ -1417,7 +1421,7 @@ class GraphStructure(Structure):
                 yield i, j, "directed"
                 yield j, i, "directed"
                 continue
-            edge_type, forward = ("directed", True) if i == j else _EDGE_TYPES[(mi, mj)]
+            edge_type, forward = ("directed", True) if i == j else EDGE_TYPES[(mi, mj)]
             yield (i, j, edge_type) if forward else (j, i, edge_type)
 
     def _type_counts(self) -> dict[str, int]:
@@ -1436,36 +1440,6 @@ class GraphStructure(Structure):
         counts[0] += reciprocal_count
         return {_TYPE_NAMES[codes[k]]: int(counts[codes[k]]) for k in np.sort(first)}
 
-    def _edge_count_text(self) -> str:
-        """Format the edge count and type breakdown for a summary header."""
-        counts = self._type_counts()
-        types = ", ".join(f"{n} {t}" for t, n in counts.items()) or "no edges"
-        return f"{sum(counts.values())} edges ({types})"
-
-    def _edge_lines(
-        self,
-        *,
-        weights: np.ndarray | scipy.sparse.csr_array | None = None,
-        limit: int | None = SUMMARY_EDGES,
-        more: str = "",
-    ) -> list[str]:
-        """Format up to ``limit`` edges and append the omitted-edge count, if any."""
-        names = self._labels
-        pairs = self._mark_pairs()
-        lines = []
-        for s, t, edge_type in itertools.islice(self._oriented(pairs), limit):
-            directed = edge_type in ("directed", "partially_directed")
-            weight = f"  ({float(weights[s, t]):+.3g})" if weights is not None and directed else ""
-            source, target = (names[s], names[t]) if names else (str(s), str(t))
-            lines.append(f"{source} {EDGE_GLYPHS[edge_type]} {target}{weight}")
-        left = len(pairs[0]) - len(lines)
-        if self._kind == "digraph":
-            i, j, near, far = pairs
-            left += np.count_nonzero((i != j) & (near == ARROW) & (far == ARROW))
-        if left > 0:
-            lines.append(f"... and {left} more{more}")
-        return lines
-
     def _summary(
         self,
         *,
@@ -1475,9 +1449,9 @@ class GraphStructure(Structure):
         more: str = "",
     ) -> list[str]:
         """Build the graph header, edge lines, and optional latent-node line."""
-        head = f"{self._kind}  |  {self._n_nodes} nodes  |  {self._edge_count_text()}"
+        head = f"{self._kind}  |  {self._n_nodes} nodes  |  {edge_count_text(self)}"
         lines = [head if name is None else f"{name}  {head}"]
-        edges = self._edge_lines(weights=weights, limit=limit, more=more)
+        edges = edge_lines(self, weights=weights, limit=limit, more=more)
         if edges:
             lines += ["", *("  " + line for line in edges)]
         if self._node_types is not None and (self._node_types == LATENT).any():
@@ -1533,6 +1507,42 @@ class GraphStructure(Structure):
         return all(np.array_equal(x, y) for x, y in zip(a, b))
 
     __hash__ = None  # type: ignore[assignment]
+
+
+def edge_count_text(graph: GraphStructure) -> str:
+    """Return the edge count and type breakdown of a summary header, such as ``3 edges (2
+    directed, 1 undirected)``."""
+    counts = graph._type_counts()
+    types = ", ".join(f"{n} {t}" for t, n in counts.items()) or "no edges"
+    return f"{sum(counts.values())} edges ({types})"
+
+
+def edge_lines(
+    graph: GraphStructure,
+    *,
+    weights: np.ndarray | scipy.sparse.csr_array | None = None,
+    limit: int | None = SUMMARY_EDGES,
+    more: str = "",
+) -> list[str]:
+    """Return the summary lines of up to ``limit`` edges, then the count of the others, if any.
+
+    ``weights[source, target]`` follows a directed edge, and ``more`` ends the count's line.
+    """
+    names = graph._labels
+    pairs = graph._mark_pairs()
+    lines = []
+    for s, t, edge_type in itertools.islice(graph._oriented(pairs), limit):
+        directed = edge_type in ("directed", "partially_directed")
+        weight = f"  ({float(weights[s, t]):+.3g})" if weights is not None and directed else ""
+        source, target = (names[s], names[t]) if names else (str(s), str(t))
+        lines.append(f"{source} {EDGE_GLYPHS[edge_type]} {target}{weight}")
+    left = len(pairs[0]) - len(lines)
+    if graph._kind == "digraph":
+        i, j, near, far = pairs
+        left += np.count_nonzero((i != j) & (near == ARROW) & (far == ARROW))
+    if left > 0:
+        lines.append(f"... and {left} more{more}")
+    return lines
 
 
 @dataclass(frozen=True, eq=False, slots=True, kw_only=True, repr=False)
@@ -1914,8 +1924,8 @@ class TemporalStructure(Structure):
         head = f"temporal  |  {self._n_nodes} nodes  |  {self.n_lags} lags"
         lines = [head if name is None else f"{name}  {head}"]
         for lag, graph in zip(self._lag_indices, self._lags):
-            lines += ["", f"  lag {lag}  |  {graph._edge_count_text()}"]
-            lines += ["    " + line for line in graph._edge_lines(limit=limit, more=more)]
+            lines += ["", f"  lag {lag}  |  {edge_count_text(graph)}"]
+            lines += ["    " + line for line in edge_lines(graph, limit=limit, more=more)]
         return lines
 
     def summary_graph(self, *, include_lag0: bool = True) -> SummaryGraph:
@@ -1944,19 +1954,11 @@ class TemporalStructure(Structure):
         for lag, graph in zip(self._lag_indices, self._lags):
             if lag == 0 and not include_lag0:
                 continue
-            support = _directed_support(graph.to_numpy())
+            support = directed_support(graph.to_numpy())
             total |= support
             for i, j in zip(*np.nonzero(support)):
                 lag_sets.setdefault((int(i), int(j)), []).append(int(lag))
-        # Rebuild endpoint marks from the directed union: a mutual pair (or the diagonal) is a
-        # double arrowhead (2-cycle / self-loop), a one-way pair is tail -> arrow.
-        marks = np.zeros((n, n), dtype=np.int8)
-        one_way = total & ~total.T
-        both = total & total.T
-        marks[one_way] = TAIL
-        marks[one_way.T] = ARROW
-        marks[both] = ARROW
-        indptr, indices, mark_data = _dense_to_csr(marks)
+        indptr, indices, mark_data = _dense_to_csr(endpoint_marks(total))
         edge_lags = tuple((i, j, tuple(sorted(lag_sets[(i, j)]))) for i, j in sorted(lag_sets))
         return SummaryGraph(
             _n_nodes=n,
@@ -2103,6 +2105,20 @@ def node_labels(names: Iterable[object], what: str = "column") -> tuple[str, ...
     raise ValueError(
         f"{what} names must be unique as text, but {clashes}; give each {what} its own name"
     )
+
+
+def column_labels(data: object) -> tuple[str, ...] | None:
+    """Return a DataFrame's column names as node labels; ``None`` for arrays.
+
+    Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
+    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
+    name becomes text, and ``ValueError`` names each label two columns share (:func:`node_labels`).
+    """
+    columns = getattr(data, "columns", None)
+    if columns is None:
+        return None
+    names = list(columns)
+    return None if names == list(range(len(names))) else node_labels(names)
 
 
 def relabel(structure: Structure, labels: tuple[str, ...]) -> Structure:
@@ -2264,17 +2280,76 @@ def _expand_compact(
     return _frozen(new_indptr, np.int64), _frozen(c, np.int32), _frozen(m, np.int8)
 
 
-def _directed_support(m: np.ndarray) -> np.ndarray:
+def directed_support(m: np.ndarray) -> np.ndarray:
     """Boolean ``(n, n)`` directed support of a mark matrix: ``D[i, j]`` is the edge ``i -> j``.
 
     A plain directed edge (arrowhead at ``j``) sets ``D[i, j]``; a 2-cycle / bidirected pair sets
     both directions; an autoregressive self-loop (``m[i, i] == ARROW``) sets ``D[i, i]``. Undirected
-    and circle marks carry no direction and are ignored. Shared with ``metrics`` so the topological
-    collapse cannot drift between the summary-graph projection and temporal scoring.
+    and circle marks carry no direction and are ignored; :func:`endpoint_marks` turns a support
+    back into marks.
     """
     directed = (m == TAIL) & (m.T == ARROW)
     both_arrow = (m == ARROW) & (m.T == ARROW)
     return directed | both_arrow
+
+
+def endpoint_marks(support: np.ndarray) -> np.ndarray:
+    """The ``int8`` endpoint marks of the directed graph ``support`` (nonzero ``[i, j]`` is
+    ``i -> j``).
+
+    A one-way pair is ``i -> j``: ``TAIL`` at ``i`` and ``ARROW`` at ``j``. The tails are written
+    first and the arrowheads over them, so a pair joined both ways ends as two arrowheads, a 2-cycle
+    or a bidirected edge, and a self-loop as ``ARROW`` on the diagonal.
+    """
+    support = np.asarray(support, dtype=bool)
+    marks = np.zeros(support.shape, dtype=np.int8)
+    marks[support] = TAIL
+    marks[support.T] = ARROW
+    return marks
+
+
+def has_cycle(adj: np.ndarray) -> bool:
+    """Whether the directed graph ``adj`` (nonzero ``[i, j]`` is ``i -> j``) has a directed cycle,
+    a self-loop included (Kahn's algorithm)."""
+    adj = np.asarray(adj, dtype=bool)
+    waiting = adj.sum(axis=0)
+    ready = np.flatnonzero(waiting == 0).tolist()
+    placed = 0
+    while ready:
+        v = ready.pop()
+        placed += 1
+        for c in np.flatnonzero(adj[v]).tolist():
+            waiting[c] -= 1
+            if waiting[c] == 0:
+                ready.append(c)
+    return placed < adj.shape[0]
+
+
+def topological_order(
+    adj: np.ndarray, key: Sequence[Any] | None = None, what: str = "the graph"
+) -> list[int]:
+    """Kahn's topological order of the directed graph ``adj`` (nonzero ``[i, j]`` is ``i -> j``).
+
+    Of the nodes whose parents are all placed, the one with the lowest ``key[v]`` comes next; the
+    default key is the position. Raises ``ValueError`` when ``adj`` has a directed cycle, naming
+    the graph by ``what``.
+    """
+    adj = np.asarray(adj, dtype=bool)
+    rank: Sequence[Any] = range(adj.shape[0]) if key is None else key
+    waiting = adj.sum(axis=0)
+    ready = [(rank[v], v) for v in np.flatnonzero(waiting == 0).tolist()]
+    heapq.heapify(ready)
+    order: list[int] = []
+    while ready:
+        _, v = heapq.heappop(ready)
+        order.append(v)
+        for c in np.flatnonzero(adj[v]).tolist():
+            waiting[c] -= 1
+            if waiting[c] == 0:
+                heapq.heappush(ready, (rank[c], c))
+    if len(order) < adj.shape[0]:
+        raise ValueError(f"{what} has a directed cycle")
+    return order
 
 
 def _infer_kind(M: np.ndarray) -> Kind:

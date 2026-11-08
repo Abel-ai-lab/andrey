@@ -42,12 +42,8 @@ import numpy.typing as npt
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta, stats
 from andrey.core.knowledge import Constraints, mpdag, orient, violates
-from andrey.core.mixed import column_mask
 from andrey.core.orient import pdag2dag, to_structure
 from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
     BDeuScore,
     BICScore,
     CategoricalBICScore,
@@ -56,11 +52,10 @@ from andrey.core.score import (
     LocalScore,
     make_score,
 )
+from andrey.core.ties import EPS_IMPROVE, tie_mask, tie_ranks
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search._parallel_ges import move_key
-from andrey.search.ges import _reachable, _recompute_objective, required_dag
-from andrey.search.hc import tie_ranks
+from andrey.search.ges import reachability, recompute_objective, required_dag
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +187,6 @@ class InterventionalScore:
         categorical: np.ndarray | None = None,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        if score_func not in SCORES:
-            raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {SCORES}")
         X = np.asarray(data, dtype=np.float64)
         n, d = X.shape
         # Checks the settings and, for the BIC, the columns (check_columns).
@@ -488,7 +481,7 @@ def _forward_candidates(
     out = []
     if ne.size == 0:
         deltas = score.add_deltas(v, pa)[sources]
-        better = deltas < -_EPS_IMPROVE
+        better = deltas < -EPS_IMPROVE
         for u, delta in zip(sources[better].tolist(), deltas[better].tolist(), strict=True):
             out.append((move_key(delta, n, u, v, (), ranks), u, set()))
     else:
@@ -510,7 +503,7 @@ def _forward_candidates(
             deltas = score.add_deltas(v, base)
             for u, C in moves:
                 delta = float(deltas[u])
-                if delta < -_EPS_IMPROVE:
+                if delta < -EPS_IMPROVE:
                     out.append((move_key(delta, n, u, v, C, ranks), u, C))
     out.sort(key=lambda move: move[0])
     return out
@@ -553,7 +546,7 @@ def _backward_candidate(
             C = set(h0) - set(H)
             kept = C | pa
             delta = score.score(v, kept - {u}) - score.score(v, kept | {u})
-            if delta < -_EPS_IMPROVE:
+            if delta < -EPS_IMPROVE:
                 key = move_key(delta, n, u, v, C, ranks)
                 if found is not None and not (excluded and (u, v, frozenset(C)) in excluded):
                     found.append((key, (u, v, C)))
@@ -628,10 +621,10 @@ def _turning_best(
 
     def offer(delta: float, key: tuple, move: tuple[int, int, set[int], bool]) -> None:
         nonlocal best_key, best
-        if found is not None and delta < -_EPS_IMPROVE:
+        if found is not None and delta < -EPS_IMPROVE:
             if not (excluded and (move[0], move[1], frozenset(move[2])) in excluded):
                 found.append((key, move))
-        if delta < -_EPS_IMPROVE and (best_key is None or key < best_key):
+        if delta < -EPS_IMPROVE and (best_key is None or key < best_key):
             if excluded and (move[0], move[1], frozenset(move[2])) in excluded:
                 return
             best_key, best = key, move
@@ -714,7 +707,7 @@ _PHASES: dict[Callable[..., np.ndarray], str] = {
 }
 
 
-class _Search:
+class GIESSearch:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
     ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
@@ -764,7 +757,7 @@ class _Search:
         if not heap:
             return
         heapq.heapify(heap)
-        reachable = _reachable(adj)
+        reachable = reachability(adj)
         while heap:
             _key, v, i = heapq.heappop(heap)
             moves = self.forward[v]
@@ -899,7 +892,7 @@ def gies(
     phases, each until it finds no improving step, until a round of backward and turning phases
     changes nothing. Every step takes the move with the lowest score change divided by the
     variable count and rounded to nine decimal places; equal ones are ordered by the
-    :func:`~andrey.search.hc.tie_ranks` of the move's two vertices, then of its other vertices.
+    :func:`~andrey.core.ties.tie_ranks` of the move's two vertices, then of its other vertices.
 
     Parameters
     ----------
@@ -964,10 +957,7 @@ def gies(
         categorical=categorical,
     )
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
-    columns = np.full(n, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        columns = column_mask(categorical, n)
-    ranks = tie_ranks(X, columns).tolist()
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, n)).tolist()
     adj, total = search_class(score, cut, ranks, constraints, max_parents)
     if constraints is not None:
         adj = mpdag(adj, constraints)
@@ -986,7 +976,7 @@ def search_class(
     Starts from the empty graph, or under ``constraints`` from the class of the required edges, and
     repeats the forward, backward, and turning phases, each until it finds no improving step, until
     a round of backward and turning phases changes nothing. Ties between moves go to the lower
-    ``ranks`` (:func:`~andrey.search.hc.tie_ranks`), as :func:`gies` describes. When the start's
+    ``ranks`` (:func:`~andrey.core.ties.tie_ranks`), as :func:`gies` describes. When the start's
     total is ``inf``, the required edges giving some node a family the score makes unavailable, the
     search takes no step and returns the start with total ``inf``.
 
@@ -1021,13 +1011,9 @@ def search_class(
     start = None
     if constraints is not None and constraints.required.any():
         start = replace_unprotected(required_dag(constraints), cut)
-    if max_parents is not None and start is not None and ops.exceeds_parent_cap(start, max_parents):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents "
-            "in some graph of their class"
-        )
+    ops.check_parent_cap(start, max_parents, in_class=True)
     with backend.one_blas_thread():
-        search = _Search(score, n, ranks, constraints, start, max_parents)
+        search = GIESSearch(score, n, ranks, constraints, start, max_parents)
         if math.isinf(search.objective.total):
             return search.adj, math.inf
         while True:
@@ -1040,5 +1026,5 @@ def search_class(
                 changed = True
             if not changed:
                 break
-        total = _recompute_objective(search.adj, score, n)
+        total = recompute_objective(search.adj, score, n)
     return search.adj, total

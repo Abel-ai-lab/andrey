@@ -16,8 +16,6 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-import andrey
-
 from .dataset import CausalDataset, QAReport, SCMParams
 from .graphs import DAGDraw, dag_truth
 from .interventions import (
@@ -27,17 +25,17 @@ from .interventions import (
     check_columns,
     env_labels,
     env_targets,
-    environments,
+    pooled_rows,
     record,
 )
 from .scm import (
-    _GRAPH,
-    _INTERVENTION,
-    _NOISE,
-    _SEED_SCHEME,
-    _WEIGHTS,
-    _column_order,
-    _component_rng,
+    GRAPH,
+    INTERVENTION,
+    NOISE,
+    WEIGHTS,
+    column_order,
+    component_rng,
+    dataset_provenance,
     named_graph,
 )
 
@@ -122,29 +120,13 @@ def sample_discrete(
     >>> ds.data.shape, ds.graph.kind
     ((200, 5), 'dag')
     """
-    whole = len(categories) == 2 and all(
-        isinstance(k, int | np.integer) and not isinstance(k, bool) for k in categories
-    )
-    low, high = (int(k) for k in categories) if whole else (0, 0)
-    if not 2 <= low <= high:
-        raise ValueError(
-            f"categories must be (least, most) with 2 <= least <= most, got {categories}"
-        )
-    if not (np.isfinite(concentration) and concentration > 0):
-        raise ValueError(f"concentration must be finite and positive, got {concentration}")
-    pooled = None
-    if envs is None:
-        if not isinstance(n, int | np.integer):
-            raise TypeError(f"n is one row count without envs, got {n!r}")
-        rows = int(n)
-    else:
-        pooled = environments(envs, n)
-        rows = sum(size for _, size in pooled)
+    low, high = check_cpt_args(categories, concentration)
+    rows, pooled = pooled_rows(envs, n)
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
     model = root if model_seed is None else np.random.SeedSequence(model_seed)
-    _, draw = spec.materialize(_component_rng(model, _GRAPH))
-    table_rng = _component_rng(model, _WEIGHTS)
+    _, draw = spec.materialize(component_rng(model, GRAPH))
+    table_rng = component_rng(model, WEIGHTS)
     cards = table_rng.integers(low, high + 1, size=draw.d)
     parents = _parents_of(draw)
     tables = [
@@ -154,16 +136,16 @@ def sample_discrete(
         )
         for c in range(draw.d)
     ]
-    order = _column_order(model, draw.d, shuffle)  # the drawn node of each column
+    order = column_order(model, draw.d, shuffle)  # the drawn node of each column
     if pooled is None:
-        values = _forward_sample(
-            draw.topo_order.tolist(), parents, cards, tables, rows, _component_rng(root, _NOISE)
+        values = forward_sample(
+            draw.topo_order.tolist(), parents, cards, tables, rows, component_rng(root, NOISE)
         )
     else:
         check_columns(pooled, draw.d)
         values = np.concatenate(
             [
-                _forward_sample(
+                forward_sample(
                     draw.topo_order.tolist(),
                     parents,
                     cards,
@@ -171,12 +153,11 @@ def sample_discrete(
                         tables,
                         interventions,
                         order,
-                        cards,
                         concentration,
-                        _component_rng(model, _INTERVENTION, k),
+                        component_rng(model, INTERVENTION, k),
                     ),
                     size,
-                    _component_rng(root, _NOISE) if k == 0 else _component_rng(root, _NOISE, k),
+                    component_rng(root, NOISE) if k == 0 else component_rng(root, NOISE, k),
                 )
                 for k, (interventions, size) in enumerate(pooled)
             ]
@@ -189,19 +170,13 @@ def sample_discrete(
         functional="categorical",
         noise="dirichlet",
     )
-    provenance = {
-        "root_entropy": str(root.entropy),
-        "spawn_key": list(root.spawn_key),
-        **({} if model is root else {"model_entropy": str(model.entropy)}),
-        "seed_scheme": _SEED_SCHEME,
-        "column_order": order.tolist(),
-        "config": {
-            "graph": {
-                "model": spec.name,
-                "num_nodes": draw.d,
-                "density": spec.density,
-                "params": spec.params,
-            },
+    provenance = dataset_provenance(
+        root,
+        model,
+        order,
+        spec,
+        draw.d,
+        {
             "functional": "categorical",
             "categories": cards[order].tolist(),
             "concentration": float(concentration),
@@ -209,8 +184,7 @@ def sample_discrete(
             "shuffle": bool(shuffle),
             **({} if pooled is None else {"envs": record(pooled)}),
         },
-        "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
-    }
+    )
     return CausalDataset(
         data=np.take(values, order, axis=1),
         graph=dag_truth(edges[:, 0], edges[:, 1], draw.d),
@@ -222,33 +196,64 @@ def sample_discrete(
     )
 
 
+def check_cpt_args(categories: tuple[int, int], concentration: float) -> tuple[int, int]:
+    """Return the least and the most categories of ``categories``.
+
+    Raises ``ValueError`` unless ``categories`` is a pair of whole numbers with
+    ``2 <= least <= most`` and ``concentration`` is finite and positive.
+    """
+    whole = len(categories) == 2 and all(
+        isinstance(k, int | np.integer) and not isinstance(k, bool) for k in categories
+    )
+    low, high = (int(k) for k in categories) if whole else (0, 0)
+    if not 2 <= low <= high:
+        raise ValueError(
+            f"categories must be (least, most) with 2 <= least <= most, got {categories}"
+        )
+    if not (np.isfinite(concentration) and concentration > 0):
+        raise ValueError(f"concentration must be finite and positive, got {concentration}")
+    return low, high
+
+
 def intervened_tables(
     tables: list[np.ndarray],
     spec: Mapping[int, Intervention],
     order: np.ndarray,
-    cards: np.ndarray,
     concentration: float,
     rng: np.random.Generator,
 ) -> list[np.ndarray]:
     """Each node's conditional probability table under one environment's interventions.
 
-    ``spec`` names columns; ``order[j]`` is the node of column ``j``. A ``hard`` intervention gives
-    every configuration of the parents one row; ``soft()`` draws every row anew from ``rng``.
+    ``spec`` names columns; ``order[j]`` is the node of column ``j``.
     """
     tables = list(tables)
     for column, intervention in spec.items():
         c = int(order[column])
-        k, rows = int(cards[c]), tables[c].shape[0]
-        if isinstance(intervention, SoftIntervention):
-            if intervention != SoftIntervention():
-                raise ValueError(
-                    f"column {column}: soft() on a discrete variable takes no arguments; it draws "
-                    "the variable's table anew"
-                )
-            tables[c] = rng.dirichlet(np.full(k, float(concentration)), size=rows)
-            continue
-        tables[c] = np.tile(categorical_probs(intervention, column, k), (rows, 1))
+        tables[c] = intervened_table(tables[c], intervention, column, concentration, rng)
     return tables
+
+
+def intervened_table(
+    table: np.ndarray,
+    intervention: Intervention,
+    column: int,
+    concentration: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Return a node's conditional probability table under an intervention on its ``column``.
+
+    A ``hard`` intervention gives every configuration of the parents one row; ``soft()`` draws
+    every row anew from ``rng``, from the symmetric Dirichlet of ``concentration``.
+    """
+    rows, k = table.shape
+    if isinstance(intervention, SoftIntervention):
+        if intervention != SoftIntervention():
+            raise ValueError(
+                f"column {column}: soft() on a discrete variable takes no arguments; it draws "
+                "the variable's table anew"
+            )
+        return rng.dirichlet(np.full(k, float(concentration)), size=rows)
+    return np.tile(categorical_probs(intervention, column, k), (rows, 1))
 
 
 def categorical_probs(intervention: HardIntervention, column: int, k: int) -> np.ndarray:
@@ -275,7 +280,7 @@ def _parents_of(draw: DAGDraw) -> list[np.ndarray]:
     return [np.sort(draw.parents[draw.children == c]) for c in range(draw.d)]
 
 
-def _forward_sample(
+def forward_sample(
     order: list[int],
     parents: list[np.ndarray],
     cards: np.ndarray,
@@ -291,9 +296,27 @@ def _forward_sample(
     values = np.zeros((n, len(order)), dtype=np.int64)
     uniforms = rng.random((n, len(order)))
     for c in order:
-        row = np.zeros(n, dtype=np.int64)
-        for p in parents[c].tolist():
-            row = row * cards[p] + values[:, p]
-        cdf = np.cumsum(tables[c][row], axis=1)
-        values[:, c] = np.minimum((uniforms[:, [c]] > cdf).sum(axis=1), cards[c] - 1)
+        own = parents[c]
+        values[:, c] = draw_categories(
+            tables[c], [values[:, p] for p in own.tolist()], cards[own], uniforms[:, c]
+        )
     return values.astype(np.float64)
+
+
+def draw_categories(
+    table: np.ndarray,
+    parents: Sequence[np.ndarray],
+    cards: Sequence[int] | np.ndarray,
+    uniform: np.ndarray,
+) -> np.ndarray:
+    """Draw one node's category in each row by inverse CDF of ``uniform`` from its table row.
+
+    ``parents`` holds the parents' category codes and ``cards`` their numbers of categories. Row
+    ``i`` of ``table`` is the parents' configuration ``i`` in mixed radix, the first parent the most
+    significant digit.
+    """
+    row = np.zeros(uniform.shape[0], dtype=np.int64)
+    for values, k in zip(parents, cards, strict=True):
+        row = row * k + values.astype(np.int64, copy=False)
+    cdf = np.cumsum(table[row], axis=1)
+    return np.minimum((uniform[:, None] > cdf).sum(axis=1), table.shape[1] - 1)

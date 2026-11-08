@@ -31,11 +31,12 @@ from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+    from andrey.core.knowledge import Constraints
 
 
 def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
@@ -46,6 +47,30 @@ def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
     ``dag`` built from ``W`` and the stored ``weighted_adjacency`` then share one orientation.
     """
     return np.ascontiguousarray(np.asarray(B, dtype=np.float64).T)
+
+
+def lingam_output(
+    order: npt.ArrayLike,
+    B: npt.ArrayLike,
+    constraints: Constraints | None,
+    labels: tuple[str, ...] | None,
+    metadata: Mapping[str, object] | None = None,
+) -> StructureOutput:
+    """Return a LiNGAM fit as a ``dag`` with its causal ``order``, weights, and ``metadata``.
+
+    The weights are ``B`` in Andrey's orientation (:func:`_canonical_weights`), and the ``dag`` has
+    an edge for each nonzero weight and each edge ``constraints`` requires, which stays an edge
+    when its weight is ``0``.
+    """
+    weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
+    return structure_output(
+        dag_from_adjacency(edges),
+        labels=labels,
+        ordering=order,
+        weighted_adjacency=weighted,
+        metadata=metadata,
+    )
 
 
 def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
@@ -109,24 +134,33 @@ def direct_lingam(
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
         adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
-        edge.
+        edge. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
-        named in the message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with
-        which the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column, named in the
+        message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with which the
+        pruning step can estimate the edge weights. Also if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
-    See Also
-    --------
-    andrey.pc, andrey.ges : Return the equivalence class, which is what Gaussian noise identifies.
-    andrey.fci : Allows unmeasured common causes and selection bias.
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -227,14 +261,7 @@ def direct_lingam(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
     order, B = _native(X, measure=measure, constraints=constraints)
-    weighted = _canonical_weights(B)
-    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-    return structure_output(
-        dag_from_adjacency(edges),
-        labels=labels,
-        ordering=order,
-        weighted_adjacency=weighted,
-    )
+    return lingam_output(order, B, constraints, labels)
 
 
 @method_spec("ica_lingam")
@@ -283,19 +310,22 @@ def ica_lingam(
         a tuple of column indices, causes first. ``weighted_adjacency[i, j]`` is the coefficient of
         edge ``i -> j``, estimated by adaptive Lasso, or by least squares for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
-        edge.
+        edge. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the
-        edge weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than
+        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
+        weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -303,11 +333,14 @@ def ica_lingam(
     SearchLimitWarning
         When FastICA does not converge within ``max_iter`` iterations, or the adaptive Lasso's LARS
         path reports that it stopped early (scikit-learn's ``ConvergenceWarning``, raised again).
-
-    See Also
-    --------
-    andrey.direct_lingam : The same model with a deterministic order search; it recovered most
-        edges on the published benchmarks.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -349,16 +382,16 @@ def ica_lingam(
     to 100 variables with ten rows per variable: its median errors (SHD) passed the empty graph's at
     every size, 27 against 19 at 20 variables and 181 against 99 at 100. The median fit took 0.44 s
     at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
-    variables), its errors were below the empty graph's (14 against 17). The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine. Its causal order depends on the columns' scale, as its authors note
-    [2]_: matching the rows of the unmixing matrix to the variables, and pruning its coefficients
-    from the smallest, both read the data's units, and the matching assumes every noise term has
-    the same scale [1]_. On simulated linear data with uniform noise and weights between 0.5 and 2
-    whose noise terms all have unit variance, at 50 variables, mean degree 4 and 2,000 rows, its
-    errors (SHD) summed over 5 datasets were 9 on the columns as drawn and 1,784 on the same columns
-    standardized, against 500 for the empty graph. ``direct_lingam`` finds the order in a way that
-    does not depend on the scale [2]_.
+    variables), its errors were below the empty graph's (14 against 17). Its causal order depends on
+    the columns' scale, as its authors note [2]_: matching the rows of the unmixing matrix to the
+    variables, and pruning its coefficients from the smallest, both read the data's units, and the
+    matching assumes every noise term has the same scale [1]_. On simulated linear data with uniform
+    noise and weights between 0.5 and 2 whose noise terms all have unit variance, at 50 variables,
+    mean degree 4 and 2,000 rows, its errors (SHD) summed over 5 datasets were 9 on the columns as
+    drawn and 1,784 on the same columns standardized, against 500 for the empty graph.
+    ``direct_lingam`` finds the order in a way that does not depend on the scale [2]_. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -381,18 +414,12 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
+    assert seed is not None  # method_spec resolves it
     X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
-    order, B = _native(X, random_state=seed, max_iter=max_iter, constraints=constraints)
-    weighted = _canonical_weights(B)
-    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-    return structure_output(
-        dag_from_adjacency(edges),
-        labels=labels,
-        ordering=order,
-        weighted_adjacency=weighted,
-    )
+    order, B = _native(X, seed=seed, max_iter=max_iter, constraints=constraints)
+    return lingam_output(order, B, constraints, labels)
 
 
 @method_spec("multi_group_direct_lingam")
@@ -433,21 +460,30 @@ def multi_group_direct_lingam(
     list[StructureOutput]
         One envelope per group, in input order. Each wraps a ``dag``
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
-        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
-        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
-        ``metadata["group_index"]`` is the group's position in ``data``.
+        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights
+        ``i -> j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
+        ``metadata["group_index"]`` is the group's position in ``data``. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if fewer than
-        two groups are given, if the groups disagree on the variable count or on their column names,
-        or if a group is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the
-        fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
-        names a column the groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if fewer than two groups are
+        given, if the groups disagree on the variable count or on their column names, or if a group
+        is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the fewest with which
+        the pruning step can estimate the edge weights. Also if ``knowledge`` names a column the
+        groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -524,17 +560,7 @@ def multi_group_direct_lingam(
     labels = shared_labels(column_labels(X) for X in data)
     constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
     order, adjacency_matrices = _native(groups, measure=measure, constraints=constraints)
-    outputs = []
-    for k, B in enumerate(adjacency_matrices):
-        weighted = _canonical_weights(B)
-        edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-        outputs.append(
-            structure_output(
-                dag_from_adjacency(edges),
-                labels=labels,
-                ordering=order,
-                weighted_adjacency=weighted,
-                metadata={"group_index": k},
-            )
-        )
-    return outputs
+    return [
+        lingam_output(order, B, constraints, labels, {"group_index": k})
+        for k, B in enumerate(adjacency_matrices)
+    ]

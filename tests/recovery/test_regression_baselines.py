@@ -9,6 +9,9 @@ import re
 import numpy as np
 import pytest
 
+import andrey
+from andrey.core.orient import dag2cpdag
+from qa import capture_baselines as capture
 from tests.recovery.helpers import datagen, harness
 from tests.recovery.helpers.tolerances import SPEC
 
@@ -40,9 +43,10 @@ _REQUIRED_KEYS = {
     "output",
 }
 # Clean-room: no host/hardware identifiers may leak into a committed fixture.
-# Defense-in-depth (the capture script also refuses to leak); high-signal tokens
-# only, word-boundaried so GPU names can't false-match inside a hex SHA, and
-# private-IP patterns that won't match a version string like "0.1.4.0".
+# The capture writes the case's inputs and the output's numbers and checks for
+# nothing, so this scan is the one guard; high-signal tokens only, word-boundaried
+# so GPU names can't false-match inside a hex SHA, and private-IP patterns that
+# won't match a version string like "0.1.4.0".
 _FORBIDDEN = re.compile(
     r"\b(?:a800|a100|h100|v100)\b"  # NVIDIA datacenter GPUs
     r"|\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b"  # MAC address
@@ -93,13 +97,42 @@ def test_forbidden_regex_catches_leaks():
         assert not _FORBIDDEN.search(ok), f"false positive: {ok!r}"
 
 
-# --- input integrity -----------------------------------------------------------
+# --- every recorded output against a fit ----------------------------------------
+
+RUNNERS = capture.ALGORITHMS | capture.GROUP_ALGORITHMS
+
+
+@pytest.fixture(scope="module")
+def module_fixture_backend():
+    """The backend a module fixture fits on while ``ANDREY_BACKEND`` pins the CPU."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("ANDREY_BACKEND", "cpu")
+        return andrey.config.backend
+
+
+def test_fits_run_on_numpy_whatever_the_environment(monkeypatch, module_fixture_backend):
+    """The baselines record NumPy numerics, so the suite's NumPy pin outranks ``ANDREY_BACKEND``."""
+    monkeypatch.setenv("ANDREY_BACKEND", "cpu")
+    assert andrey.config.backend == "numpy"
+    assert module_fixture_backend == "numpy"
 
 
 @pytest.mark.parametrize(("algorithm", "case"), BASELINES, ids=IDS)
-def test_input_integrity(algorithm, case):
-    doc = harness.load_baseline(algorithm, case)
-    assert datagen.input_sha256(case) == doc["input"]["sha256"], "input drift vs recorded sha256"
+def test_a_fit_reproduces_the_recorded_output(algorithm, case):
+    """Fit each recorded method on its case with the capture's runner and compare."""
+    if algorithm == "CALM":
+        pytest.importorskip("torch")  # CALM's optimizer is built on torch
+    runner, runner_case = RUNNERS[algorithm]
+    assert runner_case == case, f"{algorithm}: the capture records {runner_case!r}"
+    if algorithm in capture.GROUP_ALGORITHMS:
+        candidate = runner(datagen.generate_groups(case), algorithm)
+    else:
+        candidate = runner(datagen.generate(case), algorithm)
+    if algorithm == "ExactSearch":
+        dag = np.asarray(candidate["graph"], dtype=np.int8)
+        harness.assert_recorded_class(algorithm, dag2cpdag(dag), case=case)
+    else:
+        harness.assert_baseline(algorithm, candidate, case=case)
 
 
 # --- the gate PASSES on a matching candidate -----------------------------------
@@ -112,21 +145,12 @@ def test_gate_passes_on_identity(algorithm, case):
     assert result.ok
 
 
-def _numeric_baselines():
-    return [(a, c) for a, c in BASELINES if SPEC[a]["numeric"]]
-
-
-def _structural_baselines():
-    return [(a, c) for a, c in BASELINES if SPEC[a]["structural"]]
-
-
-def test_derived_baselines_nonempty():
-    # Guard the parametrize sources: an empty list silently collects 0 cases and
-    # reports PASS, vanishing the gate-fail coverage below.
-    assert _numeric_baselines(), "no numeric baselines — numeric gate-fail tests would vanish"
-    assert _structural_baselines(), (
-        "no structural baselines — structural gate-fail tests would vanish"
-    )
+# The gate's self-tests run on one rectangular structural field (PC's graph), one ragged field
+# (LongitudinalLiNGAM's causal orders, one per time point), and one numeric field (DirectLiNGAM's
+# weights): each exercises one branch of ``harness.compare``.
+RECTANGULAR = ("PC", "gauss_5v")
+RAGGED = ("LongitudinalLiNGAM", "panel_4v")
+NUMERIC = ("DirectLiNGAM", "lingam_5v_uniform")
 
 
 # --- compare() fails fast on an unusable spec/baseline (no silent pass) -----------
@@ -142,7 +166,7 @@ def test_compare_rejects_empty_spec():
 
 
 def test_compare_rejects_uncovered_baseline_field():
-    algorithm, case = _structural_baselines()[0]
+    algorithm, case = RECTANGULAR
     baseline = dict(harness.load_baseline(algorithm, case)["output"])
     baseline["_unspecced"] = [1, 2, 3]  # a field not in SPEC would ship unverified
     with pytest.raises(ValueError):
@@ -150,7 +174,7 @@ def test_compare_rejects_uncovered_baseline_field():
 
 
 def test_compare_rejects_baseline_missing_spec_field():
-    algorithm, case = _structural_baselines()[0]
+    algorithm, case = RECTANGULAR
     doc = harness.load_baseline(algorithm, case)
     baseline = dict(doc["output"])
     del baseline[SPEC[algorithm]["structural"][0]]  # broken fixture
@@ -159,10 +183,10 @@ def test_compare_rejects_baseline_missing_spec_field():
 
 
 def test_compare_is_nan_aware_on_both_paths():
-    # No current baseline carries NaN, so exercise compare()'s equal_nan branch on a
-    # synthetic spec: a candidate reproducing a reference NaN must PASS (no false
-    # fail); a one-sided NaN must FAIL - on both the structural and numeric paths.
-    # Guards the NaN handling needed once NaN-bearing methods (p-values) are captured.
+    # ICP's baseline carries NaN only on the numeric path (its p-value at the target
+    # is a JSON null), so exercise compare()'s equal_nan branch on a synthetic spec:
+    # a candidate reproducing a reference NaN must PASS (no false fail); a one-sided
+    # NaN must FAIL - on both the structural and numeric paths.
     harness.SPEC["_tmp_nan"] = {
         "structural": ["g"],
         "numeric": {"v": {"atol": 1e-6, "rtol": 1e-6}},
@@ -186,7 +210,7 @@ def test_compare_is_nan_aware_on_both_paths():
 
 
 def test_gate_fails_on_shape_mismatch():
-    algorithm, case = _structural_baselines()[0]
+    algorithm, case = RECTANGULAR
     doc = harness.load_baseline(algorithm, case)
     field = SPEC[algorithm]["structural"][0]
     candidate = copy.deepcopy(doc["output"])
@@ -195,15 +219,15 @@ def test_gate_fails_on_shape_mismatch():
 
 
 def test_gate_fails_on_missing_candidate_field():
-    algorithm, case = _structural_baselines()[0]
+    algorithm, case = RECTANGULAR
     doc = harness.load_baseline(algorithm, case)
     candidate = copy.deepcopy(doc["output"])
     del candidate[SPEC[algorithm]["structural"][0]]
     assert not harness.compare(algorithm, candidate, doc["output"]).ok
 
 
-@pytest.mark.parametrize(("algorithm", "case"), _numeric_baselines())
-def test_gate_fails_on_numeric_perturbation(algorithm, case):
+def test_gate_fails_on_numeric_perturbation():
+    algorithm, case = NUMERIC
     doc = harness.load_baseline(algorithm, case)
     field, tol = next(iter(SPEC[algorithm]["numeric"].items()))
     candidate = copy.deepcopy(doc["output"])
@@ -217,8 +241,8 @@ def test_gate_fails_on_numeric_perturbation(algorithm, case):
     assert not harness.compare(algorithm, candidate, doc["output"]).ok
 
 
-@pytest.mark.parametrize(("algorithm", "case"), _numeric_baselines())
-def test_gate_tolerates_subthreshold_noise(algorithm, case):
+def test_gate_tolerates_subthreshold_noise():
+    algorithm, case = NUMERIC
     doc = harness.load_baseline(algorithm, case)
     field, tol = next(iter(SPEC[algorithm]["numeric"].items()))
     candidate = copy.deepcopy(doc["output"])
@@ -241,17 +265,22 @@ def _perturb_structural(value):
     return changed
 
 
-@pytest.mark.parametrize(("algorithm", "case"), _structural_baselines())
-def test_gate_fails_on_structural_perturbation(algorithm, case):
+@pytest.mark.parametrize(
+    ("algorithm", "case", "rectangular"),
+    [(*RECTANGULAR, True), (*RAGGED, False)],
+    ids=["rectangular", "ragged"],
+)
+def test_gate_fails_on_structural_perturbation(algorithm, case, rectangular):
     doc = harness.load_baseline(algorithm, case)
     field = SPEC[algorithm]["structural"][0]
+    assert harness._is_rectangular(doc["output"][field]) is rectangular
     candidate = copy.deepcopy(doc["output"])
     candidate[field] = _perturb_structural(candidate[field])
     assert not harness.compare(algorithm, candidate, doc["output"]).ok
 
 
 def test_assert_baseline_raises_on_mismatch():
-    algorithm, case = _numeric_baselines()[0]
+    algorithm, case = NUMERIC
     doc = harness.load_baseline(algorithm, case)
     field = next(iter(SPEC[algorithm]["numeric"]))
     candidate = copy.deepcopy(doc["output"])

@@ -26,8 +26,9 @@ By default, each column gets a rank computed from the data: a hash of how the co
 the others, through the rank correlations of continuous columns and through which rows share a
 category in categorical ones. A tie goes to the candidate whose columns rank first. The rank stays
 the same when you shuffle the rows, change a column's units, or flip its sign, and it moves with
-its column, so reordering the columns relabels the result and changes nothing else. The rank is
-arbitrary with respect to the causal structure.
+its column, so reordering the columns relabels the result and changes nothing else. In rare cases a
+change of units rounds two values of a column to one, which changes its rank. The rank is arbitrary
+with respect to the causal structure.
 
 Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
 column in the other sign, or two columns whose rows also appear with the two swapped. These rank by
@@ -39,12 +40,12 @@ bits count as tied and go to the rank.
 
 ## Each method
 
-What reordering the columns does to each method's result with the default settings. "Relabels"
-means you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the
-methods the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod`
-the p-value order of their colliders, for `pc`, `cdnod`, `fci`, and `gfci` the order-free rounds of
-their orientation rules, and for `fci` and `gfci` the rank order of their possible-d-separation
-step.
+What reordering the columns does to each method's result with the default settings. "Relabels" means
+you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the methods
+the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod` the
+p-value order of their colliders, for `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and
+`fci_jci` the order-free rounds of their orientation rules, and for `fci`, `gfci`, and `fci_jci`
+the rank order of their possible-d-separation step.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -52,7 +53,7 @@ step.
 The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
 They seed their random draws and order their variables by the same rank, so a p-value depends on
 neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
-position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
+position instead. Every method that takes `indep_test` follows the setting through them when
 `indep_test` names one.
 
 `bootstrap` is not a method either. Its resamples draw the same rows whatever the column order, so
@@ -63,10 +64,11 @@ tie gives the same graph.
 
 Identical columns, copies of a column in other units, and categorical columns that group the rows
 alike are the exception for every method: they rank the same, so position decides which comes first,
-and the graph is the same up to swapping them. The score-based searches with the BIC score, and
-`pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy another up to
-scale and shift, with a `ValueError` that names each group of copies; the LiNGAM causal-order search
-keeps one column per group and places the other copies right after it.
+and the graph is the same up to swapping them. The methods with a partial-correlation test
+(`fisherz`, `student_t`) or the BIC score, and `icp`, `cam`, `resit`, `camuv`, and `dynotears`,
+reject columns that copy another up to scale and shift, with a `ValueError` that names each group of
+copies; the LiNGAM causal-order search keeps one column per group and places the other copies right
+after it.
 
 ## Across machines
 
@@ -81,9 +83,9 @@ and the tests of `iamb`, `inter_iamb`, `mmpc`, and the restrict phases of `mmhc`
 the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000 rows,
 the scores of `ges` (and so of `gfci`'s first phase), `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`,
 and `rsmax2`, the fits of `notears`, `dagma`, `dynotears`, `cam`, `resit`, and `camuv`, and the
-tests of `pcmci`, `pcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker
-processes, so the host's thread count cannot change their results. From 2,000 rows, KCI runs on
-every BLAS thread, where its kernel products run faster; its p-values then repeat for a fixed
+tests of `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run on one BLAS thread, and so do their
+worker processes, so the host's thread count cannot change their results. From 2,000 rows, KCI runs
+on every BLAS thread, where its kernel products run faster; its p-values then repeat for a fixed
 thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
@@ -130,35 +132,37 @@ export ANDREY_TIE_BREAK=position
 `rank` and `position`.
 
 What it trades: ranking reads each column once per fit, so `position` saves little time next to the
-search itself. The exception is `fci` and `gfci`, where the setting also orders the
-possible-d-separation step. On simulated graphs, a fit with the order-free step took 0.99 to 1.05
-times as long as one in column order at up to 200 variables and 0.78 to 1.42 times as long at 400
-and 800. On some dense graphs from 400 variables, though, the order-free step's visiting order needs
-more tests: one `gfci` dataset with 400 variables took 407 s, against 120 to 336 s in column order
-over five column orders. `position` is not more or less accurate, since a tie is a choice the data
-cannot make. Scores are still compared at the same rounding, so with a fixed column order you get
-the same graph on every machine where the default does. But reordering the columns can change the
-graph, and the column order can leak into it; `andrey.data.sortability.index_correlation` measures
-how much a dataset's column order reveals of its causal order.
+search itself. The exception is `fci`, `gfci`, and `fci_jci`, where the setting also orders the
+possible-d-separation step. On simulated graphs, an `fci` or `gfci` fit with the order-free step
+took 0.99 to 1.05 times as long as one in column order at up to 200 variables and 0.78 to 1.42 times
+as long at 400 and 800. On some dense graphs from 400 variables, though, the order-free step's
+visiting order needs more tests: one `gfci` dataset with 400 variables took 407 s, against 120 to
+336 s in column order over five column orders. `position` is not more or less accurate, since a tie
+is a choice the data cannot make. Scores are still compared at the same rounding, so with a fixed
+column order you get the same graph on every machine where the default does. But reordering the
+columns can change the graph, and the column order can leak into it;
+`andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals of
+its causal order.
 
-For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented:
-by the p-value that separated each pair under `rank`, in column order under `position`. Their
+For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented: by
+the p-value that separated each pair under `rank`, in column order under `position`. Their
 `collider_order` argument, `"p_value"` or `"column"`, overrides it for one call. Their
-`collider_rule="conservative"` and `"majority"`, and those of `fci` and `gfci`, decide each
-collider by a vote over the final skeleton's adjacencies, which does not read the column order.
+`collider_rule="conservative"` and `"majority"`, and those of `fci`, `gfci`, `boss_fci`,
+`grasp_fci`, and `fci_jci`, decide each collider by a vote over the final skeleton's adjacencies,
+which does not read the column order.
 
-The orientation rules of `pc`, `cdnod`, `fci`, and `gfci`, Meek's rules and FCI's R1-R10, run in
-rounds under `rank`: each round sets together everything the rules imply on the graph as it stands,
-and an edge or endpoint two rules decide differently stays undirected or a circle, so the column
-order does not enter. Under `position` they fire one at a time in column order, and of two firings
-that conflict the first decides. `gfci` then also records the first subset found as the separating
-set of a pair its GES phase leaves non-adjacent, where `rank` records the union of the smallest
-ones.
+The orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`,
+Meek's rules and FCI's R1-R10, run in rounds under `rank`: each round sets together everything the
+rules imply on the graph as it stands, and an edge or endpoint two rules decide differently stays
+undirected or a circle, so the column order does not enter. Under `position` they fire one at a time
+in column order, and of two firings that conflict the first decides. `gfci`, `boss_fci`, and
+`grasp_fci` then also record the first subset found as the separating set of a pair their GES, BOSS,
+or GRaSP phase leaves non-adjacent, where `rank` records the union of the smallest ones.
 
-`fci` and `gfci` take the order of their possible-d-separation step from the setting too: their
-`possible_dsep` argument, when the call gives none, is `"order_free"` under `rank`, which visits the
-step by the rank, and `"fast"` under `position`, which visits it in column order. A `possible_dsep`
-in the call overrides the setting.
+`fci`, `gfci`, and `fci_jci` take the order of their possible-d-separation step from the setting
+too: their `possible_dsep` argument, when the call gives none, is `"order_free"` under `rank`, which
+visits the step by the rank, and `"fast"` under `position`, which visits it in column order. A
+`possible_dsep` in the call overrides the setting.
 
 The methods in the "No" rows have no rank to replace, and the setting does not change them.
 

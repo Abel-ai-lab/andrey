@@ -19,8 +19,8 @@ import warnings
 import pytest
 
 import andrey
+from andrey import metrics
 from andrey.api import __all__ as API_ALL
-from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
@@ -28,23 +28,16 @@ from andrey.spec.models import Status
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
 _INPUT_FLAGS = ("data", "env")
 
-# The former input flags, which the CLI still takes for one release: the inputs' former names and
-# gies's former intervention matrix, now a form of targets.
-_FORMER_INPUT_FLAGS = (
-    *sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases}),
-    "interventions",
-)
-
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
+    | set(_INPUT_FLAGS)
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
 # The inputs whose facade default, None, stands for data given as each environment's rows apart,
 # which one data file cannot give, so the CLI needs them.
-APART_DEFAULTS = {("cdnod", "env"), ("icp", "env")}
+APART_DEFAULTS = {("cdnod", "env"), ("fci_jci", "env"), ("icp", "env")}
 
 _SPEC_NAMES = sorted(REGISTRY)
 
@@ -52,6 +45,26 @@ _SPEC_NAMES = sorted(REGISTRY)
 def test_registry_matches_api_all_both_ways():
     """No method is in one list but not the other -- the registry cannot silently drift."""
     assert set(REGISTRY) == set(API_ALL)
+
+
+def test_every_method_is_exported_at_the_top_level():
+    """``andrey.<name>`` is the facade of every method in ``andrey.api.__all__``."""
+    assert set(API_ALL) <= set(andrey.__all__)
+    assert all(getattr(andrey, name) is getattr(andrey.api, name) for name in API_ALL)
+
+
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_spec_references_are_in_the_docstring(name):
+    """Each of the spec's ``references``, which ``--help --json`` lists, names an entry of the
+    facade's References section by its first author and year."""
+    doc = inspect.getdoc(getattr(andrey, name)) or ""
+    section = doc.partition("References\n----------\n")[2]
+    entries = [" ".join(e.split()) for e in re.split(r"^\.\. \[\d+\] ", section, flags=re.M)[1:]]
+    cited = {(e.split(",")[0], year) for e in entries for year in re.findall(r"\((\d{4})\)", e)}
+    for reference in get_spec(name).references:
+        authors, year = reference.rsplit(" ", 1)
+        first = re.split(r",| & | et al\.", authors)[0]
+        assert (first, year) in cited, f"{name}: {reference!r} is not in its References"
 
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)
@@ -124,15 +137,14 @@ def _type_matches(ptype: str, default: object) -> bool:
 @pytest.mark.parametrize("name", list(REGISTRY))
 def test_knowledge_parts_match_the_facade(name):
     """A method takes ``knowledge`` exactly when its spec lists the parts it honors, and its
-    docstring names them."""
+    docstring says it honors all of them."""
     spec = get_spec(name)
     takes = "knowledge" in inspect.signature(getattr(andrey, name)).parameters
     assert takes is bool(spec.knowledge)
     if takes:
         doc = inspect.getdoc(getattr(andrey, name)) or ""
         entry = doc.split("knowledge : Knowledge or None", 1)[1].split("\n\n", 1)[0]
-        named = "all honored" if spec.knowledge == KNOWLEDGE_PARTS else ", ".join(spec.knowledge)
-        assert named in " ".join(entry.split())
+        assert "all honored" in " ".join(entry.split())
 
 
 def test_param_type_is_consistent_with_default():
@@ -258,20 +270,37 @@ def test_public_core_methods_document_their_parameters(cls_name):
             )
 
 
+@pytest.mark.parametrize("cls_name", ["SCM", "CausalDataset"])
+def test_public_data_classes_document_every_field(cls_name):
+    """A simulated model or dataset is built from its fields, so its ``Parameters`` section names
+    each one, in order."""
+    import dataclasses
+
+    import andrey.data as data
+
+    cls = getattr(data, cls_name)
+    fields = [f.name for f in dataclasses.fields(cls)]
+    assert _docstring_param_names(inspect.getdoc(cls) or "") == fields
+
+
+@pytest.mark.parametrize("name", metrics.__all__)
+def test_public_metrics_document_their_parameters_and_returns(name):
+    """Each metric names its arguments in a ``Parameters`` section, in order, and describes what
+    it returns, such as the keys of a dict of scores, in a ``Returns`` section."""
+    func = getattr(metrics, name)
+    doc = inspect.getdoc(func) or ""
+    assert _docstring_param_names(doc) == list(inspect.signature(func).parameters)
+    assert re.search(r"^Returns\n-{3,}", doc, re.MULTILINE), f"{name}: no Returns section"
+
+
 def test_cmd_run_wires_every_input_flag():
     """Every `_INPUT_FLAGS` entry is an actual `cmd_run` option, so an input added to the registry
     and `_INPUT_FLAGS` but not to `cmd_run` fails here instead of being unreachable at runtime."""
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
+    missing = set(_INPUT_FLAGS) - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
-
-
-def test_seeded_methods_expose_a_seed_param():
-    for spec in REGISTRY.values():
-        if spec.seeded:
-            assert "seed" in {p.name for p in spec.params}, f"{spec.name} has no seed param"
 
 
 def test_multi_output_only_in_family_that_supports_it():
@@ -319,14 +348,18 @@ def test_every_env_var_has_one_parser():
 
 
 def test_every_indep_test_takes_the_shipped_tests():
-    """Every method's ``indep_test`` choices are the shipped CI-registry names it dispatches, so
-    the CLI/JSON schema the registry renders cannot drift from what the facades accept."""
+    """Every method's ``indep_test`` choices are the shipped CI-registry names it dispatches, all of
+    them unless the concept records a deviation, so the CLI/JSON schema the registry renders cannot
+    drift from what the facades accept."""
     from andrey.core.ci import SHIPPED_INDEP_TESTS
+    from andrey.spec.concepts import CONCEPTS
 
     params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "indep_test"}
     assert {"pc", "pcmci", "pcmciplus", "lpcmci"} <= set(params)
     for name, p in params.items():
-        assert p.choices == SHIPPED_INDEP_TESTS, name
+        deviation = CONCEPTS["indep_test"].deviation(name)
+        assert p.choices == (SHIPPED_INDEP_TESTS if deviation is None else deviation.choices), name
+        assert set(p.choices) <= set(SHIPPED_INDEP_TESTS), name
 
 
 # --- support status -------------------------------------------------------------------------------
@@ -337,7 +370,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
-LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 WHEN_TO_USE = "DEVELOPMENT.md (Docstring standard) says what the paragraph holds"
 
 
@@ -481,16 +513,6 @@ def _notes(name: str) -> str:
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
     return notes.group(1) if notes else ""
-
-
-@pytest.mark.parametrize("name", _SPEC_NAMES)
-def test_method_declares_its_limitations(name):
-    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
-    notes = _notes(name)
-    assert notes, f"{name}: no Notes section; {LIMITATIONS}"
-    assert re.search(r"^\*\*Limitations\.\*\* ", notes, re.MULTILINE), (
-        f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
-    )
 
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)

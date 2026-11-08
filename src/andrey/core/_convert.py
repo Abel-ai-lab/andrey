@@ -39,7 +39,11 @@ def dag_extension(
     if not undirected:
         return GraphStructure.from_numpy(first, kind="dag", labels=structure.labels)
     if tie_break is None and seed is None:
-        names = [" -- ".join(map(str, _names(structure, [u, v]))) for u, v in undirected[:_LISTED]]
+        from ._queries import named
+
+        names = [
+            " -- ".join(map(str, named(structure, [u, v], False))) for u, v in undirected[:_LISTED]
+        ]
         more = f" and {len(undirected) - _LISTED} more" if len(undirected) > _LISTED else ""
         raise ValueError(
             f"the {structure.kind} has {len(undirected)} undirected edge(s), "
@@ -115,12 +119,11 @@ def mag_of_pag(pag: np.ndarray) -> np.ndarray:
     """Return the MAG that Zhang's construction (2008, Theorem 2) builds from a PAG's mark matrix.
 
     A circle opposite an arrowhead becomes a tail (``o->`` to ``->``), and the ``o-o`` edges are
-    oriented into a DAG with no unshielded collider, a consistent extension (Dor and Tarsi) of
-    them as an undirected graph. For a PAG, the result is a MAG of its equivalence class. A circle
-    opposite a tail, which a PAG without selection variables does not have, becomes an arrowhead,
-    as pcalg's ``pag2magAM`` does. Raises ``ValueError`` when the ``o-o`` edges have no such
-    orientation, which happens when they hold a chordless cycle of four or more nodes, so the input
-    is not a PAG.
+    oriented into a DAG with no unshielded collider, a consistent extension (Dor and Tarsi) of them
+    as an undirected graph. For a PAG, the result is a MAG of its equivalence class. A circle
+    opposite a tail, which a PAG without selection variables does not have, becomes an arrowhead.
+    Raises ``ValueError`` when the ``o-o`` edges have no such orientation, which happens when they
+    hold a chordless cycle of four or more nodes, so the input is not a PAG.
     """
     mag = pag.copy()
     circle = pag == CIRCLE
@@ -140,10 +143,10 @@ def _causal_dag(structure: GraphStructure) -> networkx.DiGraph:
     """
     import networkx as nx
 
-    from andrey.data.latent import _causal_digraph
+    from andrey.data.latent import causal_digraph
 
     structure.validate()
-    digraph = _causal_digraph(structure)
+    digraph = causal_digraph(structure)
     if not nx.is_directed_acyclic_graph(digraph):
         cycle = " -> ".join(str(u) for u, _ in nx.find_cycle(digraph))
         raise ValueError(f"the dag has the directed cycle {cycle}")
@@ -158,7 +161,7 @@ def _canonical_dag(mag: GraphStructure) -> tuple[networkx.DiGraph, list[int]]:
     """
     import networkx as nx
 
-    from andrey.data.latent import _mag_projection, _observed_ancestors
+    from andrey.data.latent import mag_projection, observed_ancestors
 
     mag.validate()
     marks = mag.to_numpy()
@@ -186,9 +189,9 @@ def _canonical_dag(mag: GraphStructure) -> tuple[networkx.DiGraph, list[int]]:
     nodes = range(n)
     is_mag = nx.is_directed_acyclic_graph(digraph)
     if is_mag:
-        anc = _observed_ancestors(digraph, nodes)
+        anc = observed_ancestors(digraph, nodes)
         up = _observed_ancestors_of(digraph, nodes, added_selection)
-        projected = _mag_projection(digraph, nodes, anc, added_selection, up)
+        projected = mag_projection(digraph, nodes, anc, added_selection, up)
         is_mag = np.array_equal(projected.to_numpy(), marks)
     if not is_mag:
         raise ValueError(
@@ -222,13 +225,13 @@ def _project(
     Every d-separation query also conditions on ``selection``. A PAG gets the endpoints
     ``constraints`` set before its orientation rules.
     """
-    from andrey.data.latent import _mag_projection, _observed_ancestors, _pag_projection
+    from andrey.data.latent import mag_projection, observed_ancestors, pag_projection
 
-    anc = _observed_ancestors(digraph, observed)
+    anc = observed_ancestors(digraph, observed)
     up = _observed_ancestors_of(digraph, observed, selection)
     if target == "mag":
-        return _mag_projection(digraph, observed, anc, selection, up)
-    return _pag_projection(digraph, observed, anc, selection, up, constraints)
+        return mag_projection(digraph, observed, anc, selection, up)
+    return pag_projection(digraph, observed, anc, selection, up, constraints)
 
 
 def _named(
@@ -254,7 +257,11 @@ def _split(
     selected = _positions(structure, selection, "selection")
     shared = sorted(set(hidden) & set(selected))
     if shared:
-        raise ValueError(f"latent and selection share the node(s) {_names(structure, shared)}")
+        from ._queries import named
+
+        raise ValueError(
+            f"latent and selection share the node(s) {named(structure, shared, False)}"
+        )
     removed = set(hidden) | set(selected)
     observed = [k for k in range(structure.n_nodes) if k not in removed]
     return observed, selected
@@ -282,9 +289,3 @@ def _positions(structure: GraphStructure, nodes: Collection[str | int], what: st
     if len(set(found)) < len(found):
         raise ValueError(f"{what} names a node more than once")
     return found
-
-
-def _names(structure: GraphStructure, positions: list[int]) -> list[str | int]:
-    """Return the labels of ``positions``, or the positions when the graph has no labels."""
-    labels = structure.labels
-    return [labels[k] for k in positions] if labels is not None else list(positions)

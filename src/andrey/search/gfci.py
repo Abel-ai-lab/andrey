@@ -1,49 +1,71 @@
-"""GFCI, the engine behind :func:`andrey.gfci`.
+"""GFCI, BOSS-FCI, and GRaSP-FCI: the engines behind :func:`andrey.gfci`, :func:`andrey.boss_fci`,
+and :func:`andrey.grasp_fci`.
 
-The algorithm, its settings, and its references are described on :func:`andrey.gfci`.
+The algorithms, their settings, and their references are described on those functions.
 
-The steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016). GES returns a CPDAG, the
-pattern. FCI's adjacency search, started from the pattern's adjacencies instead of a complete graph,
-removes the pairs a subset of either endpoint's neighbors separates. An unshielded triple of the
-result is a collider when it is one in the pattern, or, when the pattern shields it, when the
-separating set of its endpoints leaves out its middle node. The possible-d-separation and R0-R10
-passes of :mod:`andrey.constraint.fci` follow, with its rule implementations,
-conditional-independence tests, and mark convention.
+GFCI's steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016), and BOSS-FCI's and
+GRaSP-FCI's follow Algorithm 5 of Ramsey, Andrews, and Spirtes (2025). GES, BOSS, or GRaSP returns
+a CPDAG, the pattern, and :func:`fci_from_pattern` runs the rest. FCI's adjacency search, started
+from the pattern's adjacencies instead of a complete graph, removes the pairs a subset of either
+endpoint's neighbors separates. An unshielded triple of the result is a collider when it is one in
+the pattern, or, when the pattern shields it, when the separating set of its endpoints leaves out
+its middle node. GFCI then runs the possible-d-separation step of :mod:`andrey.constraint.fci`,
+which Algorithm 5 leaves out, and all three run its rules R1-R10, with its rule implementations,
+conditional-independence tests, and mark convention. With ``edge_removal="triangles"``, the tests
+consider only the pattern's edges that lie in a triangle of the pattern, as Section 5 of Ogarrio,
+Spirtes, and Ramsey (2016) does.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from itertools import combinations
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, marginal_separated, separating_subsets
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    marginal_separated,
+    separating_subsets,
+    vote_triples,
+)
 from andrey.constraint.fci import (
     _adjacent,
-    _arrow_allowed,
-    _circle_pag,
-    _fast_adjacency_search,
-    _fci_orient,
-    _is_def_collider,
-    _knowledge_marks,
     _largest_size,
-    _neighbor_lists,
-    _remove_by_possible_dsep,
-    _sepset,
-    _test_in_rank_order,
-    _triple,
-    _validate_possible_dsep,
-    _vote_sepsets,
+    circle_pag,
+    fci_orient,
+    knowledge_marks,
+    orient_colliders,
+    possible_dsep_step,
+    validate_possible_dsep,
 )
-from andrey.core import ARROW, NULL, GraphStructure, backend
+from andrey.constraint.fci_jci import mark_index
+from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
+from andrey.search.boss import boss
 from andrey.search.ges import ges
+from andrey.search.grasp import grasp
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
+
+#: The pattern edges the test phase may remove: every one, or those in a triangle of the pattern.
+EDGE_REMOVALS: tuple[str, ...] = ("all", "triangles")
+
+
+def check_edge_removal(edge_removal: str) -> None:
+    """Raise ``ValueError`` unless ``edge_removal`` is one of :data:`EDGE_REMOVALS`."""
+    if edge_removal not in EDGE_REMOVALS:
+        raise ValueError(f"edge_removal must be 'all' or 'triangles', got {edge_removal!r}")
+
+
+def outside_triangles(adjacent: np.ndarray) -> np.ndarray:
+    """The pairs the symmetric boolean ``adjacent`` joins that share no neighbor: its edges in no
+    triangle."""
+    joined = adjacent.astype(np.float64)
+    return adjacent & (joined @ joined == 0)
 
 
 def gfci(
@@ -59,20 +81,25 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "order_free",
+    edge_removal: str = "all",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
-    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
-    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
+    visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
+    ``edge_removal`` ``"triangles"`` lets the adjacency search and the possible-d-sep step test only
+    the GES CPDAG's edges that lie in a triangle of it (:func:`fci_from_pattern`); ``"all"`` tests
+    every edge. ``in_column_order`` applies the orientation rules one firing at a time in column
+    order instead of in order-free rounds (:func:`~andrey.constraint.fci.fci_orient`).
     ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
@@ -80,20 +107,24 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
-    ``workers`` worker processes share the GES passes and the adjacency search's larger
-    conditioning-size passes, each above its own work threshold; ``None`` reads
-    ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
-    the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
-    after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
-    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
-    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
-    non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    ``workers`` worker processes share the GES passes, the adjacency search's larger
+    conditioning-size passes, and the larger possible-d-sep searches, each above its own work
+    threshold; ``None`` reads ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or
+    ``"majority"`` decides the triples the pattern shields by the vote of
+    :func:`~andrey.constraint._skeleton.vote_triples` after the possible-d-sep step. ``seed`` fixes
+    the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
+    ``None`` uses ``ANDREY_SEED``. ``context``, the column of an environment index, is a source of
+    the GES phase (:func:`~andrey.search.ges.ges`), whose passes then run in this process, and the
+    test phase gives its edges the marks of Joint Causal Inference (:func:`fci_from_pattern`, with
+    ``confounded_index``). The private ``_ambiguous`` sink receives the triples no orientation rule
+    reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
 
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
+    check_edge_removal(edge_removal)
     cpdag_structure, _score = ges(
         X,
         score_func=score_func,
@@ -104,35 +135,257 @@ def gfci(
         categorical=categorical,
         constraints=constraints,
         workers=workers,
+        sources=() if context is None else (context,),
     )
-    pattern = from_structure(cpdag_structure)
+    return fci_from_pattern(
+        X,
+        cpdag_structure,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=possible_dsep,
+        edge_removal=edge_removal,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=workers,
+        seed=seed,
+        context=context,
+        confounded_index=confounded_index,
+        _ambiguous=_ambiguous,
+    )
+
+
+def boss_fci(
+    data: np.ndarray,
+    *,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    max_parents: int | None = None,
+    n_starts: int = 1,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
+    edge_removal: str = "all",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool = False,
+    workers: int | None = None,
+    seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Discover a PAG with BOSS adjacency and FCI orientation.
+
+    The score settings, ``seed``, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS
+    search (:func:`~andrey.search.boss.boss`), and the rest act as for :func:`gfci`, whose
+    possible-d-separation step it leaves out (:func:`fci_from_pattern`), so ``edge_removal`` acts
+    on the adjacency search alone. ``context``,
+    the column of an environment index, leads every BOSS order, and the test phase gives its edges
+    the marks of Joint Causal Inference (:func:`fci_from_pattern`, with ``confounded_index``).
+    """
+    X = np.asarray(data, dtype=np.float64)
+    check_collider_rule(collider_rule)
+    check_edge_removal(edge_removal)
+    pattern, _score = boss(
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        seed=0 if seed is None else seed,
+        n_starts=n_starts,
+        score_func=score_func,
+        max_parents=max_parents,
+        categorical=categorical,
+        constraints=constraints,
+        sources=() if context is None else (context,),
+    )
+    return fci_from_pattern(
+        X,
+        pattern,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=None,
+        edge_removal=edge_removal,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=backend.worker_count(workers),
+        seed=seed,
+        context=context,
+        confounded_index=confounded_index,
+        _ambiguous=_ambiguous,
+    )
+
+
+def grasp_fci(
+    data: np.ndarray,
+    *,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    grasp_depth: int = 3,
+    max_parents: int | None = None,
+    n_starts: int = 1,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
+    edge_removal: str = "all",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool = False,
+    workers: int | None = None,
+    seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Discover a PAG with GRaSP adjacency and FCI orientation.
+
+    The score settings, ``grasp_depth``, ``seed``, ``max_parents``, ``n_starts``, and
+    ``constraints`` reach the GRaSP search (:func:`~andrey.search.grasp.grasp`), and the rest act
+    as for :func:`boss_fci`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    check_collider_rule(collider_rule)
+    check_edge_removal(edge_removal)
+    pattern, _score = grasp(
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        depth=grasp_depth,
+        seed=0 if seed is None else seed,
+        n_starts=n_starts,
+        score_func=score_func,
+        max_parents=max_parents,
+        categorical=categorical,
+        constraints=constraints,
+        sources=() if context is None else (context,),
+    )
+    return fci_from_pattern(
+        X,
+        pattern,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=None,
+        edge_removal=edge_removal,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=backend.worker_count(workers),
+        seed=seed,
+        context=context,
+        confounded_index=confounded_index,
+        _ambiguous=_ambiguous,
+    )
+
+
+def fci_from_pattern(
+    X: np.ndarray,
+    cpdag: GraphStructure,
+    *,
+    alpha: float,
+    indep_test: str,
+    collider_rule: str,
+    categorical: np.ndarray | None,
+    possible_dsep: str | None,
+    edge_removal: str = "all",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool,
+    workers: int = 1,
+    seed: int | None = None,
+    context: int | None = None,
+    confounded_index: bool = True,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Prune and orient the score search's ``cpdag`` with FCI's tests and rules: a PAG.
+
+    FCI's adjacency search starts from the pattern's adjacencies; the pattern then decides the
+    colliders on triples whose ends it leaves non-adjacent, and the separating sets the others,
+    before the rules R1-R10. ``possible_dsep`` (``"order_free"`` or ``"fast"``, as for
+    :func:`gfci`) runs the possible-d-separation step between the two, after a first collider pass
+    that sets the arrowheads its sets read; ``None`` leaves the step out, as Algorithm 5 of Ramsey,
+    Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
+    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
+
+    ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
+    pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
+    does: neither the adjacency search nor the possible-d-separation step tests an edge in no
+    triangle (:func:`outside_triangles`), which stays and still conditions the tests of the other
+    pairs, as a required edge does. ``"all"`` tests every edge.
+
+    ``context``, the column of an environment index, runs the test phase as
+    :func:`~andrey.constraint.fci_jci.fci_jci` runs FCI's: before each collider pass, every edge
+    of the index gets the marks of Joint Causal Inference
+    (:func:`~andrey.constraint.fci_jci.mark_index`, with ``confounded_index``), and the rules leave
+    out R5-R7, since JCI assumes no selection bias. The PAG still holds the index.
+    """
+    check_edge_removal(edge_removal)
+    pattern = from_structure(cpdag)
+    keep = knowledge_masks(constraints)[1]
+    untested = None
+    if edge_removal == "triangles":
+        untested = outside_triangles(pattern != NULL)
+        keep = untested if keep is None else keep | untested
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
-    keep = None if constraints is None else constraints.required | constraints.required.T
-    support, sepsets = _fast_adjacency_search(
-        X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
+    skeleton, sepsets, _ = adjacency_search(
+        test,
+        X.shape[1],
+        alpha,
+        support=pattern != NULL,
+        keep=keep,
+        max_depth=max_depth,
+        workers=workers,
     )
     sepsets.update(
         _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
     )
 
-    marks = _circle_pag(support)
-    _knowledge_marks(marks, constraints)
-    _orient_colliders_from_pattern(marks, pattern, sepsets)
-    if possible_dsep == "fast":
-        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
+    marks = circle_pag(skeleton)
+    knowledge_marks(marks, constraints)
+    if possible_dsep is None:
+        if constraints is not None:
+            check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
-        _remove_by_possible_dsep(
-            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
+        if context is not None:
+            mark_index(marks, context, confounded_index)
+        orient_colliders(marks, sepsets, pattern=pattern)
+        marks = possible_dsep_step(
+            marks,
+            X,
+            test,
+            alpha,
+            sepsets,
+            possible_dsep=possible_dsep,
+            indep_test=indep_test,
+            categorical=categorical,
+            seed=seed,
+            max_depth=max_depth,
+            constraints=constraints,
+            keep=untested,
+            workers=workers,
         )
-    marks = _circle_pag(marks != NULL)
-    _knowledge_marks(marks, constraints)
+    if context is not None:
+        mark_index(marks, context, confounded_index)
     ambiguous = (
         frozenset(
             triple
-            for triple in _vote_sepsets(
-                marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth
+            for triple in vote_triples(
+                marks, test, alpha, sepsets, collider_rule, max_depth=max_depth
             )
             if _adjacent(pattern, triple[0], triple[2])
         )
@@ -141,46 +394,19 @@ def gfci(
     )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders_from_pattern(marks, pattern, sepsets, ambiguous)
-    _fci_orient(
-        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+    orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
+    fci_orient(
+        marks,
+        test,
+        alpha,
+        sepsets,
+        ambiguous,
+        max_depth=max_depth,
+        in_column_order=in_column_order,
+        selection_bias=context is None,
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")
-
-
-def _orient_colliders_from_pattern(
-    marks: np.ndarray,
-    pattern: np.ndarray,
-    sepsets: Mapping[tuple[int, int], tuple[int, ...]],
-    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-) -> None:
-    """Orient the unshielded colliders ``a *-> b <-* c`` of ``marks`` with the GES pattern.
-
-    For each node ``b`` and each non-adjacent pair ``(a, c)`` of its neighbors (visited in
-    ascending order): when ``a`` and ``c`` are not adjacent in ``pattern``, ``b`` is a collider iff
-    the pattern has ``a -> b <- c``; when they are, ``b`` is a collider iff a separating set for
-    ``a`` and ``c`` is recorded and does not contain ``b``, and the triple is not ``ambiguous``. An
-    already-directed tail at ``b`` blocks the orientation.
-    """
-    for b, adj in enumerate(_neighbor_lists(marks)):
-        for i in range(len(adj)):
-            for k in range(i + 1, len(adj)):
-                a, c = adj[i], adj[k]
-                if _adjacent(marks, a, c) or _is_def_collider(marks, a, b, c):
-                    continue
-                if _adjacent(pattern, a, c):
-                    if _triple(a, b, c) in ambiguous:
-                        continue
-                    sep = _sepset(sepsets, a, c)
-                    if sep is None or b in sep:
-                        continue
-                elif not (pattern[b, a] == ARROW and pattern[b, c] == ARROW):
-                    continue
-                if not _arrow_allowed(marks, a, b) or not _arrow_allowed(marks, c, b):
-                    continue
-                marks[b, a] = ARROW
-                marks[b, c] = ARROW
 
 
 def _derive_sepsets(

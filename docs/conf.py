@@ -122,14 +122,24 @@ napoleon_numpy_docstring = True
 always_use_bars_union = True
 
 # ---- intersphinx -----------------------------------------------------------------------------
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
-    "sklearn": ("https://scikit-learn.org/stable", None),
-    "networkx": ("https://networkx.org/documentation/stable", None),
-    "matplotlib": ("https://matplotlib.org/stable", None),
+# Each inventory comes from its project's site, or from its stored copy in `_intersphinx/` when the
+# site does not answer within `intersphinx_timeout` seconds (a limit on each connection attempt and
+# each read). `scripts/refresh_intersphinx.py` downloads the copies again. A cache limit of 0 days
+# makes every build ask each site again; with a longer limit, a rebuild that finds an earlier
+# download still fresh skips the site and reads the stored copy.
+INTERSPHINX_SITES = {
+    "python": "https://docs.python.org/3",
+    "numpy": "https://numpy.org/doc/stable",
+    "scipy": "https://docs.scipy.org/doc/scipy",
+    "sklearn": "https://scikit-learn.org/stable",
+    "networkx": "https://networkx.org/documentation/stable",
+    "matplotlib": "https://matplotlib.org/stable",
 }
+intersphinx_mapping = {
+    name: (site, (None, f"_intersphinx/{name}.inv")) for name, site in INTERSPHINX_SITES.items()
+}
+intersphinx_timeout = 5
+intersphinx_cache_limit = 0
 
 # ---- notebooks -------------------------------------------------------------------------------
 EXAMPLES = HERE / "docs" / "examples"
@@ -437,14 +447,99 @@ def _facts() -> list[str]:
     ]
 
 
+# Each method's name in prose. A method missing here, or a name no method has, stops the build.
+PROSE_NAMES = {
+    "pc": "PC",
+    "fci": "FCI",
+    "gfci": "GFCI",
+    "boss_fci": "BOSS-FCI",
+    "grasp_fci": "GRaSP-FCI",
+    "cdnod": "CD-NOD",
+    "fci_jci": "FCI-JCI",
+    "icp": "ICP",
+    "iamb": "IAMB",
+    "inter_iamb": "Inter-IAMB",
+    "mmpc": "MMPC",
+    "ges": "GES",
+    "gies": "GIES",
+    "gnies": "GnIES",
+    "xges": "XGES",
+    "hc": "hill climbing",
+    "tabu": "tabu search",
+    "exact_search": "exact search",
+    "calm": "CALM",
+    "notears": "NOTEARS",
+    "dagma": "DAGMA",
+    "mmhc": "MMHC",
+    "rsmax2": "RSMAX2",
+    "boss": "BOSS",
+    "grasp": "GRaSP",
+    "igsp": "IGSP",
+    "ut_igsp": "UT-IGSP",
+    "direct_lingam": "DirectLiNGAM",
+    "ica_lingam": "ICA-LiNGAM",
+    "multi_group_direct_lingam": "Multi-group DirectLiNGAM",
+    "cam": "CAM",
+    "resit": "RESIT",
+    "varma_lingam": "VARMA-LiNGAM",
+    "longitudinal_lingam": "Longitudinal LiNGAM",
+    "pcmci": "PCMCI",
+    "pcmciplus": "PCMCI+",
+    "jpcmciplus": "J-PCMCI+",
+    "lpcmci": "LPCMCI",
+    "granger": "Granger",
+    "dynotears": "DYNOTEARS",
+    "anm": "ANM",
+    "pnl": "PNL",
+    "gin": "GIN",
+    "rcd": "RCD",
+    "bottom_up_parce_lingam": "BottomUpParceLiNGAM",
+    "camuv": "CAM-UV",
+}
+
+# The method lists the pages print, each the methods a registry predicate selects:
+# ``{{ <key>_methods }}`` in prose names and ``{{ <key>_names }}`` in code names.
+METHOD_LISTS = {
+    "indep_test": lambda s: any(p.name == "indep_test" for p in s.params),
+    "score_func": lambda s: any(p.name == "score_func" for p in s.params),
+    "no_knowledge": lambda s: not s.knowledge,
+    "ordering": lambda s: s.output.has_ordering,
+    "weighted": lambda s: s.output.weighted,
+    "score": lambda s: "score" in s.output.metadata,
+    "targets": lambda s: any(p.type == "targets" for p in s.params),
+    "cpdag_targets": lambda s: (
+        any(p.type == "targets" for p in s.params) and s.output.graph_kind == "cpdag"
+    ),
+    "missing": lambda s: s.data.missing,
+}
+
+
+def _listed(items: list[str]) -> str:
+    """``a``, ``a and b``, or ``a, b, and c``; an empty list stops the build."""
+    if not items:
+        raise ConfigError("a method list selects no method")
+    if len(items) < 3:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
 def _methods_text() -> dict[str, str]:
-    """The method count and tiers, for the FAQ."""
-    supported = [f"`{s.name}`" for s in list_specs() if s.status == "supported"]
-    return {
-        "method_count": f"{len(list_specs())} methods",
+    """The method count and tiers, for the FAQ, and the method lists of `METHOD_LISTS`."""
+    specs = list_specs()
+    stale = set(PROSE_NAMES) - {s.name for s in specs}
+    if stale:
+        raise ConfigError(f"PROSE_NAMES has names no method has: {sorted(stale)}")
+    supported = [f"`{s.name}`" for s in specs if s.status == "supported"]
+    text = {
+        "method_count": f"{len(specs)} methods",
         "n_supported": str(len(supported)),
-        "supported_methods": ", ".join(supported[:-1]) + f", and {supported[-1]}",
+        "supported_methods": _listed(supported),
     }
+    for key, selects in METHOD_LISTS.items():
+        names = [s.name for s in specs if selects(s)]
+        text[f"{key}_methods"] = _listed([PROSE_NAMES[name] for name in names])
+        text[f"{key}_names"] = _listed([f"`{name}`" for name in names])
+    return text
 
 
 # Brand kit colors: each color's name, role, and palette value.

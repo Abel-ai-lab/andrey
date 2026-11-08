@@ -52,9 +52,11 @@ from qa import reference_parity
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 import camuv_cpu  # noqa: E402
+import fci_jci_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
+import jpcmciplus_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
 from andrey_bench import (  # noqa: E402
@@ -67,7 +69,9 @@ from andrey_bench import (  # noqa: E402
 )
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
 from andrey_bench.adapters.andrey_dynotears import AndreyDYNOTEARS  # noqa: E402
+from andrey_bench.adapters.andrey_fci_jci import AndreyFCIJCI  # noqa: E402
 from andrey_bench.adapters.andrey_gies import stack, unstack  # noqa: E402
+from andrey_bench.adapters.andrey_jpcmciplus import AndreyJPCMCIPlus  # noqa: E402
 from andrey_bench.adapters.andrey_lingam_ts import (  # noqa: E402
     AndreyLongitudinalLiNGAM,
     AndreyVarmaLiNGAM,
@@ -231,6 +235,21 @@ HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
     "latent_anm_er_tenth_d22_n1000": ("latent_anm_er_tenth", 22, 1000),
 }
 
+#: FCI-JCI's published regimes, drawn by its benchmark driver (``benchmarks/fci_jci_cpu.py``) at
+#: the two in-claim cells of mechanism changes: the paper's small setting, 4 variables, and its
+#: larger one, 10, each with one context variable and 500 rows per regime. The environment is the
+#: last column of the data.
+INDEX_PAG_CELLS: dict[str, str] = {"fci_jci_s4": "S4", "fci_jci_l10": "L10"}
+
+#: J-PCMCI+'s published cells, drawn by its benchmark driver (``benchmarks/jpcmciplus_cpu.py``) from
+#: the model of its authors' experiment script: 5 system variables and 10 datasets of 100 steps,
+#: with every context observed, and with one time and one space context observed, the draws where
+#: Assumption 3 holds.
+CONTEXT_CELLS: dict[str, str] = {
+    "jpcmciplus_all_m10_t100": "all-M10-T100",
+    "jpcmciplus_half_m10_t100": "half-M10-T100",
+}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -388,6 +407,32 @@ def hidden_cause_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
     return tuple(out)
 
 
+def index_pag_draws(cell: str) -> tuple[Draw, ...]:
+    """The data with the environment as the last column, and FCI-JCI's PAG at the true
+    distribution over the variables and the environment, under ``confounded_index=True``."""
+    out = []
+    for seed in SEEDS:
+        ds = fci_jci_cpu.draw(fci_jci_cpu.CELLS[cell], seed)
+        marks = fci_jci_cpu.truth(ds)["1"]
+        out.append(Draw(ds.full, GraphStructure.from_numpy(marks, kind="pag")))
+    return tuple(out)
+
+
+def context_draws(cell: str) -> tuple[Draw, ...]:
+    """The datasets of a J-PCMCI+ cell, ``(datasets, steps, columns)``: the system variables, then
+    the observed time contexts, then the observed space contexts, as many of each kind; and the
+    window graph of the system variables over lags 0 to 2. A seed whose draw breaks Assumption 3 is
+    skipped and the next one taken, as the driver's claimed rows leave it out."""
+    out: list[Draw] = []
+    seed = 0
+    while len(out) < len(SEEDS):
+        ds = jpcmciplus_cpu.draw(jpcmciplus_cpu.CELLS[cell], seed)
+        seed += 1
+        if not ds.draw.breaks_assumption_3:
+            out.append(Draw(ds.draw.datasets, ds.truth))
+    return tuple(out)
+
+
 def parents_of(graph: Any, node: int) -> set[int]:
     """Return the nodes with an edge into ``node`` in ``graph``, a structure or an output."""
     marks = getattr(graph, "structure", graph).to_numpy()
@@ -490,6 +535,8 @@ SERIES_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "varma_lingam_paper": ((3, 300), (5, 300)),
     "dynotears_paper": ((10, 500), (20, 500)),
 }
+#: DYNOTEARS at the paper's settings for 500 steps, the benchmark driver's ``n500``.
+DYNOTEARS = AndreyDYNOTEARS("dynotears", lambda1=0.05, w_threshold=0.3, lag_threshold=0.1)
 #: ``(d, n, m)`` of the longitudinal LiNGAM panel: variables, time points, and units.
 PANEL_MODEL = "panel2013"
 PANEL_SIZES: tuple[tuple[int, int, int], ...] = ((3, 20, 200), (5, 20, 500))
@@ -594,6 +641,8 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         name: functools.partial(hidden_cause_draws, *cell)
         for name, cell in HIDDEN_CAUSE_CELLS.items()
     },
+    **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
+    **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
     "sachs": sachs_draws,
@@ -632,8 +681,9 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
 #: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
 #: ``direct`` scores the directed edges against those between observed variables that no hidden
-#: path joins (:func:`direct`). A time-series estimate is scored in its published summary's unit
-#: (:func:`series_error`).
+#: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
+#: index by its endpoints against the one the draw records. A time-series estimate is scored in its
+#: published summary's unit (:func:`series_error`).
 Target = Literal[
     "cpdag",
     "dag",
@@ -643,6 +693,7 @@ Target = Literal[
     "clusters",
     "parents",
     "direct",
+    "index_pag",
     "lagged",
     "window",
     "window_edges",
@@ -665,14 +716,14 @@ def _sizes(regime: str) -> tuple[str, ...]:
 
 
 # A method applies where its assumptions hold. PC and the score searches (GES, XGES, HC, Tabu, BOSS,
-# GRaSP, exact search, CALM) assume no hidden variables, FCI and GFCI allow them, and the LiNGAM
-# methods need non-Gaussian noise. Sachs is measured data that fits each only approximately. RCD and
-# BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000 rows RCD marks most pairs
-# <-> and scores worse than the empty graph, and on Sachs BottomUpParceLiNGAM does. ANM and PNL take
-# one pair of variables, so each runs on its benchmark's pairs only. GIES, GnIES, CD-NOD,
-# MultiGroupDirectLiNGAM, and GIN need what only their regimes have: interventions, environments
-# that change noise variances, domains, groups, or latents measured by indicators. CAM-UV runs on
-# its benchmark's nonlinear regimes with hidden variables.
+# GRaSP, exact search, CALM) assume no hidden variables, FCI, GFCI, BOSS-FCI, and GRaSP-FCI allow
+# them, and the LiNGAM methods need non-Gaussian noise. Sachs is measured data that fits each only
+# approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000
+# rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
+# BottomUpParceLiNGAM does. ANM and PNL take one pair of variables, so each runs on its benchmark's
+# pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
+# have: interventions, environments that change noise variances, domains, groups, or latents
+# measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -683,6 +734,10 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
+#: FCI-JCI needs data pooled from an observational and an interventional regime.
+INDEX_PAG_DATA = tuple(INDEX_PAG_CELLS)
+#: J-PCMCI+ needs time series from several datasets that differ through context variables.
+CONTEXT_DATA = tuple(CONTEXT_CELLS)
 KNOWN_TARGET_DATA = tuple(KNOWN_TARGET_CELLS)
 
 
@@ -723,6 +778,36 @@ def igsp_fit(x: np.ndarray) -> Any:
     return andrey.igsp(samples, env, targets={0: [], **dict(enumerate(targets, start=1))})
 
 
+FCI_JCI = AndreyFCIJCI()
+
+
+def fci_jci_fit(x: np.ndarray) -> Any:
+    """``andrey.fci_jci`` at its defaults on an FCI-JCI draw, its last column as ``env``: the PAG
+    over the variables and the environment, as the benchmark driver scores it."""
+    return FCI_JCI.to_structure(FCI_JCI.fit(x, {"context_vars": [x.shape[1] - 1]}))
+
+
+JPCMCIPLUS = AndreyJPCMCIPlus()
+#: The system variables of every J-PCMCI+ draw the gate fits.
+CONTEXT_SYSTEM = 5
+
+
+def context_columns(x: np.ndarray) -> dict[str, list[int]]:
+    """The observed time and space contexts of a J-PCMCI+ draw (:func:`context_draws`)."""
+    contexts = list(range(CONTEXT_SYSTEM, x.shape[-1]))
+    half = len(contexts) // 2
+    return {"time_contexts": contexts[:half], "space_contexts": contexts[half:]}
+
+
+def jpcmciplus_fit(x: np.ndarray) -> Any:
+    """``andrey.jpcmciplus`` with both dummies, ``tau_max=2``, and alpha 0.05, the benchmark's
+    claimed setting: the window graph of the system variables, as the benchmark driver scores it."""
+    params = {**JPCMCIPLUS.params(), "tau_max": 2, "alpha": 0.05, **context_columns(x)}
+    marks = np.asarray(JPCMCIPLUS.fit(x, params))
+    n = CONTEXT_SYSTEM
+    return WindowGraph(marks[:, :n, :n], lag0="cpdag")
+
+
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
     """The benchmark adapter's fit with the published settings, as the harness scores it."""
     return lambda x: adapter.to_structure(adapter.fit(x, adapter.params()))
@@ -751,15 +836,16 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
 #: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
-#: fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's optimizer. CD-NOD
-#: and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions
-#: with the published settings: the domain index of four equal blocks of rows, and three groups of
-#: columns.
+#: fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
+#: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
+#: call the public functions with the published settings: the domain index of four equal blocks of
+#: rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
     "GFCI": Method(lambda x: andrey.gfci(x), "pag", PAG_DATA),
     "CDNOD": Method(_adapted(AndreyCDNOD()), "essential", _models("domain_shift_er")),
+    "FCI-JCI": Method(fci_jci_fit, "index_pag", INDEX_PAG_DATA),
     "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
@@ -779,6 +865,8 @@ SUPPORTED: dict[str, Method] = {
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
+    "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
+    "GRaSP-FCI": Method(lambda x: andrey.grasp_fci(x, seed=0), "pag", PAG_DATA),
     "UT-IGSP": Method(ut_igsp_fit, "essential", UNKNOWN_TARGET_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
     "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, seed=0), "dag", LINGAM_DATA),
@@ -803,6 +891,7 @@ SUPPORTED: dict[str, Method] = {
         _adapted(andrey_pcmciplus_adapter(5)), "window", _series("pcmciplus_paper")
     ),
     "LPCMCI": Method(_adapted(andrey_lpcmci_adapter(3)), "window", _series("lpcmci_paper")),
+    "J-PCMCI+": Method(jpcmciplus_fit, "window", CONTEXT_DATA),
     "VARMA-LiNGAM": Method(
         _adapted(AndreyVarmaLiNGAM()), "cross_links", _series("varma_lingam_paper")
     ),
@@ -815,7 +904,7 @@ SUPPORTED: dict[str, Method] = {
         _granger, "lagged_edges", tuple(f"var2_lagged_d{d}_n{n}" for d, n in GRANGER_SIZES)
     ),
     "DYNOTEARS": Method(
-        _adapted(AndreyDYNOTEARS("dynotears", lambda1=0.05, w_threshold=0.3, lag_threshold=0.1)),
+        _adapted(DYNOTEARS),
         "window_edges",
         _series("dynotears_paper"),
     ),
@@ -926,7 +1015,7 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
         return set_errors(parents_of(estimate, last), parents_of(truth, last))
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
-    return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection"))
+    return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
 
 
 def set_errors(estimate: set[int], truth: set[int]) -> int:
@@ -948,7 +1037,7 @@ def latents_missed(estimate: Any, truth: GraphStructure) -> int:
 
 
 def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
-    kind = "pag" if target == "projection" else target
+    kind = "pag" if target in ("projection", "index_pag") else target
     return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 

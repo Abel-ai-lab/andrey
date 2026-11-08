@@ -1,9 +1,13 @@
 import edu.cmu.tetrad.algcomparison.algorithm.Algorithm;
 import edu.cmu.tetrad.algcomparison.algorithm.AlgorithmFactory;
+import edu.cmu.tetrad.algcomparison.utils.HasKnowledge;
 import edu.cmu.tetrad.data.DataModel;
 import edu.cmu.tetrad.data.DataSet;
 import edu.cmu.tetrad.data.DataType;
+import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.data.DiscreteVariable;
+import edu.cmu.tetrad.data.Knowledge;
+import edu.cmu.tetrad.data.SimpleDataLoader;
 import edu.cmu.tetrad.graph.Edge;
 import edu.cmu.tetrad.graph.Endpoint;
 import edu.cmu.tetrad.graph.Graph;
@@ -22,6 +26,7 @@ import edu.cmu.tetrad.search.utils.PcCommon;
 import edu.cmu.tetrad.search.utils.SepsetMap;
 import edu.cmu.tetrad.util.DataConvertUtils;
 import edu.cmu.tetrad.util.Parameters;
+import edu.pitt.dbmi.causal.cmd.CausalCmdApplication;
 import edu.pitt.dbmi.causal.cmd.CmdArgs;
 import edu.pitt.dbmi.causal.cmd.CmdParser;
 import edu.pitt.dbmi.causal.cmd.data.DataFiles;
@@ -56,7 +61,10 @@ import java.util.StringJoiner;
  * column as continuous. The {@code search} mode takes causal-cmd's own argument parser, parameters,
  * and algorithm factory from the jar and replaces only that reader with one that marks a column
  * categorical when it holds at most {@code --numCategories} distinct values; continuous data takes
- * no {@code --numCategories}. The file runs from source, with no build step:
+ * no {@code --numCategories}. As causal-cmd's own command line does, {@code search} sets the
+ * knowledge file of {@code --knowledge} on the algorithm, and lists the experimental algorithms,
+ * such as {@code bfci}, under {@code --experimental}. The file runs from source, with no build
+ * step:
  *
  * <pre>
  * java --class-path causal-cmd-1.12.0-jar-with-dependencies.jar TetradDriver.java search ARGS
@@ -71,6 +79,8 @@ import java.util.StringJoiner;
  *                             seconds: " and the timed search call's wall time, a blank line,
  *                             then the graph
  * columns CSV k               each column's type as causal-cmd's reader and as this reader read it
+ * knowledge FILE              every ordered pair "a b" of the file's variables that its knowledge
+ *                             forbids ("FORBIDDEN a b") or requires ("REQUIRED a b") as a -> b
  * pc CSV k cg|dg [TABLE]      PC as causal-cmd sets it up; print every test, the separating sets,
  *                             and the graph; with TABLE ("x y z1 ... p" lines), the p-values come
  *                             from it, and a query it lacks exits 3
@@ -88,10 +98,11 @@ public class TetradDriver {
         switch (mode) {
             case "search" -> search(rest);
             case "columns" -> columns(rest[0], Integer.parseInt(rest[1]));
+            case "knowledge" -> knowledge(rest[0]);
             case "pc", "ptest", "score", "fges" -> Probe.run(mode, rest);
             default -> {
                 System.err.println("usage: TetradDriver.java MODE ARGS; MODE is search, columns,"
-                        + " pc, ptest, score, or fges");
+                        + " knowledge, pc, ptest, score, or fges");
                 System.exit(2);
             }
         }
@@ -135,7 +146,7 @@ public class TetradDriver {
     /**
      * Runs the search {@code --warmup} times, then once more, and keeps the last run's graph and
      * time. The clock holds the search call alone: the JVM start, the compile of this file, and
-     * the data read come before it.
+     * the data and knowledge reads come before it.
      */
     @SuppressWarnings("unchecked")
     static void search(String[] argv) throws Exception {
@@ -144,6 +155,8 @@ public class TetradDriver {
             warmup = Integer.parseInt(argv[1]);
             argv = Arrays.copyOfRange(argv, 2, argv.length);
         }
+        // causal-cmd's own main sets this flag before parsing; its parser lists bfci only then.
+        CausalCmdApplication.showExperimental = Arrays.asList(argv).contains("--experimental");
         CmdArgs args = CmdParser.parse(argv);
         boolean mixed = args.getDataType() == DataType.Mixed;
         DataSet data = read(args, mixed ? numCategories(argv) : 0);
@@ -152,6 +165,15 @@ public class TetradDriver {
         for (int i = 0; i <= warmup; i++) {
             Algorithm algorithm = AlgorithmFactory.create(
                     args.getAlgorithmClass(), args.getTestClass(), args.getScoreClass());
+            // causal-cmd's own runner reads the file and sets it on the algorithm in this way.
+            Knowledge knowledge = DataFiles.readInKnowledge(args, QUIET);
+            if (knowledge != null && !knowledge.getVariables().isEmpty()) {
+                if (!(algorithm instanceof HasKnowledge takes)) {
+                    throw new IllegalArgumentException(algorithm.getClass().getSimpleName()
+                            + " takes no knowledge");
+                }
+                takes.setKnowledge(knowledge);
+            }
             Parameters parameters = Tetrad.getParameters(args);
             parameters.set("printStream", QUIET);
             long start = System.nanoTime();
@@ -197,6 +219,19 @@ public class TetradDriver {
             }
         }
         System.out.println("cells differing: " + differ);
+    }
+
+    /** Every ordered pair of the file's variables that its knowledge forbids or requires. */
+    static void knowledge(String file) throws Exception {
+        Knowledge knowledge = SimpleDataLoader.loadKnowledge(
+                Paths.get(file).toFile(), DelimiterType.WHITESPACE, "//");
+        for (String a : knowledge.getVariables()) {
+            for (String b : knowledge.getVariables()) {
+                if (a.equals(b)) continue;
+                if (knowledge.isForbidden(a, b)) System.out.println("FORBIDDEN " + a + " " + b);
+                if (knowledge.isRequired(a, b)) System.out.println("REQUIRED " + a + " " + b);
+            }
+        }
     }
 
     static String kind(Node v) {

@@ -87,6 +87,30 @@ def _var_process(
     return X[burn_in:]
 
 
+def _context_var(
+    seed: int,
+    n_datasets: int,
+    n_samples: int,
+    B0: list[list[float]],
+    A1: list[list[float]],
+    loadings: list[float],
+    noise: str,
+    burn_in: int,
+) -> list[np.ndarray]:
+    """Several series of one :func:`_var_process` model, each shifted by a hidden dataset level.
+
+    Dataset ``m`` is the VAR(1) series of seed ``seed + 1 + m`` plus ``level[m] * loadings``, the
+    levels standard normal from ``seed``: a space context no column holds, which a dataset dummy
+    stands in for.
+    """
+    levels = np.random.default_rng(seed).standard_normal(n_datasets)
+    load = np.asarray(loadings, dtype=np.float64)
+    return [
+        _var_process(seed + 1 + m, n_samples, B0, A1, noise, burn_in) + levels[m] * load
+        for m in range(n_datasets)
+    ]
+
+
 def _lagged_var(
     seed: int, n_samples: int, lags: list[list[list[float]]], noise: str, burn_in: int
 ) -> np.ndarray:
@@ -389,7 +413,7 @@ CASES: dict[str, dict] = {
             [0.0, -0.8, 0.0, 0.0, 0.0],
         ],
     },
-    # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
+    # Stable VAR(1), non-Gaussian noise - Granger and PCMCI+.
     "var_4v_stable": {
         "model": "var",
         "noise": "uniform",
@@ -632,7 +656,7 @@ CASES: dict[str, dict] = {
 # sharing one causal order (each weight matrix is strictly lower-triangular over the same order
 # 0 -> ... -> d-1) but differing in edge support and strength -- MultiGroupDirectLiNGAM's
 # assumption. Each group has its own seed for an independent noise draw. A ``panel`` case is one
-# process observed at several time points.
+# process observed at several time points, and a ``context_var`` case several series of one process.
 GROUP_CASES: dict[str, dict] = {
     # A panel: 600 units at 4 time points, non-Gaussian noise, one instantaneous DAG
     # x0 -> x1 -> x2, x0 -> x3 and one lag-1 matrix with memory in every variable and the cross
@@ -655,6 +679,29 @@ GROUP_CASES: dict[str, dict] = {
             [0.0, 0.0, 0.4, 0.0],
             [0.0, 0.0, -0.5, 0.4],
         ],
+    },
+    # Six datasets of 100 steps of var_4v_stable's model, each shifted by a hidden dataset level on
+    # x0 and x2, a space context that the dataset dummy stands in for - J-PCMCI+.
+    "context_var_4v": {
+        "model": "context_var",
+        "noise": "uniform",
+        "seed": 20261108,
+        "n_datasets": 6,
+        "n_samples": 100,
+        "burn_in": 100,
+        "B0": [
+            [0.0, 0.0, 0.0, 0.0],
+            [0.3, 0.0, 0.0, 0.0],
+            [0.0, 0.4, 0.0, 0.0],
+            [0.2, 0.0, 0.3, 0.0],
+        ],
+        "A1": [
+            [0.3, 0.0, 0.0, 0.1],
+            [0.0, 0.3, 0.0, 0.0],
+            [0.0, 0.0, 0.3, 0.0],
+            [0.1, 0.0, 0.0, 0.3],
+        ],
+        "loadings": [2.0, 0.0, 2.0, 0.0],
     },
     "mgdl_2groups": {
         "noise": "uniform",
@@ -858,7 +905,7 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
     model = spec.get("model", "linear_sem")
     if "groups" in spec:  # every group shares one causal order
         spec, model = {"weights": spec["groups"][0]["weights"]}, "linear_sem"
-    if model in ("linear_sem", "confounded", "var", "varma", "panel"):
+    if model in ("linear_sem", "confounded", "var", "varma", "panel", "context_var"):
         B = np.asarray(spec["weights"] if "weights" in spec else spec["B0"])  # B[j, i]: i -> j
         observed = list(spec.get("observed", range(B.shape[0])))
         order = observed + [v for v in range(B.shape[0]) if v not in observed]
@@ -962,6 +1009,17 @@ def generate_groups(case_id: str, *, shuffle: bool = True) -> list[np.ndarray]:
             A1=spec["A1"],
             noise=spec["noise"],
         )
+    elif spec.get("model") == "context_var":
+        matrices = _context_var(
+            seed=spec["seed"],
+            n_datasets=spec["n_datasets"],
+            n_samples=spec["n_samples"],
+            B0=spec["B0"],
+            A1=spec["A1"],
+            loadings=spec["loadings"],
+            noise=spec["noise"],
+            burn_in=spec["burn_in"],
+        )
     else:
         matrices = [
             _linear_sem(
@@ -976,6 +1034,29 @@ def generate_groups(case_id: str, *, shuffle: bool = True) -> list[np.ndarray]:
         return matrices
     order = column_order(case_id)
     return [np.ascontiguousarray(X[:, order]) for X in matrices]
+
+
+def domain_shift(
+    case_id: str, variables: tuple[int, ...], *, size: float = 2.0
+) -> tuple[np.ndarray, np.ndarray]:
+    """``case_id``'s pinned input in two domains, and their index: ``(data, index)``.
+
+    ``variables``, numbered as the case defines them, shift by ``size`` in the second domain of
+    :func:`domain_index`, and every descendant shifts with them through the case's linear weights,
+    as if the shift were a term of the structural equations. The columns then come in
+    :func:`column_order`. The input before the shift is the case's, so its recorded hash still
+    checks it. Linear SEM cases only.
+    """
+    spec = CASES[case_id]
+    if spec.get("model", "linear_sem") != "linear_sem":
+        raise ValueError(f"domain_shift needs a linear SEM case, got {case_id!r}")
+    weights = np.asarray(spec["weights"], dtype=np.float64)  # weights[child, parent]
+    shift = np.zeros(len(weights))
+    shift[list(variables)] = size
+    total = np.linalg.solve(np.eye(len(weights)) - weights, shift)
+    index = domain_index(case_id)
+    X = generate(case_id, shuffle=False) + index * total
+    return np.ascontiguousarray(X[:, column_order(case_id)]), index
 
 
 def domain_index(case_id: str, *, n_domains: int = 2) -> np.ndarray:

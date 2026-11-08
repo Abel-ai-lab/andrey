@@ -7,8 +7,8 @@ tau_max``:
    candidate parent. Round ``p = 0, 1, ...`` tests each candidate against ``X^j_t`` given the ``p``
    strongest other candidates, then drops the candidates whose p-value exceeds ``pc_alpha``. A
    candidate's strength is the smallest absolute test statistic it has had so far; the survivors
-   are re-sorted by it, strongest first, after each round. Strengths equal to ``_KEY_DP`` decimals
-   are ordered by :func:`~andrey.search.hc.tie_ranks` of their variables, then by lag, so the
+   are re-sorted by it, strongest first, after each round. Strengths equal to ``KEY_DP`` decimals
+   are ordered by :func:`~andrey.core.ties.tie_ranks` of their variables, then by lag, so the
    order follows the variables when the columns are reordered. The rounds stop when no candidate
    has ``p`` others left to condition on.
 2. **MCI.** Every link ``X^i_{t-tau} -> X^j_t`` is tested given the selected parents of ``X^j_t``
@@ -26,12 +26,12 @@ conditional-independence test (:func:`~andrey.core.ci.make_indep_test`) built ov
 categorical mask repeated for every lag. A PC1 round tests all of a target's candidates in one call,
 and MCI tests all links into a target together, grouped by conditioning-set size. Any object with
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
-can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statistic, as in the
-reference implementation, tigramite: the partial correlation, the chi-square or G-square
-statistic, the likelihood ratio of the mixed-data tests, CMIknn's estimate of the conditional
-mutual information, GPDC's squared distance correlation, RCoT's statistic, or KCI's relative to
-its mean under independence. A registered test that reports only p-values is asked one query at a
-time and its candidates are ranked by p-value, smallest first (:class:`~andrey.core.ci.PValueTest`).
+can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statistic: the partial
+correlation, the chi-square or G-square statistic, the likelihood ratio of the mixed-data tests,
+CMIknn's estimate of the conditional mutual information, GPDC's squared distance correlation, RCoT's
+statistic, or KCI's relative to its mean under independence. A registered test that reports only
+p-values is asked one query at a time and its candidates are ranked by p-value, smallest first
+(:class:`~andrey.core.ci.PValueTest`).
 
 A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
 fit on the conditioning columns. The partial-correlation tests, ``"student_t"``
@@ -68,8 +68,7 @@ from andrey.core.ci import (
 from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.score import copies_error
-from andrey.search._parallel import _KEY_DP
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import KEY_DP, tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -186,10 +185,28 @@ def design_test(
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
     """
-    design = lagged_design(data, tau_max)
+    mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
+    design = lagged_design(data, 2 * tau_max)
+    return column_test(indep_test, design, data.shape[1], categorical=mask, seed=seed)
+
+
+def column_test(
+    indep_test: str,
+    design: np.ndarray,
+    n_vars: int,
+    *,
+    categorical: np.ndarray | None = None,
+    n_lagged: int | None = None,
+    seed: int | None = None,
+) -> LinkTest:
+    """The ``indep_test`` test over the columns of ``design``, as :func:`design_test` builds it.
+
+    ``categorical`` masks the columns of ``design``, and the copies error covers the groups that
+    hold one of its first ``n_vars`` columns, the lag-0 columns of a lagged design. ``n_lagged``
+    counts the columns of the lagged design when more follow it; the error ignores those.
+    """
     if indep_test not in PARTIAL_CORRELATION_TESTS:
-        mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
-        built = make_indep_test(indep_test, design, categorical=mask, seed=seed)
+        built = make_indep_test(indep_test, design, categorical=categorical, seed=seed)
         if not callable(getattr(built, "statistic_pvalues", None)):
             built = PValueTest(built)
         return cast("LinkTest", built)
@@ -209,8 +226,9 @@ def design_test(
         )
     else:
         test = PARTIAL_CORRELATION_TESTS[indep_test](design)
-    n_vars = data.shape[1]
-    groups = [group for group in test.copies() if group[0] < n_vars]
+    width = design.shape[1] if n_lagged is None else n_lagged
+    lagged = [tuple(column for column in group if column < width) for group in test.copies()]
+    groups = [group for group in lagged if len(group) > 1 and group[0] < n_vars]
     if groups:
         raise copies_error(groups, design_column_name(n_vars))
     return DesignTest(test, design)
@@ -226,15 +244,15 @@ def design_column_name(n_vars: int, name: Callable[[int], str] = str) -> Callabl
     return column
 
 
-def lagged_design(data: np.ndarray, tau_max: int) -> np.ndarray:
-    """Return the ``(T - 2 * tau_max, n * (2 * tau_max + 1))`` lagged design of a ``(T, n)`` series.
+def lagged_design(series: np.ndarray, n_lags: int, *, first: int = 0) -> np.ndarray:
+    """Return the lagged design of a ``(T, n)`` series over lags ``first`` to ``n_lags``.
 
-    Column ``lag * n + i`` holds variable ``i`` at ``t - lag``, row by row for ``t = 2 * tau_max ..
-    T - 1``.
+    Column ``(lag - first) * n + i`` holds variable ``i`` at ``t - lag``, row by row for ``t =
+    n_lags .. T - 1``, so the design has ``T - n_lags`` rows and ``n * (n_lags - first + 1)``
+    columns.
     """
-    n_steps = data.shape[0]
-    window = 2 * tau_max
-    return np.hstack([data[window - lag : n_steps - lag] for lag in range(window + 1)])
+    n_steps = series.shape[0]
+    return np.hstack([series[n_lags - lag : n_steps - lag] for lag in range(first, n_lags + 1)])
 
 
 def _column(link: Link, n_vars: int) -> int:
@@ -264,9 +282,9 @@ def pc1(
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
     Candidates start in variable-major order, ``(0, 1), (0, 2), ..., (1, 1), ...``. Each round
-    re-sorts the survivors by strength rounded to ``_KEY_DP`` decimals, strongest first, and equal
+    re-sorts the survivors by strength rounded to ``KEY_DP`` decimals, strongest first, and equal
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
-    variable's :func:`~andrey.search.hc.tie_ranks`. Each round is one ``test`` call over all
+    variable's :func:`~andrey.core.ties.tie_ranks`. Each round is one ``test`` call over all
     remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
     is never tested: it stays, with the strength of a partial correlation of ``1``. With
     ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
@@ -295,7 +313,7 @@ def pc1(
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
-        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], _KEY_DP)))]
+        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
     return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)

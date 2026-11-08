@@ -11,14 +11,14 @@ from collections.abc import Callable, Sequence
 import numpy as np
 from threadpoolctl import threadpool_limits
 
-from andrey.core.orient import to_structure
+from andrey.core.orient import cpdag_of_pdag, to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.core.ties import tie_ranks
 from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search.ges import _parent_limits, _recompute_objective, _reform_cpdag
-from andrey.search.hc import tie_ranks
+from andrey.search.ges import _parent_limits, recompute_objective
 
 
 def forward_inprocess(
@@ -42,7 +42,7 @@ def forward_inprocess(
             return adj
         _key, x, y, T = best
         ops.apply_insert(adj, x, y, T)
-        adj = _reform_cpdag(adj)
+        adj = cpdag_of_pdag(adj)
 
 
 def backward_inprocess(
@@ -65,7 +65,7 @@ def backward_inprocess(
             return adj
         _key, x, y, H = best
         ops.apply_delete(adj, x, y, H)
-        adj = _reform_cpdag(adj)
+        adj = cpdag_of_pdag(adj)
 
 
 def ges_inprocess(
@@ -94,5 +94,5 @@ def ges_inprocess(
         ranks = tie_ranks(X).tolist()
         adj = forward_inprocess(adj, delta_engine, n, gate, n_chunks, ranks, cap)
         adj = backward_inprocess(adj, delta_engine, n, n_chunks, ranks, cap)
-        total = _recompute_objective(adj, score, n)
+        total = recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag").to_numpy(), total

@@ -37,7 +37,7 @@ CARD_ROWS = (
     ("Data types", "continuous, categorical, mixed, time series, nonlinear"),
     ("Real data processing", "missing values, background knowledge, edge confidence"),
     ("Graphs", "DAG, CPDAG, PAG, temporal; hidden confounders"),
-    ("Acceleration", "parallel CPU; GPU with PyTorch (CUDA, MPS)"),
+    ("Acceleration", "parallel CPU; GPU with PyTorch (CUDA)"),
     ("Portability", "NetworkX, pcalg, Graphviz DOT, NumPy"),
     ("Interface", "Python, CLI, skill"),
 )
@@ -247,7 +247,7 @@ def shd_parts(learned, truth):
     words = {
         "missing": "are missing",
         "extra": "are extra",
-        "oriented": "are oriented that the known network leaves undirected",
+        "oriented": "are oriented where the known network's CPDAG leaves them undirected",
         "reversed": "are oriented differently",
     }
     parts = [f"{n} {words[kind]}" for kind, n in counts.items() if n]

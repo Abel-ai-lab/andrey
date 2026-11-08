@@ -2,7 +2,7 @@
 
 Each test fits data built so that a method meets a tie, refits under every column order, maps the
 result back to the original labels, and expects the original fit. Where the tie is broken by
-:func:`~andrey.search.hc.tie_ranks`, the same fits under ``tie_break="position"`` change under at
+:func:`~andrey.core.ties.tie_ranks`, the same fits under ``tie_break="position"`` change under at
 least one order, so the orders exercise the tie-break and the switch reaches the method.
 """
 
@@ -20,13 +20,12 @@ from andrey.core import TAIL
 from andrey.core.ci import FisherZ
 from andrey.core.independence import gamma_gram
 from andrey.core.score import BICScore
+from andrey.core.ties import KEY_DP, _centered_ranks
 from andrey.irregular.bottom_up_parce import _fisher_hsic_test, _residual
 from andrey.latent.gin import _root_pvalue, gin
-from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
 from andrey.search.gies import gies
-from andrey.search.hc import _centered_ranks
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
 from tests.recovery.helpers.xges_rescan import xges_rescan
@@ -130,7 +129,7 @@ def test_ges_ties() -> None:
     """GES adds the 0 - 1 edge, then column 2's edges to 0 and to 1 tie; it adds one of them."""
     x = _swap_symmetric(0)
     score, n = BICScore(x), x.shape[0]
-    assert round(score.score(2, [0]) / n, _KEY_DP) == round(score.score(2, [1]) / n, _KEY_DP)
+    assert round(score.score(2, [0]) / n, KEY_DP) == round(score.score(2, [1]) / n, KEY_DP)
     _assert_order_free(lambda data: ges(data)[0].to_numpy(), x)
 
 
@@ -146,7 +145,7 @@ def test_calm_moral_graph_ties() -> None:
     x = _swap_symmetric_sem(181)
     test = FisherZ(x)
     (r0, _), (r1, _) = test.statistic_pvalue(2, 0, []), test.statistic_pvalue(2, 1, [])
-    assert round(abs(r0), _KEY_DP) == round(abs(r1), _KEY_DP)
+    assert round(abs(r0), KEY_DP) == round(abs(r1), KEY_DP)
     _assert_order_free(moral_graph, x)
 
 
@@ -230,7 +229,7 @@ def test_bottom_up_parce_lingam_ties() -> None:
     for j in (0, 1):
         residual = _residual(centered, cov, np.array([1 - j, 2]), j)
         stats.append(_fisher_hsic_test([grams[1 - j], grams[2]], residual, 600, np.inf)[1])
-    assert round(stats[0], _KEY_DP) == round(stats[1], _KEY_DP)
+    assert round(stats[0], KEY_DP) == round(stats[1], KEY_DP)
 
     def order(data: np.ndarray, columns: np.ndarray) -> list[int]:
         found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["partial_order"]
@@ -259,7 +258,7 @@ def test_gin_ties() -> None:
     cov = np.cov(x, rowvar=False)
     grams = [gamma_gram(x[:, j]) for j in range(4)]
     lowest = [_root_pvalue(x, cov, grams, [a, a + 1], [b, b + 1], []) for a, b in ((0, 2), (2, 0))]
-    assert round(lowest[0], _KEY_DP) == round(lowest[1], _KEY_DP)
+    assert round(lowest[0], KEY_DP) == round(lowest[1], KEY_DP)
     orders = [np.arange(4), np.array([2, 3, 0, 1])]
 
     def causal_order(columns: np.ndarray) -> list[list[int]]:
@@ -291,7 +290,7 @@ def test_pc_collider_ties() -> None:
     trace: list[dict] = []
     want = pc(x, _trace=trace).to_numpy()
     ranks = [step["p"] for step in trace if step["step"] == "collider"]
-    assert len(ranks) == 2 and round(ranks[0], _KEY_DP) == round(ranks[1], _KEY_DP)
+    assert len(ranks) == 2 and round(ranks[0], KEY_DP) == round(ranks[1], KEY_DP)
     for order in permutations(range(4)):
         found = _mapped(lambda data: pc(data).to_numpy(), x, np.array(order))
         np.testing.assert_array_equal(found, want)

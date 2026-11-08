@@ -3,6 +3,10 @@
 Each :class:`Ensemble` task samples an SCM with a seed. ``SCM.sample`` derives its RNG streams
 from that seed without global state, so a task regenerates from its config and seed. Results are
 byte-identical across worker counts and scheduling orders.
+
+:func:`generate` and :class:`Ensemble` are deprecated: they warn with a
+:class:`~andrey.DeprecatedArgumentWarning` and stop working in 0.16.0. A loop over
+:meth:`SCM.sample <andrey.data.SCM.sample>` draws the same datasets.
 """
 
 from __future__ import annotations
@@ -17,13 +21,27 @@ import numpy as np
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
+
 from .dataset import CausalDataset
 from .scm import SCM
+
+
+def _warn_deprecated(name: str) -> None:
+    """Warn once that ``andrey.data.<name>`` stops working in 0.16.0."""
+    warn_once(
+        f"andrey.data.{name} is deprecated and stops working in 0.16.0; sample each scenario and "
+        "seed with SCM.sample in a loop instead",
+        DeprecatedArgumentWarning,
+    )
 
 
 @dataclass(frozen=True)
 class Ensemble:
     """A grid of ``(SCM, seed)`` generation tasks sharing a sample count.
+
+    Deprecated: it warns with a :class:`~andrey.DeprecatedArgumentWarning` and stops working in
+    0.16.0.
 
     Parameters
     ----------
@@ -41,6 +59,7 @@ class Ensemble:
 
     def __post_init__(self) -> None:
         """Coerce ``scms``, ``seeds``, and ``n`` to canonical immutable types after init."""
+        _warn_deprecated("Ensemble")
         object.__setattr__(self, "scms", tuple(self.scms))
         object.__setattr__(self, "seeds", tuple(int(s) for s in self.seeds))
         object.__setattr__(self, "n", int(self.n))
@@ -59,6 +78,10 @@ def generate(
     scale: str = "standardize",
 ) -> list[CausalDataset]:
     """Sample every scenario/seed pair in ``ensemble``.
+
+    Deprecated: it warns with a :class:`~andrey.DeprecatedArgumentWarning` and stops working in
+    0.16.0; ``[scm.sample(n=n, seed=seed) for scm, seed in ensemble.tasks]`` draws the same
+    datasets.
 
     Parameters
     ----------
@@ -81,6 +104,7 @@ def generate(
     list[CausalDataset]
         One dataset per task, in ``ensemble.tasks`` order.
     """
+    _warn_deprecated("generate")
     tasks = [(scm, ensemble.n, seed, dtype, scale) for scm, seed in ensemble.tasks]
     if workers <= 1:
         return [_run(t) for t in tasks]

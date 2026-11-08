@@ -18,11 +18,12 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw on ``K`` seeded column orders and maps each answer back to the
-original columns before hashing it; ``--workers N`` refits the methods that run worker processes
-or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass and every skeleton pass of
-conditioning size two or more sent to the pool. Both report each refit whose answer differs from
-the first fit.
+``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, and J-PCMCI+'s (:class:`Fit`) on
+``K`` seeded column orders and maps each answer back to the original columns before hashing it;
+``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
+``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
+possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
+fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -36,7 +37,6 @@ import argparse
 import dataclasses
 import functools
 import hashlib
-import importlib
 import json
 import os
 import platform
@@ -77,17 +77,22 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``alpha`` is the significance level of a CI-test method.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, and J-PCMCI+, whose draws a
+    column order does not apply to: each row's environment is a column of the draw, ICP's target is
+    the last variable, and J-PCMCI+'s contexts follow the system variables.
+    ``alpha`` is the significance level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
     blocks: int = 1
+    shuffled: bool = True
     alpha: float | None = None
 
 
 _CDNOD = qg.AndreyCDNOD().params()
 _GROUPS = qg.AndreyMultiGroupDirectLiNGAM().params()["n_groups"]
 _VARMA = qg.AndreyVarmaLiNGAM().params()
+_DYNOTEARS = qg.DYNOTEARS.params()
 
 
 def _domains(x: np.ndarray) -> Any:
@@ -105,6 +110,11 @@ def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
     _, first, inverse = np.unique(mask, axis=0, return_index=True, return_inverse=True)
     env = np.argsort(np.argsort(first))[inverse.reshape(-1)]
     return samples, env, int(env[np.flatnonzero(~mask.any(axis=1))[0]])
+
+
+def _fci_jci(x: np.ndarray) -> StructureOutput:
+    """FCI-JCI with the draw's last column as the environment, as the gate fits it."""
+    return andrey.fci_jci(x[:, :-1], x[:, -1], alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -127,6 +137,20 @@ def _pcmci(x: np.ndarray) -> StructureOutput:
     return andrey.pcmci(x, **params)
 
 
+def _jpcmciplus(x: np.ndarray) -> StructureOutput:
+    """J-PCMCI+ at the gate's settings on a draw of its datasets, the contexts at the gate's
+    positions."""
+    contexts = qg.context_columns(x)
+    return andrey.jpcmciplus(
+        list(x),
+        time_contexts=contexts["time_contexts"],
+        space_contexts=contexts["space_contexts"],
+        time_dummy=True,
+        tau_max=2,
+        alpha=ALPHA,
+    )
+
+
 def _longitudinal(x):
     """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
     as lingam does."""
@@ -141,6 +165,7 @@ FITS: dict[str, Fit] = {
     "FCI": Fit(functools.partial(andrey.fci, alpha=ALPHA), alpha=ALPHA),
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
+    "FCI-JCI": Fit(_fci_jci, shuffled=False, alpha=ALPHA),
     "GES": Fit(andrey.ges),
     "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
@@ -159,6 +184,8 @@ FITS: dict[str, Fit] = {
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
+    "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
+    "GRaSP-FCI": Fit(functools.partial(andrey.grasp_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
     "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
     "MultiGroupDirectLiNGAM": Fit(
@@ -173,6 +200,7 @@ FITS: dict[str, Fit] = {
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
+    "J-PCMCI+": Fit(_jpcmciplus, shuffled=False, alpha=ALPHA),
     "VARMA-LiNGAM": Fit(
         lambda x: andrey.varma_lingam(
             x, order=tuple(_VARMA["order"]), criterion=_VARMA["criterion"], prune=_VARMA["prune"]
@@ -182,12 +210,16 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
     "UT-IGSP": Fit(_ut_igsp, blocks=2),
     "GnIES": Fit(_gnies, blocks=2),
+    "ICP": Fit(qg.icp_fit, shuffled=False),
+    "IGSP": Fit(qg.igsp_fit, shuffled=False),
+    "CAM-UV": Fit(andrey.camuv),
+    "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
 
-#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, and PNL's
-#: two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
+#: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
+#: searches of FCI, FCI-JCI, and GFCI in worker processes, and PNL's two directions on threads.
+WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -207,6 +239,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
+    "fci_jci_x100": functools.partial(qg.index_pag_draws, "X100"),
     "multi_group_er_d30": functools.partial(qg.model_draws, "multi_group_er", 30, 1000),
     "latent_measurement_d16": functools.partial(qg.model_draws, "latent_measurement", 16, 1000),
     "anm_pair_n1500": functools.partial(qg.pair_draws, "anm_pair", 1500),
@@ -219,6 +252,15 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.panel_draws, 10, 20, 500, scale=PANEL_SCALE
     ),
     "var2_lagged_d10_n1000": functools.partial(qg.granger_draws, 10, 1000),
+    "icp_do_d16": functools.partial(qg.invariance_draws, 16, 200),
+    "known_targets_ten_settings_gauss_er_d50": functools.partial(
+        qg.known_target_draws, "O1_perfect_k10_p50_n1000"
+    ),
+    "latent_anm_er_tenth_d33_n1000": functools.partial(
+        qg.hidden_cause_draws, "latent_anm_er_tenth", 33, 1000
+    ),
+    "dynotears_paper_d40_n1000": functools.partial(qg.series_draws, "dynotears_paper", 40, 1000),
+    "jpcmciplus_half_m200_t10": functools.partial(qg.context_draws, "half-M200-T10"),
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
@@ -238,7 +280,7 @@ LARGER: dict[str, str] = {
         ),
         "linear_gauss_er_d100",
     ),
-    **dict.fromkeys(("FCI", "GFCI"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
@@ -246,6 +288,7 @@ LARGER: dict[str, str] = {
     "RESIT": "anm_er_n1000_d12",
     "CALM": "linear_gauss_er_d15",
     "CDNOD": "domain_shift_er_d70",
+    "FCI-JCI": "fci_jci_x100",
     "GIES": "interventional_gauss_er_d100",
     "MultiGroupDirectLiNGAM": "multi_group_er_d30",
     "GIN": "latent_measurement_d16",
@@ -254,9 +297,14 @@ LARGER: dict[str, str] = {
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
+    "J-PCMCI+": "jpcmciplus_half_m200_t10",
     "VARMA-LiNGAM": "varma_lingam_paper_d8_n300",
     "LongitudinalLiNGAM": "longitudinal_lingam_stable_d10_n20_m500",
     "Granger": "var2_lagged_d10_n1000",
+    "ICP": "icp_do_d16",
+    "IGSP": "known_targets_ten_settings_gauss_er_d50",
+    "CAM-UV": "latent_anm_er_tenth_d33_n1000",
+    "DYNOTEARS": "dynotears_paper_d40_n1000",
 }
 
 
@@ -389,11 +437,15 @@ LAG_MATRICES = ("p_values", "statistics", "links")
 NODE_LISTS = (
     "ambiguous_triples",
     "causal_orders",
+    "changing_variables",
     "cluster_order",
     "clusters",
     "confounded_pairs",
     "conflicts",
+    "cycle_edges",
     "dag",
+    "index_edges",
+    "latent_pairs",
     "parents",
     "partial_order",
     "unordered",
@@ -569,7 +621,6 @@ SCORE_QUERIES: dict[str, Callable[..., Iterable[Iterable[int]]]] = {
     ),
 }
 SCORE_CLASSES = (
-    importlib.import_module("andrey.search.exact")._GramBICScore,
     score.BICScore,
     score.BDeuScore,
     score.CategoricalBICScore,
@@ -707,9 +758,11 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
-        # A refit on more workers sends every GES pass and every skeleton pass to the worker pool.
+        # A refit on more workers sends every GES pass, every skeleton pass, and every
+        # possible-d-sep search to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
+        "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
     }
 
 
@@ -763,12 +816,13 @@ def run(
     """Fit ``methods`` on the corpus; return the manifest's rows and the refits that differ.
 
     Each draw is fitted once with its queries counted. ``shuffle`` refits it on that many column
-    orders, the k-th drawn from ``(seed, k)``, and hashes each answer mapped back
-    (:func:`unpermute`). ``workers`` above 1 refits :data:`WORKER_METHODS` on that many workers,
-    with every GES pass and every skeleton pass of conditioning size two or more sent to the worker
-    pool. A refit differs when one of its :func:`parts`
-    differs from the first fit's, mapped back the same way for a column order; each difference is
-    reported as ``("graph" | "bits", description)``, naming the parts that changed.
+    orders, the k-th drawn from ``(seed, k)``, unless its :class:`Fit` is not ``shuffled``, and
+    hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
+    :data:`WORKER_METHODS` on that many workers, with every GES pass, every skeleton pass of
+    conditioning size two or more, and every possible-d-sep search sent to the worker pool. A refit
+    differs when one of its
+    :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
+    difference is reported as ``("graph" | "bits", description)``, naming the parts that changed.
     """
     rows, findings = [], []
     with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
@@ -780,7 +834,7 @@ def run(
             print(f"{method:24s} {dataset:40s} seed {seed}  {_brief(rows[-1])}", flush=True)
             refits = []  # (permutation, workers, the first fit hashed as the refit is, the refit)
             n_vars = x.shape[-1] // fit.blocks
-            for k in range(1, shuffle + 1):
+            for k in range(1, shuffle + 1 if fit.shuffled else 1):
                 order = np.random.default_rng([seed, k]).permutation(n_vars)
                 refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
                 refits.append((k, 1, unpermute(out, np.arange(n_vars)), refit))
@@ -789,6 +843,7 @@ def run(
                     andrey.config(n_jobs=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))

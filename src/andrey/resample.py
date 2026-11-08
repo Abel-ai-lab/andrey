@@ -11,6 +11,7 @@ the same at any worker count, and the first ``k`` resamples of a longer run are 
 
 from __future__ import annotations
 
+import inspect
 import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -24,23 +25,25 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
+from andrey.api._method import removed_name_error
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
-from andrey.core.orient import _cpdag_of_pdag
+from andrey.core.orient import cpdag_of_pdag
 from andrey.core.structure import (
-    _EDGE_TYPES,
     EDGE_GLYPHS,
+    EDGE_TYPES,
     Kind,
     Structure,
     TemporalStructure,
+    endpoint_marks,
     is_ancestral_kind,
 )
-from andrey.core.warning_policy import AndreyWarning, DeprecatedArgumentWarning, warn_once
+from andrey.core.ties import tie_ranks
+from andrey.core.warning_policy import AndreyWarning, warn_once
 from andrey.search._parallel import pick_context
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -209,8 +212,9 @@ class BootstrapOutput:
     ) -> BootstrapOutput:
         """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none).
 
-        ``ranks`` holds each node's :func:`~andrey.search.hc.tie_ranks` rank on the data the fits
-        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data.
+        ``ranks`` holds each node's :func:`~andrey.core.ties.tie_ranks` rank on the data the fits
+        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data or the
+        fits' kind is not ``dag``.
         """
         fits = tuple(fits)
         if not fits:
@@ -279,16 +283,6 @@ class BootstrapOutput:
     @property
     def n_resamples(self) -> int:
         """The number of fits counted."""
-        return self._n_resamples
-
-    @property
-    def n_boot(self) -> int:
-        """The former name of ``n_resamples``, which stops working in the next release."""
-        warn_once(
-            "andrey.BootstrapOutput.n_boot is now n_resamples; the former name stops working in "
-            "the next release",
-            DeprecatedArgumentWarning,
-        )
         return self._n_resamples
 
     @property
@@ -437,7 +431,7 @@ class BootstrapOutput:
                 i, j, near, far = _decode(s.codes, n)
                 pairs = []
                 for a, c, m, f in zip(i.tolist(), j.tolist(), near.tolist(), far.tolist()):
-                    kind, forward = ("directed", True) if a == c else _EDGE_TYPES[(m, f)]
+                    kind, forward = ("directed", True) if a == c else EDGE_TYPES[(m, f)]
                     pairs.append((a, c, kind) if forward else (c, a, kind))
             for (source, target, kind), count in zip(pairs, s.counts.tolist()):
                 if count / b < min_frequency:
@@ -457,33 +451,7 @@ class BootstrapOutput:
 
     def __repr__(self) -> str:
         """Return the averaged graph and the most frequent edges."""
-        return "\n".join(self._summary())
-
-    def _summary(
-        self, *, name: str | None = None, limit: int | None = 10, more: str = ""
-    ) -> list[str]:
-        """Build the result summary as lines for ``repr`` and ``andrey bootstrap``.
-
-        ``name`` defaults to ``metadata["method"]``. ``limit`` caps the listed edges, and ``more``
-        extends the omitted-edge count.
-        """
-        method = self._metadata.get("method")
-        name = name if name is not None else (str(method) if method else "bootstrap")
-        head = (
-            f"{name}  |  {self._n_resamples} fits  |  averaged graph at threshold {self._threshold}"
-        )
-        lines = [head, "", *self._structure._summary()]
-        rows = self.table()
-        if rows:
-            lines += ["", "  most frequent edges:"]
-        shown = rows if limit is None else rows[:limit]
-        for row in shown:
-            lag = f"lag {row['lag']}  " if "lag" in row else ""
-            edge = f"{row['source']} {EDGE_GLYPHS[row['type']]} {row['target']}"
-            lines.append(f"    {lag}{edge}  {row['frequency']:.2f}")
-        if len(shown) < len(rows):
-            lines.append(f"    ... and {len(rows) - len(shown)} more{more}")
-        return lines
+        return "\n".join(bootstrap_summary_lines(self))
 
     # ---- internals ------------------------------------------------------------------------
 
@@ -498,6 +466,31 @@ class BootstrapOutput:
         if lag is None or lag not in self._lags:
             raise ValueError(f"lag must be one of {self._lags}, got {lag!r}")
         return self._lags.index(lag)
+
+
+def bootstrap_summary_lines(
+    out: BootstrapOutput, *, name: str | None = None, limit: int | None = 10, more: str = ""
+) -> list[str]:
+    """Return the bootstrap's summary as lines, for ``repr`` and ``andrey bootstrap``.
+
+    ``name`` defaults to ``metadata["method"]``. ``limit`` caps the listed edges, and ``more`` ends
+    the line that counts the others.
+    """
+    method = out._metadata.get("method")
+    name = name if name is not None else (str(method) if method else "bootstrap")
+    head = f"{name}  |  {out._n_resamples} fits  |  averaged graph at threshold {out._threshold}"
+    lines = [head, "", *out._structure._summary()]
+    rows = out.table()
+    if rows:
+        lines += ["", "  most frequent edges:"]
+    shown = rows if limit is None else rows[:limit]
+    for row in shown:
+        lag = f"lag {row['lag']}  " if "lag" in row else ""
+        edge = f"{row['source']} {EDGE_GLYPHS[row['type']]} {row['target']}"
+        lines.append(f"    {lag}{edge}  {row['frequency']:.2f}")
+    if len(shown) < len(rows):
+        lines.append(f"    ... and {len(rows) - len(shown)} more{more}")
+    return lines
 
 
 # ---- counting -----------------------------------------------------------------------------------
@@ -586,11 +579,8 @@ def _vote_graph(
         keep = np.array([_often(int(c), n_resamples, threshold) for c in s.counts], dtype=bool)
         edge = np.zeros((n, n), dtype=bool)
         edge[src[keep], dst[keep]] = True
-        marks = np.zeros((n, n), dtype=np.int8)
-        marks[edge] = TAIL
-        marks[edge.T] = ARROW  # a 2-cycle and a self-loop end as arrowheads
         return GraphStructure.from_numpy(
-            marks, kind="digraph", labels=labels, allow_self_loops=True
+            endpoint_marks(edge), kind="digraph", labels=labels, allow_self_loops=True
         )
     marks = _vote(s, n_resamples, threshold, n)
     kind = s.kind
@@ -615,16 +605,16 @@ def _valid_graph(
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
     MPDAG, and a ``pag`` is oriented as ``fci`` orients one under knowledge: the vote and the PAG
-    get the knowledge's endpoints (``_knowledge_marks``) before the MAG step and before the
+    get the knowledge's endpoints (``knowledge_marks``) before the MAG step and before the
     orientation rules, which then run to a fixed point.
     Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
         if constraints is not None:
-            from andrey.constraint.fci import _knowledge_marks
+            from andrey.constraint.fci import knowledge_marks
 
             vote = vote.copy()
-            _knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
+            knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
         return pag_of(mag, None, (), constraints)
     if ((vote == ARROW) & (vote.T == ARROW)).any():
@@ -634,7 +624,7 @@ def _valid_graph(
     if kind == "dag" and (ranks is not None or not ((vote == TAIL) & (vote.T == TAIL)).any()):
         order = np.arange(len(vote)) if ranks is None else np.argsort(ranks, kind="stable")
         return GraphStructure.from_numpy(extend_in_order(vote, order), kind="dag", labels=labels)
-    cpdag = _cpdag_of_pdag(vote)
+    cpdag = cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
@@ -643,11 +633,11 @@ def _valid_graph(
 def _nearest(s: _Slice, coded: list[np.ndarray], fits: Sequence[StructureOutput]) -> _Nearest:
     """Return the valid fit nearest the others: the first with the highest agreement.
 
-    This is Tetrad's Median among the fits that are valid graphs of the slice's kind
-    (``_is_valid``). A fit's agreement sums, over the pairs, the number of fits that give the pair
-    the fit's own state, no edge included; the highest agreement is the least mean SHD to the
-    fits. ``coded`` holds each fit's codes, as ``_codes`` makes them. When no fit is valid, it
-    returns the fit with the highest agreement, marked invalid.
+    It picks among the fits that are valid graphs of the slice's kind (``_is_valid``). A fit's
+    agreement sums, over the pairs, the number of fits that give the pair the fit's own state, no
+    edge included; the highest agreement is the least mean SHD to the fits. ``coded`` holds each
+    fit's codes, as ``_codes`` makes them. When no fit is valid, it returns the fit with the highest
+    agreement, marked invalid.
     """
     n_resamples = len(fits)
     pair = s.codes // _STATES
@@ -768,15 +758,18 @@ def _decode(codes: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarr
 
 
 @dataclass(frozen=True, slots=True)
-class _Job:
+class Job:
     """Everything a resample needs, sent once to each worker."""
 
     name: str  # the facade, by name
     data: Any  # the first input: an array or table, or a list of them for a panel
     aligned: dict[str, Any]  # row-aligned arguments by keyword (env, a targets matrix)
+    named: dict[str, str]  # row-aligned arguments that name a column of data, by keyword
     kwargs: dict[str, Any]
     seed: int
-    unit: str  # "rows", "blocks", "units" (one draw for every array), or "groups" (one each)
+    # "rows", "blocks", "units" (one draw for every array), "groups" (one each), or "steps" (one
+    # draw of blocks for every array)
+    unit: str
     block_length: int | None
     seeded: bool  # the method takes a seed, derived per resample
     backend: str
@@ -784,6 +777,10 @@ class _Job:
     resampling: str  # "subsample" or "bootstrap", resolved
     sample_fraction: float  # a subsample's share of the rows
     strata: tuple[np.ndarray, ...] | None = None  # each environment's rows, drawn on their own
+
+
+_PANEL_UNITS = ("units", "groups", "steps")  # the data is a list of arrays
+_BLOCK_UNITS = ("blocks", "steps")  # the rows are time steps
 
 
 def _take(x: Any, idx: np.ndarray) -> Any:
@@ -798,7 +795,7 @@ def _kept(n: int, sample_fraction: float) -> int:
     return round(sample_fraction * n)
 
 
-def _draw(job: _Job, b: int) -> list[np.ndarray]:
+def _draw(job: Job, b: int) -> list[np.ndarray]:
     """Draw resample ``b``'s row indices, one array per data array."""
     rng = np.random.default_rng(np.random.SeedSequence(job.seed, spawn_key=(b, 0)))
     if job.strata is not None:  # the same share of each environment's rows, at least one
@@ -814,29 +811,29 @@ def _draw(job: _Job, b: int) -> list[np.ndarray]:
         else:
             picks = [rows[rng.integers(0, len(rows), size=len(rows))] for rows in job.strata]
         return [np.sort(np.concatenate(picks))]
-    sizes = [len(x) for x in job.data] if job.unit in ("units", "groups") else [len(job.data)]
+    sizes = [len(x) for x in job.data] if job.unit in _PANEL_UNITS else [len(job.data)]
     if job.resampling == "subsample":
         kept = [_kept(n, job.sample_fraction) for n in sizes]
-        if job.unit == "blocks":  # one stretch of consecutive rows, as in Politis et al. (1999)
+        if job.unit in _BLOCK_UNITS:  # one stretch of consecutive rows, as in Politis et al. (1999)
             start = int(rng.integers(0, sizes[0] - kept[0] + 1))
-            return [np.arange(start, start + kept[0])]
+            return [np.arange(start, start + kept[0])] * len(sizes)
         if job.unit == "units":
             return [np.sort(rng.choice(sizes[0], size=kept[0], replace=False))] * len(sizes)
         return [np.sort(rng.choice(n, size=m, replace=False)) for n, m in zip(sizes, kept)]
-    if job.unit == "blocks":
+    if job.unit in _BLOCK_UNITS:
         n, length = sizes[0], job.block_length
         assert length is not None
         starts = rng.integers(0, n - length + 1, size=math.ceil(n / length))
-        return [(starts[:, None] + np.arange(length)).ravel()[:n]]
+        return [(starts[:, None] + np.arange(length)).ravel()[:n]] * len(sizes)
     if job.unit == "units":
         return [rng.integers(0, sizes[0], size=sizes[0])] * len(sizes)
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-def _run_one(job: _Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
+def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     """Fit resample ``b``; return the fit and the warnings it raised."""
     idx = _draw(job, b)
-    if job.unit in ("units", "groups"):
+    if job.unit in _PANEL_UNITS:
         data = [_take(x, ix) for x, ix in zip(job.data, idx)]
     else:
         data = _take(job.data, idx[0])
@@ -858,11 +855,11 @@ def _run_one(job: _Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return out, [(w.category, str(w.message)) for w in caught]
 
 
-_JOB: _Job | None = None
+_JOB: Job | None = None
 _BLAS: object = None  # a held threadpoolctl controller capping this worker's BLAS to one thread
 
 
-def _init_worker(job: _Job) -> None:
+def _init_worker(job: Job) -> None:
     """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings."""
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
@@ -880,7 +877,7 @@ def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return _run_one(_JOB, b)
 
 
-def _fit_all(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
+def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
         with _backend.one_blas_thread(), _backend.config(n_jobs=1):
@@ -902,14 +899,11 @@ def _fit_all(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]
 # ---- the public function ------------------------------------------------------------------------
 
 
-_N_RESAMPLES_DEFAULT = 100
-
-
 def bootstrap(
     method: str | Callable[..., Any],
     data: npt.ArrayLike | Sequence[npt.ArrayLike],
     *,
-    n_resamples: int = _N_RESAMPLES_DEFAULT,
+    n_resamples: int = 100,
     seed: int | None = None,
     threshold: float = 0.5,
     strict: bool = False,
@@ -928,29 +922,32 @@ def bootstrap(
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
     with a row-aligned input (``env``, or ``targets`` as a 0/1 matrix) resamples that input with the
     rows, and a column that ``env`` or ``targets`` names travels with the rows of ``data``. When
-    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``igsp``, and
-    ``ut_igsp``), a resample is drawn within each environment of ``env``: of an environment's ``m``
-    rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample
-    draws ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
-    ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
-    as a whole. For a method that takes ``targets``, the averaged graph is made a CPDAG without the
-    targets, so an edge that only the interventions orient is undirected there; the edge frequencies
-    keep its direction. A time-series method on one series subsamples one stretch of consecutive
-    rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units,
-    and ``multi_group_direct_lingam`` resamples each dataset on its own.
+    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``gnies``, ``igsp``,
+    ``ut_igsp``, and ``icp``), a resample is drawn within each environment of ``env``: of an
+    environment's ``m`` rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a
+    bootstrap resample draws ``m`` with replacement, so every resample keeps every environment. A
+    numeric ``env`` of a method without ``targets``, which reads it as numbers, such as a domain
+    number or a time step, resamples the rows as a whole. For a method that takes ``targets`` and
+    returns a CPDAG (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a
+    CPDAG without the targets, so an edge that only the interventions orient is undirected there;
+    the edge frequencies keep its direction. A time-series method on one series subsamples one
+    stretch of consecutive rows (and bootstraps blocks of consecutive rows), ``jpcmciplus`` takes
+    the same stretch or blocks from every dataset, so a time context stays the same in all of them,
+    ``longitudinal_lingam`` resamples whole units, and ``multi_group_direct_lingam`` resamples each
+    dataset on its own.
 
     Parameters
     ----------
     method : str or callable
         A method's name, such as ``"pc"``, or the callable itself, such as ``andrey.pc``.
     data : array-like of shape (n_samples, n_variables), or a sequence of them
-        The data, as the method takes it. ``multi_group_direct_lingam`` and
-        ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
-        each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
-        and resampled within each environment, ``cdnod``'s domains included.
+        The data, as the method takes it. ``multi_group_direct_lingam``, ``longitudinal_lingam``,
+        and ``jpcmciplus`` take a sequence of arrays; ``longitudinal_lingam`` and ``jpcmciplus``
+        need datasets of one length here. A method that takes ``env`` also takes each environment's
+        rows apart, as a list or a mapping, pooled into one table and ``env`` and resampled within
+        each environment, even by a method that reads ``env`` as numbers.
     n_resamples : int, default=100
-        The number of resamples and fits. ``n_boot``, the former name, works with a
-        ``DeprecatedArgumentWarning`` for one more release.
+        The number of resamples and fits.
     seed : int or None, default=None
         The seed of the resamples, a non-negative integer. ``None`` uses ``ANDREY_SEED``, or 0 when
         it is unset. Resample ``b`` depends on ``seed`` and ``b`` alone. A method that takes a
@@ -966,18 +963,18 @@ def bootstrap(
         ``ValueError``.
     resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
-        distinct rows, kept in their original order; for a time-series method on one series it is
-        one stretch of consecutive rows at a random start [4]_ [5]_. ``"bootstrap"`` draws
-        ``n_samples`` rows with replacement; for a time-series method on one series it draws blocks
-        of ``block_length`` consecutive rows (a moving block bootstrap).
+        distinct rows, kept in their original order; for a time-series method it is one stretch of
+        consecutive rows at a random start [4]_ [5]_. ``"bootstrap"`` draws ``n_samples`` rows with
+        replacement; for a time-series method it draws blocks of ``block_length`` consecutive rows
+        (a moving block bootstrap). ``longitudinal_lingam``, whose rows are units, is none of these.
     sample_fraction : float, default=0.5
         The share of the rows in a subsample, in ``(0, 1]``, so that ``round(sample_fraction *
         n_samples)`` is at least 2; for ``longitudinal_lingam``, the share of the units, and for
         ``multi_group_direct_lingam``, the share of each dataset's rows, and for a resample drawn
         within environments, the share of each environment's rows. Not used by ``"bootstrap"``.
     block_length : int or None, default=None
-        For ``resampling="bootstrap"`` of a time-series method on one series, the number of
-        consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
+        For ``resampling="bootstrap"`` of a time-series method on one series or of ``jpcmciplus``,
+        the number of consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
         ``max(ceil(n_samples ** (1/3)), 10 * tau_max)`` for a method with a ``tau_max``, and
         ``ceil(n_samples ** (1/3))`` for the others, at most ``n_samples``. A block break puts rows
         that were not neighbors side by side, which weakens a link that many steps long or longer,
@@ -1005,6 +1002,9 @@ def bootstrap(
         has a different number of rows from ``data``, ``block_length`` is given for a resampling
         that does not use blocks, ``strict=True`` and the vote has no valid graph of the method's
         kind, or a fit raises it: the error then names the resample in a note.
+    TypeError
+        Before any fit, for ``n_boot`` or an argument name that a release removed from the method;
+        the message gives its current name.
     NotImplementedError
         For ``gin``, whose number of latent nodes varies from fit to fit.
     RuntimeError
@@ -1055,49 +1055,47 @@ def bootstrap(
     that edge than have no edge, which needs the pair adjacent in more than half of them, and
     ``threshold`` can ask for more. When two edges tie, the pair takes the least committal one,
     ``--``, or ``o-o`` for a ``pag``. This vote is the graph with the least mean structural Hamming
-    distance to the fits. It is the ``Highest`` ensemble of Tetrad [6]_, with a tie between an edge
-    and no edge going to no edge, as in tigramite's majority vote [7]_.
+    distance to the fits. A tie between an edge and no edge goes to no edge, as in the majority vote
+    of [6]_.
 
     A vote of CPDAGs or PAGs is often not a valid CPDAG or PAG: it can direct an edge that no
     v-structure compels. So the vote is then made a valid graph of the method's kind by the
     published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
-    v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
-    tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
+    v-structures, and directed edges [7]_: the vote itself when it has no directed cycle, with a
+    tie edge pointing as the columns' :func:`~andrey.core.ties.tie_ranks` on ``data`` decide
     (``tie_break``, :data:`andrey.config`: ranks computed from the data, or the
     column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
-    becomes the CPDAG [9]_ of a consistent extension, so an edge that no v-structure compels is
+    becomes the CPDAG [8]_ of a consistent extension, so an edge that no v-structure compels is
     undirected. A ``pag`` becomes
-    the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
+    the PAG of the MAG that Zhang's construction builds from it [9]_. With ``knowledge``, the
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
     is oriented as ``fci`` orients one under knowledge: the endpoints the knowledge sets come
     first, and Zhang's orientation rules then run from them until no endpoint changes, as they do
-    in a fit [10]_, [11]_. A time-series result's lag graphs
-    keep the vote, as tigramite's does [7]_: a lag-0 graph is oriented with the lagged edges, which
+    in a fit [9]_, [10]_. A time-series result's lag graphs
+    keep the vote, as in [6]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 
-    The vote has no consistent extension or MAG when, for example, its directed edges form a
-    cycle or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``,
-    the averaged graph is then the resample graph nearest the others, a graph the method returned:
-    the fit whose state of each pair the most fits share, summed over the pairs, which is the fit
-    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). Only
-    a resample that is a valid graph of the method's kind can be that fit: a ``cpdag`` with a
-    consistent DAG extension, or a PAG that passes the steps above, because a method can return a
-    graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting orientations
-    undirected). A warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``;
-    it is ``"vote"`` otherwise. When no resample is valid, a warning says so, the averaged graph is
-    the resample nearest the others, and ``metadata["averaged_graph"]`` is
-    ``"nearest_resample_invalid"``. ``strict=True`` raises in both cases instead, as bnlearn's
-    ``cextend`` does by default [12]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle
+    or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``, the
+    averaged graph is then the resample graph nearest the others, a graph the method returned: the
+    fit whose state of each pair the most fits share, summed over the pairs, which is the fit with
+    the least mean structural Hamming distance to the others. Only a resample that is a valid graph
+    of the method's kind can be that fit: a ``cpdag`` with a consistent DAG extension, or a PAG that
+    passes the steps above, because a method can return a graph labeled ``cpdag`` that no DAG
+    extends (``pc`` leaves conflicting orientations undirected). A warning says so, and
+    ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is ``"vote"`` otherwise. When no
+    resample is valid, a warning says so, the averaged graph is the resample nearest the others, and
+    ``metadata["averaged_graph"]`` is ``"nearest_resample_invalid"``. ``strict=True`` raises in both
+    cases instead. Either way, ``frequency`` and ``table`` keep the whole vote.
 
     On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
     ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
-    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the rule of 0.11.0
-    (a pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24
-    cells, by an interval below 0, and more in none. It had fewer errors than the fit on all the
-    rows in 14 cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a
-    valid graph of the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all
-    of ``ges`` and ``direct_lingam``; the rule of 0.11.0 gave a valid CPDAG or PAG in 0 to 13 of
-    the 20 datasets of a cell.
+    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the majority rule (a
+    pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24 cells, by
+    an interval below 0, and more in none. It had fewer errors than the fit on all the rows in 14
+    cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a valid graph of
+    the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all of ``ges`` and
+    ``direct_lingam``; that rule gave a valid CPDAG or PAG in 0 to 13 of the 20 datasets of a cell.
 
     A frequency is a ranking of the edges, not a probability, and no error bound comes with the
     averaged graph. Resampling can also make a column constant; a fit that raises stops the run,
@@ -1126,25 +1124,20 @@ def bootstrap(
     .. [4] Meinshausen, N., and Buhlmann, P. (2010). Stability selection. Journal of the Royal
        Statistical Society: Series B, 72(4), 417-473.
     .. [5] Politis, D. N., Romano, J. P., and Wolf, M. (1999). Subsampling. Springer.
-    .. [6] Tetrad, ``edu.pitt.dbmi.algo.resampling.ResamplingEdgeEnsemble`` and
-       ``edu.cmu.tetrad.util.GraphSampling``, github.com/cmu-phil/tetrad, development branch,
-       2026-08-13. ``Median`` is not in release 7.6.10.
-    .. [7] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
+    .. [6] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
        confidence measures to improve time series causal discovery. Proceedings of the Third
        Conference on Causal Learning and Reasoning, PMLR 236.
-    .. [8] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
+    .. [7] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
        of a partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
-    .. [9] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
+    .. [8] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
        Journal of Machine Learning Research, 2, 445-498.
-    .. [10] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+    .. [9] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
        presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
        1873-1896.
-    .. [11] Andrews, B., Spirtes, P., and Cooper, G. F. (2020). On the completeness of causal
+    .. [10] Andrews, B., Spirtes, P., and Cooper, G. F. (2020). On the completeness of causal
        discovery in the presence of latent confounding with tiered background knowledge.
        Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics,
        PMLR 108, 4002-4011.
-    .. [12] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
-       Statistical Software, 35(3), 1-22.
 
     Examples
     --------
@@ -1164,17 +1157,14 @@ def bootstrap(
     from andrey.core.seeding import resolve_seed
 
     if "n_boot" in method_kwargs:
-        if n_resamples != _N_RESAMPLES_DEFAULT:
-            raise ValueError(
-                "bootstrap: n_boot is the former name of n_resamples; pass only n_resamples"
-            )
-        n_resamples = method_kwargs.pop("n_boot")
-        warn_once(
-            "andrey.bootstrap: n_boot is now n_resamples; the former name stops working in the "
-            "next release",
-            DeprecatedArgumentWarning,
+        raise TypeError(
+            "bootstrap() got an unexpected keyword argument 'n_boot'; it was renamed "
+            "`n_resamples` in 0.12.0"
         )
     spec = _method_spec(method)
+    signature = inspect.signature(getattr(api, spec.name))
+    if (error := removed_name_error(spec.name, signature, method_kwargs)) is not None:
+        raise error
     n_resamples = int_in_range(n_resamples, "n_resamples", 1)
     threshold = _check_threshold(threshold)
     strict = _check_strict(strict)
@@ -1187,10 +1177,10 @@ def bootstrap(
     root = resolve_seed(seed)
     if root < 0:
         raise ValueError(f"seed must be a non-negative integer, got {root}")
-    job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
+    job = build_job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
     workers = min(_backend.worker_count(None), n_resamples)
-    results = _fit_all(job, n_resamples, workers)
-    ranks = _column_ranks(job.data, job.unit == "groups")
+    results = fit_resamples(job, n_resamples, workers)
+    ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     metadata: dict[str, JSONValue] = {
@@ -1218,13 +1208,17 @@ def bootstrap(
     return outs if spec.output.multi else outs[0]
 
 
-def _column_ranks(data: Any, groups: bool) -> np.ndarray:
-    """Return the columns' :func:`~andrey.search.hc.tie_ranks` on all of ``data``.
+def _column_ranks(job: Job) -> np.ndarray:
+    """Return the variables' :func:`~andrey.core.ties.tie_ranks` on all of the job's data.
 
-    ``data`` is a table or an array, or, for ``groups``, a list of them stacked as the methods
-    over groups stack them. A column that does not hold numbers is numbered by its sorted values,
-    as the fits read its categories.
+    The variables are the columns the fit reads: a column that a row-aligned argument names, such
+    as ``env="env"``, is taken out, as the method takes it out. The data are a table or an array,
+    or, for a method over groups, a list of them stacked as the methods over groups stack them. A
+    column that does not hold numbers is numbered by its sorted values, as the fits read its
+    categories.
     """
+    data = environments.take_columns(job.data, job.named, job.name)[0]
+    groups = job.unit == "groups"
     stacked = np.vstack([_numbers(table) for table in (data if groups else [data])])
     return tie_ranks(stacked)
 
@@ -1280,7 +1274,7 @@ def _default_block_length(spec: MethodSpec, kwargs: dict[str, Any], n: int) -> i
     return min(length, n)
 
 
-def _job(
+def build_job(
     spec: MethodSpec,
     data: Any,
     kwargs: dict[str, Any],
@@ -1288,7 +1282,7 @@ def _job(
     seed: int,
     resampling: str,
     sample_fraction: float,
-) -> _Job:
+) -> Job:
     """Check the call against ``spec`` and bundle it for the workers.
 
     Data given as each environment's rows apart become one table and ``env`` first
@@ -1317,9 +1311,9 @@ def _job(
     if panel:
         data = list(data)
         sizes = [len(x) for x in data]
+        unit = "steps" if spec.data.steps else "units" if temporal else "groups"
         if temporal and len(set(sizes)) > 1:
-            raise ValueError(f"every dataset needs the same units, got {sizes} rows")
-        unit = "units" if temporal else "groups"
+            raise ValueError(f"every dataset needs the same {unit}, got {sizes} rows")
     else:
         sizes = [len(data)]
         unit = "blocks" if temporal else "rows"
@@ -1330,15 +1324,17 @@ def _job(
                 f"sample_fraction {sample_fraction} of {too_few[0]} rows is "
                 f"{_kept(too_few[0], sample_fraction)}; a subsample needs at least 2 rows"
             )
-    if unit != "blocks" and block_length is not None:
-        raise ValueError(f"block_length is for a time-series method on one series, not {spec.name}")
-    if unit == "blocks" and resampling == "bootstrap":
+    if unit not in _BLOCK_UNITS and block_length is not None:
+        raise ValueError(
+            f"block_length is for a time-series method on one series or jpcmciplus, not {spec.name}"
+        )
+    if unit in _BLOCK_UNITS and resampling == "bootstrap":
         n = sizes[0]
         length = _default_block_length(spec, kwargs, n) if block_length is None else block_length
         block_length = int_in_range(length, "block_length", 1, n)
     elif block_length is not None:
         raise ValueError("block_length is for resampling='bootstrap', not resampling='subsample'")
-    aligned = {}
+    aligned, named = {}, {}
     for entry in (*spec.data.inputs[1:], *(p for p in spec.params if p.type == "targets")):
         key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
         value = kwargs.get(key)
@@ -1346,16 +1342,20 @@ def _job(
             if getattr(entry, "required", False):
                 raise ValueError(f"{spec.name} needs {entry.name}")
             continue
-        if isinstance(value, (str, Mapping)):  # a column of data, or one entry per environment
+        if isinstance(value, str):  # a column of data
+            named[key] = value
+            continue
+        if isinstance(value, Mapping):  # one entry per environment
             continue
         if len(value) != sizes[0]:
             raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
         aligned[key] = kwargs.pop(key)
     strata = _strata(spec, data, aligned, kwargs, apart=apart) if unit == "rows" else None
-    return _Job(
+    return Job(
         name=spec.name,
         data=data,
         aligned=aligned,
+        named=named,
         kwargs=kwargs,
         seed=seed,
         unit=unit,

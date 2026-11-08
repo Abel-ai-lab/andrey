@@ -20,17 +20,12 @@ from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.harness import assert_recorded_output
 from tests.recovery.helpers.moves import class_gain, grid
 from tests.recovery.helpers.project import found_dag
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # The extended-BIC weight that tabu search and exact search score with by default.
 _EBIC_GAMMA = 1.0
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
 def _er_sample(d: int, seed: int):
@@ -74,7 +69,9 @@ def test_tabu_finds_no_edges_between_independent_columns():
     assert out.metadata["score"] == _bic(x, out.structure)
 
 
-@pytest.mark.parametrize("seed", range(12))
+# Tabu search reaches the optimum below hill climbing's score (seed 2), stops with hill climbing
+# above the optimum (4), and stops strictly between the two (6).
+@pytest.mark.parametrize("seed", [2, 4, 6])
 def test_tabu_score_lies_between_the_optimum_and_hill_climbing(seed):
     x = _er_sample(8, seed).data
     found = andrey.tabu(x).metadata["score"]
@@ -99,6 +96,16 @@ def test_longer_searches_never_score_worse():
     with pytest.warns(andrey.SearchLimitWarning):
         short = andrey.tabu(x, max_iter=12).metadata["score"]
     assert andrey.tabu(x).metadata["score"] <= short
+
+
+def test_a_one_dag_tabu_list_stops_where_hill_climbing_stops():
+    """With ``tabu_length=1``, and so ``max_tabu=1``, the one non-improving move is undone by the
+    next, and the search ends at hill climbing's local optimum; the default list of 10 leaves it for
+    a better score."""
+    x = _er_sample(10, 9).data
+    short = andrey.tabu(x, tabu_length=1)
+    assert short.structure == andrey.hc(x).structure
+    assert andrey.tabu(x).metadata["score"] < short.metadata["score"]
 
 
 def test_tabu_is_deterministic_across_runs_and_worker_counts():

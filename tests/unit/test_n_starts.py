@@ -12,7 +12,6 @@ import pytest
 import andrey
 from andrey import Knowledge, data
 from andrey.search import hc as hc_engine
-from andrey.search import tabu as tabu_engine
 
 METHODS = ("boss", "grasp", "hc", "tabu")
 #: The searches whose later starts change the best DAG so far at random.
@@ -112,7 +111,7 @@ def test_random_changes_keep_every_rule_of_a_move(max_parents):
     adj_int = [0] * d
     parents_of: dict[int, list[int]] = {v: [] for v in range(d)}
     for v, u in zip(*np.nonzero(required)):
-        hc_engine._apply_move(adj_int, parents_of, ("add", int(u), int(v)))
+        hc_engine.apply_move(adj_int, parents_of, ("add", int(u), int(v)))
     draws = random.Random(0)
     seen = set()
     for _ in range(300):
@@ -139,14 +138,13 @@ def test_every_later_start_begins_from_a_dag_that_keeps_the_knowledge(
 ):
     """Every start's DAG after its random changes keeps the knowledge and ``max_parents``, and so
     does the result."""
-    engine = {"hc": hc_engine, "tabu": tabu_engine}[method]
     starts = []
 
     def recorded(adj_int, parents_of, changes, draws, **rules):
         PERTURB(adj_int, parents_of, changes, draws, **rules)
         starts.append(({v: list(pa) for v, pa in parents_of.items()}, rules))
 
-    monkeypatch.setattr(engine, "perturb", recorded)
+    monkeypatch.setattr(hc_engine, "perturb", recorded)
     knowledge = Knowledge(
         tiers=[[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]], required=[(1, 7)], forbidden=[(2, 3), (8, 9)]
     )
@@ -166,14 +164,13 @@ def test_every_later_start_begins_from_a_dag_that_keeps_the_knowledge(
 @pytest.mark.parametrize("method", RESTARTED)
 def test_random_changes_keep_the_mixed_data_rule(method, monkeypatch):
     """Under a mixed-data score no start's DAG gives a categorical column a continuous parent."""
-    engine = {"hc": hc_engine, "tabu": tabu_engine}[method]
     starts = []
 
     def recorded(adj_int, parents_of, changes, draws, **rules):
         PERTURB(adj_int, parents_of, changes, draws, **rules)
         starts.append({v: list(pa) for v, pa in parents_of.items()})
 
-    monkeypatch.setattr(engine, "perturb", recorded)
+    monkeypatch.setattr(hc_engine, "perturb", recorded)
     x = DATASETS[2].copy()
     categorical = [0, 3, 6]
     for c in categorical:

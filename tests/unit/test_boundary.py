@@ -138,12 +138,14 @@ class _Checked(Exception):
 
 
 def _call(method: str, data: np.ndarray) -> object:
-    """Fit ``method`` on ``data``: two environments for cdnod, gnies, and icp, two or three copies
-    for a panel."""
-    if method in ("cdnod", "gnies"):
+    """Fit ``method`` on ``data``: two environments for cdnod, fci_jci, gnies, and icp, two or three
+    copies for a panel."""
+    if method in ("cdnod", "fci_jci", "gnies"):
         return getattr(andrey, method)(data, env=np.arange(len(data)) % 2)
     if method == "icp":
         return andrey.icp(data, env=np.arange(len(data)) % 2, target=0)
+    if method == "jpcmciplus":  # it checks the datasets stacked
+        return andrey.jpcmciplus([data, data, data])
     if method in ("multi_group_direct_lingam", "longitudinal_lingam"):
         return getattr(andrey, method)([data, data + 1, data * 2])
     return getattr(andrey, method)(data)
@@ -163,7 +165,9 @@ def test_every_method_checks_its_data_against_the_boundary(method, monkeypatch):
     data = np.random.default_rng(0).standard_normal((60, 2 if method in PAIRS else 4))
     with pytest.raises(_Checked):
         _call(method, data)
-    assert checked == [(method, data.shape)]
+    # J-PCMCI+ checks its datasets stacked, as a space context is constant within one.
+    shape = (3 * len(data), data.shape[1]) if method == "jpcmciplus" else data.shape
+    assert checked == [(method, shape)]
     data[:, 1] = 1.0
     with pytest.raises(ValueError, match="constant"):
         _call(method, data)

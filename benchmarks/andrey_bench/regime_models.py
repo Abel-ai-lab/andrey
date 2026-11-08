@@ -49,6 +49,9 @@ CAM-UV paper permutes its observed variables the same way, and the hidden nodes 
 keep their order, so each domain keeps its block of rows; a multi-group dataset repeats one order
 of its ``d`` variables in every group, so each group keeps its block of columns and lists the
 variables as the others do. ``measurement`` already draws its column order and takes no such step.
+
+:func:`jci_diagonal`, the simulation of the Joint Causal Inference paper, stands apart: the FCI-JCI
+lane draws it directly, not through the dataset store, and it keeps the authors' column order.
 """
 
 from __future__ import annotations
@@ -362,3 +365,94 @@ def _camuv2021(spec: CamUV2021, d, n, density, rng):
     for j, i in edges:
         marks[j, i], marks[i, j] = _TAIL, _ARROW
     return values[:, :p], marks
+
+
+@dataclass(frozen=True)
+class JCIDraw:
+    """One dataset of :func:`jci_diagonal`.
+
+    ``data`` is ``(n, p)``, the system variables; ``context`` is ``(n, q)``, the context variables;
+    ``regime`` is ``(n,)``, ``0`` for the observational rows and ``k`` where context ``k`` is 1.
+    ``adjacency`` is the full DAG, ``adjacency[i, j] = 1`` for ``i -> j``, over the system
+    variables, then the context variables, then one hidden confounder per confounded pair, which
+    ``hidden`` counts. ``targets[k]`` is the system variable context ``k`` points into.
+    """
+
+    data: np.ndarray
+    context: np.ndarray
+    regime: np.ndarray
+    adjacency: np.ndarray
+    hidden: int
+    targets: np.ndarray
+
+
+def jci_diagonal(
+    p: int, q: int, eps: float, eta: float, n_per: int, seed: int, surgical: bool = False
+) -> JCIDraw:
+    """Draw the linear-Gaussian SCM of Mooij, Magliacane, and Claassen (2020, Sec. 5.2).
+
+    The draw follows the authors' ``simul_linear_stochastic.R`` in its acyclic form: each ordered
+    pair of system variables ``i < j`` gets the edge ``i -> j`` with probability `eps`; each
+    unordered pair, with probability `eta`, a hidden confounder of its own with exactly those two
+    children; each context variable one system target, distinct when ``q <= p``. Weights are
+    ``+-U[0.5, 1.5]``, and each system variable's incoming weights are divided by the square root
+    of one plus the sum of its squared system and confounder weights. Noise is standard normal.
+    The design is diagonal: ``q + 1`` regimes of `n_per` rows, regime 0 observational and regime
+    ``k`` with context ``k`` set to 1, the target's noise drawn from ``N(1, 1)``, and, with
+    `surgical`, every weight into the target set to 0 (a perfect intervention). No context
+    variable shares a confounder with a system variable, so JCI Assumptions 1-3 hold.
+    """
+    rng = np.random.default_rng(seed)
+    upper = np.triu((rng.random((p, p)) < eta).astype(float), 1)
+    pairs = np.argwhere(upper != 0)
+    m = p + q + len(pairs)
+    adjacency = np.zeros((m, m))
+    adjacency[:p, :p] = np.triu((rng.random((p, p)) < eps).astype(float), 1)
+    for i, (a, b) in enumerate(pairs):
+        adjacency[p + q + i, [a, b]] = 1
+    targets = rng.choice(p, size=q, replace=q > p)
+    for k in range(q):
+        adjacency[p + k, targets[k]] = 1
+    weights = np.sign(rng.standard_normal((m, m))) * (rng.random((m, m)) + 0.5)
+    B = adjacency * weights
+    system = list(range(p)) + list(range(p + q, m))
+    for i in range(p):
+        B[:, i] /= np.sqrt((B[system, i] ** 2).sum() + 1)
+    data, context = [], []
+    for regime in range(q + 1):
+        E = rng.standard_normal((n_per, m))
+        values = np.zeros(q)
+        if regime > 0:
+            values[regime - 1] = 1.0
+        E[:, p : p + q] = values
+        Br = B.copy()
+        if regime > 0:
+            hit = np.flatnonzero(adjacency[p + regime - 1] != 0)
+            E[:, hit] = rng.standard_normal((n_per, len(hit))) + 1.0
+            if surgical:
+                Br[:, hit] = 0.0
+        X = np.linalg.solve(np.eye(m) - Br.T, E.T).T
+        data.append(X[:, :p])
+        context.append(X[:, p : p + q])
+    return JCIDraw(
+        data=np.ascontiguousarray(np.vstack(data)),
+        context=np.ascontiguousarray(np.vstack(context)),
+        regime=np.repeat(np.arange(q + 1), n_per),
+        adjacency=adjacency.astype(np.int8),
+        hidden=len(pairs),
+        targets=np.asarray(targets, dtype=int),
+    )
+
+
+def merged_index_dag(adjacency: np.ndarray, p: int, q: int) -> np.ndarray:
+    """The DAG of :func:`jci_diagonal` with its `q` context variables merged into one index.
+
+    The index takes the place of the context variables at position `p` and points into every
+    target, so the hidden confounders move from ``p + q`` onward to ``p + 1`` onward.
+    """
+    m = adjacency.shape[0]
+    merged = np.zeros((m - q + 1, m - q + 1), dtype=np.int8)
+    merged[:p, :p] = adjacency[:p, :p]
+    merged[p + 1 :, :p] = adjacency[p + q :, :p]
+    merged[p, :p] = adjacency[p : p + q, :p].any(axis=0)
+    return merged

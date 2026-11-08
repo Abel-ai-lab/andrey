@@ -4,8 +4,8 @@ Every mark is drawn by shape -- an arrowhead (``ARROW``), a hollow circle (``CIR
 tail (nothing) -- so the grammar is colorblind-safe and the emitted string is self-contained. A
 2-cycle is drawn as two parallel curved edges (feedback), distinct from a single double-headed
 bidirected edge (a latent confounder). An edge that would cross another node bends around it. An
-intervened node is a square, and a bar crosses each arrowhead into it, the edge an intervention
-cuts.
+intervened node is a square, and a bar crosses each arrowhead into it, whether the intervention
+cuts that edge (hard) or keeps it (soft).
 """
 
 from __future__ import annotations
@@ -85,11 +85,19 @@ def footprint(label: str, inside: bool) -> tuple[float, float]:
     return max(2 * NODE_R, len(label) * LABEL_W), 2 * (NODE_R + LABEL_H)
 
 
-def _text(x: float, y: float, s: str, color: str, *, center: bool = False) -> str:
+def _text(
+    x: float, y: float, s: str, color: str, *, center: bool = False, halo: str | None = None
+) -> str:
+    """Draw a label; ``halo`` outlines its letters in that color under the fill, over any edge."""
     baseline = ' dominant-baseline="central"' if center else ""
+    outline = (
+        f' stroke="{halo}" stroke-width="3" stroke-linejoin="round" paint-order="stroke"'
+        if halo
+        else ""
+    )
     return (
         f'<text x="{_f(x)}" y="{_f(y)}" text-anchor="middle" font-size="11" font-weight="600" '
-        f'fill="{color}"{baseline}>{escape(s)}</text>'
+        f'fill="{color}"{outline}{baseline}>{escape(s)}</text>'
     )
 
 
@@ -327,7 +335,7 @@ def _node(
     if label_inside:
         color = palette.muted if latent else palette.ink
         return node + _text(x, y, label, color, center=True)
-    return node + _text(x, y + NODE_R + 12, label, palette.muted)
+    return node + _text(x, y + NODE_R + 12, label, palette.muted, halo=palette.paper)
 
 
 def render(

@@ -24,7 +24,9 @@ _GRAPH = (
             "MMPC",
             "ExactSearch",
             "BOSS",
+            "BOSSFCI",
             "GRaSP",
+            "GRaSPFCI",
             "CALM",
         }
     )
@@ -54,7 +56,9 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 # at the target.
 _INVARIANT = frozenset({"ICP"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
-_WEIGHTED_LAGS = frozenset({"DYNOTEARS"})
+_WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
+# VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
+_VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -93,6 +97,8 @@ def project_output(out: Any, algorithm: str) -> dict:
             "causal_order": np.asarray(out.ordering),
             "weighted_adjacency": np.asarray(out.weighted_adjacency).T,
         }
+    if algorithm == "FCIJCI":  # the PAG over the data, and the index's edges
+        return {"graph": out.structure.to_numpy(), "index_edges": out.metadata["index_edges"]}
     if algorithm in _CONFOUNDED:
         candidate = {
             "graph": out.structure.to_numpy(),
@@ -125,6 +131,17 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": out.structure.to_numpy(),
             "score": out.metadata["score"],
             "targets": [targets[key] for key in sorted(targets)],
+        }
+    if algorithm == "JPCMCIplus":  # PCMCI+'s fields, and the context and dummy links
+        s, md = out.structure, out.metadata
+        return {
+            "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
+            "p_values": np.asarray(md["p_values"]),
+            "statistics": np.asarray(md["statistics"]),
+            "conflicts": md["conflicts"],
+            "context_links": md["context_links"],
+            "index_edges": md["index_edges"],
+            "time_index_edges": md["time_index_edges"],
         }
     if algorithm in _PCMCI:
         s = out.structure
@@ -160,12 +177,7 @@ def project_output(out: Any, algorithm: str) -> dict:
             "causal_order": order,
             "group_weighted_adjacency": np.stack([np.asarray(o.weighted_adjacency).T for o in out]),
         }
-    if algorithm == "VARLiNGAM":
-        return {
-            "causal_order": np.asarray(out.ordering),
-            "adjacency_matrices": np.asarray(out.structure.lag_weights).transpose(0, 2, 1),
-        }
-    if algorithm == "VARMALiNGAM":
+    if algorithm in _VARMA:
         s = out.structure
         return {
             "causal_order": np.asarray(out.ordering),

@@ -36,20 +36,12 @@ def test_shd_identity_is_zero():
         (EDGE_01, [[0, 0], [0, 0]], 1),  # deletion
         ([[0, 0], [0, 0]], EDGE_01, 1),  # insertion
         (CHAIN, FORK, 1),  # one edge reversed
+        ([[0, 1, 1], [0, 0, 1], [0, 0, 0]], np.zeros((3, 3), dtype=int), 3),  # every pair deleted
+        (CHAIN, [[0, 0, 0], [1, 0, 0], [0, 1, 0]], 2),  # both edges reversed, one edit each
     ],
 )
 def test_shd_hand_cases(a, b, expected):
     assert shd(a, b) == expected
-
-
-def test_shd_complete_vs_empty_counts_every_pair():
-    complete = [[0, 1, 1], [0, 0, 1], [0, 0, 0]]  # 3 edges
-    assert shd(complete, np.zeros((3, 3), dtype=int)) == 3
-
-
-def test_shd_all_reversed_chain():
-    reversed_chain = [[0, 0, 0], [1, 0, 0], [0, 1, 0]]  # 2 -> 1 -> 0
-    assert shd(CHAIN, reversed_chain) == 2  # both edges reversed, one edit each
 
 
 def test_shd_endpoint_aware_doubles_a_reversal(pag_of):
@@ -119,10 +111,10 @@ def test_standalone_metrics_reject_digraph_vs_pag():
     marks = np.array([[0, 2], [2, 0]], dtype=np.int8)
     digraph = GraphStructure.from_numpy(marks, kind="digraph")
     pag = GraphStructure.from_numpy(marks, kind="pag")
-    for metric in (shd, orientation_scores, confounder_pair_scores):
-        with pytest.raises(ValueError, match="digraph to a PAG"):
+    for metric in (shd, orientation_scores, confounder_pair_scores, markov_equivalent):
+        with pytest.raises(ValueError, match="digraph"):
             metric(digraph, pag)
-        with pytest.raises(ValueError, match="digraph to a PAG"):
+        with pytest.raises(ValueError, match="digraph"):
             metric(pag, digraph)  # rejected from either side
     # the skeleton is kind-agnostic (both share the 0-1 edge), so it stays answerable
     assert skeleton_scores(digraph, pag)["f1"] == 1.0
@@ -165,11 +157,6 @@ def test_markov_equivalent_same_mec_no_vstructure():
     assert markov_equivalent(CHAIN, FORK)
 
 
-def test_markov_equivalent_identity():
-    assert markov_equivalent(VSTRUCT, VSTRUCT)
-    assert markov_equivalent(CHAIN, CHAIN)
-
-
 def test_markov_equivalent_different_skeletons_separate_mec():
     # CHAIN and VSTRUCT differ in skeleton (0-1-2 vs 0-2-1), so they are not Markov equivalent.
     assert not markov_equivalent(CHAIN, VSTRUCT)
@@ -190,6 +177,20 @@ def test_markov_equivalent_accepts_cpdag_structures():
     assert markov_equivalent(marks, VSTRUCT)
     same = GraphStructure.from_numpy(marks.to_numpy(), kind="cpdag")
     assert markov_equivalent(marks, same)
+
+
+def test_markov_equivalent_rejects_a_directed_cycle():
+    # A cycle has no equivalence class, though a 3-cycle and its reverse share a skeleton and have
+    # no collider; a raw cyclic array reads as a digraph too.
+    from andrey.core import ARROW, TAIL, GraphStructure
+
+    cycle = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])  # 0 -> 1 -> 2 -> 0
+    marks = (TAIL * cycle + ARROW * cycle.T).astype(np.int8)
+    digraph = GraphStructure.from_numpy(marks, kind="digraph")
+    reverse = GraphStructure.from_numpy(marks.T, kind="digraph")
+    for a, b in ((digraph, reverse), (cycle, cycle.T)):
+        with pytest.raises(ValueError, match="digraph"):
+            markov_equivalent(a, b)
 
 
 def test_markov_equivalent_rejects_node_count_mismatch():

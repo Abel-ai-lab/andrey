@@ -24,18 +24,25 @@ The module is a building block for the methods; ``andrey`` does not export it.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from andrey.core.knowledge import column_position
-from andrey.core.structure import node_labels
+from andrey.core.structure import column_labels
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-__all__ = ["env_codes", "normalize_env_targets", "pool_environments", "take_columns"]
+__all__ = [
+    "check_constant_columns",
+    "check_environment_rows",
+    "env_codes",
+    "normalize_env_targets",
+    "pool_environments",
+    "take_columns",
+]
 
 
 def normalize_env_targets(
@@ -55,9 +62,9 @@ def normalize_env_targets(
         each environment's rows apart, labeled by position or key (:func:`pool_environments`),
         with ``env`` ``None`` and ``targets`` a mapping from those labels or ``None``.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None
-        Each row's environment: a label per row, strings or numbers but not both, or the name of a
-        column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
-        ``targets``.
+        Each row's environment: a label per row, strings or finite numbers but not both, or the
+        name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
+        environments from ``targets``.
     targets : mapping, str, array-like, or None
         The variables intervened on in each environment, by column label or 0-based position:
 
@@ -106,14 +113,14 @@ def normalize_env_targets(
     Raises
     ------
     ValueError
-        If ``data`` holds each environment apart and :func:`pool_environments` raises; if
-        ``env`` does not hold one label per row, misses a label (``None`` or ``NaN``), holds a
+        If ``data`` holds each environment apart and :func:`pool_environments` raises; if ``env``
+        does not hold one label per row, misses a label (``None`` or ``NaN``), holds ``inf`` or a
         label that is neither a string nor a number, or mixes strings and numbers; if ``env`` or
         ``targets`` names a column ``data`` lacks, or both name one column; if a mapping comes
         without ``env``, has a key that names no label of ``env``, or has two keys that name one
-        label, such as ``1`` and ``"1"``; if a cell or a mapping names a
-        variable ``data`` lacks, or a value that is neither a label nor a position; if a matrix is
-        not ``(n_samples, n_variables)`` or holds a value other than 0 or 1; if two rows of one
+        label, such as ``1`` and ``"1"``; if a cell or a mapping names a variable ``data`` lacks, or
+        a value that is neither a label nor a position; if a matrix is not
+        ``(n_samples, n_variables)`` or holds a value other than 0 or 1; if two rows of one
         environment give different targets; or, with ``require_known_targets``, if some
         environment's targets are unknown.
 
@@ -137,7 +144,7 @@ def normalize_env_targets(
     env, targets = values.get("env", env), values.get("targets", targets)
     X = variables if hasattr(variables, "columns") else np.asarray(variables)
     n, d = np.shape(X)[0], (np.shape(X)[1] if np.ndim(X) == 2 else 0)
-    labels = _column_labels(X)
+    labels = column_labels(X)
     if targets is None:
         if env is None:
             return X, np.zeros(n, dtype=np.intp), [frozenset()], {0: frozenset()}
@@ -309,13 +316,15 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
 
     The codes are ``0..K-1`` for the ``K`` distinct labels in sorted order, text or numbers alike,
     so they do not depend on the row order. Raises ``ValueError`` when ``env`` does not hold one
-    label per row, as shape ``(n,)`` or ``(n, 1)``, when a label is missing (``None`` or ``NaN``),
-    when a label is neither a string nor a number, or when ``env`` mixes strings and numbers.
+    label per row, as shape ``(n,)`` or ``(n, 1)``, when a label is missing (``None`` or ``NaN``)
+    or infinite, when a label is neither a string nor a number, or when ``env`` mixes strings and
+    numbers.
     """
     import pandas as pd
 
     if isinstance(env, np.ndarray) and env.shape in ((n,), (n, 1)) and env.dtype.kind in "iuU":
-        # Integer or text labels: none can be missing or of the other kind, so no row is checked.
+        # Integer or text labels: none can be missing, infinite, or of the other kind, so no row is
+        # checked.
         codes, labels = pd.factorize(np.asarray(env).reshape(-1), sort=True)
         return codes.astype(np.intp), labels.tolist()
     prefix = f"{method}: " if method else ""
@@ -331,6 +340,14 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
         raise ValueError(
             f"{prefix}env contains NaN or None at row {missing[0]}; every row needs a label"
         )
+    infinite = [
+        i for i, v in enumerate(values) if isinstance(v, (float, np.floating)) and math.isinf(v)
+    ]
+    if infinite:
+        raise ValueError(
+            f"{prefix}env contains {float(values[infinite[0]])} at row {infinite[0]}; a numeric "
+            "label must be finite"
+        )
     kinds = {isinstance(v, str) for v in values}
     if not all(isinstance(v, str) or _is_number(v) for v in values):
         raise ValueError(f"{prefix}env labels must be strings or numbers")
@@ -338,6 +355,41 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
         raise ValueError(f"{prefix}env mixes strings and numbers; give its labels one type")
     codes, labels = pd.factorize(values, sort=True)
     return codes.astype(np.intp), list(labels)
+
+
+def check_environment_rows(
+    codes: np.ndarray, names: Sequence[object], method: str, min_rows: int
+) -> None:
+    """Raise ``ValueError`` unless every environment has at least ``min_rows`` rows.
+
+    ``codes`` gives each row's environment as a code ``0..K-1``, and ``names[k]`` names
+    environment ``k`` in the message, which lists every environment with fewer rows.
+    """
+    sizes = np.bincount(codes, minlength=len(names))
+    small = [names[k] for k in np.flatnonzero(sizes < min_rows)]
+    if small:
+        raise ValueError(
+            f"{method} needs at least {min_rows} rows in every environment; {small} have fewer"
+        )
+
+
+def check_constant_columns(
+    X: np.ndarray, name: Callable[[int], str], method: str, where: str
+) -> None:
+    """Raise ``ValueError`` when a column of ``X``, the rows ``where`` names, is constant on them.
+
+    ``name`` names a column by its position in the message, which names every constant column.
+    """
+    constant = [name(int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if not constant:
+        return
+    if len(constant) == 1:
+        columns, verb, pronoun = f"column {constant[0]}", "is", "it"
+    else:
+        columns, verb, pronoun = f"columns {', '.join(constant)}", "are", "them"
+    raise ValueError(
+        f"{method}: data {columns} {verb} constant on {where}; drop {pronoun} before the fit"
+    )
 
 
 def take_columns(
@@ -372,16 +424,6 @@ def _is_table(value: object) -> bool:
         return np.ndim(value) == 2  # ty: ignore[invalid-argument-type]  # a ValueError is caught
     except ValueError:  # a ragged nested list
         return False
-
-
-def _column_labels(X: Any) -> tuple[str, ...] | None:
-    """A DataFrame's column names as text, ``None`` for an array or the default names ``0..d-1``,
-    as the methods label their nodes."""
-    columns = getattr(X, "columns", None)
-    if columns is None:
-        return None
-    names = list(columns)
-    return None if names == list(range(len(names))) else node_labels(names)
 
 
 def _mapped(

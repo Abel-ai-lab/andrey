@@ -26,6 +26,7 @@ import statistics
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
+from collections import Counter
 from html import escape
 from pathlib import Path
 from typing import get_args
@@ -66,6 +67,7 @@ RELEASES = (
     "0.12.0",
     "0.13.0",
     "0.14.0",
+    "0.15.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -396,6 +398,70 @@ REGIMES = {
     "hidden",
     "camuv_paper": "nonlinear data from the CAM-UV paper's simulation, with hidden common causes "
     "and hidden intermediates",
+    "fci_jci_s4": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 500 rows each",
+    "fci_jci_s4p": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a perfect intervention, 500 rows each",
+    "fci_jci_l10": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 500 rows each",
+    "fci_jci_x100": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and a mechanism change, 100 rows each",
+    "fci_jci_s4m": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and two mechanism changes as one environment, outside the method's claim",
+    "fci_jci_l10m": "linear-Gaussian data with hidden confounders from the JCI paper's simulation, "
+    "observation and ten mechanism changes as one environment, outside the method's claim",
+    "fci_jci_l10n100": "linear-Gaussian data with hidden confounders from the JCI paper's "
+    "simulation, observation and a mechanism change, 100 rows each, outside the method's claim",
+    "fci_jci_l10n2000": "linear-Gaussian data with hidden confounders from the JCI paper's "
+    "simulation, observation and a mechanism change, 2,000 rows each, outside the method's claim",
+    "bgf_p20_deg2_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with no hidden variables",
+    "bgf_p20_deg2_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with up to 4 hidden confounders",
+    "bgf_p20_deg2_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "2, with up to 8 hidden confounders",
+    "bgf_p20_deg4_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with no hidden variables",
+    "bgf_p20_deg4_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with up to 4 hidden confounders",
+    "bgf_p20_deg4_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "4, with up to 8 hidden confounders",
+    "bgf_p20_deg6_l0": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with no hidden variables",
+    "bgf_p20_deg6_l4": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with up to 4 hidden confounders",
+    "bgf_p20_deg6_l8": "linear-Gaussian data from the BOSS-FCI paper's random DAGs at mean degree "
+    "6, with up to 8 hidden confounders",
+    "bgf_o3_deg4_l4": "linear-Gaussian data from Erdos-Renyi graphs at mean degree 4 with 4 of 24 "
+    "variables hidden, standardized, outside the method's claim",
+}
+# J-PCMCI+'s cells at alpha 0.05, keyed as its summary keys them: linear time series of 5 variables
+# from the J-PCMCI+ paper's script, with every context observed, or one of each kind and the draws
+# where no hidden context confounds an observed one and a variable; and, outside the claim, the
+# model of andrey.data.sample_context_series and the script's model with 10 and 15 variables.
+JPCMCIPLUS_PAPER = "linear time series from the J-PCMCI+ paper's script"
+REGIMES |= {
+    **{
+        f"jpcmciplus_all_m10_t{t}": f"{JPCMCIPLUS_PAPER}, 10 datasets of {t} steps, every context "
+        "observed"
+        for t in (10, 20, 30, 50, 100, 150, 200)
+    },
+    **{
+        f"jpcmciplus_half_m{m}_t{t}": f"{JPCMCIPLUS_PAPER}, {m} datasets of {t} steps, half the "
+        "contexts observed"
+        for m, t in [(10, t) for t in (10, 20, 30, 50, 100, 150, 200)]
+        + [(m, 10) for m in (5, 20, 30, 50, 100, 150, 200)]
+    },
+    **{
+        f"jpcmciplus_current_m{m}_t{t}": f"linear time series with same-step links, {m} datasets "
+        f"of {t} steps, every context observed, outside the method's claim"
+        for m, t in ((5, 100), (10, 50), (10, 100), (10, 200), (20, 50), (20, 100), (50, 10))
+    },
+    **{
+        f"jpcmciplus_all_n{n}_m10_t100": f"{JPCMCIPLUS_PAPER} with {n} variables, 10 datasets of "
+        "100 steps, every context observed, outside the method's claim"
+        for n in (10, 15)
+    },
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -449,7 +515,11 @@ NOT_COUNTED = {"earlier-build", "second-machine timing"}
 # bound.
 NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # Lanes the homepage omits: settings swept around a method's default, which its release card
-# reports. IGSP at other levels and starts, and UT-IGSP at its paper's level.
+# reports. IGSP at other levels and starts, UT-IGSP and FCI-JCI at their papers' levels, and
+# BOSS-FCI and GRaSP-FCI at their paper's penalty and level. J-PCMCI+ shows its claimed level, the
+# paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
+# paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
+# dummies.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -457,18 +527,49 @@ NOT_SHOWN_LANES = {
     "igsp.alpha_1e-4_starts_5",
     "igsp.alpha_1e-4_starts_10",
     "ut_igsp.paper_level",
+    "fci_jci.alpha_0.01",
+    "boss_grasp_fci.paper",
+    "jpcmciplus.alpha_0.01",
+    "jpcmciplus.context_links",
+    "jpcmciplus.assumption_3_broken",
+    "jpcmciplus.gpdc",
 }
-# Packages the homepage omits: a reference patched to follow its paper where the package does
-# not, which the release card reports beside the package itself.
-NOT_SHOWN_COMPARATORS = {"graphical-model-learning 0.1a8, patched to Definition 4.2"}
+# Packages the homepage omits, each reported on its release card beside the default comparison: a
+# reference patched to follow its paper where the package does not; pcalg under the JCI
+# assumptions that match FCI-JCI's non-default confounded_index=False; an earlier Tetrad release,
+# 7.6.3 in causal-cmd 1.12.0, measured as context; Tetrad 7.6.3 against the
+# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI; and lingam's CAM-UV at its default
+# set size of 2, beside the paper's size of 3, Andrey's default.
+NOT_SHOWN_COMPARATORS = {
+    "graphical-model-learning 0.1a8, patched to Definition 4.2",
+    'pcalg 2.7-12, jci = "123"',
+    "causal-cmd 1.12.0 bfci (tetrad-lib 7.6.3)",
+    "causal-cmd 1.12.0 grasp-fci (tetrad-lib 7.6.3)",
+    "Tetrad 7.6.3",
+    "lingam 1.13.0 at its default set size",
+}
+# The package each comparator names in the speed panel's legend, without the version or setting
+# its release card gives; every other comparator is a package's name already.
+PACKAGE_NAMES = {
+    "CAM 1.0": "CAM",
+    "InvariantCausalPrediction 0.8": "InvariantCausalPrediction",
+    "causal-learn 0.1.4.8": "causal-learn",
+    "lingam 1.13.0": "lingam",
+    "lingam RESIT": "lingam",
+    'pcalg 2.7-12, jci = "1"': "pcalg",
+    "tetrad-lib 7.6.10 BossFci": "Tetrad",
+    "tetrad-lib 7.6.10 GraspFci": "Tetrad",
+    "tigramite 5.2.10.1": "tigramite",
+}
 # The summary lanes that measure each graph size at several sample sizes.
-GRID_LANES = {"nonlinear"}
-# A method's line uses its shortest-named comparison by default. These settings override that
-# choice: BOSS and GRaSP with the BDeu score on categorical data, as measured in 0.8.0, each shown
-# under the method's name.
+GRID_LANES = {"nonlinear", "boss_grasp_fci"}
+# A method's line uses its first shortest-named comparison by default. These settings override that
+# choice, each shown under the method's name from its first comparison: BOSS and GRaSP with the
+# BDeu score on categorical data, as measured in 0.8.0, and ICP with its default approximate test.
 SHOWN_SETTINGS = {
     "BOSS on discrete data, BDeu score": "BOSS",
     "GRaSP on discrete data, BDeu score": "GRaSP",
+    "ICP, approximate test": "ICP",
 }
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
@@ -693,6 +794,7 @@ def comparisons(summary: dict) -> list[dict]:
 
     - ``d``: the size, in ``unit``: the variables the method gets, the observed ones on data with
       hidden variables, or a cause-effect pair's rows, since every pair has two variables;
+    - ``n``: the sample size, ``None`` where the summary records none;
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`;
@@ -715,6 +817,7 @@ def comparisons(summary: dict) -> list[dict]:
             rows.append(
                 {
                     "d": row["n"] if pairs else row.get("observed", row["d"]),
+                    "n": row.get("n"),
                     "andrey_s": row["andrey_s"],
                     "comparator_s": row["comparator_s"],
                     "ratio": ratio,
@@ -863,18 +966,28 @@ def family_intro() -> str:
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
     """The comparisons a chart each: a method's comparisons share one chart when they come from
-    the same runs (Andrey's times agree at every common size), otherwise one chart apiece."""
+    the same runs, otherwise one chart apiece. A comparison joins a chart when it measures a size
+    every comparison in the chart measures, and Andrey's times agree with each of them at every
+    size they share."""
+
+    def times(method: dict) -> dict[int, Counter]:
+        out: dict[int, Counter] = {}
+        for r in method["rows"]:
+            out.setdefault(r["d"], Counter())[r["andrey_s"]] += 1
+        return out
+
     groups: list[tuple[str, list[dict]]] = []
     for method in claimed_comparisons(summaries):
+        ours = times(method)
         same = [
             g
             for g in groups
             if g[0] == method["method"]
+            and set(ours).intersection(*(times(m).keys() for m in g[1]))
             and all(
-                a["andrey_s"] == b["andrey_s"]
-                for a in g[1][0]["rows"]
-                for b in method["rows"]
-                if a["d"] == b["d"]
+                theirs[d] == ours[d]
+                for theirs in map(times, g[1])
+                for d in theirs.keys() & ours.keys()
             )
         ]
         if same:
@@ -882,6 +995,16 @@ def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
         else:
             groups.append((method["method"], [method]))
     return groups
+
+
+def andrey_rows(methods: list[dict]) -> list[dict]:
+    """Andrey's rows across a chart's comparisons (:func:`time_groups`), smallest size first: each
+    size from the first comparison that measures it, since the chart's comparisons agree there."""
+    rows: list[dict] = []
+    for method in methods:
+        known = {r["d"] for r in rows}
+        rows += [r for r in method["rows"] if r["d"] not in known]
+    return sorted(rows, key=lambda r: r["d"])
 
 
 def log_scale(lo: float, hi: float, a: float, b: float):
@@ -916,7 +1039,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float]) -> str:
             f'<line x1="{left}" x2="{right}" y1="{y(d):.1f}" y2="{y(d):.1f}" class="tc-grid"/>'
             f'<text x="{left - 6}" y="{y(d) + 3:.1f}" text-anchor="end">{d:,}</text>'
         )
-    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in methods[0]["rows"]]
+    ours = [(r["d"], r["andrey_s"], r["ratio"] is not None) for r in andrey_rows(methods)]
     series = [("Andrey", ours, "tc-andrey")]
     series += [
         (
@@ -1089,17 +1212,78 @@ def error_comparisons(methods: list[dict]) -> list[dict]:
     return out
 
 
+def settings_text(cells: list[tuple[dict, dict]]) -> str:
+    """Name settings, a comparison and row each, with one comparison's sizes together: "FCI
+    compared with causal-learn on <regime> at 50 and 100 variables"."""
+    sizes: dict[tuple[str, str, str, str], list[int]] = {}
+    for method, row in cells:
+        key = (method["method"], method["comparator"], method["regime"], method["unit"])
+        sizes.setdefault(key, []).append(row["d"])
+    return listed(
+        [
+            f"{name} compared with {comparator} on {REGIMES[regime]} at "
+            f"{listed([f'{d:,}' for d in dict.fromkeys(ds)])} {unit}"
+            for (name, comparator, regime, unit), ds in sizes.items()
+        ]
+    )
+
+
+def recorded_outcomes(summaries: list[dict]) -> tuple[dict[str, list], dict[str, list]]:
+    """The outcome the summaries record at each setting of the comparisons the charts cover
+    (:func:`claimed_comparisons`), as (comparison, row) pairs, in two groups.
+
+    The first holds the settings a release card judges (``card_verdict``), by verdict: "tie"
+    where the paired 95% interval of the difference in errors contains 0, "better", or "worse";
+    a setting the card did not judge is left out. The second holds the settings from summaries
+    that predate ``card_verdict``, by the two packages' error counts alone, as
+    :func:`error_comparisons` compares them: "same", "fewer", or "more". Past a time cap a
+    package has no graph to count.
+    """
+    judged: dict[str, list] = {"tie": [], "better": [], "worse": []}
+    counted: dict[str, list] = {"same": [], "fewer": [], "more": []}
+    for m in claimed_comparisons(summaries):
+        for r in m["rows"]:
+            ours, theirs = r["andrey_errors"], r["comparator_errors"]
+            if r["card_verdict"] in judged:
+                judged[r["card_verdict"]].append((m, r))
+            elif r["card_verdict"] == "unrecorded" and ours is not None and theirs is not None:
+                kind = "same" if abs(ours - theirs) < 1e-9 else "fewer" if ours < theirs else "more"
+                counted[kind].append((m, r))
+    return judged, counted
+
+
 def quality_intro(summaries: list[dict]) -> str:
-    """Say what an error is in each count the comparisons use, and that releases are tested
-    against true graphs (the quality gate, which every publish job needs)."""
+    """Say what an error is in each count the comparisons use, the outcome the summaries record
+    (:func:`recorded_outcomes`), naming every setting where Andrey makes more errors, and that
+    releases are tested against true graphs (the quality gate, which every publish job needs)."""
     kinds = dict.fromkeys(m["error_kind"] for m in claimed_comparisons(summaries))
     errors = ", or, ".join(ERRORS[kind][1] for kind in kinds)
-    return (
-        f"An error is {errors}. Andrey's graphs are as accurate as the reference packages' (the "
-        "other packages it is compared with) on the same data: the charts give both packages' "
-        "errors at each size, and every release is tested against the true graphs that generated "
-        "the data."
-    )
+    judged, counted = recorded_outcomes(summaries)
+
+    def outcome(cells: list) -> str:
+        return str(len(cells)) if cells else "none"
+
+    def named(cells: list) -> str:
+        return f": {settings_text(cells)}." if cells else "."
+
+    text = f"An error is {errors}. The charts give both packages' errors at each size."
+    if any(judged.values()):
+        text += (
+            f" Of the {sum(map(len, judged.values()))} settings in the charted comparisons that "
+            "a release card judges, Andrey ties the other package in "
+            f"{outcome(judged['tie'])}, where the paired 95% interval of the difference in errors "
+            f"contains 0, makes fewer errors in {outcome(judged['better'])}, and makes more in "
+            f"{outcome(judged['worse'])}" + named(judged["worse"])
+        )
+    if any(counted.values()):
+        text += (
+            f" Of the {sum(map(len, counted.values()))} settings in the charted comparisons "
+            "without a card's verdict, compared by their error counts alone, Andrey makes the "
+            f"same number of errors as the other package in {outcome(counted['same'])}, fewer "
+            f"in {outcome(counted['fewer'])}, and more in {outcome(counted['more'])}"
+            + named(counted["more"])
+        )
+    return text + " Every release is tested against the true graphs that generated the data."
 
 
 def accuracy_card(name: str, methods: list[dict]) -> str:
@@ -1325,6 +1509,8 @@ def returns_text(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
         return "Two-node DAG"
     if spec.output.structure_type == "temporal":
         return "Temporal graph"
+    if spec.output.graph_kind == "undirected":
+        return "Undirected graph"
     return spec.output.graph_kind.upper()
 
 
@@ -2284,13 +2470,15 @@ DIALOG_TAIL = "</div></dialog>"
 
 # ---- a family's methods on one figure: fit time against errors ------------------------------
 # Each method uses its shortest-named comparison unless SHOWN_SETTINGS overrides it. Each line
-# covers sizes where Andrey and every compared package ran and were scored; its largest marker
-# shows the largest shared size. Errors are divided by the empty graph's error count: 0 means no
-# errors, and 1 means the same error count as the empty graph.
+# covers sizes where Andrey and every compared package ran and were scored, at the largest sample
+# size where a lane measures several; its largest marker shows the largest shared size. Errors are
+# divided by the empty graph's error count: 0 means no errors, and 1 means the same error count as
+# the empty graph.
 # Temporal methods use 1 minus link F1 instead: cross-variable links in the window graph, or
 # adjacencies for LPCMCI. Their lag windows can produce far more errors than the empty graph.
 F1_FAMILIES = {"temporal"}
-FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
+# A marker shape for each package in a family's figure.
+FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star", "triangle_down")
 FRONTIER_BAND = 0.25  # share of chart height for errors above the empty graph's
 
 
@@ -2300,23 +2488,24 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     Each line records ``method``, ``package``, ``ours``, ``unit``, and ``sizes``. Each size is
     ``(size, seconds, share)``, smallest first. The score is the error count divided by the empty
     graph's, or one minus link F1 for temporal methods. ``size``, ``seconds``, and ``share`` also
-    record the largest size's values.
+    record the largest size's values. Where a comparison measures a size at several sample sizes,
+    the line takes the row at the largest, the last listed among equal ones.
     """
     default: dict[str, tuple[str, list[dict]]] = {}
     for name, methods in time_groups(summaries):
         if not all(faster(m) for m in methods):
             continue
         shown = default.get(methods[0]["spec"])
-        if (
-            name in SHOWN_SETTINGS
-            or (shown is not None and shown[0] not in SHOWN_SETTINGS and len(name) < len(shown[0]))
-            or shown is None
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
         ):
             default[methods[0]["spec"]] = (name, methods)
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
         name = SHOWN_SETTINGS.get(name, name)
-        by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
+        by_size = [
+            {r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods
+        ]
         f1 = methods[0]["family"] in F1_FAMILIES
 
         def score(row: dict, who: str) -> float | None:
@@ -2374,6 +2563,8 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
             f"M{cx - r:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r:.1f}"
             f"M{cx + r:.1f} {cy - r:.1f}L{cx - r:.1f} {cy + r:.1f}"
         )
+    if kind == "triangle_down":
+        return f"M{cx:.1f} {cy + 1.2 * r:.1f}L{cx + r:.1f} {cy - 0.8 * r:.1f}H{cx - r:.1f}Z"
     tips = [math.pi / 2 + i * 4 * math.pi / 5 for i in range(5)]
     return (
         "M"
@@ -2382,6 +2573,15 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
         )
         + "Z"
     )
+
+
+def package_name(comparator: str) -> str:
+    """The package ``comparator`` names, without a version or setting, from ``PACKAGE_NAMES``;
+    a name that still holds a digit raises ``ValueError``."""
+    name = PACKAGE_NAMES.get(comparator, comparator)
+    if re.search(r"\d", name):
+        raise ValueError(f"name the package of {comparator!r} in PACKAGE_NAMES")
+    return name
 
 
 def method_key(name: str) -> str:
@@ -2482,7 +2682,10 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 
     Scores are errors divided by the empty graph's error count, or one minus link F1 for temporal
     methods. Each line spans the measured sizes, with a larger marker at the largest size.
-    Andrey's lines use the accent color; other packages use gray and distinct marker shapes.
+    Andrey's lines use the accent color; other packages use gray and a marker shape each, from
+    ``FRONTIER_SHAPES``, and a family with more packages than shapes raises ``ValueError``. The
+    legend names each package once, by :func:`package_name`; a tooltip keeps the comparator's
+    version and setting.
     Each method uses different data, so comparisons apply within a method. The shaded corner
     shares the position set by ``frontier_frame`` across families.
     """
@@ -2528,8 +2731,10 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         )
     if span >= 1 and not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
-    packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
-    shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
+    packages = list(dict.fromkeys(package_name(p["package"]) for p in points if not p["ours"]))
+    if len(packages) > len(FRONTIER_SHAPES):
+        raise ValueError(f"{title}: {len(packages)} packages, {len(FRONTIER_SHAPES)} marker shapes")
+    shapes = dict(zip(packages, FRONTIER_SHAPES, strict=False))
     ours = {p["method"]: p for p in points if p["ours"]}
     # The shaded region has the same position in every family's figure.
     mid_x, mid_y = x(frame["corner"][0]), shared(frame["corner"][1])
@@ -2559,7 +2764,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
                     f'r="{5 if last else 3}"{tip}/>'
                 )
             else:
-                kind = shapes[p["package"]]
+                kind = shapes[package_name(p["package"])]
                 body.append(
                     f'<path class="pf-other pf-{kind}" '
                     f'd="{shape(kind, cx, cy, 4.5 if last else 3)}"{tip}/>'

@@ -4,34 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from andrey.core import backend, stats, warning_policy
-
-
-@pytest.fixture(autouse=True)
-def _reset_backend_state():
-    """Isolate process-level backend config, warn-once memory, and calibration cache between tests.
-
-    The warn-once set, the ``config`` object, and the calibration cache are process-global, so a
-    test that pins a backend, trips an unavailable-backend warning, or seeds a cutoff would
-    otherwise leak into later tests in the session. Warn-once memory is also cleared on entry, so
-    warnings raised by tests outside this directory do not hide a first warning here.
-    """
-    warning_policy._warned.clear()
-    yield
-    backend.config._backend = None
-    backend.config._n_jobs = None
-    backend.config._tie_break = None
-    warning_policy._warned.clear()
-    backend._dispatch_counts.clear()
-    stats._CALIBRATED.clear()
-
 
 def serve_datasets_offline(monkeypatch, cache):
     """Serve dataset downloads from fixtures/, into the empty directory ``cache``, with no network.
 
-    Sachs is the 853-row file, under its own SHA-256; ASIA, CHILD, and INSURANCE are the published
-    BIFs, under the recorded ones. Returns the list of URLs fetched, so a test can tell a download
-    from a cache hit.
+    Sachs is the 853-row file, under its own SHA-256; Sachs's nine conditions are the published
+    experimental file, and ASIA, CHILD, and INSURANCE the published BIFs, under the recorded
+    SHA-256s. Returns the list of URLs fetched, so a test can tell a download from a cache hit.
     """
     import dataclasses
     import gzip
@@ -62,6 +41,10 @@ def serve_datasets_offline(monkeypatch, cache):
         sha256=hashlib.sha256(sachs).hexdigest(),
     )
     monkeypatch.setitem(real.DATASETS, "sachs", remote)
+    served |= dict.fromkeys(
+        real.SACHS_CONDITIONS_FILE.sources,
+        gzip.decompress((fixtures / "sachs-experimental.txt.gz").read_bytes()),
+    )
     monkeypatch.setattr(real, "fetch", fetch)
     monkeypatch.setenv("ANDREY_DATA_DIR", str(cache))
     return fetched

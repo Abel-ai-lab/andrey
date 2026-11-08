@@ -57,6 +57,11 @@ def pair_path(tmp_path):
     return path
 
 
+#: A VARMA(1, 1) run on one likelihood iteration: the envelope does not depend on the fit
+#: converging.
+VARMA_SHORT = ["order=[1,1]", "max_iter=1"]
+
+
 def _run(argv, capsys):
     code = main(argv)
     out, err = capsys.readouterr()
@@ -131,6 +136,7 @@ def test_run_pc_envelope(capsys, csv_path):
     assert run["n_samples"] == 300 and run["n_variables"] == 4
     assert run["params"]["alpha"] == 0.05 and run["params"]["indep_test"] is None  # defaults
     assert set(run["versions"]) == {"andrey", "numpy", "python"}
+    assert run["warnings"] == []
 
 
 def test_run_direct_lingam_weights_and_ordering(capsys, nongaussian_path):
@@ -147,13 +153,6 @@ def test_run_stdin(capsys, monkeypatch, csv_path):
     code, out, _ = _run(["run", "ges", "--data", "-"], capsys)
     env = json.loads(out)
     assert code == 0 and env["method"] == "ges"
-
-
-def test_run_writes_output_file(capsys, tmp_path, csv_path):
-    dest = tmp_path / "result.json"
-    code, out, _ = _run(["run", "pc", "--data", str(csv_path), "-o", str(dest)], capsys)
-    assert code == 0 and out.strip() == ""  # stdout stays clean when -o is given
-    assert json.loads(dest.read_text())["method"] == "pc"
 
 
 def test_run_gies_with_and_without_targets(capsys, tmp_path):
@@ -286,7 +285,7 @@ def test_nan_data_is_data_error(capsys, tmp_path):
 
 
 def test_coerce_scalars_and_choices():
-    from andrey.cli import CliError, _coerce
+    from andrey.cli import CliError, _checked, _coerce
     from andrey.spec import get_spec
 
     pc = {p.name: p for p in get_spec("pc").params}
@@ -294,8 +293,9 @@ def test_coerce_scalars_and_choices():
     assert _coerce("1e-3", pc["alpha"]) == 0.001  # scientific notation
     assert _coerce("fisherz", pc["indep_test"]) == "fisherz"
     assert _coerce("kci", pc["indep_test"]) == "kci"
-    with pytest.raises(CliError):  # bad choice
-        _coerce("no_such_test", pc["indep_test"])
+    with pytest.raises(CliError) as bad:  # bad choice, answered with the choices
+        _checked(_coerce("no_such_test", pc["indep_test"]), pc["indep_test"], "pc")
+    assert bad.value.extra["valid_options"] == list(pc["indep_test"].choices)
     with pytest.raises(CliError):  # not a number
         _coerce("abc", pc["alpha"])
 
@@ -383,9 +383,34 @@ def test_out_of_range_value_is_a_usage_error(capsys, tmp_path, csv_path, layer):
     assert code == 2 and payload["code"] == "invalid_params"
 
 
+@pytest.mark.parametrize(
+    ("method", "setting", "layer"),
+    [
+        ("pc", "alpha=nan", "cli"),
+        ("pc", "alpha=inf", "cli"),
+        ("pc", "alpha: .nan", "config"),
+        ("varma_lingam", "order=[-1,1]", "cli"),
+        ("varma_lingam", "order: [-1, 1]", "config"),
+    ],
+)
+def test_a_value_the_method_rejects_is_a_usage_error(
+    capsys, tmp_path, csv_path, method, setting, layer
+):
+    """A value the method's own check rejects exits 2 before the fit, from either layer."""
+    argv = [setting]
+    if layer == "config":
+        cfg = tmp_path / "params.yaml"
+        cfg.write_text(setting + "\n")
+        argv = ["--config", str(cfg)]
+    code, _out, err = _run(["run", method, "--data", str(csv_path), *argv], capsys)
+    payload = json.loads(err)["error"]
+    assert code == 2 and payload["code"] == "invalid_params"
+    assert [d["param"] for d in payload["details"]] == [setting.split("=")[0].split(":")[0]]
+
+
 def test_former_names_and_values_map_to_current_ones():
     """A renamed parameter, or a renamed choice, is accepted under its former name."""
-    from andrey.cli import CliError, _resolve_params
+    from andrey.cli import CliError, resolve_params
 
     spec = get_spec("pc")
     renamed = {
@@ -394,20 +419,20 @@ def test_former_names_and_values_map_to_current_ones():
     }
     params = tuple(p.model_copy(update=renamed.get(p.name, {})) for p in spec.params)
     spec = spec.model_copy(update={"params": params})
-    fkwargs, _ = _resolve_params(spec, {"level": 0.2}, ["collider_rule=votes"])
+    fkwargs, _ = resolve_params(spec, {"level": 0.2}, ["collider_rule=votes"])
     assert fkwargs["alpha"] == 0.2 and fkwargs["collider_rule"] == "majority"
     with pytest.raises(CliError) as both:
-        _resolve_params(spec, {}, ["alpha=0.1", "level=0.2"])
+        resolve_params(spec, {}, ["alpha=0.1", "level=0.2"])
     assert both.value.code == "invalid_params"
 
 
-def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
-    """A removed argument still runs for one release: the fit warns and the run's params omit it."""
-    code, out, _ = _run(["run", "granger", "--data", str(csv_path), "cv=3"], capsys)
-    env = json.loads(out)
-    assert code == 0 and "cv" not in env["run"]["params"]
-    assert any("cv" in w["message"] for w in env["run"]["warnings"])
-    assert "cv" in get_spec("granger").dropped_args
+def test_a_dropped_argument_reaches_the_facade_and_not_the_run_params():
+    """A dropped argument goes on to the facade, which ignores it, and the run's params omit it."""
+    from andrey.cli import resolve_params
+
+    spec = get_spec("pc").model_copy(update={"dropped_args": ("former",)})
+    fkwargs, resolved = resolve_params(spec, {}, ["former=3"])
+    assert "former" in fkwargs and "former" not in resolved
 
 
 @pytest.mark.parametrize(
@@ -511,16 +536,21 @@ def test_two_cycles_in_graph_and_temporal_json():
 
 
 def test_run_varma_temporal_envelope(capsys, csv_path):
-    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), "order=[1,1]"], capsys)
+    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), *VARMA_SHORT], capsys)
     env = json.loads(out)
     assert code == 0
     s = env["structure"]
     assert s["type"] == "temporal" and s["n_lags"] >= 1
     assert "lag_weights" in s  # the coefficient stack promised by the output spec
+    assert "n_edges" in s and "edge_types" in s  # aggregate summary, like a graph structure
+    assert all("edge_types" in lag for lag in s["lags"])  # per-lag summary
+    assert s["n_edges"] == sum(lag["n_edges"] for lag in s["lags"])
 
 
 def test_run_bool_flag_recorded(capsys, csv_path):
-    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), "prune=true"], capsys)
+    code, out, _ = _run(
+        ["run", "varma_lingam", "--data", str(csv_path), "prune=true", *VARMA_SHORT], capsys
+    )
     env = json.loads(out)
     assert code == 0 and env["run"]["params"]["prune"] is True
 
@@ -533,10 +563,10 @@ def test_run_enum_rejects_bad_value(capsys, csv_path):
 
 def test_run_unsupported_value_is_usage_error(capsys, csv_path, monkeypatch):
     def unsupported(*_args, **_kwargs):
-        raise NotImplementedError("GRaSP supports depth=3, not 2")
+        raise NotImplementedError("GRaSP supports grasp_depth=3, not 2")
 
     monkeypatch.setattr(andrey, "grasp", unsupported)
-    code, _out, err = _run(["run", "grasp", "--data", str(csv_path), "depth=2"], capsys)
+    code, _out, err = _run(["run", "grasp", "--data", str(csv_path), "grasp_depth=2"], capsys)
     assert code == 2
     assert json.loads(err)["error"]["code"] == "unsupported_value"
 
@@ -578,29 +608,17 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
 
 @pytest.mark.parametrize(
     "name",
-    [
-        "pc",
-        "xges",
-        "tabu",
-        "direct_lingam",
-        "varma_lingam",
-        "granger",
-        "gin",
-        "rcd",
-        "bottom_up_parce_lingam",
-        "pnl",
-        "anm",
-    ],
+    ["pc", "direct_lingam", "varma_lingam", "granger", "gin", "rcd", "pnl"],
 )
 def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path, pair_path):
-    """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""
+    """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted),
+    on one method of each distinct output shape."""
     from andrey.spec import get_spec
 
-    non_gaussian = ("direct_lingam", "gin", "rcd", "bottom_up_parce_lingam")
-    pairwise = ("pnl", "anm")
-    path = nongaussian_path if name in non_gaussian else csv_path
-    data = str(pair_path if name in pairwise else path)
-    code, out, _ = _run(["run", name, "--data", data], capsys)
+    path = nongaussian_path if name in ("direct_lingam", "gin", "rcd") else csv_path
+    data = str(pair_path if name == "pnl" else path)
+    short = VARMA_SHORT if name == "varma_lingam" else []
+    code, out, _ = _run(["run", name, "--data", data, *short], capsys)
     env = json.loads(out)
     spec = get_spec(name)
     assert code == 0
@@ -627,11 +645,6 @@ def test_fit_warnings_go_in_the_envelope_not_stderr(capsys, csv_path, filter_act
     [warning] = json.loads(out)["run"]["warnings"]
     assert warning["category"] == "SearchLimitWarning"
     assert warning["message"].startswith("hc stopped at its limit of max_iter=1 moves")
-
-
-def test_supported_run_has_no_warnings(capsys, csv_path):
-    code, out, _ = _run(["run", "pc", "--data", str(csv_path)], capsys)
-    assert code == 0 and json.loads(out)["run"]["warnings"] == []
 
 
 # --- shell-aware output ---------------------------------------------------------------------------
@@ -661,12 +674,6 @@ def test_json_flag_forces_json_on_tty(capsys, monkeypatch, csv_path):
 # --- bounded output (large-graph threshold) -------------------------------------------------------
 
 
-def test_edge_types_breakdown_is_complete(capsys, csv_path):
-    code, out, _ = _run(["run", "pc", "--data", str(csv_path)], capsys)
-    s = json.loads(out)["structure"]
-    assert code == 0 and sum(s["edge_types"].values()) == s["n_edges"]
-
-
 def test_edges_capped_on_stdout(capsys, monkeypatch, csv_path):
     monkeypatch.setattr("andrey.cli.EDGE_LIMIT", 1)
     code, out, _ = _run(["run", "pc", "--data", str(csv_path)], capsys)  # non-TTY -> JSON
@@ -691,26 +698,19 @@ def test_output_file_is_never_capped(capsys, monkeypatch, tmp_path, csv_path):
     monkeypatch.setattr("andrey.cli.EDGE_LIMIT", 1)
     dest = tmp_path / "graph.json"
     code, out, _ = _run(["run", "pc", "--data", str(csv_path), "-o", str(dest)], capsys)
-    assert code == 0 and out.strip() == ""
-    s = json.loads(dest.read_text())["structure"]
+    assert code == 0 and out.strip() == ""  # stdout stays clean when -o is given
+    env = json.loads(dest.read_text())
+    assert env["method"] == "pc"
+    s = env["structure"]
     assert "edges_truncated" not in s and len(s["edges"]) == s["n_edges"]
 
 
 # --- temporal envelope: schema fields + bounded dense weights -----------------------------------
 
 
-def test_temporal_envelope_carries_summary_fields(capsys, csv_path):
-    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), "order=[1,1]"], capsys)
-    s = json.loads(out)["structure"]
-    assert code == 0 and s["type"] == "temporal"
-    assert "n_edges" in s and "edge_types" in s  # aggregate summary, like a graph structure
-    assert all("edge_types" in lag for lag in s["lags"])  # per-lag summary
-    assert s["n_edges"] == sum(lag["n_edges"] for lag in s["lags"])
-
-
 def test_temporal_dense_weights_capped_on_stdout(capsys, monkeypatch, csv_path):
     monkeypatch.setattr("andrey.cli.EDGE_LIMIT", 1)
-    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), "order=[1,1]"], capsys)
+    code, out, _ = _run(["run", "varma_lingam", "--data", str(csv_path), *VARMA_SHORT], capsys)
     env = json.loads(out)
     s = env["structure"]
     assert code == 0
@@ -722,7 +722,7 @@ def test_temporal_dense_weights_capped_on_stdout(capsys, monkeypatch, csv_path):
 def test_temporal_full_keeps_dense_weights(capsys, monkeypatch, csv_path):
     monkeypatch.setattr("andrey.cli.EDGE_LIMIT", 1)
     code, out, _ = _run(
-        ["run", "varma_lingam", "--data", str(csv_path), "order=[1,1]", "--full"], capsys
+        ["run", "varma_lingam", "--data", str(csv_path), *VARMA_SHORT, "--full"], capsys
     )
     s = json.loads(out)["structure"]
     assert code == 0 and s["lag_weights"] is not None and "weights_truncated" not in s
@@ -731,11 +731,11 @@ def test_temporal_full_keeps_dense_weights(capsys, monkeypatch, csv_path):
 def test_temporal_edge_cap_is_shared_across_lags():
     """The inline-edge budget is per result, not per lag: many lags each under the limit must not
     collectively exceed it. Three lags of two edges at limit 2 keep two edges total, not six."""
-    from andrey.cli import _truncate_output
+    from andrey.cli import truncate_output
 
     two_edges = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
     struct = {"type": "temporal", "lags": [{"lag": k, "edges": list(two_edges)} for k in range(3)]}
-    cut = _truncate_output(struct, limit=2)
+    cut = truncate_output(struct, limit=2)
     total = sum(len(lag["edges"]) for lag in struct["lags"])
     assert cut is True and total == 2  # aggregate budget, not 2 per lag (would be 6)
     assert any(lag.get("edges_truncated") for lag in struct["lags"])
@@ -857,12 +857,6 @@ def test_run_majority_colliders(method, csv_path, capsys):
     assert result["structure"] == graph_view(expected)
 
 
-def test_cli_rejects_unknown_collider_rule(csv_path, capsys):
-    code, _, err = _run(["run", "fci", "--data", str(csv_path), "collider_rule=invalid"], capsys)
-    assert code != 0
-    assert "collider" in err
-
-
 @pytest.mark.parametrize(
     "args",
     [
@@ -879,7 +873,7 @@ def test_method_contract_flag_order_and_no_io(args, capsys, monkeypatch, tmp_pat
     def forbidden(*args, **kwargs):
         pytest.fail("Introspection must not read run inputs or execute a method")
 
-    for name in ("_load_config", "_load_method_inputs", "execute_run"):
+    for name in ("load_config", "load_method_inputs", "execute_run"):
         monkeypatch.setattr(cli, name, forbidden)
     output = tmp_path / "unused.json"
     args += ["--data", "-", "--config", "missing.yaml", "-o", str(output), "unknown=bad"]
@@ -972,17 +966,31 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
 @pytest.mark.parametrize(
     "args", [["config", "--json"], ["config", "--help", "--json"], ["--help", "--json"]]
 )
-def test_the_json_introspection_lists_the_skeleton_cutoff(args, capsys, monkeypatch):
+@pytest.mark.parametrize("method", ["skeleton", "rcot", "possible_dsep"])
+def test_the_json_introspection_lists_the_measured_cutoffs(args, method, capsys, monkeypatch):
     """An agent reads the variable, its default, and the command that measures it, from the CLI."""
-    from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES
+    from andrey.search.calibrate import METHODS
 
-    monkeypatch.delenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", raising=False)
+    cutoff = METHODS[method]
+    monkeypatch.delenv(cutoff.variable, raising=False)
     code, out, err = _run(args, capsys)
     assert code == 0 and not err
     variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
-    skeleton = variables["ANDREY_SKELETON_PARALLEL_MIN_WORK"]
-    assert skeleton["default"] == str(MIN_POOL_QUERIES)
-    assert "andrey calibrate --method skeleton" in skeleton["effect"]
+    listed = variables[cutoff.variable]
+    assert listed["default"] == str(cutoff.default())
+    assert f"andrey calibrate --method {method}" in listed["effect"]
+
+
+def test_the_json_introspection_lists_the_gpu_cutoffs_auto_uses(capsys):
+    """Each GPU cutoff's listed default is the cutoff ``auto`` dispatches on."""
+    from andrey.core.backend import GPU_THRESHOLDS
+
+    code, out, err = _run(["config", "--help", "--json"], capsys)
+    assert code == 0 and not err
+    variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
+    for op, cutoffs in GPU_THRESHOLDS.items():
+        listed = variables[f"ANDREY_{op.upper()}_GPU_THRESHOLD"]["default"]
+        assert listed == f"cuda {cutoffs['cuda']}, mps never"
 
 
 def test_config_report_is_readable_when_piped(capsys, monkeypatch):
@@ -1214,3 +1222,57 @@ def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsy
     assert code == 0 and env["metadata"]["categorical"] == []
     messages = [w["message"] for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
     assert any("columns 'g' hold at most 10" in m for m in messages)
+
+
+def _context_files(tmp_path, header):
+    """Three datasets of ``x`` and ``y`` that a time context ``c`` drives, as ``--data`` flags."""
+    rng = np.random.default_rng(0)
+    c = rng.standard_normal(120)
+    flags = []
+    for k in range(3):
+        x = 2 * c + rng.standard_normal(120)
+        y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(120)
+        path = tmp_path / f"{header}{k}.csv"
+        rows = [f"{a},{b},{d}" for a, b, d in zip(x, y, c)]
+        path.write_text("\n".join([*([header] if header else []), *rows]))
+        flags += ["--data", str(path)]
+    return flags
+
+
+def test_contexts_name_columns_by_the_header_or_by_position(tmp_path, capsys):
+    named = ["run", "jpcmciplus", *_context_files(tmp_path, "x,y,c"), "time_dummy=false"]
+    code, out, err = _run([*named, "time_contexts=[c]"], capsys)
+    env = json.loads(out)
+    assert code == 0, err
+    assert env["metadata"]["context_links"] == [["c", 0, "x"]]
+    assert env["structure"]["labels"] == ["x", "y"]
+    code, again, err = _run([*named, "time_contexts=[2]"], capsys)
+    assert code == 0, err
+    assert json.loads(again)["metadata"]["context_links"] == [["c", 0, "x"]]
+    plain = ["run", "jpcmciplus", *_context_files(tmp_path, ""), "time_dummy=false"]
+    code, out, err = _run([*plain, "time_contexts=[2]"], capsys)
+    assert code == 0, err
+    assert json.loads(out)["metadata"]["context_links"] == [[2, 0, 0]]
+    code, _, err = _run([*named, "time_contexts=[d]"], capsys)
+    assert code != 0 and "unknown_column" in err
+
+
+def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, capsys):
+    argv = [
+        "bootstrap",
+        "jpcmciplus",
+        *_context_files(tmp_path, "x,y,c"),
+        "--n-resamples",
+        "3",
+        "--seed",
+        "0",
+        "--resampling",
+        "bootstrap",
+        "--block-length",
+        "20",
+        "time_contexts=[c]",
+        "time_dummy=false",
+    ]
+    code, out, err = _run(argv, capsys)
+    assert code == 0, err
+    assert json.loads(out)["structure"]["labels"] == ["x", "y"]

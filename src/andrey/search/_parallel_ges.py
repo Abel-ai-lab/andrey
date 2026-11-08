@@ -6,7 +6,7 @@ target, candidates sharing ``base = sorted(NA u T u Pa)`` are scored in one batc
 caches across passes.
 
 The move key is :func:`move_key`: ``stable_key(delta, n)``, which quantizes ``delta / n``, then the
-:func:`~andrey.search.hc.tie_ranks` of ``x``, of ``y``, and of the subset ``T`` or ``H``. Moves
+:func:`~andrey.core.ties.tie_ranks` of ``x``, of ``y``, and of the subset ``T`` or ``H``. Moves
 with equal quantized deltas are chosen by ranks that follow the columns, so reordering the columns
 reorders the CPDAG the same way. Each key is unique, so the CPDAG is byte-identical across
 partitions and worker assignments.
@@ -21,8 +21,13 @@ scan never selects a move whose rebuilt CPDAG breaks it (:func:`_breaks_cap`), s
 returns is the best of those that keep it; an Insert whose scored family alone exceeds it is left
 out before scoring (:func:`_over_cap`).
 
+Columns no other column may cause (``sources``, such as an environment index) are never the target
+of an Insert, and after each move the whole graph is rebuilt with their edges directed out of them
+(:func:`out_of`), so the search moves over partially directed graphs in which no source has a
+parent.
+
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
-recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective`.
+recomputed from the final CPDAG by :func:`andrey.search.ges.recompute_objective`.
 """
 
 from __future__ import annotations
@@ -36,14 +41,13 @@ import numpy as np
 
 from andrey.core import _bitset, env
 from andrey.core.knowledge import Constraints, admits
+from andrey.core.orient import cpdag_of_pdag, orient_out_of
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, stable_key
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
-
-_pick_context = par.pick_context
 
 # A chunk best, or ``None`` when the chunk has no improving operator. ``key`` is the total-order
 # reduce key from :func:`move_key`; ``T`` / ``H`` carry the move to apply.
@@ -60,7 +64,7 @@ def move_key(
     """The reduce key of the move of edge ``x``-``y`` with ``subset`` (``T`` or ``H``); lower wins.
 
     ``(stable_key(delta, n), ranks[x], ranks[y], sorted ranks of subset)``, with ``ranks`` from
-    :func:`~andrey.search.hc.tie_ranks`. A candidate's ``(x, y, subset)`` is unique in a pass, so
+    :func:`~andrey.core.ties.tie_ranks`. A candidate's ``(x, y, subset)`` is unique in a pass, so
     the key is too.
     """
     return (stable_key(delta, n), ranks[x], ranks[y], tuple(sorted(ranks[v] for v in subset)))
@@ -146,11 +150,33 @@ def _breaks_cap(
     """Whether some DAG of the class of the CPDAG after ``rebuilt(adj.copy(), *move)`` gives a node
     more than ``cap`` parents.
 
-    ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, ``move`` its
-    ``(x, y, subset)``. The rebuild can direct or undirect edges far from the move, so the CPDAG
-    after it is the one checked.
+    ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, or one of
+    them as :func:`out_of` makes it, ``move`` its ``(x, y, subset)``. The rebuild can direct or
+    undirect edges far from the move, so the graph after it is the one checked.
     """
     return cap is not None and ops.exceeds_parent_cap(rebuilt(adj.copy(), *move), cap)
+
+
+def out_of(
+    apply: Callable[[np.ndarray, int, int, Iterable[int]], None], sources: Sequence[int]
+) -> Callable[[np.ndarray, int, int, Iterable[int]], np.ndarray]:
+    """``apply``, :func:`~andrey.search.operators.apply_insert` or ``apply_delete``, as a move that
+    rebuilds the whole graph and keeps ``sources`` without a parent.
+
+    The returned move applies ``apply`` to the graph in place and returns the CPDAG of a consistent
+    extension of the result (:func:`~andrey.core.orient.cpdag_of_pdag`) with every edge at
+    ``sources`` directed out of them and Meek's rules applied
+    (:func:`~andrey.core.orient.orient_out_of`). On a graph that directs every edge at ``sources``
+    out of them, a move whose target is not a source neither adds an edge into one nor reorients
+    one of its edges, since no source is an undirected neighbor, so the extension gives no source
+    a parent.
+    """
+
+    def move(adj: np.ndarray, x: int, y: int, subset: Iterable[int]) -> np.ndarray:
+        apply(adj, x, y, subset)
+        return orient_out_of(cpdag_of_pdag(adj), sources)
+
+    return move
 
 
 def backward_chunk_best(
@@ -164,19 +190,20 @@ def backward_chunk_best(
     constraints: Constraints | None = None,
     excluded: Excluded = None,
     cap: float | None = None,
+    delete: Callable[..., np.ndarray] = ops.delete_cpdag,
 ) -> BackwardResult:
     """The best-improving Delete whose target is in ``targets``, by :func:`move_key`.
 
     Enumerates the chunk's valid Delete candidates score-free (residual-clique check; Delete carries
     no reachability test) and scores each with one scalar ``("remove", x)`` off ``base = sorted(
     residual u Pa u {x})`` -- the PURE Schur remove delta. Improving iff the raw delta is below
-    ``-_EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
+    ``-EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
     ``(y, base, x)``'s delta across passes: a scalar remove depends on nothing else.
 
     With ``constraints``, a required pair is never deleted, and ``H`` holds no ``h`` whose
     orientation ``y -> h`` or ``x -> h`` is forbidden: such an ``h`` stays in the residual, which
     must still be a clique. A move in ``excluded`` is never selected, nor, under ``cap``, one whose
-    CPDAG breaks it (:func:`_breaks_cap`).
+    CPDAG, rebuilt by ``delete``, breaks it (:func:`_breaks_cap`).
     """
     adj_sets, par_of, nbr = state
     best: BackwardResult = None
@@ -208,12 +235,12 @@ def backward_chunk_best(
                     delta = delta_engine.delta_many_with_base(y, base, [("remove", int(x))])[0]
                     if kept is not None:
                         kept[(y, base, x)] = delta
-                if delta < -_EPS_IMPROVE:
+                if delta < -EPS_IMPROVE:
                     key = move_key(delta, n, x, y, H, ranks)
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:
                             continue
-                        if _breaks_cap(adj, ops.delete_cpdag, (x, y, H), cap):
+                        if _breaks_cap(adj, delete, (x, y, H), cap):
                             continue
                         best_key = key
                         best = (key, x, y, H)
@@ -305,8 +332,8 @@ class _ForwardScan:
     :meth:`best` returns the best-improving Insert into the targets on the graph, by
     :func:`move_key`; a move in ``excluded`` is never selected. With ``forbidden`` (``[i, j]``: no
     edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target. Under
-    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG breaks
-    it is never selected.
+    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG,
+    rebuilt by ``insert``, breaks it is never selected.
     """
 
     def __init__(
@@ -318,12 +345,14 @@ class _ForwardScan:
         ranks: Sequence[int],
         forbidden: np.ndarray | None = None,
         cap: float | None = None,
+        insert: Callable[..., np.ndarray] = ops.insert_cpdag,
     ) -> None:
         self.targets = list(targets)
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
         self.cap = cap
+        self.insert = insert
         self.ranks = ranks
         self.everyone = (1 << n) - 1
         self.forbidden = forbidden
@@ -348,7 +377,7 @@ class _ForwardScan:
         heapq.heapify(heap)
         scored: dict[tuple[int, tuple[int, ...]], tuple[dict[int, float], int]] = {}
         best: ForwardResult = None
-        limit = -_EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
+        limit = -EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
         while heap and heap[0][0] <= limit:
             _low, y, i = heapq.heappop(heap)
             moves = self.screened[y]
@@ -359,20 +388,20 @@ class _ForwardScan:
             if exact is None:
                 exact = scored[(y, base)] = self._exact(y, base)
             deltas, passing = exact
-            if not (passing >> x) & 1 or not deltas[x] < -_EPS_IMPROVE:
+            if not (passing >> x) & 1 or not deltas[x] < -EPS_IMPROVE:
                 continue  # a y ~> x path misses the clique, or the Insert does not improve
             delta = deltas[x]
             key = move_key(delta, self.n, x, y, T, self.ranks)
             if best is None or key < best[0]:
                 if excluded and key[1:] in excluded:
                     continue
-                if _breaks_cap(adj, ops.insert_cpdag, (x, y, T), self.cap):
+                if _breaks_cap(adj, self.insert, (x, y, T), self.cap):
                     continue
                 best = (key, x, y, T)
                 # A delta that can still win rounds to this key or below, so it lies within half a
                 # quantization step of it; the limit allows two steps as slack against rounding.
                 # At a key of minus infinity, only a delta of minus infinity can tie.
-                limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
+                limit = min(-EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-KEY_DP))
         return best
 
     def _refresh(self, adj: np.ndarray) -> None:
@@ -457,7 +486,7 @@ class _ForwardScan:
             for x, t_index, T in cands:
                 bound = bounds[x]
                 low = -math.inf if bound == math.inf else deltas[x] - bound
-                if low < -_EPS_IMPROVE:
+                if low < -EPS_IMPROVE:
                     screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
@@ -604,13 +633,13 @@ def _backward_task(
 # counts the targets the in-process scan would enumerate again: those touched since the graph it
 # kept, which is every target on the first pass and after the workers ran the passes in between. A
 # backward pass counts every target. It is checked per pass, and the worker set is created lazily
-# on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK`` below;
+# on the first pass that crosses. The default is the fixed ``MIN_POOL_GES_WORK`` below;
 # ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a fit with
 # workers warns once on the default when a pass nears it.
 
 # Estimated candidate evaluations below which a pass runs in-process. The default is a starting
 # point, not tuned for any machine; `andrey calibrate` measures the value for this one.
-_DEFAULT_MIN_WORK = 10_000
+MIN_POOL_GES_WORK = 10_000
 
 # The largest estimated work of a pass in the last fit with more than one worker; `andrey calibrate`
 # reads it to state a measured crossover in the gate's units.
@@ -623,7 +652,7 @@ _DEGREE_CAP = (
 
 def _min_work() -> int:
     """The crossover gate in estimated candidate evals (env override, fixed default)."""
-    return par.min_work(env.GES_PARALLEL_MIN_WORK, _DEFAULT_MIN_WORK)
+    return par.min_work(env.GES_PARALLEL_MIN_WORK, MIN_POOL_GES_WORK)
 
 
 def forward_work_per_target(
@@ -671,7 +700,7 @@ def _create_pool(
         workers,
         _init_worker,
         (cov, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
-        context=_pick_context(),
+        context=par.pick_context(),
     )
 
 
@@ -723,14 +752,16 @@ def _admitted(
     constraints: Constraints,
     excluded: set[tuple[int, int, tuple[int, ...]]],
     key: tuple,
+    rebuilt: bool = False,
 ) -> np.ndarray:
     """``after``, the CPDAG a move with ``key`` reaches from ``before``, when its class holds a DAG
     that satisfies ``constraints``; otherwise ``before``.
 
-    An accepted move clears ``excluded``; a rejected one joins it, so the next scan of ``before``
-    selects the next best move.
+    With ``rebuilt``, ``after`` is a graph :func:`out_of` returned, and its class is that of its
+    CPDAG. An accepted move clears ``excluded``; a rejected one joins it, so the next scan of
+    ``before`` selects the next best move.
     """
-    if admits(after, constraints):
+    if admits(cpdag_of_pdag(after) if rebuilt else after, constraints):
         excluded.clear()
         return after
     excluded.add(key[1:])
@@ -747,6 +778,7 @@ def run_ges(
     ranks: list[int],
     constraints: Constraints | None = None,
     cap: float | None = None,
+    sources: tuple[int, ...] = (),
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -755,7 +787,7 @@ def run_ges(
     it the pass fans out to one lazily-created worker set that spans all remaining passes -- each
     worker owns a FIXED contiguous target partition, so its inv-cov cache persists across passes.
     Either way the reduce keys on :func:`move_key`, so the selected CPDAG is partition-invariant;
-    ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`. Returns only the CPDAG;
+    ``ranks`` holds each column's :func:`~andrey.core.ties.tie_ranks`. Returns only the CPDAG;
     ``ges()`` recomputes the objective from it. Pooled workers only ever run Schur on BIC, so any
     score other than :class:`~andrey.core.score.BICScore` (BDeu and the mixed-data scores) is held
     in-process and never fans out.
@@ -767,9 +799,15 @@ def run_ges(
     ``max_parents`` is the forward phase's gate on a node's directed parents and ``cap`` the cap on
     the most parents any DAG of the class gives a node, which ``adj`` must already satisfy: no pass
     selects a move whose CPDAG breaks it, so each applied move keeps it.
+
+    ``sources`` are columns no other column causes, which ``adj`` leaves without an edge. No Insert
+    targets one, and every move is applied by :func:`out_of`, so each graph after a move directs
+    the edges at ``sources`` out of them; ``constraints`` then admit a move when its class holds a
+    DAG that satisfies them and gives no source a parent. The passes run in-process, whatever
+    ``workers``.
     """
     global largest_pass_work
-    workers = max(1, min(workers, n))
+    workers = 1 if sources else max(1, min(workers, n))
     w_min = _min_work()
     engine: DeltaEngine
     lazy: _LazyWorkerSet | None
@@ -782,8 +820,17 @@ def run_ges(
     largest = 0
     # Warn once a pass comes near the default cutoff (only a pass that can fan out).
     warn = workers > 1 and lazy is not None and calibrate.cutoff_is_default("ges")
+    insert, delete = ops.insert_cpdag, ops.delete_cpdag
+    if sources:
+        insert, delete = out_of(ops.apply_insert, sources), out_of(ops.apply_delete, sources)
+        if constraints is not None:  # admit a class only for a DAG with no edge into a source
+            into_sources = constraints.forbidden.copy()
+            into_sources[:, list(sources)] = True
+            np.fill_diagonal(into_sources, False)
+            constraints = Constraints(into_sources, constraints.required, constraints.tier)
     forbidden = None if constraints is None else constraints.forbidden
-    scan = _ForwardScan(range(n), engine, n, max_parents, ranks, forbidden, cap)
+    targets = [y for y in range(n) if y not in sources]
+    scan = _ForwardScan(targets, engine, n, max_parents, ranks, forbidden, cap, insert)
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     excluded: set[tuple[int, int, tuple[int, ...]]] = (
         set()
@@ -817,10 +864,10 @@ def run_ges(
                 break
             key, x, y, T = best
             if constraints is None:
-                adj = ops.insert_cpdag(adj, x, y, T)
+                adj = insert(adj, x, y, T)
             else:
-                moved = ops.insert_cpdag(adj.copy(), x, y, T)
-                adj = _admitted(moved, adj, constraints, excluded, key)
+                moved = insert(adj.copy(), x, y, T)
+                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
         excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
             state = neighborhood_state(adj)
@@ -836,16 +883,16 @@ def run_ges(
                 )
             else:
                 best = backward_chunk_best(
-                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap
+                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap, delete
                 )
             if best is None:
                 break
             key, x, y, H = best
             if constraints is None:
-                adj = ops.delete_cpdag(adj, x, y, H)
+                adj = delete(adj, x, y, H)
             else:
-                moved = ops.delete_cpdag(adj.copy(), x, y, H)
-                adj = _admitted(moved, adj, constraints, excluded, key)
+                moved = delete(adj.copy(), x, y, H)
+                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
     finally:
         if lazy is not None:
             lazy.close()

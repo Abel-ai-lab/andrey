@@ -30,8 +30,8 @@ the parents of ``A`` and ``B``. ``S`` runs over the ``p``-subsets of the adjacen
 have no arrowhead at themselves (``apds_t``), minus ``S_def``, sorted by the smallest absolute test
 statistic of their link with ``B``, largest first, as it stood when the group started, so the tests
 of one link do not reorder the search of another link in its group and the order does not depend on
-the order of the variables; statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to
-the lower :func:`~andrey.search.hc.tie_ranks` of its variable. A same-step link is also tested from
+the order of the variables; statistics equal to ``KEY_DP`` decimals go to the earlier node, then to
+the lower :func:`~andrey.core.ties.tie_ranks` of its variable. A same-step link is also tested from
 ``A``'s side; the earlier end of a lagged link is searched with the empty set only. The first
 p-value above ``alpha`` marks the link for removal and adds ``S + S_def`` to its separating sets;
 marked links leave the graph when their group ends. A side with fewer than ``p`` candidates is done,
@@ -90,8 +90,7 @@ import numpy as np
 from andrey.core import backend
 from andrey.core.ci_missing import PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
-from andrey.search._parallel import _KEY_DP
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.temporal.pcmci import DesignTest, LinkTest, design_test
 
 if TYPE_CHECKING:
@@ -182,10 +181,10 @@ def _add_middle(current: str, letter: str) -> str:
     return current
 
 
-class _Search:
+class LPCMCISearch:
     """The state of one LPCMCI run: the graph, the test memories, and the separating sets.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`. The search keeps what it
+    ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`. The search keeps what it
     reads often until a change can alter it: each node's neighbors until a link is removed, its
     parents and children until an edge mark changes or a link is removed, its path steps until any
     mark changes or a link is removed, and the stored separating sets moved into a frame until a
@@ -688,7 +687,7 @@ class _Search:
         """A sort of candidates by the smallest statistics as they stand now.
 
         The sort puts ``nodes`` in order of the smallest statistic of their link with ``anchor``,
-        largest first. Statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to
+        largest first. Statistics equal to ``KEY_DP`` decimals go to the earlier node, then to
         the lower rank. Each node's sort key is computed once per anchor.
         """
         imin = dict(self.imin)
@@ -698,7 +697,7 @@ class _Search:
             known = keys.setdefault(anchor, {})
             for c in nodes:
                 if c not in known:
-                    statistic = round(float(imin.get(_key(anchor, c)[0], np.inf)), _KEY_DP)
+                    statistic = round(float(imin.get(_key(anchor, c)[0], np.inf)), KEY_DP)
                     known[c] = (-statistic, -c[1], self.ranks[c[0]])
             return sorted(nodes, key=known.__getitem__)
 
@@ -1369,14 +1368,14 @@ def run(
 ) -> LPCMCIResult:
     """Run Algorithm 1 with ``test`` over the columns of the lagged design.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`. With ``constraints``, a
+    ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`. With ``constraints``, a
     forbidden lagged link and a lag-0 pair forbidden both ways are never linked; a lag-0 link
     forbidden one way carries an arrowhead at its cause; a required link is directed, with the
     empty middle mark, so no removal phase or rule tests or removes it. No rule changes a mark
     the knowledge sets. Every re-initialization applies the knowledge again. ``max_p_global`` caps
     the searched subset size (see :func:`lpcmci`).
     """
-    search = _Search(test, n_vars, tau_max, alpha, ranks, constraints, max_p_global)
+    search = LPCMCISearch(test, n_vars, tau_max, alpha, ranks, constraints, max_p_global)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):
@@ -1388,7 +1387,7 @@ def run(
     return _result(search, kept)
 
 
-def _result(search: _Search, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
+def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
     n, tau_max = search.n, search.tau_max
     shape = (tau_max + 1, n, n)
     start_marks = np.zeros(shape, dtype=np.int8)

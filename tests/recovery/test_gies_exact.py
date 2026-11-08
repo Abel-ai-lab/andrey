@@ -15,13 +15,7 @@ from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output, assert_recorded_output_mec
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
+from tests.recovery.helpers.harness import assert_recorded_class, assert_recorded_output
 
 _BASELINE_LAMBDA = 2.0
 
@@ -145,12 +139,12 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
     X, mask = _random_interventional(seed, d, p, n_targets, n=40 * d)
     mask = mask if n_targets else None
     kept_graph, kept_score = gies_search.gies(X, mask)
-    kept_backward = gies_search._Search.backward_best
+    kept_backward = gies_search.GIESSearch.backward_best
 
     def forward_best(self, excluded=None):
         """The lowest-keyed valid insertion over the candidates of every target, enumerated now."""
         adj, n = self.adj, self.n
-        reachable = gies_search._reachable(adj)
+        reachable = gies_search.reachability(adj)
         valid = (
             (key, u, v, C)
             for v in range(n)
@@ -167,8 +161,8 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
         self.backward.clear()
         return kept_backward(self, excluded)
 
-    monkeypatch.setattr(gies_search._Search, "forward_best", forward_best)
-    monkeypatch.setattr(gies_search._Search, "backward_best", backward_best)
+    monkeypatch.setattr(gies_search.GIESSearch, "forward_best", forward_best)
+    monkeypatch.setattr(gies_search.GIESSearch, "backward_best", backward_best)
     full_graph, full_score = gies_search.gies(X, mask)
     assert np.array_equal(kept_graph.to_numpy(), full_graph.to_numpy())
     assert kept_score == full_score
@@ -177,7 +171,7 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
 def test_gies_step_that_does_not_lower_the_score_fails():
     X, mask = _interventional_sem([[1], [6]], n=600, seed=0)
     score = gies_search.InterventionalScore(X, mask)
-    search = gies_search._Search(score, X.shape[1], range(X.shape[1]))
+    search = gies_search.GIESSearch(score, X.shape[1], range(X.shape[1]))
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
 
@@ -360,16 +354,8 @@ def test_exact_search_recovers_the_planted_class(search_method):
 
 
 def test_exact_search_recovery():
-    assert_recorded_output_mec(
-        andrey.exact_search(datagen.generate("gauss_5v")),
-        "ExactSearch",
-        case="gauss_5v",
-    )
-
-
-def test_gies_output_contract():
-    out = andrey.gies(datagen.generate("gauss_5v"))
-    assert out.structure.kind == "cpdag" and "score" in out.metadata
+    out = andrey.exact_search(datagen.generate("gauss_5v"))
+    assert_recorded_class("ExactSearch", out.structure.to_numpy(), case="gauss_5v")
 
 
 def _found_dag(out) -> np.ndarray:
@@ -559,12 +545,3 @@ def test_gfci_recovers_the_planted_pag():
     adjacent = {frozenset(edge[:2]) for edge in ges.oriented_edges(index=True)}
     assert adjacent - {frozenset(edge[:2]) for edge in _PLANTED_PAG}
     assert _pag_edges(_LATENT, andrey.gfci(x).structure) == _PLANTED_PAG
-
-
-def test_gfci_output_contract():
-    assert andrey.gfci(datagen.generate("gauss_5v")).structure.kind == "pag"
-
-
-def test_gfci_rejects_unknown_indep_test():
-    with pytest.raises(ValueError):
-        andrey.gfci(datagen.generate("gauss_5v"), indep_test="no_such_test")

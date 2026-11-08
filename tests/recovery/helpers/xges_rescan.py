@@ -13,12 +13,11 @@ import numpy as np
 
 from andrey.core import NULL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
-from andrey.core.orient import to_structure
+from andrey.core.orient import cpdag_of_pdag, to_structure
 from andrey.core.score import BICScore
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
-from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag, required_dag
-from andrey.search.hc import tie_ranks
+from andrey.search.ges import reachability, recompute_objective, required_dag
 from andrey.search.xges import (
     _ACCEPT_PER_SAMPLE,
     _extension_scores,
@@ -32,13 +31,13 @@ def _move_key(
 ) -> tuple:
     """The order of a move of edge ``x``-``y`` with ``subset`` (``T`` or ``C``); lower goes first.
 
-    ``(round(delta / n, _KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
-    samples and ``ranks`` from :func:`~andrey.search.hc.tie_ranks`: moves whose score changes per
-    sample agree to :data:`~andrey.search._parallel._KEY_DP` decimals are ordered by ranks that
+    ``(round(delta / n, KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
+    samples and ``ranks`` from :func:`~andrey.core.ties.tie_ranks`: moves whose score changes per
+    sample agree to :data:`~andrey.core.ties.KEY_DP` decimals are ordered by ranks that
     follow the columns.
     """
     ordered = tuple(sorted([ranks[v] for v in subset])) if subset else ()
-    return (round(delta / n, _KEY_DP), ranks[x], ranks[y], ordered)
+    return (round(delta / n, KEY_DP), ranks[x], ranks[y], ordered)
 
 
 def _sets(adj: np.ndarray, v: int) -> tuple[set[int], set[int], set[int]]:
@@ -148,7 +147,7 @@ def _ordered(candidates: Iterable[tuple], n: int, ranks: list[int]) -> list[tupl
 
 def _improving(candidates: list[tuple], n: int, ranks: list[int]) -> list[tuple]:
     """The improving candidates in :func:`_ordered` order."""
-    return _ordered((c for c in candidates if c[0] < -_EPS_IMPROVE), n, ranks)
+    return _ordered((c for c in candidates if c[0] < -EPS_IMPROVE), n, ranks)
 
 
 def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndarray:
@@ -157,14 +156,14 @@ def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndar
     _, ne_y, _ = _sets(adj, y)
     H = (ne_y & set(ops.adjacent(adj, x).tolist())) - C
     ops.apply_delete(adj, x, y, H)
-    return _reform_cpdag(adj)
+    return cpdag_of_pdag(adj)
 
 
 def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndarray:
     """Apply Insert ``x -> y`` with ``T`` to a copy of a mark matrix and re-form the CPDAG."""
     adj = adj.copy()
     ops.apply_insert(adj, x, y, T)
-    return _reform_cpdag(adj)
+    return cpdag_of_pdag(adj)
 
 
 def _rescan_moves(
@@ -182,7 +181,7 @@ def _rescan_moves(
         cut = adj.copy()
         cut[x, y] = cut[y, x] = NULL
         yield _insert_marks(cut, x, y, T)
-    inserts = _all_inserts(adj, score, forbidden, _reachable(adj), constraints)
+    inserts = _all_inserts(adj, score, forbidden, reachability(adj), constraints)
     for _, x, y, T in _improving(inserts, score.n, ranks):
         yield _insert_marks(adj, x, y, T)
 
@@ -228,7 +227,7 @@ def _rescan_search(
     """XGES with every operator rescanned and the CPDAG re-formed globally after each move."""
     start = np.zeros((d, d), dtype=np.int8)
     if constraints is not None and constraints.required.any():
-        start = _reform_cpdag(required_dag(constraints))
+        start = cpdag_of_pdag(required_dag(constraints))
     adj = _rescan_base_search(start, score, set(), ranks, constraints)
     if not extended:
         return adj
@@ -278,7 +277,7 @@ def xges_rescan(
     ranks = tie_ranks(X).tolist()
     with backend.one_blas_thread():
         adj = _rescan_search(score, d, extended_search, ranks, constraints)
-        total = _recompute_objective(adj, score, d)
+        total = recompute_objective(adj, score, d)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

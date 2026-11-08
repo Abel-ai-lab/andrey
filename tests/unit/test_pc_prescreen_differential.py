@@ -1,27 +1,27 @@
-"""Differential guard for the PC/FCI skeleton fast paths: prescreen, batched scan, worker pool.
+"""Differential guard for the skeleton fast paths: prescreen, batched scan, worker pool.
 
 The prescreen replaces the scalar size-0 and size-1 skeleton passes with vectorized reads of the
 Fisher-Z correlation matrix, the ``|S| >= 2`` scan evaluates conditioning sets through
 ``FisherZ.batched_call``, and the skeleton pass may fan out across worker processes. All three are
 *output-preserving*: the recovered adjacency and every removed pair's separating set must be
-identical to the plain scalar adjacency search, pair for pair and byte for byte, and PC's largest
+identical to the plain scalar adjacency search, pair for pair and byte for byte, and the largest
 separating p-value per removed pair must be the same float on every path.
 
 This module pins that with an independent, deliberately naive scalar reference adjacency search --
 one that calls the Fisher-Z oracle (:meth:`FisherZ.__call__`) directly, with no batching, no
-prescreen, and no vectorization -- and asserts the production ``_discover_skeleton`` (PC) and
-``_fast_adjacency_search`` (FCI) reproduce it exactly across a sweep of random linear-Gaussian DAGs
+prescreen, and no vectorization -- and asserts the production ``adjacency_search``, which PC,
+CD-NOD, and FCI share, reproduces it exactly across a sweep of random linear-Gaussian DAGs
 (seeds x dimensions x densities x sample sizes, including small ``n`` near the Fisher-Z
-degrees-of-freedom boundary). The reference encodes the exact semantics each search must preserve:
-both PC and FCI condition on either endpoint's snapshot neighborhood and union the separating sets
-(FCI records a removed pair both ways); both snapshot neighborhoods at the start of a conditioning
-size and apply removals only after the size completes.
+degrees-of-freedom boundary). The reference encodes the exact semantics the search must preserve:
+it conditions on either endpoint's snapshot neighborhood and unions the separating sets, snapshots
+the neighborhoods at the start of a conditioning size, and applies removals only after the size
+completes.
 
-The prescreen and serial-vs-parallel checks compare each fast path with the same search's scan: the
+The prescreen and serial-vs-parallel checks compare each fast path with the search's own scan: the
 prescreen with the generic scan a test without the vectorized paths takes, the pool with the
 in-process scan.
 The last section runs the reference against the chi-square, G-square, and conditional Gaussian
-tests, whose batched, marginal, and first-order paths the searches take the same way.
+tests, whose batched, marginal, and first-order paths the search takes the same way.
 """
 
 from __future__ import annotations
@@ -29,19 +29,17 @@ from __future__ import annotations
 import importlib
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
-from functools import partial
 from itertools import combinations
 
 import numpy as np
 import pytest
 
-from andrey.constraint.fci import _fast_adjacency_search
-from andrey.constraint.pc import _discover_skeleton
+from andrey.constraint.pc import adjacency_search
 from andrey.core import NULL, TAIL
 from andrey.core.ci import make_indep_test
 from andrey.data import sample_discrete, sample_mixed
 
-# Adjacency, separating sets, and, from PC's search, the largest separating p-value per pair.
+# Adjacency, separating sets, and, when recorded, the largest separating p-value per pair.
 Skeleton = (
     tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
     | tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]
@@ -57,15 +55,26 @@ def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @contextmanager
 def _generic_scan() -> Iterator[None]:
-    """Let PC and FCI treat every test as one without the vectorized size-0 and size-1 paths."""
+    """Let the adjacency search treat every test as one without the vectorized size-0 and size-1
+    paths."""
     with pytest.MonkeyPatch.context() as patch:
-        for module in ("pc", "fci"):
-            patch.setattr(
-                importlib.import_module(f"andrey.constraint.{module}"),
-                "prescreen_capable",
-                lambda test: False,
-            )
+        patch.setattr(
+            importlib.import_module("andrey.constraint.pc"), "prescreen_capable", lambda test: False
+        )
         yield
+
+
+def _search(
+    x: np.ndarray,
+    indep_test: str = "fisherz",
+    *,
+    categorical: np.ndarray | None = None,
+    workers: int = 1,
+    record_pvalues: bool = True,
+) -> Skeleton:
+    """The production adjacency search over ``x`` at alpha 0.05."""
+    test = make_indep_test(indep_test, x, categorical=categorical)
+    return adjacency_search(test, x.shape[1], 0.05, workers=workers, record_pvalues=record_pvalues)
 
 
 def _scan(prescreen: bool):
@@ -108,17 +117,15 @@ def _reference_skeleton(
     X: np.ndarray,
     alpha: float,
     *,
-    mode: str,
     indep_test: str = "fisherz",
     categorical: np.ndarray | None = None,
 ) -> Skeleton:
     """A naive scalar adjacency search -- the semantic oracle the fast paths must reproduce.
 
-    Both conventions condition on either endpoint's snapshot neighborhood and union the separating
-    sets; ``mode`` selects only how the pair is recorded -- ``"pc"`` once (``x < y``), ``"fci"``
-    both ways.
-    Every conditioning set is scored with the scalar test call directly -- no batching, no
-    vectorization -- so this path shares nothing with the production search but the oracle itself.
+    It conditions on either endpoint's snapshot neighborhood, unions the separating sets, and
+    records each removed pair once, keyed ``(x, y)`` with ``x < y``. Every conditioning set is
+    scored with the scalar test call directly -- no batching, no vectorization -- so this path
+    shares nothing with the production search but the oracle itself.
     """
     test = make_indep_test(indep_test, X, categorical=categorical)
     d = X.shape[1]
@@ -148,10 +155,7 @@ def _reference_skeleton(
                             separating.update(subset)
                 if found:
                     remove.append((x, y))
-                    key = tuple(sorted(separating))
-                    sepsets[(x, y)] = key
-                    if mode == "fci":
-                        sepsets[(y, x)] = key
+                    sepsets[(x, y)] = tuple(sorted(separating))
         for x, y in remove:
             adj[x, y] = NULL
             adj[y, x] = NULL
@@ -174,41 +178,21 @@ def _assert_same(lhs: Skeleton, rhs: Skeleton, label: str) -> None:
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
-def test_pc_skeleton_matches_scalar_reference(seed: int, d: int, n: int, p: float) -> None:
+def test_skeleton_matches_scalar_reference(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    prod = _discover_skeleton(x, 0.05, "fisherz")
-    ref = _reference_skeleton(x, 0.05, mode="pc")
-    _assert_same(prod, ref, f"PC seed={seed} d={d} n={n} p={p}")
-
-
-@pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
-def test_fci_skeleton_matches_scalar_reference(seed: int, d: int, n: int, p: float) -> None:
-    x = _gaussian_dag(seed, n, d, p)
-    test = make_indep_test("fisherz", x)
-    prod = _fast_adjacency_search(x, test, 0.05)
-    ref = _reference_skeleton(x, 0.05, mode="fci")
-    _assert_same(prod, ref, f"FCI seed={seed} d={d} n={n} p={p}")
+    _assert_same(_search(x), _reference_skeleton(x, 0.05), f"seed={seed} d={d} n={n} p={p}")
 
 
 # ---- the prescreen is bit-identical to the scan (the vectorized path vs the generic scan) --------
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
-def test_pc_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
+def test_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    on = _discover_skeleton(x, 0.05, "fisherz")
+    on = _search(x)
     with _generic_scan():
-        off = _discover_skeleton(x, 0.05, "fisherz")
-    _assert_same(on, off, f"PC prescreen seed={seed} d={d} n={n} p={p}")
-
-
-@pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
-def test_fci_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
-    x = _gaussian_dag(seed, n, d, p)
-    on = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05)
-    with _generic_scan():
-        off = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05)
-    _assert_same(on, off, f"FCI prescreen seed={seed} d={d} n={n} p={p}")
+        off = _search(x)
+    _assert_same(on, off, f"prescreen seed={seed} d={d} n={n} p={p}")
 
 
 # ---- the prescreen leaves the full CPDAG / PAG unchanged (covers downstream queries) ----------
@@ -277,32 +261,23 @@ def _open_gate(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
-def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
+def test_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    serial = _discover_skeleton(x, 0.05, "fisherz", workers=1)
-    parallel = _discover_skeleton(x, 0.05, "fisherz", workers=3)
-    _assert_same(serial, parallel, f"PC serial/parallel seed={seed} d={d} n={n} p={p}")
+    serial = _search(x, workers=1)
+    parallel = _search(x, workers=3)
+    _assert_same(serial, parallel, f"serial/parallel seed={seed} d={d} n={n} p={p}")
 
 
 @pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("prescreen", "workers"), [(True, 1), (False, 1), (True, 3)])
-def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
-    # The column collider order skips the p-values on the prescreen, scan, and worker paths.
+def test_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
+    # PC's column collider order and FCI skip the p-values on the prescreen, scan, and worker paths.
     x = _gaussian_dag(0, 600, 20, 0.25)
     with _scan(prescreen):
-        full = _discover_skeleton(x, 0.05, "fisherz", workers=workers)
-        bare = _discover_skeleton(x, 0.05, "fisherz", workers=workers, record_pvalues=False)
+        full = _search(x, workers=workers)
+        bare = _search(x, workers=workers, record_pvalues=False)
     assert full[2] and bare[2] == {}
-    _assert_same(bare[:2], full[:2], f"PC without p-values prescreen={prescreen} workers={workers}")
-
-
-@pytest.mark.usefixtures("_open_gate")
-@pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
-def test_fci_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
-    x = _gaussian_dag(seed, n, d, p)
-    serial = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=1)
-    parallel = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=3)
-    _assert_same(serial, parallel, f"FCI serial/parallel seed={seed} d={d} n={n} p={p}")
+    _assert_same(bare[:2], full[:2], f"without p-values prescreen={prescreen} workers={workers}")
 
 
 # ---- Student-t takes the same fast paths ---------------------------------------------------------
@@ -322,40 +297,27 @@ _T_PARALLEL_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _T_PARALLEL_CAS
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _T_CASES, ids=_T_IDS)
 def test_student_t_skeletons_match_scalar_reference(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    label = f"seed={seed} d={d} n={n} p={p}"
-    pc = _discover_skeleton(x, 0.05, "student_t")
-    _assert_same(pc, _reference_skeleton(x, 0.05, mode="pc", indep_test="student_t"), f"PC {label}")
-    fci = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
-    _assert_same(
-        fci, _reference_skeleton(x, 0.05, mode="fci", indep_test="student_t"), f"FCI {label}"
-    )
+    reference = _reference_skeleton(x, 0.05, indep_test="student_t")
+    _assert_same(_search(x, "student_t"), reference, f"seed={seed} d={d} n={n} p={p}")
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _T_CASES, ids=_T_IDS)
 def test_student_t_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    label = f"seed={seed} d={d} n={n} p={p}"
-    pc_on = _discover_skeleton(x, 0.05, "student_t")
-    fci_on = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
+    on = _search(x, "student_t")
     with _generic_scan():
-        pc_off = _discover_skeleton(x, 0.05, "student_t")
-        fci_off = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
-    _assert_same(pc_on, pc_off, f"PC {label}")
-    _assert_same(fci_on, fci_off, f"FCI {label}")
+        off = _search(x, "student_t")
+    _assert_same(on, off, f"seed={seed} d={d} n={n} p={p}")
 
 
 @pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _T_PARALLEL_CASES, ids=_T_PARALLEL_IDS)
 def test_student_t_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    label = f"seed={seed} d={d} n={n} p={p}"
-    serial = _discover_skeleton(x, 0.05, "student_t", workers=1)
-    fisherz = _discover_skeleton(x, 0.05, "fisherz", workers=1)
+    serial = _search(x, "student_t", workers=1)
+    fisherz = _search(x, workers=1)
     assert serial[1] != fisherz[1] or not np.array_equal(serial[0], fisherz[0]), "case too easy"
-    _assert_same(serial, _discover_skeleton(x, 0.05, "student_t", workers=3), f"PC {label}")
-    fci_serial = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=1)
-    fci_parallel = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=3)
-    _assert_same(fci_serial, fci_parallel, f"FCI {label}")
+    _assert_same(serial, _search(x, "student_t", workers=3), f"seed={seed} d={d} n={n} p={p}")
 
 
 # ---- the categorical and conditional Gaussian tests ---------------------------------------------
@@ -383,12 +345,10 @@ def test_categorical_and_mixed_skeletons_match_scalar_reference(
         data = sample_mixed(d=10, n=n, seed=0, density=3.0)
         x, mask = data.data, np.isnan(data.params.noise_scales)
     label = f"{indep_test} n={n}"
-    reference = partial(_reference_skeleton, x, 0.05, indep_test=indep_test, categorical=mask)
-    pc = _discover_skeleton(x, 0.05, indep_test, categorical=mask)
-    assert any(len(s) >= 2 for s in pc[1].values()), "no pair separated at size 2 or more"
-    _assert_same(pc, reference(mode="pc"), f"PC {label}")
+    found = _search(x, indep_test, categorical=mask)
+    assert any(len(s) >= 2 for s in found[1].values()), "no pair separated at size 2 or more"
+    reference = _reference_skeleton(x, 0.05, indep_test=indep_test, categorical=mask)
+    _assert_same(found, reference, label)
     with _generic_scan():
-        unprescreened = _discover_skeleton(x, 0.05, indep_test, categorical=mask)
-    _assert_same(pc, unprescreened, label)
-    test = make_indep_test(indep_test, x, categorical=mask)
-    _assert_same(_fast_adjacency_search(x, test, 0.05), reference(mode="fci"), f"FCI {label}")
+        unprescreened = _search(x, indep_test, categorical=mask)
+    _assert_same(found, unprescreened, label)

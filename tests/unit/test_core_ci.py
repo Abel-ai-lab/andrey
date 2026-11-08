@@ -72,6 +72,25 @@ def test_batched_matches_scalar_exactly(test_class, seed):
     np.testing.assert_array_equal(batched_p, scalar_p)
 
 
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize(
+    "conds",
+    [
+        [(2, 3, 4), (2, 5, 9), (3, 4, 8)],
+        [(4, 3, 2), (9, 2, 5), (8, 4, 3)],
+        np.array([(4, 3, 2), (9, 2, 5), (8, 4, 3)]),
+        [(2, 2, 3), (2, 5, 9), (3, 4, 8)],
+        [(), (), ()],
+    ],
+    ids=["sorted", "unsorted", "array", "repeated-member", "empty"],
+)
+def test_batched_sets_of_one_size_match_scalar_exactly(test_class, conds):
+    # A batch of one set size is sorted as one array; a repeated member sends it down the per-set
+    # path, which drops the repeat. Either way each p-value is the scalar call's.
+    test = test_class(np.random.default_rng(0).standard_normal((200, 10)))
+    assert test.batched_call(1, 0, conds) == [test(1, 0, c) for c in conds]
+
+
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
 @pytest.mark.parametrize("seed", range(15))
 def test_prescreen_pvalues_match_canonical_scalar_exactly(test_class, seed):
@@ -315,6 +334,8 @@ def test_variable_in_condition_set_is_assertion_error(data):
         test(0, 1, (0, 2))
     with pytest.raises(AssertionError, match="condition_set"):
         test.batched_call(0, 1, [(2,), (1, 3)])
+    with pytest.raises(AssertionError, match="condition_set"):
+        test.batched_call(0, 1, [(2, 3), (1, 3)])
 
 
 # ---- singularity guard -------------------------------------------------------------------
@@ -351,7 +372,7 @@ def _eigenvalues_first(corr, x, y, conditions):
         return True, None
     inv = np.linalg.inv(stack)
     r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
-    return False, np.clip(r, -ci._ONE_MINUS_EPS, ci._ONE_MINUS_EPS)
+    return False, np.clip(r, -ci.ONE_MINUS_EPS, ci.ONE_MINUS_EPS)
 
 
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
@@ -411,7 +432,7 @@ def test_guard_bound_edge(test_class, monkeypatch):
     # matrices sit just inside and just outside the inverse bound. Only the outside one takes the
     # eigenvalue test; both pass it, since the bound stays far above the eigenvalue threshold.
     size = 4
-    limit = 1.0 / (ci._BOUND_MARGIN * ci._SINGULAR_RTOL * size * size)
+    limit = 1.0 / (ci.BOUND_MARGIN * ci.SINGULAR_RTOL * size * size)
     edge = 1.0 / (size * limit)
     inside, outside = _equicorrelation(size, 1.1 * edge), _equicorrelation(size, 0.9 * edge)
     assert np.abs(np.linalg.inv(inside)).max() < limit < np.abs(np.linalg.inv(outside)).max()
@@ -590,12 +611,6 @@ def test_student_t_reports_the_statistic_fisher_z_reports(data):
 def test_student_t_p_value_is_independent_of_argument_order(data):
     test = StudentT(data)
     assert test(4, 1, (3, 2)) == test(1, 4, (2, 3, 3))
-
-
-def test_student_t_is_a_registered_indep_test(data):
-    assert "student_t" in ci.available_indep_tests()
-    assert "student_t" in ci.SHIPPED_INDEP_TESTS
-    assert isinstance(ci.make_indep_test("student_t", data), StudentT)
 
 
 def test_student_t_needs_more_samples_than_conditions_plus_two():

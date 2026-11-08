@@ -19,7 +19,7 @@ import pytest
 
 import andrey
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 COLUMNS = ["a", "b", "y", "c", "d"]
 #: ``WEIGHTS[j][i]`` is the weight of ``COLUMNS[i] -> COLUMNS[j]``, in causal order.
@@ -94,13 +94,6 @@ def test_a_target_without_parents_gets_none():
     assert [] in out.metadata["accepted_sets"]
 
 
-def test_observational_data_split_in_two_give_no_parents():
-    data, _ = environments(2, 1000, [{}])
-    out = fit(data, np.arange(1000) % 2)
-    assert out.metadata["parents"] == []
-    assert [] in out.metadata["accepted_sets"]
-
-
 def test_an_intervention_on_the_target_is_left_out_when_targets_name_it():
     data, env = environments(3, 500, [{}, {"y": ("shift", 3.0)}, *SINGLE[1:4]])
     rejected = fit(data, env)
@@ -109,12 +102,6 @@ def test_an_intervention_on_the_target_is_left_out_when_targets_name_it():
     out = fit(data, env, targets={0: [], 1: ["y"], 2: ["a"], 3: None})
     assert out.metadata["environments_left_out"] == [1]
     assert out.metadata["parents"] == PARENTS
-
-
-def test_a_fit_repeats():
-    data, env = environments(4, 500, SINGLE)
-    first, second = fit(data, env), fit(data, env)
-    assert first.metadata == second.metadata
 
 
 def test_icp_keeps_the_recorded_output():

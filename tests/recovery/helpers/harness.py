@@ -16,10 +16,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
+from andrey.core.orient import dag2cpdag
+
 from . import datagen
+from .project import project_output
 from .tolerances import SPEC
 
 SCHEMA_VERSION = 3
@@ -183,3 +187,20 @@ def assert_baseline(
     if not result.ok:
         raise AssertionError(result.describe())
     return result
+
+
+def assert_recorded_output(out: Any, algorithm: str, *, case: str) -> RegressionResult:
+    """Project ``out`` (a list for multi-group) and assert it matches the baseline."""
+    return assert_baseline(algorithm, project_output(out, algorithm), case=case)
+
+
+def assert_recorded_class(algorithm: str, cpdag: Any, *, case: str) -> None:
+    """Assert ``cpdag`` is the CPDAG of the recorded DAG.
+
+    Score-equivalent optima can differ in tie-breaking, so ExactSearch compares Markov
+    equivalence classes. Check the input hash before comparing to detect generator drift.
+    """
+    baseline = check_input(case, algorithm)["output"]["graph"]
+    baseline_dag = np.asarray(baseline, dtype=np.int8)
+    if not np.array_equal(np.asarray(cpdag), dag2cpdag(baseline_dag)):
+        raise AssertionError(f"{algorithm}: CPDAG (Markov-equivalence-class) mismatch vs baseline")

@@ -24,11 +24,11 @@ import numpy as np
 from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResultsWrapper
 
 from andrey.core.knowledge import KnowledgeError
+from andrey.core.ties import tie_ranks
 from andrey.core.units import unit_factors
 from andrey.core.warning_policy import warn_search_limit
-from andrey.lingam.adjacency import estimate, predict_adaptive_lasso, predict_with_required
+from andrey.lingam.adjacency import estimate, fit_target, predict_adaptive_lasso
 from andrey.lingam.direct import direct_lingam
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -72,7 +72,7 @@ def varma_lingam(
     true structural MA influence on the independent innovations; the default
     ``structural_ma=False`` uses ``(I - B0) Theta_j``.
 
-    The fit runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, so reordering the
+    The fit runs on the columns sorted by :func:`~andrey.core.ties.tie_ranks`, so reordering the
     columns of ``X`` relabels the result and changes nothing else, unless two columns are identical.
     The likelihood fit, which can stop before it converges, then starts from and stops at the same
     point for every column order.
@@ -279,12 +279,9 @@ def _prune(
         free = [j for j in predictors if not known(constraints.forbidden, j)]
         forced = [j for j in free if known(constraints.required, j)]
         free = [j for j in free if j not in forced]
-        if forced:
-            coefs[target, forced], coefs[target, free] = predict_with_required(
-                design, forced, free, target
-            )
-        elif free:
-            coefs[target, free] = predict_adaptive_lasso(design, free, target, refit=True)
+        coefs[target, forced], coefs[target, free] = fit_target(
+            design, forced, free, target, refit=True
+        )
 
     psis = np.stack([coefs[:, n * k : n * (k + 1)] for k in range(1 + p)])
     omegas = (

@@ -1,9 +1,10 @@
-"""``StructureOutput`` -- the one uniform return type of every algorithm.
+"""``StructureOutput`` -- the return type of every algorithm.
 
-A thin, immutable run envelope over a first-class ``Structure`` (``.structure``), plus the
-run-level slots that hang off the run rather than the graph: the discovered ``ordering``, a sparse
-``weighted_adjacency`` (its own asymmetric ``float64`` CSR), and JSON-safe ``metadata``. Every dense
-view derives lazily and uncached. ``save`` / ``load`` serialize the whole envelope.
+``multi_group_direct_lingam`` returns one per group. A thin, immutable run envelope over a
+first-class ``Structure`` (``.structure``), plus the run-level slots that hang off the run rather
+than the graph: the discovered ``ordering``, a sparse ``weighted_adjacency`` (its own asymmetric
+``float64`` CSR), and JSON-safe ``metadata``. Every dense view derives lazily and uncached.
+``save`` / ``load`` serialize the whole envelope.
 """
 
 from __future__ import annotations
@@ -146,8 +147,8 @@ class StructureOutput:
     def ordering(self) -> tuple[int, ...] | None:
         """Causal order as node indices, causes first; ``None`` unless the method finds one.
 
-        Set by ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``, and
-        ``varma_lingam`` (the order within one time step).
+        Set by ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``, ``cam``,
+        ``resit``, and ``varma_lingam`` (the order within one time step).
         """
         return self._ordering
 
@@ -161,9 +162,9 @@ class StructureOutput:
         """Edge weights as a new dense ``(n_nodes, n_nodes)`` array, or ``None`` without weights.
 
         ``W[i, j]`` is the weight of ``i -> j``, so rows are causes: the transpose of ``B`` in
-        ``x = Bx + e``. Set by ``calm``, ``direct_lingam``, ``ica_lingam``, and
-        ``multi_group_direct_lingam``; a time-series result keeps its weights in
-        ``structure.lag_weights``.
+        ``x = Bx + e``. Set by ``calm``, ``notears``, ``dagma``, ``direct_lingam``, ``ica_lingam``,
+        ``multi_group_direct_lingam``, ``rcd``, and ``bottom_up_parce_lingam``; a time-series result
+        keeps its weights in ``structure.lag_weights``.
         """
         if self._w_indptr is None or self._w_indices is None or self._w_data is None:
             return None
@@ -179,34 +180,7 @@ class StructureOutput:
 
         A metadata entry whose value is an empty list, tuple, dict, or set is left out.
         """
-        return "\n".join(self._summary())
-
-    def _summary(
-        self, *, name: str | None = None, limit: int | None = SUMMARY_EDGES, more: str = ""
-    ) -> list[str]:
-        """Build the result summary as lines for ``repr`` and ``andrey run``.
-
-        ``name`` defaults to ``metadata["algorithm"]``. ``limit`` caps the listed edges, and
-        ``more`` extends the omitted-edge count. Edge weights come from the sparse store.
-        """
-        algorithm = self._metadata.get("algorithm")
-        if name is None and algorithm is not None:
-            name = str(algorithm)
-        weights = None if self._w_indptr is None else self.to_scipy_sparse()
-        s = self._structure
-        lines = s._summary(name=name, weights=weights, limit=limit, more=more)
-        if self._ordering is not None:
-            labels = s.labels
-            order = " -> ".join(labels[i] if labels else str(i) for i in self._ordering)
-            lines += ["", f"  order: {order}"]
-        meta = [
-            f"  {k}: {_brief(k, v)}"
-            for k, v in self._metadata.items()
-            if k != "algorithm" and not (isinstance(v, (list, tuple, dict, set)) and not v)
-        ]
-        if meta:
-            lines += ["", *meta]
-        return lines
+        return "\n".join(summary_lines(self))
 
     def to_scipy_sparse(self, *, weights: bool = True) -> scipy.sparse.csr_array:
         """Return the edge weights as a ``scipy.sparse.csr_array``, without a dense array.
@@ -499,6 +473,38 @@ class StructureOutput:
         return True
 
     __hash__ = None  # type: ignore[assignment]
+
+
+def summary_lines(
+    out: StructureOutput,
+    *,
+    name: str | None = None,
+    limit: int | None = SUMMARY_EDGES,
+    more: str = "",
+) -> list[str]:
+    """Return the result summary as lines, for ``repr`` and ``andrey run``.
+
+    ``name`` defaults to ``metadata["algorithm"]``. ``limit`` caps the listed edges, and ``more``
+    ends the line that counts the others. Edge weights come from the sparse store.
+    """
+    algorithm = out._metadata.get("algorithm")
+    if name is None and algorithm is not None:
+        name = str(algorithm)
+    weights = None if out._w_indptr is None else out.to_scipy_sparse()
+    s = out._structure
+    lines = s._summary(name=name, weights=weights, limit=limit, more=more)
+    if out._ordering is not None:
+        labels = s.labels
+        order = " -> ".join(labels[i] if labels else str(i) for i in out._ordering)
+        lines += ["", f"  order: {order}"]
+    meta = [
+        f"  {k}: {_brief(k, v)}"
+        for k, v in out._metadata.items()
+        if k != "algorithm" and not (isinstance(v, (list, tuple, dict, set)) and not v)
+    ]
+    if meta:
+        lines += ["", *meta]
+    return lines
 
 
 def _graph_to_doc(g: GraphStructure) -> dict:

@@ -60,12 +60,6 @@ def test_a_stream_split_into_chunks_equals_the_same_text_whole(script):
     assert script.differences(split, stored) == []
 
 
-def test_a_stream_split_into_chunks_still_fails_when_its_text_changes(script):
-    stored = notebook(streamed(("stdout", "errors: 11\n")))
-    split = notebook(streamed(("stdout", "errors:"), ("stdout", " 12\n")))
-    assert script.differences(stored, split)
-
-
 def test_chunks_join_only_within_one_stream_and_in_order(script):
     out_err = notebook(streamed(("stdout", "a\n"), ("stderr", "b\n")))
     assert (

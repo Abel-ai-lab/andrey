@@ -9,7 +9,8 @@ display the parameter defaults defined here.
 from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
-from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
+from andrey.core.ci import CONTINUOUS_INDEP_TESTS
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -104,6 +105,32 @@ _TEST_SEED = concept_param(
     "make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
+#: The environment index the score searches and their FCI hybrids take for data pooled across
+#: environments.
+_ENV_INDEX = InputSpec(
+    name="env",
+    kind="context",
+    doc="The environment of each row, for data pooled across environments: one label per row, "
+    "(n_samples,) or (n_samples, 1), or a column of the data file, which is then not a variable. "
+    "The index joins the search as a variable no data variable causes. Numbers are read as "
+    "numbers; text labels are coded 0, 1, ... in sorted order. Leave it out for one environment.",
+    required=False,
+)
+_ENV_NOTES = (
+    "With env, the index becomes a trailing node no data variable causes, then is projected out of "
+    "the result; its edges go in metadata['index_edges']."
+)
+_ENV_DATA = DataSpec(inputs=(_DATA_MATRIX, _ENV_INDEX), layout=_MATRIX_LAYOUT, notes=_ENV_NOTES)
+#: The ``metadata`` a CPDAG search and a PAG search add with ``env``.
+_ENV_CPDAG_DOC = (
+    "; with env, metadata['index_edges'] lists the index's edges as [variable, 'directed'] pairs "
+    "and metadata['changing_variables'] the same variables, whose causal module changes across "
+    "the environments, in column order"
+)
+_ENV_PAG_DOC = (
+    ", the index numbered n_variables; with env, metadata['index_edges'] lists the index's edges "
+    "as [variable, kind] pairs, kind directed, partially_directed, or bidirected, in column order"
+)
 
 REGISTRY: dict[str, MethodSpec] = {}
 
@@ -131,7 +158,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -140,7 +166,6 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -173,7 +198,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -182,7 +206,6 @@ _add(
             '`tie_break="position"` fires the orientation rules one at a time in column order, and '
             'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -207,15 +230,14 @@ _add(
         summary="Score-then-FCI hybrid: GES adjacencies, pruned by independence tests and oriented "
         "with FCI's rules. Latent-aware like FCI but usually more accurate on the skeleton. "
         "Returns a PAG.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
             doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
-            "[x, z, y] triples the rule left ambiguous, by 0-based position",
+            "[x, z, y] triples the rule left ambiguous, by 0-based position" + _ENV_PAG_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -225,7 +247,6 @@ _add(
             'records the first separating subset found, and it or `possible_dsep="fast"` visits '
             "the possible-d-separation step in column order."
         ),
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -236,6 +257,15 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
+            concept_param(
+                "edge_removal",
+                doc="Which edges of the GES CPDAG the adjacency search and the "
+                "possible-d-separation step may remove: all = every edge; triangles = only the "
+                "edges in a triangle of the CPDAG, whose ends share a neighbor in it (Ogarrio, "
+                "Spirtes and Ramsey 2016, Section 5). An edge in no triangle then stays and still "
+                "conditions the tests of the other pairs.",
+            ),
+            concept_param("confounded_index"),
             _TEST_SEED,
             concept_param(
                 "max_parents",
@@ -271,7 +301,6 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
                     "1, ... in sorted order.",
-                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
@@ -281,11 +310,13 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            doc="metadata['index_edges'] lists the index's edges as [variable, 'directed'] "
+            "pairs and metadata['changing_variables'] the same variables, whose causal module "
+            "changes across the environments, in column order; metadata['categorical'] lists "
+            "the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -294,7 +325,6 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -317,6 +347,66 @@ _add(
             _TEST_SEED,
         ),
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
+    )
+)
+_add(
+    MethodSpec(
+        name="fci_jci",
+        family="constraint",
+        summary="FCI for data pooled from several domains or regimes, allowing hidden common "
+        "causes: adds the environment index as a variable no data variable causes (Joint Causal "
+        "Inference), which removes edges pooling adds and can orient more. Returns a PAG over the "
+        "data variables and lists the index's edges.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers are read as numbers; text labels are coded 0, 1, ... in sorted order.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+            notes="env becomes a trailing context node, then projected out of the result; its "
+            "edges go in metadata['index_edges'].",
+            missing=True,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['index_edges'] lists the index's edges as [variable, kind] pairs, kind "
+            "directed, partially_directed, or bidirected, in column order; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position, the index numbered "
+            "n_variables",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _POSSIBLE_DSEP,
+            concept_param("confounded_index"),
+            _TEST_SEED,
+        ),
+        references=(
+            "Mooij, Magliacane & Claassen 2020",
+            "Spirtes, Glymour & Scheines 2000",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
+        ),
     )
 )
 _add(
@@ -349,7 +439,6 @@ _add(
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
             "metadata['accepted_sets'], metadata['model_rejected']",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -470,12 +559,10 @@ for _name, _summary, _key, _structure, _kind, _refs in (
                 graph_kind=_kind,
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
-            determinism="stochastic",
             accel="numpy",
             status="supported",
             column_order="relabels",
             tie_break=True,
-            seeded=True,
             params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
             references=_refs,
         )
@@ -492,14 +579,13 @@ _add(
         "column is categorical, or discrete_bic for categorical data, "
         "cond_gauss, the default when some columns are, or degen_gauss for "
         "mixed data. The score is in metadata['score'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -552,7 +638,6 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -568,7 +653,6 @@ _add(
                 "observational environment. Every environment needs an entry. null, with no env, "
                 "is observational data.",
                 nullable=True,
-                aliases=("interventions",),
             ),
             concept_param(
                 "score_func",
@@ -615,7 +699,6 @@ _add(
             "some two environments, in column order; with env, its labels in "
             "metadata['environments']",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -664,7 +747,6 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -698,19 +780,17 @@ _add(
         "cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
         "when set; n_starts above 1 climbs again from the best DAG after random edge changes. "
         "Returns the CPDAG of the best DAG and its score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read" + _RESTART_DOC,
+            "a mixed-data setting read" + _RESTART_DOC + _ENV_CPDAG_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -746,19 +826,17 @@ _add(
         "score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for "
         "mixed data; n_starts above 1 searches again from the best DAG after random edge changes. "
         "Returns the CPDAG of the best DAG and its score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read" + _RESTART_DOC,
+            "a mixed-data setting read" + _RESTART_DOC + _ENV_CPDAG_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -820,7 +898,6 @@ _add(
             doc="metadata['dag'] lists the edges [i, j] of the optimal DAG the search found; "
             "metadata['categorical'] lists the categorical columns a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -857,7 +934,6 @@ _add(
             weighted=True,
             doc="weighted DAG; no score.",
         ),
-        determinism="stochastic",
         accel="torch",
         status="supported",
         column_order="relabels",
@@ -866,7 +942,6 @@ _add(
             "Repeats on one machine with one torch version; on another platform the graph "
             "can differ."
         ),
-        seeded=True,
         params=(
             concept_param(
                 "lambda1",
@@ -891,12 +966,7 @@ _add(
                 default=True,
                 doc="false makes every pair a candidate edge.",
             ),
-            ParamSpec(
-                name="standardize",
-                type="bool",
-                default=False,
-                doc="Scale each column to unit variance first.",
-            ),
+            concept_param("standardize"),
             concept_param(
                 "w_threshold",
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
@@ -1045,7 +1115,6 @@ _add(
         "Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
-        determinism="deterministic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
@@ -1084,6 +1153,7 @@ _add(
                 "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Zheng, Aragam, Ravikumar & Xing 2018",
@@ -1104,7 +1174,6 @@ _add(
         "Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
-        determinism="deterministic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
@@ -1148,6 +1217,7 @@ _add(
                 exclusive_minimum=True,
             ),
             *_CONTINUOUS_PATH_PARAMS,
+            concept_param("standardize"),
         ),
         references=(
             "Bello, Aragam & Ravikumar 2022",
@@ -1183,12 +1253,10 @@ _add(
             graph_kind="cpdag",
             doc="score in metadata['score']",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -1217,12 +1285,10 @@ _add(
             graph_kind="cpdag",
             doc="score in metadata['score']",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="restrict",
@@ -1288,19 +1354,17 @@ _add(
         "categorical, or discrete_bic for categorical data, cond_gauss, "
         "the default when some columns are, or degen_gauss for mixed data. Returns a "
         "CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1322,19 +1386,17 @@ _add(
         "default when every column is categorical, or discrete_bic for categorical "
         "data, cond_gauss, the default when some columns are, or "
         "degen_gauss for mixed data. Returns a CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=_ENV_DATA,
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _ENV_CPDAG_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1347,7 +1409,6 @@ _add(
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
                 "search more chains and run longer.",
-                aliases=("depth",),
             ),
             _SEED,
             _N_STARTS,
@@ -1356,6 +1417,105 @@ _add(
         references=("Lam, Andrews & Ramsey 2022",),
     )
 )
+#: The parent cap of the BOSS or GRaSP phase of boss_fci and grasp_fci.
+_PERMUTATION_FCI_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents in the BOSS or GRaSP phase, at least 0. The test phase only "
+    "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of the PAG. "
+    "null sets no cap.",
+)
+#: The edges of the BOSS or GRaSP CPDAG that the adjacency search of boss_fci and grasp_fci tests.
+_PERMUTATION_FCI_EDGE_REMOVAL = concept_param(
+    "edge_removal",
+    doc="Which edges of the BOSS or GRaSP CPDAG the adjacency search may remove: all = every edge; "
+    "triangles = only the edges in a triangle of the CPDAG, whose ends share a neighbor in it "
+    "(Ogarrio, Spirtes and Ramsey 2016, Section 5). An edge in no triangle then stays and still "
+    "conditions the tests of the other pairs.",
+)
+#: The seed of boss_fci and grasp_fci: the order search's and a randomized test's.
+_PERMUTATION_FCI_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
+    "gpdc.",
+)
+for _name, _summary, _own, _refs in (
+    (
+        "boss_fci",
+        "GFCI with BOSS in place of GES: BOSS adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI, with BOSS's search for "
+        "highly connected variables. Returns a PAG.",
+        (),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",
+            "Zhang 2008",
+        ),
+    ),
+    (
+        "grasp_fci",
+        "GFCI with GRaSP in place of GES: GRaSP adjacencies, pruned by independence tests and "
+        "oriented with FCI's rules. Allows hidden common causes like FCI. Returns a PAG.",
+        (
+            ParamSpec(
+                name="grasp_depth",
+                minimum=1,
+                type="int",
+                default=3,
+                doc="Maximum number of tucks in one chain of moves of the GRaSP phase, at least 1; "
+                "larger depths search more chains and run longer.",
+            ),
+        ),
+        (
+            "Ramsey, Andrews & Spirtes 2025",
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Lam, Andrews & Ramsey 2022",
+        ),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="permutation",
+            summary=_summary,
+            data=_ENV_DATA,
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="pag",
+                doc="metadata['categorical'] lists the categorical columns a mixed-data setting "
+                "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
+                "lists the [x, z, y] triples the rule left ambiguous, by 0-based position"
+                + _ENV_PAG_DOC,
+            ),
+            accel="numpy",
+            status="supported",
+            column_order="relabels",
+            tie_break=True,
+            order_note=(
+                '`tie_break="position"` fires the orientation rules one at a time in column order '
+                "and records the first separating subset found."
+            ),
+            params=(
+                _SCORE_FUNC,
+                _PENALTY_DISCOUNT,
+                _EBIC_GAMMA_STANDARD,
+                _EQUIVALENT_SAMPLE_SIZE,
+                *_own,
+                _INDEP_TEST,
+                _ALPHA,
+                _COLLIDER_RULE,
+                _CATEGORICAL,
+                _PERMUTATION_FCI_EDGE_REMOVAL,
+                concept_param("confounded_index"),
+                _PERMUTATION_FCI_SEED,
+                _N_STARTS,
+                _PERMUTATION_FCI_MAX_PARENTS,
+            ),
+            references=_refs,
+        )
+    )
 _add(
     MethodSpec(
         name="igsp",
@@ -1386,12 +1546,10 @@ _add(
             "I-contradicting edges; metadata['invariance_test'] names the invariance test; "
             "metadata['alpha'] is the level of the conditional-independence tests",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="targets",
@@ -1480,12 +1638,10 @@ _add(
             "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
             "level of the conditional-independence tests",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="targets",
@@ -1552,7 +1708,6 @@ _add(
         output=OutputSpec(
             structure_type="graph", graph_kind="dag", weighted=True, has_ordering=True
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1580,7 +1735,6 @@ _add(
         output=OutputSpec(
             structure_type="graph", graph_kind="dag", weighted=True, has_ordering=True
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels_if_converged",
@@ -1589,7 +1743,6 @@ _add(
             "At few rows per variable, FastICA can reach another solution under a new "
             "column order or on another machine."
         ),
-        seeded=True,
         params=(
             concept_param(
                 "seed",
@@ -1630,7 +1783,6 @@ _add(
             multi=True,
             doc="one StructureOutput per group; shared ordering, per-group weights.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1664,7 +1816,6 @@ _add(
             has_ordering=True,
             doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1700,7 +1851,6 @@ _add(
             has_ordering=True,
             doc="DAG after the edge removal; ordering is the causal order of the sink search.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1739,7 +1889,6 @@ _add(
             has_ordering=True,
             doc="lag_weights (AR, lag 0 = instantaneous) + lag_weights_ma (MA) + order.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1819,7 +1968,6 @@ _add(
             graph_kind=None,
             doc="instantaneous-plus-lagged lag_weights; per-time causal orders in metadata.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1862,8 +2010,6 @@ _add(
             doc="lag graphs for lags 1..tau_max; MCI p_values and statistics, and the PC1 parents, "
             "in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1883,7 +2029,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "alpha",
@@ -1933,8 +2078,6 @@ _add(
             doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max; p_values, statistics, the "
             "lagged parents, conflicting and ambiguous orientations in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1963,9 +2106,9 @@ _add(
                 "collider_rule",
                 default="majority",
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
-                "separating set found; majority = fewer than half of the separating subsets hold "
-                "the middle; conservative = none does. The default majority is tigramite's.",
-                choice_aliases=(("none", "sepsets"),),
+                "separating set found; majority and conservative = at least one subset separates "
+                "the ends and fewer than half (majority) or none (conservative) of them hold the "
+                "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
             _CATEGORICAL,
@@ -1973,8 +2116,8 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a skeleton or collider test takes beyond the default "
-                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
-                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "conditions, the lagged parents of both ends, at least 0; max_depth caps the "
+                "lagged phase. null sets no limit. A cap bounds the number of "
                 "tests and can keep links that a larger conditioning set would remove.",
             ),
             concept_param(
@@ -1986,6 +2129,111 @@ _add(
             ),
         ),
         references=("Runge 2020",),
+    )
+)
+_add(
+    MethodSpec(
+        name="jpcmciplus",
+        family="temporal",
+        summary="J-PCMCI+ for time series from several datasets that differ through measured or "
+        "hidden contexts: lagged and same-step causal links between the system variables, and "
+        "the context links. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="panel",
+                    doc="One time series per dataset, same columns, row = step (repeat the flag).",
+                ),
+            ),
+            layout="each (n_samples, n_variables); one array per dataset, row = time step",
+            steps=True,
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max over the system variables; "
+            "p_values, statistics, the lagged parents, conflicting and ambiguous orientations, "
+            "context_links, and the dummies' links in metadata.",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
+        params=(
+            ParamSpec(
+                name="time_contexts",
+                type="str_list",
+                default=None,
+                doc="The columns that hold time contexts, each the same in every dataset at each "
+                "step: column names or 0-based positions. null lists none.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="space_contexts",
+                type="str_list",
+                default=None,
+                doc="The columns that hold space contexts, each constant within a dataset: column "
+                "names or 0-based positions. null lists none.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="time_dummy",
+                type="bool",
+                default=None,
+                doc="Add the one-hot dummy of the time step, which stands in for hidden time "
+                "contexts and needs datasets of one length, aligned in time, with more than one "
+                "step after the first 2 * tau_max. null adds it when the datasets allow it, true "
+                "requires it and raises when they do not, and false leaves it out.",
+                nullable=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 0 to tau_max are tested.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this. The default is pcmciplus's.",
+            ),
+            concept_param(
+                "fdr_method",
+                doc="How the p-values of the lagged links between system variables are corrected "
+                "for the number of links tested: none keeps them as tested; fdr_bh replaces them "
+                "with their Benjamini-Hochberg adjusted values over all those links together. The "
+                "links do not change: the skeleton passes decide them at alpha.",
+            ),
+            concept_param(
+                "collider_rule",
+                default="majority",
+                doc="How a same-step collider between system variables is judged, as in "
+                "pcmciplus; a triple can open with a context or a dummy.",
+            ),
+            concept_param(
+                "indep_test",
+                choices=CONTINUOUS_INDEP_TESTS,
+                doc="Conditional-independence test, as in pcmciplus: a test of continuous data, as "
+                "the dummies enter it as numeric one-hot columns. null picks fisherz.",
+            ),
+            _TEST_SEED,
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a skeleton or collider test takes beyond the default "
+                "conditions, the parents of both ends, at least 0; max_depth caps the lagged "
+                "phase. null sets no limit. A cap bounds the number of tests and can keep links "
+                "that a larger conditioning set would remove.",
+            ),
+            concept_param(
+                "max_depth",
+                doc="The maximum conditioning-set size of every test of the lagged phase, PC1 as "
+                "in pcmci, at least 0: 0 runs only unconditional tests, and null sets no limit. "
+                "The later passes add the parents of both ends to every test, which max_p_global "
+                "caps.",
+            ),
+        ),
+        references=("Gunther et al. 2023", "Runge 2020"),
     )
 )
 _add(
@@ -2011,8 +2259,6 @@ _add(
             "with its marks, p_values, statistics, the preliminary parents, and the conflicting "
             "marks in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2041,7 +2287,7 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a test takes beyond the default conditions, the parents "
-                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "of both ends, at least 0; max_depth elsewhere counts the whole "
                 "conditioning set. null sets no limit. A cap bounds the number of tests and can "
                 "keep links that a larger conditioning set would remove.",
             ),
@@ -2071,7 +2317,6 @@ _add(
             doc="lag_weights at lags 1..tau_max (the regression coefficients of the significant "
             "links, no lag 0); no ordering.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2090,7 +2335,6 @@ _add(
                 "link is kept when its adjusted p-value is at most alpha.",
             ),
         ),
-        dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
@@ -2116,7 +2360,6 @@ _add(
             doc="a dag at lag 0 and lag graphs for lags 1..tau_max, with their lag_weights; "
             "h_final and edges_removed in metadata.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2170,6 +2413,7 @@ _add(
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
                 "this value, above 1, the weight the fit starts from.",
             ),
+            concept_param("standardize"),
         ),
         references=(
             "Pamfil et al. 2020",
@@ -2221,7 +2465,6 @@ _add(
             "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
             "statistic, divided by its mean under independence, of each test.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2268,7 +2511,6 @@ _add(
             "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
             "statistic, divided by its mean under independence, of each test.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2297,7 +2539,6 @@ _add(
             has_latents=True,
             doc="observed + latent nodes; metadata clusters, cluster_order + unordered.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="can_change",
@@ -2374,7 +2615,6 @@ _add(
             doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
             "which share a hidden common cause.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2404,7 +2644,6 @@ _add(
             doc="PAG over the observed variables; o-o joins the variables a hidden common "
             "cause leaves unordered, and metadata partial_order nests them.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2451,7 +2690,6 @@ _add(
             "common cause or a causal path, metadata latent_pairs lists those pairs, and "
             "cycle_edges the edges dropped from directed cycles.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2520,22 +2758,28 @@ _LINK_RULE = (
     "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
     "Tiers and allowed hold at every lag; a variable's links to its own past stay allowed. "
 )
+_ENV_FREE = "With env, the environment index is unconstrained."
 _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
+    "fci_jci": _SKELETON_RULE + _PAG_MARKS + "The environment index is unconstrained.",
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
-    "and never removes a required pair. " + _PAG_MARKS,
-    "ges": _MOVE_RULE + _CLASS_RULE,
+    "and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
+    "boss_fci": "The BOSS phase searches as boss does; the test phase starts from the adjacencies "
+    "BOSS found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
+    "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
+    "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
+    "ges": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
-    "hc": _MOVE_RULE + _CLASS_RULE,
-    "tabu": _MOVE_RULE + _CLASS_RULE,
+    "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
+    "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
-    "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
-    "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
+    "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     **dict.fromkeys(
         ("igsp", "ut_igsp"),
         "Every DAG the search visits keeps the required edges and holds no forbidden one. "
@@ -2570,6 +2814,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
     "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
     "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "jpcmciplus": _LINK_RULE + "It reads the knowledge over the system variables, by name or by "
+    "position among them, as pcmciplus does; the contexts bring their own rule, that no system "
+    "variable causes a context and no two contexts are linked.",
     "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
     "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
     "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
@@ -2602,24 +2849,17 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors: every part.
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
 _MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(KNOWLEDGE_PARTS)}. {_how}",
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={
-            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
-            "knowledge": _KNOWLEDGE_PARTS[_name],
-        }
+        update={"params": (*REGISTRY[_name].params, *_depth, _knowledge)}
     )
 
 #: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
@@ -2642,19 +2882,11 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         )
 
 
-# Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
-for _name in CONCEPTS["categorical"].suitable:
-    if _name in ("igsp", "ut_igsp"):
-        continue
-    _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
-    REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
-
-
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
-    "cdnod": ("conflicts",),
+    "cdnod": ("conflicts", "index_edges", "changing_variables"),
+    "fci_jci": ("index_edges",),
     "icp": (
         "target",
         "parents",
@@ -2668,9 +2900,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
+    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
-        ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
+        ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),
+    **dict.fromkeys(("gfci", "boss_fci", "grasp_fci"), ("index_edges",)),
     "gnies": ("score", "changing_variables", "environments"),
     "exact_search": ("dag",),
     "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
@@ -2683,6 +2917,10 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "dynotears": ("h_final", "edges_removed"),
     "pcmci": ("p_values", "statistics", "parents"),
     "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
+    "jpcmciplus": (
+        *("p_values", "statistics", "parents", "conflicts"),
+        *("context_links", "index_edges", "time_index_edges", "time_dummy"),
+    ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "gin": ("clusters", "cluster_order", "unordered"),

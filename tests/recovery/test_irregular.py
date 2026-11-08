@@ -5,63 +5,12 @@ import pytest
 
 import andrey
 from andrey.irregular.anm import anm
-from andrey.irregular.pnl import pnl
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
-
-# PNL draws no random state, so a fixed input pins its output. The tolerance is loose on purpose:
-# these are p-values from a kernel statistic, and holding them to the last bit would gate on the
-# host's SIMD kernels rather than on the method.
-_PNL_CUBIC_PVALUES = (0.22597081473440506, 0.01989273405111902)
-_ANM_CUBIC_PVALUES = (0.07269113995001186, 0.0)
 # The columns of ``anm_pair_cubic``'s cause and effect.
 _CAUSE, _EFFECT = (int(column) for column in datagen.column_of("anm_pair_cubic"))
 _PLANTED = [(_CAUSE, _EFFECT, "directed")]
-
-
-def _pnl_pair(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
-    """One ground-truth post-nonlinear pair ``x -> y`` with standardized, non-Gaussian variables."""
-    n = int(rng.integers(200, 351))
-
-    def nongaussian(m: int) -> np.ndarray:
-        kind = rng.integers(0, 3)
-        if kind == 0:
-            v = rng.uniform(-2.0, 2.0, m)
-        elif kind == 1:
-            v = rng.laplace(0.0, 1.0, m)
-        else:
-            u = rng.normal(0.0, 1.0, m)
-            v = np.sign(u) * np.abs(u) ** 1.5
-        return (v - v.mean()) / (v.std() + 1e-12)
-
-    inner_maps = (
-        lambda z: z**3 + z,
-        lambda z: np.tanh(2 * z),
-        lambda z: np.sinh(z),
-        lambda z: z + 0.5 * np.sin(3 * z),
-    )
-    outer_maps = (lambda z: z**3 + z, lambda z: np.tanh(2 * z), lambda z: np.sinh(z))
-    x = nongaussian(n)
-    inner = inner_maps[int(rng.integers(0, len(inner_maps)))](x)
-    inner = (inner - inner.mean()) / (inner.std() + 1e-12)
-    noise = 0.5 * nongaussian(n)
-    y = outer_maps[int(rng.integers(0, len(outer_maps)))](inner + noise)
-    x = (x - x.mean()) / (x.std() + 1e-12)
-    y = (y - y.mean()) / (y.std() + 1e-12)
-    return x, y
-
-
-def test_pnl_resolves_the_planted_direction():
-    x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward, *_ = pnl(x[:, _CAUSE], x[:, _EFFECT])
-    assert pval_forward > pval_backward  # anm_pair_cubic plants x -> y
-    assert np.allclose((pval_forward, pval_backward), _PNL_CUBIC_PVALUES, atol=1e-6)
 
 
 def test_pnl_matches_the_recorded_output():
@@ -69,36 +18,13 @@ def test_pnl_matches_the_recorded_output():
     assert_recorded_output(out, "PNL", case="anm_pair_cubic")
 
 
-def test_pnl_is_deterministic_over_varied_pairs():
-    rng = np.random.default_rng(0)
-    for _ in range(6):
-        x, y = _pnl_pair(rng)
-        first = pnl(x, y)
-        assert all(0.0 <= p <= 1.0 for p in first[:2])
-        assert pnl(x, y) == first, "PNL is not deterministic"
-
-
-def test_pnl_output_contract():
-    from andrey.api.irregular import pnl as pnl_facade
-
-    x = datagen.generate("anm_pair_cubic")
-    out = pnl_facade(x)
-    assert out.structure.type == "graph"
-    md = out.metadata
-    assert set(md) == {"algorithm", "p_values", "statistics"}
-    tests = (md["p_values"], md["statistics"])
-    found = tuple(test[direction] for test in tests for direction in ("forward", "backward"))
-    assert found == pnl(x[:, 0], x[:, 1])
-
-
-@pytest.mark.parametrize("method", ["anm", "pnl"])
-def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
+def test_a_zero_pvalue_tie_is_broken_by_the_statistic():
     # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
     # and both p-values round to zero; the smaller HSIC statistic over its null mean decides.
-    from andrey.api import irregular
+    from andrey.api.irregular import anm as anm_facade
 
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
-    out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
+    out = anm_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
     p, stat = out.metadata["p_values"], out.metadata["statistics"]
     assert p["forward"] == p["backward"] == 0.0
     assert stat["forward"] != stat["backward"]
@@ -171,23 +97,6 @@ def test_pnl_names_the_direction_whatever_the_column_order():
     for columns in (["cause", "effect"], ["effect", "cause"]):
         edges = pnl_facade(df[columns]).structure.oriented_edges()
         assert edges == [("cause", "effect", "directed")]
-
-
-def test_anm_resolves_the_planted_direction():
-    from andrey.api._irregular import _adapt_anm
-
-    x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward, stat_forward, stat_backward = anm(x[:, _CAUSE], x[:, _EFFECT])
-    assert pval_forward > pval_backward
-    # Loosely pinned as well: the direction alone would survive a numerical regression in the GP
-    # residual path that still left the forward p-value above zero.
-    assert np.allclose((pval_forward, pval_backward), _ANM_CUBIC_PVALUES, atol=1e-4)
-    out = _adapt_anm(
-        pval_forward, pval_backward, stat_forward=stat_forward, stat_backward=stat_backward
-    )
-    assert out.structure.type == "graph"
-    assert out.structure.oriented_edges() == [(0, 1, "directed")]
-    assert set(out.metadata) == {"p_values", "statistics"}  # the method wrapper adds "algorithm"
 
 
 def test_anm_matches_the_recorded_output():

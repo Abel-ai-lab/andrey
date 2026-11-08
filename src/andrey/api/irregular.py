@@ -23,13 +23,14 @@ from ._adapt import (
     with_labels,
 )
 from ._irregular import (
-    _adapt_anm,
-    _adapt_bottom_up_parce,
-    _adapt_pnl,
-    _adapt_rcd,
+    adapt_bottom_up_parce,
+    adapt_rcd,
+    pairwise_output,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
@@ -63,6 +64,44 @@ def _complete_pairs(
     return kept, rows_metadata({rows: 2})
 
 
+def fit_pair(
+    method: str,
+    data: npt.ArrayLike,
+    native: Callable[[np.ndarray, np.ndarray], tuple[float, float, float, float]],
+    alpha: float | None,
+    *,
+    standardize: bool = False,
+) -> StructureOutput:
+    """Run ``method``'s pairwise test ``native``, ANM's or PNL's, both ways on ``data``.
+
+    ``data`` must be a table of two columns; the tests read the rows where both are observed
+    (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
+    magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
+    mean and unit variance. ``native`` returns the forward and backward p-values and statistics,
+    and the result holds the edge they choose with ``alpha`` (:func:`pairwise_output`).
+    """
+    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
+        raise ValueError(
+            f"{method} expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
+        )
+    X = data_matrix(data, method=method, missing=True)
+    labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, method)
+    if standardize:
+        X = X / np.abs(X).max(axis=0)
+        X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
+    pval_forward, pval_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
+    return pairwise_output(
+        pval_forward,
+        pval_backward,
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
+        extra=rows,
+    )
+
+
 @method_spec("anm")
 def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
@@ -93,10 +132,24 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Raises
     ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data``
-        does not have 2 columns.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -182,25 +235,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """
     from andrey.irregular.anm import anm as _native
 
-    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
-        raise ValueError(
-            f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
-        )
-    X = data_matrix(data, method="anm", missing=True)
-    labels = column_labels(data)
-    X, rows = _complete_pairs(X, labels, "anm")
-    X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
-    Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
-    pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
-    return _adapt_anm(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=rows,
-    )
+    return fit_pair("anm", data, _native, alpha, standardize=True)
 
 
 @method_spec("pnl")
@@ -232,10 +267,27 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Raises
     ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data``
-        does not have 2 columns.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns.
+
+    Warns
+    -----
+    PerformanceWarning
+        When the worker threads asked for would hold more than 4 GiB of ``n x n`` matrices, so fewer
+        of them run; each message warns once per process.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -334,23 +386,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """
     from andrey.irregular.pnl import pnl as _native
 
-    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
-        raise ValueError(
-            f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
-        )
-    X = data_matrix(data, method="pnl", missing=True)
-    labels = column_labels(data)
-    X, rows = _complete_pairs(X, labels, "pnl")
-    pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
-    return _adapt_pnl(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=rows,
-    )
+    return fit_pair("pnl", data, _native, alpha)
 
 
 @method_spec("rcd")
@@ -363,17 +399,17 @@ def rcd(
     shapiro_alpha: float = 0.01,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a linear non-Gaussian graph with hidden common causes by repetitive causal discovery.
+    """Learn a PAG of a linear non-Gaussian model with hidden common causes by RCD.
 
-    RCD [1]_ repeatedly regresses variables on candidate ancestors and tests the residuals for
-    independence, to find each variable's ancestors, then its parents, and finally the pairs that
-    share a hidden common cause.
+    Repetitive causal discovery (RCD) [1]_ repeatedly regresses variables on candidate ancestors and
+    tests the residuals for independence, to find each variable's ancestors, then its parents, and
+    finally the pairs that share a hidden common cause.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observations, one variable per column. A DataFrame's column names become the structure's
-        ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``.
     max_depth : int, default=2
         The maximum conditioning-set size of an ancestor test, at least ``1``: the most variables
         regressed out together when testing whether one variable is an ancestor of another. Larger
@@ -409,13 +445,26 @@ def rcd(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
-        with the parents the search found.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 6
+        rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle with the
+        parents the search found.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -478,14 +527,14 @@ def rcd(
         shapiro_alpha=shapiro_alpha,
         constraints=constraints,
     )
-    return with_labels(_adapt_rcd(model), labels)
+    return with_labels(adapt_rcd(model), labels)
 
 
 @method_spec("bottom_up_parce_lingam")
 def bottom_up_parce_lingam(
     data: npt.ArrayLike, *, alpha: float = 0.05, knowledge: Knowledge | None = None
 ) -> StructureOutput:
-    """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
+    """Learn a PAG and a partial causal order of linear non-Gaussian data with hidden common causes.
 
     BottomUpParceLiNGAM [1]_ finds sinks one at a time, from the last variable in the causal order
     up. Where a hidden common cause hides the order, it leaves the variables unordered rather than
@@ -494,8 +543,8 @@ def bottom_up_parce_lingam(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observations, one variable per column. A DataFrame's column names become the structure's
-        ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
         across the remaining variables, in ``(0, 1)``. The default is the level of the method's
@@ -518,17 +567,31 @@ def bottom_up_parce_lingam(
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
         ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["partial_order"]``
         gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
-        holds the edge coefficients.
+        holds the edge coefficients. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 6 rows
+        or no more rows than columns. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -607,8 +670,6 @@ def bottom_up_parce_lingam(
     constraints = resolve(knowledge, X.shape[1], labels, method="bottom_up_parce_lingam")
     model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
-        return with_labels(_adapt_bottom_up_parce(model), labels)
+        return with_labels(adapt_bottom_up_parce(model), labels)
     one_way = constraints.forbidden & ~constraints.forbidden.T
-    return with_labels(
-        _adapt_bottom_up_parce(model, one_way, required=constraints.required), labels
-    )
+    return with_labels(adapt_bottom_up_parce(model, one_way, required=constraints.required), labels)

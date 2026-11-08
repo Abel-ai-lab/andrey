@@ -5,27 +5,28 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
-from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
-from andrey.core.knowledge import column_position
+from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import node_labels, relabel
+from andrey.core.structure import EDGE_TYPES, column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from andrey.core.knowledge import Constraints, Knowledge
     from andrey.core.output import JSONValue
 
 
 #: The methods that accept missing values, by deleting rows per test, named by the refusal of
 #: every other method.
-TESTWISE_METHODS = ("pc", "fci", "cdnod", "iamb", "inter_iamb", "mmpc")
+TESTWISE_METHODS = ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc")
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 
 
@@ -60,10 +61,10 @@ def data_matrix(
 ) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
-    Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
-    the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
-    ``inf``, or a column is constant: no method can estimate a variance or a dependence from such
-    data. The message names every constant column.
+    Raises ``ValueError``, naming ``name``, when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), the values are not numeric, the array is not
+    2-D, it has fewer than ``min_rows`` rows, it holds ``inf``, or a column is constant: no method
+    can estimate a variance or a dependence from such data. The message names every constant column.
 
     ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
     delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
@@ -241,6 +242,22 @@ def data_kind(name: str) -> str:
     return "continuous"
 
 
+def check_same_data(method: str, score_func: str, indep_test: str) -> None:
+    """Raise ``ValueError`` unless ``score_func`` and ``indep_test`` read the same kind of data.
+
+    A method that runs a score search and tests on the same data needs both to read it as
+    categories, as mixed data, or as continuous data (:func:`data_kind`).
+    """
+    if data_kind(score_func) != data_kind(indep_test):
+        raise ValueError(
+            f"{method}'s score and test must read the data alike: score_func='bdeu' or "
+            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
+            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
+            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
+            f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
+        )
+
+
 #: The most distinct whole numbers a column may hold for :func:`warn_category_codes` to name it as
 #: possible category codes.
 MAX_CATEGORIES = 10
@@ -269,7 +286,6 @@ def default_score(
     score_func: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the score of a score search on ``data`` and the ``categorical`` it reads.
 
@@ -277,12 +293,11 @@ def default_score(
     column types (:func:`declared_columns`): ``"bdeu"`` when every column is categorical,
     ``"cond_gauss"``, the conditional Gaussian BIC, when some are, returned with those columns by
     position so that :func:`checked_data` reads exactly them, else ``"bic"``, the linear-Gaussian
-    BIC. A search that takes only some scores passes them as ``choices``: a pick outside them gives
-    ``"bic"``.
+    BIC.
     """
     if score_func is not None:
         return score_func, categorical
-    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"), choices)
+    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"))
 
 
 def default_test(
@@ -290,42 +305,32 @@ def default_test(
     indep_test: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the conditional-independence test on ``data`` and the ``categorical`` it reads.
 
     A given ``indep_test`` returns as it is, with ``categorical``. ``None`` picks from the declared
     column types (:func:`declared_columns`): ``"gsq"``, the G-square test, when every column is
     categorical, ``"cond_gauss"``, the conditional Gaussian likelihood-ratio test, when some are,
-    returned with those columns by position, else ``"fisherz"``. A search that takes only some
-    tests passes them as ``choices``: a pick outside them gives ``"fisherz"``.
+    returned with those columns by position, else ``"fisherz"``.
     """
     if indep_test is not None:
         return indep_test, categorical
-    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"), choices)
+    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"))
 
 
 def _by_declared_types(
     data: npt.ArrayLike,
     categorical: Sequence[str | int] | None,
     names: tuple[str, str, str],
-    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
-    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types.
-
-    A pick that ``choices`` leaves out is the continuous setting.
-    """
+    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types."""
     continuous, every, some = names
     mask = declared_columns(data, categorical)
     if mask is None:
         return continuous, categorical
     if mask.all():
-        picked, columns = every, None
-    else:
-        picked, columns = some, np.flatnonzero(mask).tolist()
-    if choices is not None and picked not in choices:
-        return continuous, categorical
-    return picked, columns
+        return every, None
+    return some, np.flatnonzero(mask).tolist()
 
 
 def _listed_mask(data: npt.ArrayLike, categorical: object) -> np.ndarray:
@@ -340,7 +345,7 @@ def _listed_mask(data: npt.ArrayLike, categorical: object) -> np.ndarray:
         shape = ()
     if len(shape) != 2:
         data_matrix(data)
-    return _column_mask(categorical, column_labels(data), shape[1])
+    return column_mask(categorical, column_labels(data), shape[1])
 
 
 def checked_data(
@@ -365,10 +370,11 @@ def checked_data(
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
     and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
 
-    Raises ``ValueError`` when two columns share a name (:func:`column_labels`), when
-    ``categorical`` lists a column ``data`` lacks, and, for a continuous setting, when a column is
-    declared categorical (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by
-    a DataFrame's ``category``, ``bool``, or text type. ``[]`` declares none.
+    Raises ``ValueError`` when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), when ``categorical`` lists a column ``data``
+    lacks, and, for a continuous setting, when a column is declared categorical
+    (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by a DataFrame's
+    ``category``, ``bool``, or text type. ``[]`` declares none.
     """
     column_labels(data)
     setting = f"{option}={value!r}"
@@ -411,6 +417,177 @@ def checked_data(
         f"type and leave {option} as None, which picks a categorical or mixed-data {what}",
     )
     return X, None
+
+
+def fit_inputs(
+    data: npt.ArrayLike,
+    option: str,
+    value: str,
+    categorical: object,
+    knowledge: Knowledge | None,
+    *,
+    method: str,
+    missing: bool = False,
+    index_categorical: bool = False,
+) -> tuple[np.ndarray, np.ndarray | None, tuple[str, ...] | None, Constraints | None]:
+    """Return a fit's data matrix, its categorical-column mask, its column labels, and knowledge.
+
+    The data are checked for the setting ``option=value`` (:func:`checked_data`, with
+    ``index_categorical``, ``method``, and ``missing``), and ``knowledge`` is resolved against
+    their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those raise, in that order.
+    """
+    X, mask = checked_data(
+        data,
+        categorical,
+        option,
+        value,
+        index_categorical=index_categorical,
+        method=method,
+        missing=missing,
+    )
+    labels = column_labels(data)
+    return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
+
+
+def env_index(
+    data: Any, env: npt.ArrayLike | None, *, method: str
+) -> tuple[Any, np.ndarray | None]:
+    """Return ``data`` and the environment index a search reads from ``env``.
+
+    ``env`` is checked as :func:`~andrey.core.environments.normalize_env_targets` checks it, which
+    also returns ``data`` without a column ``env`` names. Text labels become their codes ``0, 1,
+    ...`` in sorted order; numbers, such as a time step, stay as given, coerced to ``float64``.
+    ``None`` gives ``data`` and ``None``.
+    """
+    if env is None:
+        return data, None
+    from andrey.core.environments import normalize_env_targets
+
+    data, codes, labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method=method
+    )
+    text = any(isinstance(label, str) for label in labels)
+    return data, codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
+
+
+def index_column(
+    X: np.ndarray,
+    mask: np.ndarray | None,
+    constraints: Constraints | None,
+    index: np.ndarray | None,
+    option: str,
+    value: str,
+) -> tuple[np.ndarray, np.ndarray | None, Constraints | None, int | None]:
+    """Append the environment ``index`` to ``X`` as a last column, for the setting ``option=value``.
+
+    Returns the data, their categorical-column mask, the knowledge over their columns, and the
+    index's column. A categorical or mixed-data setting reads the index as categories, so it must
+    hold whole numbers (:func:`check_categories`, which raises ``ValueError``), and a mask marks it
+    categorical. The knowledge leaves the index unconstrained
+    (:meth:`~andrey.core.knowledge.Constraints.padded`). ``None``, or an index with one value, one
+    environment and nothing to condition on, gives ``X``, ``mask``, and ``constraints`` and no
+    column.
+    """
+    if index is None:
+        return X, mask, constraints, None
+    if data_kind(value) != "continuous":
+        check_categories(index, None, f"{option}={value!r}", name="env")
+    if np.ptp(index) == 0:
+        return X, mask, constraints, None
+    d = X.shape[1]
+    return (
+        np.column_stack([X, index]),
+        None if mask is None else np.append(mask, True),
+        None if constraints is None else constraints.padded(d + 1),
+        d,
+    )
+
+
+def split_index(
+    structure: GraphStructure, column: int | None
+) -> tuple[GraphStructure, list[tuple[int, str]]]:
+    """Drop the index ``column``, the last one, from ``structure``; return the rest and its edges.
+
+    Each edge is ``(variable, kind)``, in column order, with the kind of the edge read from the
+    index (:data:`~andrey.core.structure.EDGE_TYPES`): ``"directed"`` for ``index -> variable``,
+    ``"partially_directed"`` for ``index o-> variable``, and ``"bidirected"`` for
+    ``index <-> variable``. ``None`` gives ``structure`` and no edges.
+    """
+    if column is None:
+        return structure, []
+    marks = structure.to_numpy()
+    edges = [
+        (int(j), EDGE_TYPES[(int(marks[column, j]), int(marks[j, column]))][0])
+        for j in np.flatnonzero(marks[column] != NULL)
+    ]
+    return GraphStructure.from_numpy(marks[:column, :column].copy(), kind=structure.kind), edges
+
+
+def cpdag_search(
+    name: str,
+    engine: Callable[..., tuple[GraphStructure, float]],
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | None,
+    *,
+    score_func: str | None,
+    categorical: Sequence[str | int] | None,
+    knowledge: Knowledge | None,
+    **settings: object,
+) -> StructureOutput:
+    """Run the score search ``name``, whose ``engine`` returns a CPDAG and its score, on ``data``.
+
+    With ``env``, the environment index joins the data as a last column that no other column
+    causes (the engine's ``sources``), and leaves the result again: its edges, and the variables
+    they reach, go in ``metadata``. ``settings`` reach ``engine``. An ``n_perturbations`` of
+    ``None``, the default of ``hc`` and ``tabu``, becomes one change per data variable, which
+    ``metadata`` records when ``n_starts`` is above 1.
+    """
+    assert score_func is not None  # method_spec picks it from the column types
+    data, index = env_index(data, env, method=name)
+    X, mask, labels, constraints = fit_inputs(
+        data,
+        "score_func",
+        score_func,
+        categorical,
+        knowledge,
+        method=name,
+        # One environment adds no index column (index_column), so it is not a categorical one.
+        index_categorical=index is not None and np.ptp(index) > 0,
+    )
+    if "n_perturbations" in settings and settings["n_perturbations"] is None:
+        settings["n_perturbations"] = X.shape[1]  # one change per data variable
+    augmented, augmented_mask, augmented_constraints, column = index_column(
+        X, mask, constraints, index, "score_func", score_func
+    )
+    with copies_named(labels, index_namer(labels, column)):
+        cpdag, score = engine(
+            augmented,
+            score_func=score_func,
+            categorical=augmented_mask,
+            constraints=augmented_constraints,
+            sources=() if column is None else (column,),
+            **settings,
+        )
+    cpdag, index_edges = split_index(cpdag, column)
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    if "n_perturbations" in settings and settings["n_starts"] != 1:
+        metadata["n_perturbations"] = settings["n_perturbations"]
+    if env is not None:
+        variable = label_of(labels)
+        metadata["index_edges"] = [[variable(j), kind] for j, kind in index_edges]
+        metadata["changing_variables"] = [variable(j) for j, _ in index_edges]
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def index_namer(labels: tuple[str, ...] | None, column: int | None) -> Callable[[int], str] | None:
+    """Name the columns of the data a search reads, for a copies error; ``None`` without ``column``.
+
+    The index ``column`` is ``env``, and the others are named by :func:`column_namer`.
+    """
+    if column is None:
+        return None
+    name = column_namer(labels)
+    return lambda j: "env" if j == column else name(j)
 
 
 def categories_as_numbers(
@@ -484,9 +661,9 @@ def mixed_matrix(
         mask = typed if typed.size else np.zeros(X.shape[1], dtype=bool)
     elif names is None:
         X = data_matrix(data, name=name, method=method, missing=missing, reads_categories=True)
-        mask = _column_mask(categorical, None, X.shape[1])
+        mask = column_mask(categorical, None, X.shape[1])
     else:
-        mask = _column_mask(categorical, labels, len(names))
+        mask = column_mask(categorical, labels, len(names))
         X = data_matrix(
             _encode_categories(data, mask, setting, name, method=method, missing=missing),
             name=name,
@@ -563,30 +740,17 @@ def _categorical_dtypes(data: object) -> np.ndarray:
     return np.array([categorical(dtype) for dtype in dtypes], dtype=bool)
 
 
-def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) -> np.ndarray:
-    """Mark the columns ``categorical`` lists by label or 0-based position."""
-    if isinstance(categorical, (str, bytes)) or not isinstance(
-        categorical, (list, tuple, np.ndarray)
-    ):
+def column_mask(
+    columns: object, labels: tuple[str, ...] | None, d: int, name: str = "categorical"
+) -> np.ndarray:
+    """Mark the columns the argument ``name`` lists by label or 0-based position."""
+    if isinstance(columns, (str, bytes)) or not isinstance(columns, (list, tuple, np.ndarray)):
         raise TypeError(
-            "categorical must be a list of column names or positions, got "
-            f"{type(categorical).__name__}"
+            f"{name} must be a list of column names or positions, got {type(columns).__name__}"
         )
     mask = np.zeros(d, dtype=bool)
-    for item in categorical:
-        if isinstance(item, str) or (
-            isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_))
-        ):
-            mask[
-                column_position(
-                    item if isinstance(item, str) else int(item), labels, d, "categorical"
-                )
-            ] = True
-        else:
-            raise TypeError(
-                "categorical must list column names or 0-based positions, got "
-                f"{type(item).__name__}"
-            )
+    for item in columns:
+        mask[column_position(as_node(item, name), labels, d, name)] = True
     return mask
 
 
@@ -646,6 +810,14 @@ def int_in_range(value: object, name: str, low: int, high: int | None = None) ->
         accepted = f"at least {low}" if high is None else f"from {low} to {high}"
         raise ValueError(f"{name} must be an int {accepted}, got {value}")
     return int(value)
+
+
+def tabu_cap(max_tabu: int | None, tabu_length: int) -> int:
+    """Return the non-improving moves a tabu search allows: ``max_tabu``, or else ``tabu_length``.
+
+    Raises as :func:`int_in_range` does unless the number is from 1 to ``tabu_length``.
+    """
+    return int_in_range(tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length)
 
 
 def flag(value: object, name: str) -> bool:
@@ -739,21 +911,6 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
-def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels; ``None`` for arrays.
-
-    Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
-    name becomes text, and ``ValueError`` names each label two columns share
-    (:func:`~andrey.core.structure.node_labels`).
-    """
-    columns = getattr(data, "columns", None)
-    if columns is None:
-        return None
-    names = list(columns)
-    return None if names == list(range(len(names))) else node_labels(names)
-
-
 def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     """Name a column position by its label in ``labels``, quoted, or by its number.
 
@@ -763,6 +920,13 @@ def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     if labels is None:
         return str
     return lambda j: repr(labels[j]) if j < len(labels) else str(j)
+
+
+def label_of(labels: tuple[str, ...] | None) -> Callable[[int], str | int]:
+    """Name a column position as metadata names nodes: by its label, or by its number."""
+    if labels is None:
+        return int
+    return lambda j: labels[j]
 
 
 @contextlib.contextmanager

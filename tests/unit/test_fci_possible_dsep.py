@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.constraint.pc import adjacency_search
 from andrey.core import NULL, ci
 from andrey.core.ci import make_indep_test
 from andrey.data import sample_discrete, sample_mixed, sample_scm
@@ -59,6 +60,18 @@ def test_unknown_possible_dsep_raises(method, value):
         )
 
 
+@pytest.mark.parametrize("seed", [24, 66])
+def test_relabeled_categories_keep_the_order_free_pag(seed):
+    """Under a categorical test the order-free step visits the nodes in the rank order of the
+    columns read as categories, so relabeling every column's categories keeps the PAG."""
+    x = sample_discrete(d=6, n=300, seed=seed, density=3.0, categories=(3, 4)).data
+    relabeled = (x + 1) % (x.max(axis=0) + 1)  # 0 -> 1 -> ... -> 0 in each column
+    fits = [
+        andrey.fci(data, indep_test="chisq", possible_dsep="order_free") for data in (x, relabeled)
+    ]
+    np.testing.assert_array_equal(fits[1].structure.to_numpy(), fits[0].structure.to_numpy())
+
+
 def _rebuilt_per_call(marks, test, alpha, sepsets):
     """``_remove_in_node_order`` with the lists and reach built for every possible-d-sep call."""
     n = marks.shape[0]
@@ -87,9 +100,9 @@ def test_the_lists_are_built_once_per_version_of_the_marks(monkeypatch, draw):
     alpha = 0.05
     x = sample_scm(graph="erdos_renyi", scale="standardize", **draw).data
     test = make_indep_test("fisherz", x)
-    support, sepsets = fci._fast_adjacency_search(x, test, alpha)
-    marks = fci._circle_pag(support)
-    fci._orient_colliders(marks, sepsets)
+    support, sepsets, _ = adjacency_search(test, x.shape[1], alpha)
+    marks = fci.circle_pag(support)
+    fci.orient_colliders(marks, sepsets)
 
     reference, reference_sepsets = marks.copy(), dict(sepsets)
     _rebuilt_per_call(reference, test, alpha, reference_sepsets)

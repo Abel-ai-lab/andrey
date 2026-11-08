@@ -1,80 +1,16 @@
-"""Adapter tests for ``andrey.api._temporal`` (VAR / VARMA / Granger).
-
-The fitted models are duck-typed: a ``types.SimpleNamespace`` carrying the same attributes
-(``adjacency_matrices_`` / ``causal_order_``) exercises the adapters.
-"""
+"""Adapter tests for ``andrey.api._temporal`` (VARMA-LiNGAM, Granger, Longitudinal LiNGAM)."""
 
 from __future__ import annotations
-
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from andrey.api._temporal import (
-    _adapt_granger,
-    _adapt_longitudinal_lingam,
-    _adapt_var_lingam,
-    _adapt_varma_lingam,
-)
+from andrey.api._temporal import adapt_granger, adapt_longitudinal_lingam, adapt_varma_lingam
 from andrey.core import ARROW, TAIL, StructureOutput, TemporalStructure
 
 
-def _var_model() -> tuple[SimpleNamespace, np.ndarray]:
-    """A VARLiNGAM stand-in with a known AR stack (1 instantaneous + 2 lag blocks, n=3)."""
-    n = 3
-    ar = np.zeros((3, n, n))
-    ar[0, 1, 0] = 0.6  # lag-0 (instantaneous): edge 0 -> 1
-    ar[1, 2, 1] = -0.4  # lag-1: edge 1 -> 2
-    ar[1, 0, 0] = 0.5  # lag-1: autoregressive self-loop (kept in topology)
-    ar[2, 1, 0] = 0.3  # lag-2: edge 0 -> 1 ...
-    ar[2, 0, 1] = 0.2  # lag-2: ... and edge 1 -> 0 => both directions => a 2-cycle (digraph)
-    model = SimpleNamespace(adjacency_matrices_=ar, causal_order_=[0, 1, 2])
-    return model, ar
-
-
-def test_var_lingam_recovers_lag_topology():
-    model, ar = _var_model()
-    out = _adapt_var_lingam(model)
-    assert isinstance(out, StructureOutput)
-    t = out.structure
-    assert isinstance(t, TemporalStructure)
-    assert t.n_lags == 3
-    assert t.n_nodes == 3
-    # lag-0 is the instantaneous DAG view.
-    assert t.lag(0).kind == "dag"
-    assert t.lag(0).endpoints(0, 1) == (TAIL, ARROW)
-    # every lag>=1 window is a directed graph allowing 2-cycles and self-loops (digraph), even a
-    # lag whose only extra mark is a self-loop -- the kind is a property of the producer, not data.
-    assert t.lag(1).kind == "digraph"
-    # lag-1 keeps the directed edge AND the autoregressive self-loop.
-    assert t.lag(1).endpoints(1, 2) == (TAIL, ARROW)
-    assert t.lag(1).endpoints(0, 0) == (ARROW, ARROW)  # self-loop 0 -> 0 survives
-    assert np.array_equal(np.diagonal(t.lag(1).to_numpy()), np.array([ARROW, 0, 0], dtype=np.int8))
-    # lag-2 carries both directions of 0-1 => a 2-cycle, not a PAG's bidirected (confounded) edge.
-    assert t.lag(2).kind == "digraph"
-    assert t.lag(2).endpoints(0, 1) == (ARROW, ARROW)
-
-
-def test_var_lingam_stack_and_ordering():
-    model, ar = _var_model()
-    out = _adapt_var_lingam(model)
-    # lag_weights is the canonical (B.T) AR stack; MA absent; ordering = causal_order_.
-    assert np.array_equal(out.structure.lag_weights, ar.transpose(0, 2, 1))
-    assert out.structure.lag_weights_ma is None
-    assert out.ordering == (0, 1, 2)
-
-
-def test_var_lingam_json_roundtrip(tmp_path):
-    model, _ = _var_model()
-    out = _adapt_var_lingam(model)
-    p = tmp_path / "var.json"
-    out.save(p)
-    assert StructureOutput.load(p) == out
-
-
-def _varma_model() -> tuple[SimpleNamespace, np.ndarray, np.ndarray]:
-    """A VARMALiNGAM stand-in: ``adjacency_matrices_`` is a (psis, omegas) tuple."""
+def _varma_fit() -> tuple[list[int], np.ndarray, np.ndarray]:
+    """A VARMA-LiNGAM fit: the causal order, ``psis``, and ``omegas``."""
     n = 3
     psis = np.zeros((2, n, n))  # AR order p=1 (index 0 instantaneous, index 1 lag-1)
     psis[0, 1, 0] = 0.6  # instantaneous edge 0 -> 1
@@ -82,13 +18,12 @@ def _varma_model() -> tuple[SimpleNamespace, np.ndarray, np.ndarray]:
     omegas = np.zeros((2, n, n))  # MA order q=2, independent of the AR order
     omegas[0, 1, 2] = 0.2
     omegas[1, 0, 2] = -0.1
-    model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=[2, 0, 1])
-    return model, psis, omegas
+    return [2, 0, 1], psis, omegas
 
 
 def test_varma_lingam_dual_stack():
-    model, psis, omegas = _varma_model()
-    out = _adapt_varma_lingam(model)
+    order, psis, omegas = _varma_fit()
+    out = adapt_varma_lingam(order, psis, omegas)
     t = out.structure
     assert isinstance(t, TemporalStructure)
     # The lag topology comes from psis (AR) only; both stacks are present and lossless.
@@ -101,8 +36,8 @@ def test_varma_lingam_dual_stack():
 
 
 def test_varma_lingam_json_roundtrip(tmp_path):
-    model, _, omegas = _varma_model()
-    out = _adapt_varma_lingam(model)
+    order, psis, omegas = _varma_fit()
+    out = adapt_varma_lingam(order, psis, omegas)
     p = tmp_path / "varma.json"
     out.save(p)
     back = StructureOutput.load(p)
@@ -122,7 +57,7 @@ def _granger_coeff() -> np.ndarray:
 
 def test_granger_lag_topology_and_count():
     coeff = _granger_coeff()
-    out = _adapt_granger(coeff, n_vars=3, maxlag=2)
+    out = adapt_granger(coeff, maxlag=2)
     t = out.structure
     assert isinstance(t, TemporalStructure)
     assert t.n_lags == 2  # no lag-0; one graph per lag 1..maxlag
@@ -143,15 +78,16 @@ def test_granger_lag_topology_and_count():
 
 
 def test_granger_json_roundtrip(tmp_path):
-    out = _adapt_granger(_granger_coeff(), n_vars=3, maxlag=2)
+    out = adapt_granger(_granger_coeff(), maxlag=2)
     p = tmp_path / "granger.json"
     out.save(p)
     assert StructureOutput.load(p) == out
 
 
-def test_granger_rejects_bad_shape():
+@pytest.mark.parametrize("shape", [(3, 5), (6,), (3, 6, 1)])
+def test_granger_rejects_bad_shape(shape):
     with pytest.raises(ValueError, match="shape"):
-        _adapt_granger(np.zeros((3, 5)), n_vars=3, maxlag=2)  # 5 != d*maxlag = 6
+        adapt_granger(np.zeros(shape), maxlag=2)
 
 
 def test_orientation_invariant_weights_match_edges():
@@ -160,8 +96,14 @@ def test_orientation_invariant_weights_match_edges():
     Holds for directed (i -> j), a 2-cycle (both ways), and lag>=1 self-loops (i -> i) alike, so
     the stored weights and the derived graph share one orientation.
     """
-    model, _ = _var_model()
-    t = _adapt_var_lingam(model).structure
+    n = 3
+    psis = np.zeros((3, n, n))
+    psis[0, 1, 0] = 0.6  # lag-0 (instantaneous): edge 0 -> 1
+    psis[1, 2, 1] = -0.4  # lag-1: edge 1 -> 2
+    psis[1, 0, 0] = 0.5  # lag-1: autoregressive self-loop
+    psis[2, 1, 0] = 0.3  # lag-2: edge 0 -> 1 ...
+    psis[2, 0, 1] = 0.2  # lag-2: ... and edge 1 -> 0, a 2-cycle
+    t = adapt_varma_lingam([0, 1, 2], psis, np.zeros((0, n, n))).structure
     assert isinstance(t, TemporalStructure)
     weights = t.lag_weights
     for pos, lag_value in enumerate(t.lags):
@@ -173,9 +115,9 @@ def test_orientation_invariant_weights_match_edges():
                 assert has_weight == arrowhead_at_j, (pos, i, j)
 
 
-def _longitudinal_model() -> SimpleNamespace:
-    """A LongitudinalLiNGAM stand-in with ``adjacency_matrices_`` of shape (T, 1+n_lags, p, p)
-    and NaN blocks."""
+def _longitudinal_fit() -> tuple[np.ndarray, list[list[int]]]:
+    """A Longitudinal LiNGAM fit: adjacencies of shape (T, 1+n_lags, p, p) with NaN blocks, and
+    the per-time causal orders."""
     T, L, p = 4, 2, 3
     adj = np.full((T, 1 + L, p, p), np.nan)
     for t in range(1, T):
@@ -187,11 +129,11 @@ def _longitudinal_model() -> SimpleNamespace:
             adj[t, lag + 1] = np.zeros((p, p))
             adj[t, lag + 1, 2, 1] = 0.3  # lag edge 1 -> 2
     orders = [[]] + [[0, 1, 2] for _ in range(T - 1)]  # occasion 0 is an empty placeholder
-    return SimpleNamespace(adjacency_matrices_=adj, causal_orders_=orders)
+    return adj, orders
 
 
 def test_longitudinal_adapter_stores_the_time_axis_losslessly():
-    out = _adapt_longitudinal_lingam(_longitudinal_model())
+    out = adapt_longitudinal_lingam(*_longitudinal_fit())
     t = out.structure
     assert isinstance(t, TemporalStructure)
     # occasion 0 (all-NaN) is dropped; occasions 1..3 become the explicit time axis.
@@ -209,29 +151,26 @@ def test_longitudinal_adapter_stores_the_time_axis_losslessly():
 
 
 def test_longitudinal_adapter_json_roundtrip(tmp_path):
-    out = _adapt_longitudinal_lingam(_longitudinal_model())
+    out = adapt_longitudinal_lingam(*_longitudinal_fit())
     p = tmp_path / "longitudinal.json"
     out.save(p)
     assert StructureOutput.load(p) == out  # (time, lag) axis + NaN weights round-trip
 
 
-def test_longitudinal_adapter_masks_wraparound_and_zero_fills_the_lag_view():
-    # A lag block before the panel start (k > t) is uncomputable. The adapter masks any
-    # coefficients there with NaN; the lag-only view zero-fills them. With T=2 and n_lags=2,
-    # the last occasion's lag-2 block is uncomputable.
+def test_longitudinal_adapter_gives_an_uncomputable_block_no_link_and_zero_fills_the_lag_view():
+    # A lag block before the panel start (k > t) is uncomputable, and the fit leaves it NaN; the
+    # lag-only view zero-fills it. With T=2 and n_lags=2, the last occasion's lag-2 block is
+    # uncomputable.
     p = 2
     adj = np.full((2, 1 + 2, p, p), np.nan)
     adj[1, 0] = np.zeros((p, p))
     adj[1, 0, 1, 0] = 0.5  # instantaneous 0 -> 1
     adj[1, 1] = np.zeros((p, p))
     adj[1, 1, 1, 0] = 0.3  # lag-1 (reaches occasion 0, valid)
-    adj[1, 2] = np.full((p, p), 0.9)  # lag-2 reaches t=-1: wrap-around garbage
-    t = _adapt_longitudinal_lingam(
-        SimpleNamespace(adjacency_matrices_=adj, causal_orders_=[[], [0, 1]])
-    ).structure
+    t = adapt_longitudinal_lingam(adj, [[], [0, 1]]).structure
     assert t.n_times == 1 and t.times == (1,)
-    assert np.isnan(t.time_weights[0, 2]).all()  # the garbage block is masked to NaN (lossless)
-    assert int(t.at(1, 2).to_numpy().sum()) == 0  # its graph is empty, not a dense garbage digraph
+    assert np.isnan(t.time_weights[0, 2]).all()  # the uncomputable block is kept NaN (lossless)
+    assert int(t.at(1, 2).to_numpy().sum()) == 0  # its graph has no link
     # the lag-only view zero-fills the NaN block and stays finite.
     assert np.isfinite(t.lag_weights).all()
     assert np.array_equal(t.lag_weights, np.nan_to_num(t.time_weights[0]))

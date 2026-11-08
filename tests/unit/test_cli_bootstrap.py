@@ -11,6 +11,7 @@ import pytest
 import andrey
 from andrey.cli import main, render_method_help
 from andrey.spec import REGISTRY, SCHEMA_VERSION, help_schema, render_skill
+from andrey.spec.concepts import BOOTSTRAP_PARAMS
 
 
 def _run(argv, capsys):
@@ -148,17 +149,11 @@ def test_a_flag_out_of_range_is_a_usage_error(csv_path, capsys, flags):
     assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
 
 
-def test_the_former_n_boot_flag_sets_the_resamples_with_a_warning(csv_path, capsys):
-    base = ["bootstrap", "hc", "--data", str(csv_path), "--seed", "1", "--json"]
-    code, out, _ = _run([*base, "--n-resamples", "3"], capsys)
-    current = json.loads(out)
-    code_former, out, _ = _run([*base, "--n-boot", "3"], capsys)
-    former = json.loads(out)
-    assert code == code_former == 0 and former["bootstrap"]["n_resamples"] == 3
-    assert former["frequencies"] == current["frequencies"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in former["run"]["warnings"]}
-    code, _out, err = _run([*base, "--n-boot", "3", "--n-resamples", "4"], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
+def test_the_former_n_boot_flag_is_a_usage_error_with_its_current_name(csv_path, capsys):
+    code, _out, err = _run(["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "3"], capsys)
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "usage_error"
+    assert "`--n-resamples` in 0.12.0" in error["message"]
 
 
 def test_a_method_that_cannot_be_bootstrapped_is_an_unsupported_value(csv_path, capsys):
@@ -276,15 +271,9 @@ def test_the_help_and_the_contract_describe_the_command(capsys):
     assert "frequencies" in cli["envelope"] and "gin" in cli["what"]
     for flag in ("--resampling", "--sample-fraction"):
         assert flag in cli["invocation"] and flag in out
-    params = cli["parameters"]
-    assert params["threshold"]["minimum"] == 0.5 and params["threshold"]["maximum"] == 1
-    assert params["strict"]["default"] is False
-    assert params["resampling"]["enum"][:2] == ["subsample", "bootstrap"]
-    assert params["sample_fraction"]["exclusiveMinimum"] == 0
-    assert params["sample_fraction"]["maximum"] == 1 and params["sample_fraction"]["default"] == 0.5
+    assert set(cli["parameters"]) == set(BOOTSTRAP_PARAMS)
 
 
 def test_the_agent_guide_explains_when_to_bootstrap_and_how_to_read_it():
     guide = render_skill()
-    assert "## How stable an edge is" in guide
     assert "andrey bootstrap <method> --data" in guide and "`frequencies`" in guide

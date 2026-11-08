@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.structure import ARROW, NULL, TAIL, GraphStructure, TemporalStructure
+from andrey.core.structure import GraphStructure, TemporalStructure, endpoint_marks
 
 from .graphs import DAGDraw, dag_truth
 
@@ -116,7 +116,7 @@ def build_truth(
     graphs = [dag_truth(draw.parents, draw.children, draw.d)]  # lag-0 instantaneous DAG
     lags = [0]
     for k in range(a_stack.shape[0]):
-        graphs.append(_lag_digraph(a_stack[k], draw.d))
+        graphs.append(_lag_digraph(a_stack[k]))
         lags.append(k + 1)
     # The process matrices are [effect, cause]; a structure stores weights as [cause, effect].
     lag_weights = np.concatenate([b0[None], a_stack], axis=0).transpose(0, 2, 1)  # [B0, A_1..A_p]
@@ -144,9 +144,7 @@ def relabel_truth(truth: TemporalStructure, order: np.ndarray) -> TemporalStruct
     )
 
 
-def _lag_digraph(a_k: np.ndarray, d: int) -> GraphStructure:
+def _lag_digraph(a_k: np.ndarray) -> GraphStructure:
     """Build the digraph of a lag matrix's support (``a_k[i, j] != 0`` is the edge ``j -> i``)."""
-    adj = a_k.T != 0  # adj[cause, effect]
-    # mark at the row endpoint of pair (row, col)
-    marks = np.where(adj.T, ARROW, np.where(adj, TAIL, NULL)).astype(np.int8)
+    marks = endpoint_marks(a_k.T != 0)  # [cause, effect]
     return GraphStructure.from_numpy(marks, kind="digraph", allow_self_loops=True)

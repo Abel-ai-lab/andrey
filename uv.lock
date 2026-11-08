@@ -62,7 +62,7 @@ wheels = [
 
 [[package]]
 name = "andrey-core"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "." }
 dependencies = [
     { name = "networkx" },
@@ -132,7 +132,7 @@ requires-dist = [
     { name = "statsmodels", specifier = ">=0.14" },
     { name = "threadpoolctl", specifier = ">=3" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.2", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "andrey-core", extra = "torch" } },
-    { name = "typer", specifier = ">=0.12" },
+    { name = "typer", specifier = ">=0.12.4" },
 ]
 provides-extras = ["torch", "viz", "all"]
 

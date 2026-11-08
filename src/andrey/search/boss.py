@@ -16,27 +16,18 @@ from collections.abc import Callable, Sequence
 import numpy as np
 import numpy.typing as npt
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
-from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
-)
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.orient import dag2cpdag, orient_out_of, to_structure
+from andrey.core.score import MIXED_SCORES, LocalScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
 from andrey.core.seeding import start_rng
-from andrey.search.hc import tie_ranks
-
-#: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
-PERMUTATION_SCORES: tuple[str, ...] = SCORES
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_mask, tie_ranks
+from andrey.search.operators import check_parent_cap
 
 # Fixed absolute score tolerance for numerical ties.
-_SCORE_EPS = 1e-6
+SCORE_EPS = 1e-6
 _EPS = float(np.finfo(np.float64).eps)
 
 
@@ -48,7 +39,7 @@ def ranked_score(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
 ) -> tuple[LocalScore, np.ndarray]:
-    """The local score over the columns of ``x`` sorted by :func:`~andrey.search.hc.tie_ranks`.
+    """The local score over the columns of ``x`` sorted by :func:`~andrey.core.ties.tie_ranks`.
 
     A permutation search over this score makes every choice that goes by variable index by each
     column's data instead of its position: its starting order, the orders its seed shuffles, and
@@ -65,10 +56,7 @@ def ranked_score(
     dependent columns, names the columns of ``x``.
     """
     mixed = score_func in MIXED_SCORES
-    if mixed:
-        mask = column_mask(categorical, x.shape[1])
-    else:
-        mask = np.full(x.shape[1], score_func in DISCRETE_SCORES)
+    mask = tie_mask(score_func, categorical, x.shape[1])
     ranks = tie_ranks(x, mask)
     by_rank = np.argsort(ranks)
     try:
@@ -108,6 +96,18 @@ def precedence_sort(order: Sequence[int], before: np.ndarray) -> list[int]:
     return placed
 
 
+def sources_ahead(
+    sources: Sequence[int], n_features: int, before: np.ndarray | None = None
+) -> np.ndarray | None:
+    """The precedence ``before`` (``before[a, b]``: ``a`` precedes ``b``) with every variable of
+    ``sources`` ahead of every other one; ``before`` itself when there are no sources."""
+    if not sources:
+        return before
+    ahead = np.zeros((n_features, n_features), dtype=bool)
+    ahead[np.ix_(list(sources), [v for v in range(n_features) if v not in sources])] = True
+    return ahead if before is None else before | ahead
+
+
 def parent_knowledge(constraints: Constraints, v: int) -> tuple[list[int], list[int]]:
     """Variable ``v``'s candidate parents (neither forbidden nor required) and required parents."""
     forbidden, required = constraints.forbidden[:, v], constraints.required[:, v]
@@ -118,14 +118,14 @@ def parent_knowledge(constraints: Constraints, v: int) -> tuple[list[int], list[
 def _near_threshold(
     values: list[float], bounds: list[float], score: float, bound: float
 ) -> tuple[list[int], list[int]]:
-    """Split the candidates that ``-value > score + _SCORE_EPS`` keeps from the ones it could flip.
+    """Split the candidates that ``-value > score + SCORE_EPS`` keeps from the ones it could flip.
 
     ``values`` are local scores (lower is better) within ``bounds`` of their full scores, and
     ``score`` is within ``bound`` of its own. Returns ``(kept, near)``: ``kept`` passes the test
     for every value the bounds allow, and ``near`` could fall on either side. A rounding term of a
     few units in the last place covers the sum and the difference the test computes.
     """
-    threshold = score + _SCORE_EPS
+    threshold = score + SCORE_EPS
     reach = max(bounds, default=0.0) + bound
     if reach == 0.0:
         return [k for k, value in enumerate(values) if -value > threshold], []
@@ -151,11 +151,11 @@ def _settle_groups(
     *,
     first_only: bool = False,
 ) -> None:
-    """Tighten, then rescore, the candidates whose ``_SCORE_EPS`` tie group full scores could
+    """Tighten, then rescore, the candidates whose ``SCORE_EPS`` tie group full scores could
     change.
 
     The candidates sort by value (lower is better) into groups, each holding the candidates within
-    ``_SCORE_EPS`` of its best. Full scores give the same groups when, in each group, every
+    ``SCORE_EPS`` of its best. Full scores give the same groups when, in each group, every
     member's highest possible value is within the tolerance of every other member's lowest possible
     value, and every later candidate's lowest possible value is beyond it from the highest possible
     best. The candidates of a group that could break this, and the later ones that could join it,
@@ -177,17 +177,17 @@ def _settle_groups(
         while start < len(order):
             best = values[order[start]]
             end = start + 1
-            while end < len(order) and values[order[end]] - best <= _SCORE_EPS:
+            while end < len(order) and values[order[end]] - best <= SCORE_EPS:
                 end += 1
             group_hi = min(hi[start:end])
             for t in range(start, end):
-                if any(hi[t] - lo[s] > _SCORE_EPS for s in range(start, end) if s != t):
+                if any(hi[t] - lo[s] > SCORE_EPS for s in range(start, end) if s != t):
                     flagged.update(order[start:end])
                     break
-            if end < len(order) and later_lo[end] - group_hi <= _SCORE_EPS:
+            if end < len(order) and later_lo[end] - group_hi <= SCORE_EPS:
                 flagged.update(order[start:end])
                 flagged.update(
-                    order[t] for t in range(end, len(order)) if lo[t] - group_hi <= _SCORE_EPS
+                    order[t] for t in range(end, len(order)) if lo[t] - group_hi <= SCORE_EPS
                 )
             if first_only:
                 break
@@ -212,7 +212,7 @@ def _apart(candidates: list[tuple[float, int, float]]) -> bool:
     reach = max(candidate[2] for candidate in candidates)
     if reach == 0.0:
         return True
-    reach = 2 * reach + 16 * _EPS * max(abs(candidates[0][0]), abs(candidates[-1][0])) + _SCORE_EPS
+    reach = 2 * reach + 16 * _EPS * max(abs(candidates[0][0]), abs(candidates[-1][0])) + SCORE_EPS
     return all(high[0] - low[0] > reach for low, high in zip(candidates, candidates[1:]))
 
 
@@ -241,7 +241,7 @@ def _settle_kept(
 
 
 def _tightened(
-    tree: _GrowShrinkTree, base: Sequence[int], op: str, u: int | None, bound: float
+    tree: GrowShrinkTree, base: Sequence[int], op: str, u: int | None, bound: float
 ) -> float:
     """``bound``, or the componentwise bound of the batched move ``(base, op, u)`` that gave the
     score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
@@ -265,7 +265,7 @@ class _Leaf:
 
     def __init__(
         self,
-        tree: _GrowShrinkTree,
+        tree: GrowShrinkTree,
         parents: tuple[int, ...],
         score: float,
         bound: float,
@@ -296,7 +296,7 @@ class _GSTNode:
     """One node of a grow-shrink tree: a parent set reached along a grow path from the root.
 
     ``grow_score`` is the negated local score of the node's parent set; ``branches`` are the
-    single-variable additions that improve it by more than ``_SCORE_EPS`` (best tie group first,
+    single-variable additions that improve it by more than ``SCORE_EPS`` (best tie group first,
     ascending variable index within a group; built lazily by :meth:`_grow`, and empty when the
     parent set holds the tree's ``max_parents`` members). ``remove`` is the
     shrink sequence -- the variables dropped, best first -- built lazily by :meth:`_shrink`, with
@@ -319,7 +319,7 @@ class _GSTNode:
 
     def __init__(
         self,
-        tree: _GrowShrinkTree,
+        tree: GrowShrinkTree,
         add: int | None = None,
         score: float | None = None,
         bound: float = 0.0,
@@ -337,9 +337,9 @@ class _GSTNode:
         self.leaf: _Leaf | None = None
 
     def _grow(self, available: list[int], parents: list[int]) -> None:
-        """Keep additions that improve ``grow_score`` by more than ``_SCORE_EPS``.
+        """Keep additions that improve ``grow_score`` by more than ``SCORE_EPS``.
 
-        Group improving additions within ``_SCORE_EPS`` of each group's best score. Visit groups
+        Group improving additions within ``SCORE_EPS`` of each group's best score. Visit groups
         best first, with ascending variable index within each group. A comparison that the score
         bounds leave open is decided by tighter bounds, or by full scores of the parent set and
         of the candidates.
@@ -377,7 +377,7 @@ class _GSTNode:
             for k in near:
                 values[k] = rescore(k)
                 bounds[k] = 0.0
-                if -values[k] > self.grow_score + _SCORE_EPS:
+                if -values[k] > self.grow_score + SCORE_EPS:
                     kept.append(k)
         candidates = sorted((values[k], available[k], bounds[k]) for k in kept)
         if len(candidates) > 1 and not _apart(candidates):
@@ -388,16 +388,16 @@ class _GSTNode:
         start = 0
         while start < len(candidates):
             end = start + 1
-            while end < len(candidates) and candidates[end][0] - candidates[start][0] <= _SCORE_EPS:
+            while end < len(candidates) and candidates[end][0] - candidates[start][0] <= SCORE_EPS:
                 end += 1
             for value, add, bound in sorted(candidates[start:end], key=lambda c: c[1]):
                 self.branches.append(_GSTNode(self.tree, add, -value, bound))
             start = end
 
     def _shrink(self, parents: list[int], required: Sequence[int] = ()) -> None:
-        """Remove parents while the score improves by more than ``_SCORE_EPS``.
+        """Remove parents while the score improves by more than ``SCORE_EPS``.
 
-        Each step selects the lowest-index parent among improving removals within ``_SCORE_EPS``
+        Each step selects the lowest-index parent among improving removals within ``SCORE_EPS``
         of the best score. Record the removal order, cache the final score in ``shrink_score``
         and the final parent set's :class:`_Leaf` in ``leaf``. A ``required`` parent is never
         removed. A comparison that the score bounds leave open is decided by tighter bounds, or
@@ -446,14 +446,14 @@ class _GSTNode:
             for k in near:
                 values[k] = rescore(k)
                 bounds[k] = 0.0
-                if -values[k] > self.shrink_score + _SCORE_EPS:
+                if -values[k] > self.shrink_score + SCORE_EPS:
                     kept.append(k)
             if not kept:
                 break
             if len(kept) > 1 and not _apart(sorted((values[k], k, bounds[k]) for k in kept)):
                 _settle_kept(kept, values, bounds, rescore, tighten, first_only=True)
             best_value = min(values[k] for k in kept)
-            best, k = min((removable[k], k) for k in kept if values[k] - best_value <= _SCORE_EPS)
+            best, k = min((removable[k], k) for k in kept if values[k] - best_value <= SCORE_EPS)
             self.shrink_score = -values[k]
             self.shrink_bound = bounds[k]
             removal, tightenable = (current, best), True
@@ -498,7 +498,7 @@ class _GSTNode:
         return self.leaf
 
 
-class _GrowShrinkTree:
+class GrowShrinkTree:
     """A variable's grow-shrink tree: caches the best parent set per allowed prefix.
 
     :meth:`trace` returns the :class:`_Leaf` of ``vertex``'s best-scoring parent set drawn from
@@ -560,7 +560,7 @@ class _GrowShrinkTree:
 
 
 def _sweep(
-    v: int, i: int, order: list[int], gsts: list[_GrowShrinkTree]
+    v: int, i: int, order: list[int], gsts: list[GrowShrinkTree]
 ) -> tuple[list[float], list[_Leaf], list[_Leaf | None], list[_Leaf | None], float, float]:
     """Score every insertion point of ``v``, keeping the leaves each score adds up.
 
@@ -641,7 +641,7 @@ def _decided(scores: list[float], i: int, reach: float) -> bool:
     one eligible position is within the tolerance of the best, and every other eligible position is
     beyond ``reach`` of that.
     """
-    threshold = scores[i] + _SCORE_EPS
+    threshold = scores[i] + SCORE_EPS
     if min(abs(score - threshold) for score in scores) <= reach:
         return False
     best_score = max(scores)
@@ -650,7 +650,7 @@ def _decided(scores: list[float], i: int, reach: float) -> bool:
     near_best = 0
     for score in scores:
         if score > threshold:
-            gap = best_score - score - _SCORE_EPS
+            gap = best_score - score - SCORE_EPS
             if gap <= 0.0:
                 near_best += 1
             if abs(gap) <= reach or near_best > 1:
@@ -671,7 +671,7 @@ def _unsettled(
     positions whose leaf changes with ``v`` before them, so their difference is within the bounds
     of those leaves of the difference full scores give, plus the rounding of the four sums
     (``2 (p + 2) eps`` times the absolute scores a position adds up). A comparison of the decision
-    -- each position against the current one, and the positions within ``_SCORE_EPS`` of the best
+    -- each position against the current one, and the positions within ``SCORE_EPS`` of the best
     against each other and against the other eligible ones -- that this bound leaves open returns
     the bounded leaves it depends on, or every bounded leaf when only the rounding leaves it open.
     """
@@ -697,7 +697,7 @@ def _unsettled(
         return bound
 
     open_pairs: list[tuple[int, int]] = []
-    threshold = scores[i] + _SCORE_EPS
+    threshold = scores[i] + SCORE_EPS
     for j, score in enumerate(scores):
         if score != -np.inf and abs(score - threshold) <= gap_bound(j, i):
             open_pairs.append((j, i))
@@ -705,13 +705,13 @@ def _unsettled(
     if eligible:
         best_score = max(scores)
         anchor = scores.index(best_score)
-        members = [j for j in eligible if best_score - scores[j] <= _SCORE_EPS]
+        members = [j for j in eligible if best_score - scores[j] <= SCORE_EPS]
         for a in members:
             for m in members:
-                if a != m and abs(scores[a] - scores[m] - _SCORE_EPS) <= gap_bound(a, m):
+                if a != m and abs(scores[a] - scores[m] - SCORE_EPS) <= gap_bound(a, m):
                     open_pairs.append((a, m))
         for r in eligible:
-            if r not in members and abs(scores[anchor] - scores[r] - _SCORE_EPS) <= gap_bound(
+            if r not in members and abs(scores[anchor] - scores[r] - SCORE_EPS) <= gap_bound(
                 anchor, r
             ):
                 open_pairs.append((anchor, r))
@@ -734,15 +734,15 @@ def _unsettled(
 def _better_mutation(
     v: int,
     order: list[int],
-    gsts: list[_GrowShrinkTree],
+    gsts: list[GrowShrinkTree],
     positions: dict[int, int],
     before: np.ndarray | None = None,
 ) -> bool:
     """Move ``v`` to the order position that most improves the total score; report whether it moved.
 
     Scores every insertion point for ``v`` (:func:`_sweep`). Only positions that improve the total
-    by more than ``_SCORE_EPS`` are eligible. Selects the leftmost eligible position within
-    ``_SCORE_EPS`` of the highest score. Refreshes ``positions`` after a move; returns ``False``
+    by more than ``SCORE_EPS`` are eligible. Selects the leftmost eligible position within
+    ``SCORE_EPS`` of the highest score. Refreshes ``positions`` after a move; returns ``False``
     when no position improves by more than the tolerance. With ``before`` (``before[a, b]``: ``a``
     precedes ``b``), only positions after every predecessor of ``v`` and before every successor are
     eligible. When the leaves' score bounds leave a comparison open (:func:`_unsettled`), those
@@ -773,12 +773,12 @@ def _better_mutation(
                 leaf.settle()
 
     best_score = max(scores)
-    if best_score <= scores[i] + _SCORE_EPS:
+    if best_score <= scores[i] + SCORE_EPS:
         return False
     best = next(
         j
         for j in range(p + 1)
-        if best_score - scores[j] <= _SCORE_EPS and scores[j] > scores[i] + _SCORE_EPS
+        if best_score - scores[j] <= SCORE_EPS and scores[j] > scores[i] + SCORE_EPS
     )
     insert_at = best - (1 if best > i else 0)
     order.insert(insert_at, order.pop(i))
@@ -796,7 +796,7 @@ def _search_state(
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     max_parents: int | None,
-) -> tuple[LocalScore, np.ndarray, list[_GrowShrinkTree], np.ndarray | None]:
+) -> tuple[LocalScore, np.ndarray, list[GrowShrinkTree], np.ndarray | None]:
     """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
 
     The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
@@ -804,17 +804,17 @@ def _search_state(
     score, ranks = ranked_score(
         X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
     )
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        gsts = [GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
         return score, ranks, gsts, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
     gsts = []
     for v in range(p):
         candidates, required = parent_knowledge(ranked, v)
         gsts.append(
-            _GrowShrinkTree(
+            GrowShrinkTree(
                 v,
                 score,
                 delta,
@@ -827,17 +827,90 @@ def _search_state(
     return score, ranks, gsts, ranked.precedence()
 
 
+def permutation_search(
+    data: np.ndarray,
+    run_start: Callable[
+        [int, random.Random, list[GrowShrinkTree], np.ndarray | None], dict[int, list[int]]
+    ],
+    *,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    equivalent_sample_size: float,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+    n_starts: int,
+    seed: int,
+    sources: tuple[int, ...] = (),
+) -> tuple[GraphStructure, float]:
+    """Run ``n_starts`` permutation searches; return the best one's CPDAG and total score.
+
+    Every start builds its own score, caches, and trees (:func:`_search_state`), and
+    ``run_start(start, rng, gsts, before)`` returns its parent sets over the score's variables,
+    with ``rng`` from :func:`~andrey.core.seeding.start_rng`. ``before`` holds the knowledge's
+    precedence and puts ``sources``, columns of ``data``, ahead of every other variable
+    (:func:`sources_ahead`). A start's total score is the sum of the full local scores of its
+    parent sets, lower is better, and a later start replaces the best one only when it scores
+    lower by more than ``SCORE_EPS``. The best parent sets' DAG, mapped back to the columns of
+    ``data``, is returned as its CPDAG, with the edges at ``sources`` directed out of them
+    (:func:`~andrey.core.orient.orient_out_of`) and narrowed by the knowledge. The other arguments
+    are those of :func:`boss`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    p = X.shape[1]
+    if p == 0:
+        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
+
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
+    best: tuple[dict[int, list[int]], float] | None = None
+    for start in range(n_starts):
+        # Each start builds its own score, caches, and trees, so a search of many starts holds
+        # one start's state at a time.
+        score, ranks, gsts, before = _search_state(
+            X,
+            score_func,
+            penalty_discount,
+            ebic_gamma,
+            equivalent_sample_size,
+            categorical,
+            constraints,
+            max_parents,
+        )
+        before = sources_ahead(sorted(int(ranks[column]) for column in sources), p, before)
+        parents = run_start(start, start_rng(seed, start), gsts, before)
+        total = 0.0
+        for child in range(p):
+            total += score.score(child, parents[child])
+        if best is None or total < best[1] - SCORE_EPS:
+            best = (parents, total)
+        del score, gsts
+    assert best is not None  # n_starts >= 1
+    parents, total = best
+
+    dag = np.zeros((p, p), dtype=bool)
+    for child in range(p):
+        dag[parents[child], child] = True
+
+    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
+    if sources:
+        cpdag = orient_out_of(cpdag, sources)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    return to_structure(cpdag, kind="cpdag"), float(total)
+
+
 def _search_from(
     order: list[int],
     rng: random.Random,
-    gsts: list[_GrowShrinkTree],
-    score: LocalScore,
+    gsts: list[GrowShrinkTree],
     before: np.ndarray | None,
-) -> tuple[dict[int, list[int]], float]:
-    """Sweep ``order`` (mutated) until no move improves it; return its parent sets and score.
+) -> dict[int, list[int]]:
+    """Sweep ``order`` (mutated) until no move improves it; return its parent sets.
 
-    Each sweep visits the variables in an order ``rng`` shuffles. The score is the sum of the
-    full local scores of the parent sets, lower is better.
+    Each sweep visits the variables in an order ``rng`` shuffles.
     """
     positions = {v: idx for idx, v in enumerate(order)}
     variables = list(order)
@@ -856,10 +929,7 @@ def _search_from(
         gsts[v].trace(prefix, pa)
         parents[v] = pa
         prefix.add(v)
-    total = 0.0
-    for child in range(len(order)):
-        total += score.score(child, parents[child])
-    return parents, total
+    return parents
 
 
 def boss(
@@ -868,12 +938,13 @@ def boss(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     equivalent_sample_size: float = 1.0,
-    random_state: int = 0,
+    seed: int = 0,
     n_starts: int = 1,
     score_func: str = "bic",
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by best-order score search and return it with its total score.
 
@@ -891,15 +962,15 @@ def boss(
     equivalent_sample_size : float
         Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
         (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
-    random_state : int
+    seed : int
         Seed for the sweep-order RNG of every start and the start orders after the first
         (:func:`~andrey.core.seeding.start_rng`).
     n_starts : int
         Number of searches, at least ``1``: the first from the tie-rank order, each later one from
         an order its own RNG shuffles. The returned order is the best-scoring one; a later start
-        replaces an earlier one only when it scores better by more than ``_SCORE_EPS``.
+        replaces an earlier one only when it scores better by more than ``SCORE_EPS``.
     score_func : str
-        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC
+        Local score, one of :data:`~andrey.core.score.SCORES`: the linear-Gaussian BIC
         (``"bic"``), BDeu or the multinomial BIC on
         category codes (:class:`~andrey.core.score.BDeuScore`,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
@@ -917,11 +988,18 @@ def boss(
         :meth:`~andrey.core.knowledge.Constraints.precedence`, starting from the tie-rank order
         rearranged as little as possible. The CPDAG is then narrowed by the knowledge
         (:func:`~andrey.core.knowledge.mpdag`).
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: they lead every order, a
+        precedence each move keeps (:func:`sources_ahead`), and their edges are then directed out
+        of them, with Meek's rules orienting what follows
+        (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every variable
+        free.
 
     Returns
     -------
     GraphStructure
-        The learned CPDAG (``kind="cpdag"``).
+        The learned CPDAG (``kind="cpdag"``); with ``sources``, the partially directed graph that
+        also directs their edges.
     float
         The total score of the learned order's DAG -- the sum of each variable's local score
         given its traced parents (lower is better, matching :meth:`BICScore.score`).
@@ -932,57 +1010,28 @@ def boss(
     order, and every tie follow the columns' data, and reordering the columns of ``data`` reorders
     the CPDAG's nodes. See :func:`andrey.boss` for the score tolerance.
     """
-    X = np.asarray(data, dtype=np.float64)
-    p = X.shape[1]
-    if p == 0:
-        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    if score_func not in PERMUTATION_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
-        )
-    if (
-        max_parents is not None
-        and constraints is not None
-        and (constraints.required.sum(axis=0) > max_parents).any()
-    ):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
-    best: tuple[dict[int, list[int]], float] | None = None
-    for start in range(n_starts):
-        # Each start builds its own score, caches, and trees, so a search of many starts holds
-        # one start's state at a time.
-        score, ranks, gsts, before = _search_state(
-            X,
-            score_func,
-            penalty_discount,
-            ebic_gamma,
-            equivalent_sample_size,
-            categorical,
-            constraints,
-            max_parents,
-        )
-        rng = start_rng(random_state, start)
-        order = list(range(p))
+    def run_start(
+        start: int, rng: random.Random, gsts: list[GrowShrinkTree], before: np.ndarray | None
+    ) -> dict[int, list[int]]:
+        order = list(range(len(gsts)))
         if start > 0:
             rng.shuffle(order)
         if before is not None:
             order = precedence_sort(order, before)
-        parents, total = _search_from(order, rng, gsts, score, before)
-        if best is None or total < best[1] - _SCORE_EPS:
-            best = (parents, total)
-        del score, gsts
-    assert best is not None  # n_starts >= 1
-    parents, total = best
+        return _search_from(order, rng, gsts, before)
 
-    adj = np.zeros((p, p), dtype=np.int8)
-    for child in range(p):
-        for parent in parents[child]:
-            adj[parent, child] = TAIL
-            adj[child, parent] = ARROW
-
-    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), float(total)
+    return permutation_search(
+        data,
+        run_start,
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        seed=seed,
+        sources=sources,
+    )

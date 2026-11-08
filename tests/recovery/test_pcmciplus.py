@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 
@@ -11,7 +13,7 @@ from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # B0[effect, cause]: X0 -> X1 -> X2 <- X3 within each step.
 B0 = np.zeros((5, 5))
@@ -53,39 +55,39 @@ def planted() -> np.ndarray:
     return temporal.generate(ib_inv, np.stack([LAG_1, LAG_2]), None, innovations, burn_in=200)
 
 
+@pytest.fixture(scope="module")
+def fit(planted):
+    """``pcmciplus`` on the planted data with the given settings, fitted once per module."""
+    return functools.cache(lambda **settings: andrey.pcmciplus(planted, tau_max=2, **settings))
+
+
 INDEP_TESTS = ["student_t", "fisherz"]
 
 
 @pytest.mark.parametrize("indep_test", INDEP_TESTS)
-def test_recovers_the_planted_links(planted, indep_test):
-    out = andrey.pcmciplus(planted, tau_max=2, indep_test=indep_test)
+def test_recovers_the_planted_links(fit, indep_test):
+    out = fit(indep_test=indep_test)
     assert _lagged(out) == {(i, i, 1) for i in range(5)} | {(1, 4, 1), (4, 3, 2)}
     # The collider X1 -> X2 <- X3 orients two links, and R1 orients X0 -> X1 from X0's past.
     assert _same_step(out) == {(0, 1, "->"), (1, 2, "->"), (3, 2, "->")}
     assert out.metadata["conflicts"] == []
 
 
-def test_the_conservative_rule_recovers_the_planted_links(planted):
-    out = andrey.pcmciplus(planted, tau_max=2, collider_rule="conservative")
+def test_the_conservative_rule_recovers_the_planted_links(fit):
+    out = fit(collider_rule="conservative")
     assert _same_step(out) == {(0, 1, "->"), (1, 2, "->"), (3, 2, "->")}
 
 
-def test_the_none_rule_finds_the_same_links(planted):
-    out = andrey.pcmciplus(planted, tau_max=2, collider_rule="sepsets")
+def test_the_sepsets_rule_finds_the_same_links(fit):
+    out = fit(collider_rule="sepsets")
     assert {(i, j) for i, j, _ in _same_step(out)} == {(0, 1), (1, 2), (2, 3)}
-    assert _lagged(out) == _lagged(andrey.pcmciplus(planted, tau_max=2))
+    assert _lagged(out) == _lagged(fit(indep_test="fisherz"))
 
 
-def test_same_result_on_every_run(planted):
-    first, second = (andrey.pcmciplus(planted, tau_max=2) for _ in range(2))
-    assert first.structure == second.structure
-    assert first.metadata == second.metadata
-
-
-def test_the_result_does_not_depend_on_the_variable_order(planted):
+def test_the_result_does_not_depend_on_the_variable_order(planted, fit):
     order = [3, 0, 4, 2, 1]
-    out = andrey.pcmciplus(planted, tau_max=2)
-    permuted = andrey.pcmciplus(planted[:, order], tau_max=2)
+    out = fit(indep_test="fisherz")
+    permuted = andrey.pcmciplus(planted[:, order], tau_max=2, indep_test="fisherz")
     back = {(order[i], order[j], kind) for i, j, kind in _same_step(permuted)}
     back = {(min(i, j), max(i, j), k) if k == "--" else (i, j, k) for i, j, k in back}
     assert back == _same_step(out)

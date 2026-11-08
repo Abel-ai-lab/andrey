@@ -10,11 +10,11 @@ independent.
   the same numbers from kernels it shares across pairs.
 - :func:`hsic_gamma_from_grams`, used by RCD, ParceLiNGAM, and GIN with the grams of
   :func:`gamma_gram`, sets the bandwidth by the median distance over the first rows without
-  z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT runs
-  the same test through :func:`hsic_gamma_log_p`, which returns the logarithm of a p-value that
-  keeps its precision below ``1e-16``, on each side's joint distances with two settings of its own:
-  the bandwidth's median over every row (``median_rows=None``) and the variance's product form
-  (``variance="product"``).
+  z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT and
+  CAM-UV run the same test through :func:`hsic_log_p`, which returns the logarithm of a p-value
+  that keeps its precision below ``1e-16`` (:func:`hsic_gamma_log_p`), on each side's joint
+  distances with two settings of their own: the bandwidth's median over every row
+  (:func:`hsic_gram`) and the variance's product form.
 
 References
 ----------
@@ -310,11 +310,10 @@ def hsic_gamma_from_grams(
     gamma function, whose resolution ends near ``1e-16``. A larger p-value means more independent.
 
     ``variance="bias_corrected"`` estimates the variance from the joint products
-    ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
-    ``"product"`` uses the variance's product form in that paper,
-    ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
-    the RESIT paper's; a gram that carries its sum of squares as a third element has it read rather
-    than summed again.
+    ``(Kxc * Kyc / 6)^2``, less their diagonal; ``"product"`` uses the variance's product form in
+    Gretton et al. (2007), ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's
+    ``sum(Kc^2) / (n - 1)^2``, the RESIT paper's; a gram that carries its sum of squares as a third
+    element has it read rather than summed again.
     """
     statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
     return float(statistic), float(1.0 - gammainc(shape, x))
@@ -343,6 +342,36 @@ def hsic_gamma_log_p(
     if 0.0 > statistic >= -_rounding_bound(gram_x, gram_y, n):
         x = 0.0
     return _log_upper_gamma(float(shape), float(x))
+
+
+def hsic_gram(side: np.ndarray) -> tuple[np.ndarray, float, float]:
+    """One side's gram for :func:`hsic_log_p`: :func:`gamma_gram` with the bandwidth's median over
+    every row, and the centered gram's sum of squares, which the product-form variance reads, so a
+    side tested against many others sums it once.
+
+    ``side`` is one column or several read jointly, as given: the caller centers it when its mean
+    is far from 0.
+    """
+    centered, mu = gamma_gram(side, median_rows=None)
+    return centered, mu, float(np.sum(centered * centered))
+
+
+def hsic_log_p(gram_x: Gram, gram_y: Gram, method: str) -> float:
+    """The log p-value of the gamma HSIC of two :func:`hsic_gram` sides, the null variance in its
+    product form (:func:`hsic_gamma_log_p`); ``method`` names the caller in the error.
+
+    Raises
+    ------
+    FloatingPointError
+        If the test's value is not finite, so that no choice rests on it.
+    """
+    log_p = hsic_gamma_log_p(gram_x, gram_y, gram_x[0].shape[0], variance="product")
+    if not math.isfinite(log_p):
+        raise FloatingPointError(
+            f"{method}: an HSIC test gave a non-finite p-value; the kernels could not be computed "
+            "from these data"
+        )
+    return log_p
 
 
 def _sum_of_squares(gram: Gram) -> float:

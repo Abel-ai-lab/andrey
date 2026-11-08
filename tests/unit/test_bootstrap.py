@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import warnings
 
 import numpy as np
@@ -10,13 +9,13 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey import BootstrapOutput, bootstrap
-from andrey.constraint.fci import _fci_orient
+from andrey import BootstrapOutput, bootstrap, resample
+from andrey.constraint.fci import fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
-from andrey.core.orient import _cpdag_of_pdag, dag2cpdag, pdag2dag
-from andrey.data.latent import DSepOracle, _AncestorSepsets, _observed_ancestors
-from andrey.resample import EDGES, _default_block_length, _draw, _Job
+from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
+from andrey.data.latent import DSepOracle, _AncestorSepsets, observed_ancestors
+from andrey.resample import EDGES, Job, _default_block_length, _draw
 from andrey.spec import REGISTRY
 
 
@@ -195,7 +194,7 @@ def test_the_averaged_graph_is_a_valid_graph_of_the_fits_kind(kind, seed):
     if kind == "dag":
         assert np.array_equal(pdag2dag(marks), marks)  # acyclic, no undirected edge
     elif kind == "cpdag":
-        assert np.array_equal(_cpdag_of_pdag(marks), marks)
+        assert np.array_equal(cpdag_of_pdag(marks), marks)
     else:
         mag = GraphStructure.from_numpy(mag_of_pag(marks), kind="mag")
         assert mag.to_pag() == graph_
@@ -408,16 +407,15 @@ def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
     assert short.fits is not None and bootstrap("hc", data, n_resamples=2).fits is None
 
 
-def test_the_former_n_boot_still_sets_the_number_of_resamples_with_a_warning():
+def test_a_former_name_is_refused_with_its_current_name_before_any_fit():
+    """The bootstrap's ``n_boot`` and a method's former input name raise, each with what it is
+    called now, and a result no longer has ``n_boot``."""
     data = lingam_data()
-    current = bootstrap("hc", data, n_resamples=3, seed=1)
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="n_boot is now n_resamples"):
-        former = bootstrap("hc", data, n_boot=3, seed=1)
-    assert former.n_resamples == 3 and former.table() == current.table()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="BootstrapOutput.n_boot is now"):
-        assert former.n_boot == former.n_resamples
-    with pytest.raises(ValueError, match="n_boot is the former name of n_resamples"):
-        bootstrap("hc", data, n_boot=3, n_resamples=4)
+    with pytest.raises(TypeError, match=r"'n_boot'.*`n_resamples` in 0\.12\.0"):
+        bootstrap("hc", data, n_boot=3)
+    with pytest.raises(TypeError, match=r"'domain_index'.*`env` in 0\.14\.0"):
+        bootstrap("cdnod", data, domain_index=np.arange(len(data)) % 2)
+    assert not hasattr(BootstrapOutput, "n_boot")
 
 
 def test_the_default_seed_follows_andrey_seed(monkeypatch):
@@ -501,6 +499,25 @@ def test_a_row_aligned_input_is_resampled_with_the_rows():
     assert bootstrap("gies", data, n_resamples=2).n_resamples == 2
 
 
+@pytest.mark.parametrize("method", ["icp", "cdnod"])
+def test_an_input_that_names_a_column_gives_the_bootstrap_of_its_values(method):
+    """``env="env"`` resamples as the column's values do, and the column is not a node."""
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1], 150)
+    x0 = rng.standard_normal(300) * (1.0 + env)
+    x1 = 0.6 * x0 + rng.standard_normal(300) + 0.8 * env
+    y = 0.5 * x0 - 0.7 * x1 + rng.standard_normal(300)
+    data = pd.DataFrame({"x0": x0, "x1": x1, "y": y})
+    kwargs = {"target": "y"} if method == "icp" else {}
+    given = bootstrap(method, data, env=env, n_resamples=4, seed=0, keep_fits=True, **kwargs)
+    named = bootstrap(
+        method, data.assign(env=env), env="env", n_resamples=4, seed=0, keep_fits=True, **kwargs
+    )
+    assert named.structure.labels == ("x0", "x1", "y")
+    assert named.fits == given.fits and named.table() == given.table()
+    assert named.structure == given.structure
+
+
 def test_a_method_with_a_group_per_dataset_returns_one_result_per_group():
     groups = [lingam_data(150, seed) for seed in range(3)]
     out = bootstrap("multi_group_direct_lingam", groups, n_resamples=3, seed=1, keep_fits=True)
@@ -540,8 +557,20 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
 
 def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
     """The job a worker draws a resample from, without the call that builds it."""
-    return _Job(
-        name, data, {}, {}, seed, unit, block_length, False, "auto", "rank", resampling, fraction
+    return Job(
+        name,
+        data,
+        {},
+        {},
+        {},
+        seed,
+        unit,
+        block_length,
+        False,
+        "auto",
+        "rank",
+        resampling,
+        fraction,
     )
 
 
@@ -593,14 +622,28 @@ def test_a_bootstrap_resample_is_n_rows_drawn_with_replacement_from_the_seed():
         assert np.array_equal(_draw(job, b)[0], rng.integers(0, 80, size=80))
 
 
+#: Each method's row-aligned arguments for 150 rows: none, a domain index, and a targets matrix.
+ROW_ALIGNED = {
+    "hc": {},
+    "cdnod": {"env": np.repeat([0, 1, 2], 50)},
+    "gies": {"targets": (np.random.default_rng(1).random((150, 4)) < 0.1).astype(int)},
+}
+
+
 @pytest.mark.parametrize("resampling", ["bootstrap", "subsample"])
-def test_each_fit_is_the_method_on_the_rows_its_resample_draws(resampling):
-    data = lingam_data(150)
-    out = bootstrap("hc", data, n_resamples=4, seed=5, resampling=resampling, keep_fits=True)
-    job = job_of("hc", data, "rows", resampling, seed=5)
+@pytest.mark.parametrize("method", list(ROW_ALIGNED))
+def test_each_fit_is_the_method_on_the_rows_its_resample_draws(method, resampling):
+    """Each fit is the method on its resample's rows, with those rows' environments or targets."""
+    data, aligned = lingam_data(150), ROW_ALIGNED[method]
+    out = bootstrap(
+        method, data, n_resamples=4, seed=5, resampling=resampling, keep_fits=True, **aligned
+    )
+    job = job_of(method, data, "rows", resampling, seed=5)
     assert out.fits is not None
     for b, fit in enumerate(out.fits):
-        assert fit == andrey.hc(data.iloc[_draw(job, b)[0]].reset_index(drop=True))
+        idx = _draw(job, b)[0]
+        rows = {key: value[idx] for key, value in aligned.items()}
+        assert fit == getattr(andrey, method)(data.iloc[idx].reset_index(drop=True), **rows)
     if resampling == "bootstrap":  # the scheme of every release before sample_fraction
         for b in range(4):
             rng = np.random.default_rng(np.random.SeedSequence(5, spawn_key=(b, 0)))
@@ -628,6 +671,34 @@ def test_a_panel_subsample_keeps_the_same_units_in_every_dataset_and_each_groups
     )
     first, second = _draw(groups, 0)
     assert (len(first), len(second)) == (60, 90) and len(set(second.tolist())) == 90
+
+
+def test_a_panel_of_series_takes_the_same_consecutive_rows_from_every_dataset():
+    stretch = job_of("jpcmciplus", [np.zeros((50, 2))] * 3, "steps", "subsample", 0.4)
+    idx = _draw(stretch, 0)
+    assert len(idx) == 3 and all(np.array_equal(ix, idx[0]) for ix in idx)
+    assert np.array_equal(np.diff(idx[0]), np.ones(19, dtype=int))
+    blocks = job_of("jpcmciplus", [np.zeros((50, 2))] * 3, "steps", "bootstrap", block_length=10)
+    idx = _draw(blocks, 0)
+    assert len(idx) == 3 and all(np.array_equal(ix, idx[0]) for ix in idx)
+    assert all((np.diff(block) == 1).all() for block in idx[0].reshape(5, 10))
+
+
+def test_a_resample_of_several_series_keeps_their_lagged_links():
+    rng = np.random.default_rng(0)
+    panel = []
+    for _ in range(6):
+        x = rng.standard_normal(300)
+        panel.append(
+            np.column_stack([x, np.r_[0.0, 0.9 * x[:-1]] + 0.3 * rng.standard_normal(300)])
+        )
+    for resampling in ("subsample", "bootstrap"):
+        out = bootstrap(
+            "jpcmciplus", panel, n_resamples=5, seed=0, resampling=resampling, time_dummy=False
+        )
+        assert out.frequency("->", lag=1)[0, 1] == 1.0
+    with pytest.raises(ValueError, match="same steps"):
+        bootstrap("jpcmciplus", [panel[0], panel[1][:100]], n_resamples=2, time_dummy=False)
 
 
 def test_resampling_defaults_to_a_subsample_for_every_method():
@@ -739,13 +810,34 @@ def test_each_warning_of_the_fits_is_raised_once():
         assert len(kinds) == 1, workers
 
 
-def test_the_workers_follow_the_configured_count_and_never_nest():
-    data = lingam_data()
-    with andrey.config(n_jobs=2):
-        configured = bootstrap("pc", data, n_resamples=4, seed=0, keep_fits=True)
-    serial = with_workers(1, "pc", data, n_resamples=4, seed=0, keep_fits=True)
-    assert configured.fits == serial.fits
-    assert andrey.config.n_jobs == 1 or "ANDREY_N_JOBS" in os.environ
+@pytest.mark.parametrize(("n_jobs", "n_resamples", "workers"), [(1, 3, 0), (2, 3, 2), (4, 2, 2)])
+def test_the_workers_follow_the_configured_count_and_never_nest(
+    monkeypatch, n_jobs, n_resamples, workers
+):
+    """The fits run in this process at one job, else on ``min(n_jobs, n_resamples)`` worker
+    processes, and each worker fits with one job on one BLAS thread whatever ``ANDREY_N_JOBS``
+    it inherits, so a method never starts workers of its own."""
+    pools = []
+
+    class Pool(resample.ProcessPoolExecutor):
+        def __init__(self, **kwargs):
+            pools.append(kwargs)
+            super().__init__(**kwargs)
+
+    monkeypatch.setattr(resample, "ProcessPoolExecutor", Pool)
+    with_workers(n_jobs, "pc", lingam_data(), n_resamples=n_resamples, seed=0)
+    assert [pool["max_workers"] for pool in pools] == ([workers] if workers else [])
+    if not workers:
+        return
+    limits = []
+    monkeypatch.setattr("threadpoolctl.threadpool_limits", lambda **kw: limits.append(kw))
+    monkeypatch.setattr(resample, "_JOB", None)
+    monkeypatch.setattr(resample, "_BLAS", None)
+    monkeypatch.setenv("ANDREY_N_JOBS", "4")
+    assert andrey.config.n_jobs == 4
+    pools[0]["initializer"](*pools[0]["initargs"])  # what each worker runs before its fits
+    assert andrey.config.n_jobs == 1
+    assert limits == [{"limits": 1}]
 
 
 def test_knowledge_travels_to_the_workers():
@@ -783,7 +875,7 @@ def mag_oracle(pag):
     sepsets = _AncestorSepsets(
         np.asarray(mag.to_numpy()) != 0,
         nodes,
-        _observed_ancestors(digraph, nodes),
+        observed_ancestors(digraph, nodes),
         _observed_ancestors_of(digraph, nodes, selection),
     )
     return DSepOracle(digraph, nodes, selection), sepsets
@@ -797,7 +889,7 @@ def test_an_averaged_pag_under_knowledge_is_closed_under_the_orientation_rules(m
     out = bootstrap(method, data, n_resamples=8, seed=0, knowledge=knowledge, keep_fits=True)
     test, sepsets = mag_oracle(BootstrapOutput.from_fits(out.fits).structure)
     marks = np.array(out.structure.to_numpy(), dtype=np.int8)
-    _fci_orient(marks, test, 0.5, sepsets)
+    fci_orient(marks, test, 0.5, sepsets)
     assert np.array_equal(marks, out.structure.to_numpy())
 
 

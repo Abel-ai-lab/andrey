@@ -44,9 +44,18 @@ def _sample(
 
 
 def _fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
+    """Fit ``name``, which is experimental, so its ``ExperimentalWarning`` is expected."""
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         return FITS[name](X, **kwargs)
+
+
+def _quick_fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
+    """Fit ``name`` on the ``QUICK`` schedule, which can stop DAGMA at its iteration limit."""
+    with warnings.catch_warnings():
+        if name == "dagma":
+            warnings.simplefilter("ignore", andrey.SearchLimitWarning)
+        return _fit(name, X, **kwargs, **QUICK[name])
 
 
 def _edges(out: andrey.StructureOutput) -> set[tuple[int, int]]:
@@ -100,19 +109,51 @@ def test_independent_columns_have_no_edges(name) -> None:
 
 @pytest.mark.parametrize("name", NAMES)
 def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
-    out = _fit(name, chain, robust=True, **QUICK[name])
+    out = _quick_fit(name, chain, robust=True)
     assert _edges(out) == set(CHAIN)
     assert out.metadata["path_steps"] >= 1
 
 
+@pytest.mark.filterwarnings("ignore:dagma stopped at its limit of max_iter")
+@pytest.mark.parametrize("name", NAMES)
+def test_max_path_caps_the_accepted_steps_and_warns(name, chain) -> None:
+    """The path accepts its first step whatever its likelihood, so a cap of one is reached."""
+    with pytest.warns(andrey.SearchLimitWarning, match="max_path=1"):
+        capped = _fit(name, chain, robust=True, max_path=1, **QUICK[name])
+    assert capped.metadata["path_steps"] == 1
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_an_mcp_wider_than_every_weight_empties_the_path(name, chain) -> None:
+    """With ``mcp_delta`` above every weight, the quasi-MCP's slope reaches each one, and at
+    ``mcp_lambda=5`` it pulls them all to zero. The path accepts its first step whatever its
+    likelihood, so it returns the empty graph, and the next step does not lower the likelihood."""
+    out = _quick_fit(name, chain, robust=True, mcp_lambda=5.0, mcp_delta=2.0)
+    assert not out.weighted_adjacency.any()
+    assert out.metadata["path_steps"] == 1
+
+
+def test_h_tol_ends_the_dual_steps(tree) -> None:
+    """The dual steps end once the acyclicity function falls to ``h_tol``."""
+    tight, loose = _fit("notears", tree), _fit("notears", tree, h_tol=1e-2)
+    assert tight.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
 def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_variances() -> None:
-    """Here least squares is one edit from the CPDAG, and the likelihood path reaches it."""
+    """The likelihood path reaches the CPDAG."""
     X, adjacency = _unequal_variances(8)
     truth = to_cpdag(dag_from_adjacency(adjacency))
-    default = to_cpdag(_fit("dagma", X).structure)
     robust = to_cpdag(_fit("dagma", X, robust=True).structure)
     assert shd(robust, truth) == 0
-    assert shd(robust, truth) <= shd(default, truth)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_standardize_makes_the_fit_independent_of_the_units(name, tree) -> None:
+    """Scaling by powers of two leaves the standardized columns equal bit for bit."""
+    units = np.array([4.0, 0.25, 1.0, 8.0, 0.5])
+    plain = _fit(name, tree, standardize=True)
+    rescaled = _fit(name, tree * units, standardize=True)
+    np.testing.assert_array_equal(rescaled.weighted_adjacency, plain.weighted_adjacency)
 
 
 # ---- determinism and column order ----------------------------------------------------------------
@@ -121,8 +162,8 @@ def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_varia
 @pytest.mark.parametrize("robust", [False, True])
 @pytest.mark.parametrize("name", NAMES)
 def test_a_repeated_fit_is_identical(name, robust, chain) -> None:
-    first = _fit(name, chain, robust=robust, **QUICK[name])
-    second = _fit(name, chain, robust=robust, **QUICK[name])
+    first = _quick_fit(name, chain, robust=robust)
+    second = _quick_fit(name, chain, robust=robust)
     np.testing.assert_array_equal(first.weighted_adjacency, second.weighted_adjacency)
 
 
@@ -131,6 +172,6 @@ def test_a_repeated_fit_is_identical(name, robust, chain) -> None:
 def test_reordering_the_columns_only_reorders_the_weights(name, robust, chain) -> None:
     """The columns are fit in the order of their ranks, so the order they arrive in is lost."""
     order = np.array([2, 0, 1])
-    base = _fit(name, chain, robust=robust, **QUICK[name]).weighted_adjacency
-    moved = _fit(name, chain[:, order], robust=robust, **QUICK[name]).weighted_adjacency
+    base = _quick_fit(name, chain, robust=robust).weighted_adjacency
+    moved = _quick_fit(name, chain[:, order], robust=robust).weighted_adjacency
     np.testing.assert_allclose(moved, base[np.ix_(order, order)], atol=1e-6)

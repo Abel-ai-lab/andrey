@@ -79,25 +79,27 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
 
 ### Colors
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| accent | `#3b5bdb` | `#6e86f5` | highlighted endpoints; links and selection |
-| ink | `#182233` | `#e8ecf5` | text; the ring of an observed node |
-| muted | `#5c6675` | `#8d97ab` | secondary text; latent nodes |
-| paper / surface_2 | `#fafbfc` / `#eef1f6` | `#0b1220` / `#182236` | grounds |
-| surface | `#ffffff` | `#121a2b` | the fill of an observed node |
-| line | `#d9dde6` | `#25314c` | a chart's axes and grid |
-| edge directed | `#3a4658` | `#98a4bd` | a resolved edge |
-| edge undirected | `#e0982b` | `#f0b357` | orientation unknown (CPDAG) |
-| edge bidirected | `#d6495b` | `#f0687a` | a hidden common cause (PAG) |
-| edge partial | `#7c5cd8` | `#a08cf0` | a circle endpoint (PAG) |
+Each token is a field of `Palette`, with one value in `andrey.viz.LIGHT` and one in
+`andrey.viz.DARK` ([`src/andrey/viz/theme.py`](src/andrey/viz/theme.py)); the
+[brand kit](docs/docs/brand.md#colors) shows the brand colors with their values.
+
+| Token | Use |
+|---|---|
+| `accent` | highlighted endpoints; links and selection |
+| `ink` | text; the ring of an observed node |
+| `muted` | secondary text; latent nodes |
+| `paper`, `surface_2` | grounds |
+| `surface` | the fill of an observed node |
+| `line` | a chart's axes and grid |
+| `edge_directed` | a resolved edge |
+| `edge_undirected` | orientation unknown (CPDAG) |
+| `edge_bidirected` | a hidden common cause (PAG) |
+| `edge_partial` | a circle endpoint (PAG) |
 
 ### Charts
 
-- **Series** take the categorical eight, in this order, safe for color blindness (light):
-  `#3b5bdb #e0982b #2e9e5b #e5573f #7c5cd8 #2f9bd0 #c74e9b #c9a227`.
-- **Magnitudes** (confidence, weight, density) take the cobalt ramp (light):
-  `#e7ebfb #bcc8f4 #7c93ee #3b5bdb #1f338f`.
+- **Series** take the eight `categorical` colors, in their order, safe for color blindness.
+- **Magnitudes** (confidence, weight, density) take the cobalt `ramp`.
 - `andrey.viz.mpl` applies both to matplotlib: `mpl.use()` or `mpl.context()` for the style,
   `mpl.cycle()` for the series colors, and `mpl.cmap()` for the ramp.
 
@@ -132,7 +134,8 @@ post or a release card gets the tint and the bold at build time (`_comparison_ta
   directed edges, causes on the left; without it, nodes sit in layers, or on a circle when no edge
   is directed.
 - Labels sit inside the nodes when every label has at most two characters, and below them
-  otherwise, the same for the whole figure.
+  otherwise, the same for the whole figure. A label below its node is outlined in the ground color
+  (`paper`), so an edge that passes under it never crosses its letters.
 - A highlighted endpoint lights up: its mark and its half of the edge turn accent, a little
   heavier, over a soft accent glow. The highlight is drawn in strokes, so it keeps its proportions
   at any size.

@@ -49,12 +49,13 @@ from .interventions import (
     Environment,
     HardIntervention,
     Intervention,
-    SoftIntervention,
     as_interventions,
     check_columns,
+    check_continuous_soft,
+    continuous_hard_values,
     env_labels,
     env_targets,
-    environments,
+    pooled_rows,
     record,
 )
 from .latent import latent_order
@@ -72,35 +73,68 @@ _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
 # selection, the temporal lag matrices, the column shuffle, and the intervention draws each get an
 # independent stream, so a change to one component's draws never shifts another's. Environment
-# ``k >= 1`` draws its noise from ``(_NOISE, k)`` and environment ``k`` its intervention values from
-# ``(_INTERVENTION, k)`` and its redrawn weights from ``(_WEIGHTS, k)``; environment 0 draws from
-# ``_NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
+# ``k >= 1`` draws its noise from ``(NOISE, k)`` and environment ``k`` its intervention values from
+# ``(INTERVENTION, k)`` and its redrawn weights from ``(WEIGHTS, k)``; environment 0 draws from
+# ``NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
 # latents, lags, columns) come off the model seed's root, the rows' streams off the seed's root;
 # without a model seed the two are one root.
-_GRAPH, _WEIGHTS, _NOISE, _LATENT, _LAG, _COLUMNS, _INTERVENTION = 0, 1, 2, 3, 4, 5, 6
+GRAPH, WEIGHTS, NOISE, _LATENT, _LAG, _COLUMNS, INTERVENTION = 0, 1, 2, 3, 4, 5, 6
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
 
-def _component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Generator:
+def component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Generator:
     """Derive an independent ``Generator`` for one pipeline component, statelessly from ``root``.
 
     Uses ``spawn_key`` extension rather than ``root.spawn()`` (which mutates a counter), so the
     stream for task ``i`` component ``c`` is a pure function of ``(root.entropy, (*root.spawn_key,
     c))`` -- reproducible regardless of submission order or worker count. A component of several
-    keys, such as ``(_NOISE, k)``, names a stream of its own.
+    keys, such as ``(NOISE, k)``, names a stream of its own.
     """
     seq = np.random.SeedSequence(entropy=root.entropy, spawn_key=(*root.spawn_key, *component))
     return np.random.default_rng(seq)
 
 
-def _column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
+def column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
     """Return the drawn index of each output column; the identity unless ``shuffle``.
 
     The permutation comes from the column stream of ``root``, so no other draw depends on it.
     """
     if not shuffle:
         return np.arange(n_observed)
-    return _component_rng(root, _COLUMNS).permutation(n_observed)
+    return component_rng(root, _COLUMNS).permutation(n_observed)
+
+
+def dataset_provenance(
+    root: np.random.SeedSequence,
+    model: np.random.SeedSequence,
+    columns: np.ndarray,
+    graph: GraphSpec,
+    d: int,
+    config: dict,
+) -> dict:
+    """Return the provenance of a sampled dataset: its seeds, column order, settings, and versions.
+
+    ``columns`` is the drawn index of each output column, ``graph`` the spec the ``d``-node graph
+    was drawn from, and ``config`` the sampler's own settings, listed after the graph's. The model's
+    seed is recorded when it is not the root's.
+    """
+    return {
+        "root_entropy": str(root.entropy),
+        "spawn_key": list(root.spawn_key),
+        **({} if model is root else {"model_entropy": str(model.entropy)}),
+        "seed_scheme": _SEED_SCHEME,
+        "column_order": columns.tolist(),
+        "config": {
+            "graph": {
+                "model": graph.name,
+                "num_nodes": d,
+                "density": graph.density,
+                "params": graph.params,
+            },
+            **config,
+        },
+        "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
+    }
 
 
 def _options(functional: Functional, noise: Noise) -> dict:
@@ -128,6 +162,10 @@ class SCM:
         The structural-equation family (for example, ``andrey.data.functional.linear()``).
     noise : Noise
         The exogenous-noise family (for example, ``andrey.data.noise.gaussian()``).
+    latents : int, default=0
+        How many of the ``d`` nodes to hide as latent confounders, chosen among nodes with at least
+        two children: ``data`` drops them, and the true graph lists them last. Temporal
+        functionals take only ``0``.
     interventions : tuple of (int, HardIntervention or SoftIntervention) pairs, default=()
         The interventions :meth:`do` applied, by column, in column order.
 
@@ -343,18 +381,11 @@ class SCM:
             )
         if self.interventions:
             envs = [dict(self.interventions)]
-        pooled = None
-        if envs is None:
-            if not isinstance(n, int | np.integer):
-                raise TypeError(f"n is one row count without envs, got {n!r}")
-            rows = int(n)
-        else:
-            if self.functional.is_temporal:
-                raise ValueError("temporal functionals take no interventions")
-            if screen is not None:
-                raise ValueError("screen is not supported under interventions")
-            pooled = environments(envs, n)
-            rows = sum(size for _, size in pooled)
+        if envs is not None and self.functional.is_temporal:
+            raise ValueError("temporal functionals take no interventions")
+        if envs is not None and screen is not None:
+            raise ValueError("screen is not supported under interventions")
+        rows, pooled = pooled_rows(envs, n)
         root = np.random.SeedSequence(seed)
         if screen is None:
             model = root if model_seed is None else np.random.SeedSequence(model_seed)
@@ -394,22 +425,22 @@ class SCM:
         envs: list[Environment] | None = None,
     ) -> CausalDataset:
         """Draw one dataset: the model from the streams of ``model``, the rows from ``root``'s."""
-        _, draw = self.graph.materialize(_component_rng(model, _GRAPH))
-        noise_rng = _component_rng(root, _NOISE)
+        _, draw = self.graph.materialize(component_rng(model, GRAPH))
+        noise_rng = component_rng(root, NOISE)
         scale_weights = np.empty(0)
         if scale == "unitless":
             weights, scales = self.functional.draw_unitless(  # ty: ignore[unresolved-attribute]  # checked in sample: Linear only
-                draw, _component_rng(model, _WEIGHTS)
+                draw, component_rng(model, WEIGHTS)
             )
         else:
-            weight_rng = _component_rng(model, _WEIGHTS)
+            weight_rng = component_rng(model, WEIGHTS)
             weights = self.functional.draw_weights(draw, weight_rng)
             # The scale weights follow the location weights in their stream, so they leave the
             # location weights and every other stream as they are.
             scale_weights = self.functional.draw_scale_weights(draw, weight_rng)
             scales = self.noise.draw_scales(draw.d, noise_rng)
             if model is not root:  # the rows' stream moves past its own scales, as without a model
-                scales = self.noise.draw_scales(draw.d, _component_rng(model, _NOISE))
+                scales = self.noise.draw_scales(draw.d, component_rng(model, NOISE))
         if self.functional.is_temporal:
             return self._sample_temporal(
                 n, draw, weights, scales, noise_rng, root, model, scale, dtype, shuffle
@@ -421,10 +452,10 @@ class SCM:
         order = np.arange(draw.d)
         node_types = None
         if self.latents > 0:
-            order = latent_order(edges, draw.d, self.latents, _component_rng(model, _LATENT))
+            order = latent_order(edges, draw.d, self.latents, component_rng(model, _LATENT))
             node_types = np.full(draw.d, OBSERVED, dtype=np.int8)
             node_types[n_obs:] = LATENT
-        columns = _column_order(model, n_obs, shuffle)
+        columns = column_order(model, n_obs, shuffle)
         order[:n_obs] = order[columns]
         if envs is None:
             innovations = self.noise.draw(n, scales, noise_rng)
@@ -460,19 +491,13 @@ class SCM:
             functional=self.functional.name,
             noise=self.noise.name,
         )
-        provenance = {
-            "root_entropy": str(root.entropy),
-            "spawn_key": list(root.spawn_key),
-            **({} if model is root else {"model_entropy": str(model.entropy)}),
-            "seed_scheme": _SEED_SCHEME,
-            "column_order": columns.tolist(),
-            "config": {
-                "graph": {
-                    "model": self.graph.name,
-                    "num_nodes": draw.d,
-                    "density": self.graph.density,
-                    "params": self.graph.params,
-                },
+        provenance = dataset_provenance(
+            root,
+            model,
+            columns,
+            self.graph,
+            draw.d,
+            {
                 "functional": self.functional.name,
                 "noise": self.noise.name,
                 **_options(self.functional, self.noise),
@@ -483,8 +508,7 @@ class SCM:
                 "shuffle": bool(shuffle),
                 **({} if envs is None else {"envs": record(envs)}),
             },
-            "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
-        }
+        )
         # Sortability is a property of the observed data over observed-observed edges.
         obs_mask = (edges[:, 0] < n_obs) & (edges[:, 1] < n_obs)
         report = qa.report(data, edges[obs_mask], n_obs, scale=scale)
@@ -523,7 +547,7 @@ class SCM:
         noise = np.concatenate(
             [
                 self.noise.draw(
-                    size, scales, noise_rng if k == 0 else _component_rng(root, _NOISE, k)
+                    size, scales, noise_rng if k == 0 else component_rng(root, NOISE, k)
                 )
                 for k, (_, size) in enumerate(envs)
             ]
@@ -544,26 +568,16 @@ class SCM:
                 continue  # its rows are the reference's
             env_weights, env_scale_weights = weights.copy(), scale_weights.copy()
             env_noise, fixed = noise[rows].copy(), {}
-            draws = _component_rng(root, _INTERVENTION, k)
-            redraws = _component_rng(model, _WEIGHTS, k)
+            draws = component_rng(root, INTERVENTION, k)
+            redraws = component_rng(model, WEIGHTS, k)
             for column, intervention in spec.items():
                 c = int(order[column])
                 if isinstance(intervention, HardIntervention):
-                    if intervention.value is None:
-                        raise ValueError(
-                            f"column {column}: hard() on a continuous variable takes a value"
-                        )
-                    target = np.full(size, intervention.value)
-                    if intervention.sd > 0:
-                        target += intervention.sd * draws.standard_normal(size)
+                    target = continuous_hard_values(intervention, column, size, draws)
                     set_values.append((rows, c, target))
                     fixed[c] = loc[c] + unit[c] * target
                     continue
-                if intervention == SoftIntervention():
-                    raise ValueError(
-                        f"column {column}: soft() changes nothing on a continuous variable; give "
-                        "shift, weight_scale, noise_scale, or weights"
-                    )
+                check_continuous_soft(intervention, column)
                 into = draw.children == c
                 if intervention.weights == "redraw":
                     if scale == "unitless":
@@ -610,7 +624,7 @@ class SCM:
             )
         innovations = self.noise.draw(n + _TEMPORAL_BURN_IN, scales, noise_rng)
         series, temporal_truth = self.functional.generate_temporal(  # ty: ignore[unresolved-attribute]  # gated by is_temporal (VAR/VARMA only)
-            draw, weights, innovations, _component_rng(model, _LAG), burn_in=_TEMPORAL_BURN_IN
+            draw, weights, innovations, component_rng(model, _LAG), burn_in=_TEMPORAL_BURN_IN
         )
         if scale == "standardize":
             series = standardize(series)
@@ -621,7 +635,7 @@ class SCM:
                 "reduce lag_density or the weight range"
             )
         # The shuffle relabels the lag-0 DAG and every lag block on both axes.
-        order = _column_order(model, draw.d, shuffle)
+        order = column_order(model, draw.d, shuffle)
         data = np.take(data, order, axis=1)
         temporal_truth = relabel_truth(temporal_truth, order)
         edges = np.stack([draw.parents, draw.children], axis=1)  # the instantaneous (lag-0) DAG
@@ -632,19 +646,13 @@ class SCM:
             functional=self.functional.name,
             noise=self.noise.name,
         )
-        provenance = {
-            "root_entropy": str(root.entropy),
-            "spawn_key": list(root.spawn_key),
-            **({} if model is root else {"model_entropy": str(model.entropy)}),
-            "seed_scheme": _SEED_SCHEME,
-            "column_order": order.tolist(),
-            "config": {
-                "graph": {
-                    "model": self.graph.name,
-                    "num_nodes": draw.d,
-                    "density": self.graph.density,
-                    "params": self.graph.params,
-                },
+        provenance = dataset_provenance(
+            root,
+            model,
+            order,
+            self.graph,
+            draw.d,
+            {
                 "functional": self.functional.name,
                 "noise": self.noise.name,
                 **_options(self.functional, self.noise),
@@ -658,8 +666,7 @@ class SCM:
                 ),  # VARMA MA order (None for VAR)
                 "shuffle": bool(shuffle),
             },
-            "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
-        }
+        )
         # Sortability targets iid data; it does not apply to a time series.
         report = QAReport(scale=scale)
         return CausalDataset(

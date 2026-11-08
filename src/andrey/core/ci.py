@@ -89,6 +89,7 @@ import numpy.typing as npt
 from scipy.special import chdtrc, gammaln, ndtr, ndtri, stdtr
 
 from . import categorical, stats
+from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
 
@@ -104,20 +105,20 @@ __all__ = [
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
-_ONE_MINUS_EPS = 1.0 - np.finfo(np.float64).eps
+ONE_MINUS_EPS = 1.0 - np.finfo(np.float64).eps
 
 # A correlation submatrix is singular when its smallest eigenvalue is at most this fraction of its
 # largest.
-_SINGULAR_RTOL = 1e-12
+SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
-_BOUND_MARGIN = 1e4
+BOUND_MARGIN = 1e4
 
 
 class SingularCorrelationError(ValueError):
     """A ``[x, y, *S]`` correlation submatrix is singular to working precision.
 
-    Its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its largest, so its inverse cannot
+    Its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its largest, so its inverse cannot
     give the partial correlation. :meth:`PartialCorrelationTest.residual_statistic_pvalues` gives it
     from the data instead. When the data hold columns that repeat others up to scale and shift,
     ``groups`` holds them as :func:`~andrey.core.score.copy_groups` returns them, and the message
@@ -158,24 +159,18 @@ class PartialCorrelationTest:
     visited. Later queries are recomputed.
 
     The scalar path, :meth:`batched_call`, :meth:`statistic_pvalues`, :meth:`marginal_pvalues`,
-    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search and GFCI's
-    separating-set search call with queries canonical as built, use identical partial-correlation,
-    clip, and p-value arithmetic.
-    Their p-values match exactly, so repeated queries take the same ``p > alpha`` decision across
-    call paths, including at the threshold.
+    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search, GFCI's
+    separating-set search, and :meth:`batched_call` call with queries canonical as built, use
+    identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
+    repeated queries take the same ``p > alpha`` decision across call paths, including at the
+    threshold.
     """
 
     # The data's groups of copies, set by the first singular inversion.
     _copies: tuple[tuple[int, ...], ...]
 
     def __init__(self, data: np.ndarray) -> None:
-        arr = np.asarray(data, dtype=np.float64)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run a partial-correlation test")
+        arr = stats.checked_matrix(data, "run a partial-correlation test")
         self._n: int = arr.shape[0]
         self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
 
@@ -228,9 +223,7 @@ class PartialCorrelationTest:
             var = (x_int, y_int, *cond)
             inv = self._invert(corr[np.ix_(var, var)][None])[0]
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
-        return (
-            -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
-        )
+        return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of data columns that repeat one another up to scale and shift.
@@ -263,8 +256,14 @@ class PartialCorrelationTest:
         :meth:`__call__`; queries are grouped by set size so each size is evaluated in one
         vectorized shot, and the p-values match :meth:`__call__` exactly. A single-set
         batch takes the scalar path. Nothing is retained once the list is returned.
+
+        A batch of sets of one size, such as an ``(N, m)`` int array, is sorted as one array instead
+        of one set at a time and goes to ``_canonical_pvalues`` whole; a batch with mixed sizes, a
+        repeated member, or ``x`` or ``y`` in a set takes the per-set path, which canonicalizes it
+        or raises.
         """
-        condition_sets = list(condition_sets)
+        if not isinstance(condition_sets, np.ndarray):
+            condition_sets = list(condition_sets)
         n = len(condition_sets)
         if n == 0:
             return []
@@ -272,6 +271,19 @@ class PartialCorrelationTest:
             return [self(x, y, condition_sets[0])]
 
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        try:
+            same_size = np.sort(np.asarray(condition_sets, dtype=np.intp), axis=1)
+        except (TypeError, ValueError):  # sets of mixed sizes, or members that are not numbers
+            same_size = None
+        if (
+            same_size is not None
+            and same_size.ndim == 2
+            and not (same_size[:, 1:] == same_size[:, :-1]).any()
+            and not ((same_size == x_int) | (same_size == y_int)).any()
+        ):
+            xs = np.full(n, x_int, dtype=np.intp)
+            return self._canonical_pvalues(xs, np.full_like(xs, y_int), same_size).tolist()
+
         results: list[float | None] = [None] * n
         groups: dict[int, list[tuple[int, list[int]]]] = {}
         for i, condition_set in enumerate(condition_sets):
@@ -359,7 +371,7 @@ class PartialCorrelationTest:
             var[:, 2:] = conds
             inv = self._invert(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
-        r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
     def residual_statistic_pvalues(
@@ -403,7 +415,7 @@ class PartialCorrelationTest:
                     "partial-correlation test"
                 )
             r[k] = (residual[:, 0] @ residual[:, 1]) / math.sqrt(spread[0] * spread[1])
-        r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
     def marginal_pvalues(self) -> np.ndarray:
@@ -415,7 +427,7 @@ class PartialCorrelationTest:
         correlation matrix. The diagonal is self-correlation and is not meaningful.
         """
         df = self._degrees_of_freedom(0)
-        r = np.clip(self._corr, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        r = np.clip(self._corr, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return np.asarray(self._pvalue(r, df))
 
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
@@ -793,12 +805,6 @@ _MEANS_FILLED = np.zeros((_MEANS_N + 1, _MEANS_N + 1), dtype=bool)  # by n and c
 # A block of tests counted by :meth:`ChiSquare._given`: the positions of its tests in the scan,
 # their table bounds, their statistics, and the margins of their tables.
 _Counted = tuple[np.ndarray, np.ndarray, np.ndarray, _Margins]
-# The batched chi-square path takes a test whose conditioning set's configurations times its table
-# cells are at most max(_TABLE_ROWS * n, _TABLE_MIN), and the scalar path above.
-_TABLE_ROWS = 4
-_TABLE_MIN = 1 << 16
-# The most row indices, table cells, or Gram-matrix entries one batched count holds.
-_BATCH_CELLS = 1 << 22
 
 
 def _segment_sums(values: np.ndarray, cuts: np.ndarray) -> np.ndarray:
@@ -902,13 +908,7 @@ class ChiSquare:
     """
 
     def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
+        arr = stats.checked_matrix(data, "run a chi-square test", dtype=None)
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
         # Each column's codes as one contiguous row, for the batched counts and for numbering
@@ -982,10 +982,10 @@ class ChiSquare:
 
         Each pair is ordered as :meth:`__call__` orders it. The pairs whose tables over the
         configurations of ``cond`` have at most ``_DENSE_CELLS`` cells are counted together, in
-        blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
+        blocks of at most ``BATCH_CELLS`` row indices and table cells, a block per table shape;
         the others, and a single pair, take the scalar path. The blocks of a scan are counted
         first, and their degrees of freedom are evaluated together (:func:`_null_means_batch`),
-        for as many blocks as hold ``_BATCH_CELLS`` table cells at once. Without ``cond``, the
+        for as many blocks as hold ``BATCH_CELLS`` table cells at once. Without ``cond``, the
         pairs answered before are read from the kept answers (:meth:`_marginal_memo`).
         """
         a, b = np.minimum(xs, ys), np.maximum(xs, ys)
@@ -1021,9 +1021,9 @@ class ChiSquare:
                 for i in members:
                     statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
                 continue
-            step = max(1, _BATCH_CELLS // max(n, m * cells))
+            step = max(1, BATCH_CELLS // max(n, m * cells))
             # Each row's first cell in its configuration. A block's tables hold at most
-            # max(_BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
+            # max(BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
             # rows' dtype.
             dtype = self._rows.dtype
             first = (layer * cells).astype(dtype)
@@ -1040,7 +1040,7 @@ class ChiSquare:
                     (part, bounds, *self._table_sums(tables.reshape(-1, kx, ky), bounds))
                 )
                 held += tables.size
-                if held >= _BATCH_CELLS:
+                if held >= BATCH_CELLS:
                     self._refer(counted, statistics, p_values)
                     counted, held = [], 0
         self._refer(counted, statistics, p_values)
@@ -1164,12 +1164,12 @@ class ChiSquare:
         total = int(cards.sum())
         x = 0
         while x < d - 1:
-            if self._n == 0 or int(cards[x]) * total > _BATCH_CELLS:
+            if self._n == 0 or int(cards[x]) * total > BATCH_CELLS:
                 out[x, x + 1 :] = [self(x, y) for y in range(x + 1, d)]
                 x += 1
                 continue
             stop = x + 1
-            while stop < d - 1 and int(cards[x : stop + 1].sum()) * total <= _BATCH_CELLS:
+            while stop < d - 1 and int(cards[x : stop + 1].sum()) * total <= BATCH_CELLS:
                 stop += 1
             self._marginal_block(out, x, stop, offsets, total)
             x = stop
@@ -1183,7 +1183,7 @@ class ChiSquare:
         cards = self._cardinalities
         first = int(offsets[start])
         gram = np.zeros((int(offsets[stop - 1] + cards[stop - 1]) - first, total))
-        step = max(1, _BATCH_CELLS // total)
+        step = max(1, BATCH_CELLS // total)
         for row in range(0, n, step):
             codes = self._codes[row : row + step]
             indicators = np.zeros((len(codes), total))
@@ -1196,8 +1196,8 @@ class ChiSquare:
         for shape in np.unique(shapes):
             pairs = np.flatnonzero(shapes == shape)
             kx, ky = int(cards[xs[pairs[0]]]), int(cards[ys[pairs[0]]])
-            for at in range(0, pairs.size, max(1, _BATCH_CELLS // (kx * ky))):
-                part = pairs[at : at + max(1, _BATCH_CELLS // (kx * ky))]
+            for at in range(0, pairs.size, max(1, BATCH_CELLS // (kx * ky))):
+                part = pairs[at : at + max(1, BATCH_CELLS // (kx * ky))]
                 rows = offsets[xs[part], None, None] - first + np.arange(kx)[:, None]
                 cols = offsets[ys[part], None, None] + np.arange(ky)
                 tables = gram[rows, cols].astype(np.int64)
@@ -1217,7 +1217,7 @@ class ChiSquare:
         cards = self._cardinalities
         kx, ky = int(cards[x]), int(cards[y])
         cells = kx * ky
-        limit = max(_TABLE_ROWS * n, _TABLE_MIN)
+        limit = max(DENSE_ROWS * n, DENSE_MIN)
         by_size: dict[int, list[int]] = {}
         configurations = [math.prod(int(cards[c]) for c in cond) for cond in conds]
         for i, cond in enumerate(conds):
@@ -1228,14 +1228,14 @@ class ChiSquare:
         if not by_size:
             return statistics, p_values
         target = self._rows[x] * ky + self._rows[y]  # each row's (x, y) cell
-        rows_per_block = max(1, _BATCH_CELLS // n)
+        rows_per_block = max(1, BATCH_CELLS // n)
         for size, members in by_size.items():
             start = 0
             while start < len(members):
                 stop, held = start + 1, configurations[members[start]] * cells
                 while stop < len(members) and stop - start < rows_per_block:
                     held += configurations[members[stop]] * cells
-                    if held > _BATCH_CELLS:
+                    if held > BATCH_CELLS:
                         break
                     stop += 1
                 block = members[start:stop]
@@ -1550,7 +1550,7 @@ class DGTest:
         wx_t = np.ascontiguousarray(np.swapaxes(wx, 1, 2))
         wy = np.swapaxes(np.ascontiguousarray(np.swapaxes(wy, 1, 2)), 1, 2)
         rho = np.linalg.svd(wx_t @ block[full][:, :px, px:] @ wy, compute_uv=False)
-        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * np.sum(np.log1p(-(rho * rho)), axis=1)
         out[full] = chdtrc(px * py, np.maximum(statistic, 0.0))
         return out
@@ -1583,7 +1583,7 @@ class DGTest:
         if dof == 0:
             return 0.0, 1.0
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
-        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
@@ -1732,13 +1732,13 @@ class CGTest:
 
 # The module and class of each nonlinear test. Building one imports only its own module: GPDC's
 # loads scikit-learn, which takes a second or more.
-_NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
+NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "kci": ("ci_kernel", "KCI"),
     "rcot": ("ci_kernel", "RCoT"),
     "cmiknn": ("ci_cmiknn", "CMIknn"),
     "gpdc": ("ci_gpdc", "GPDC"),
 }
-NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
+NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(NONLINEAR_CLASSES)
 #: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
 #: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
 STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
@@ -1746,7 +1746,7 @@ STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
     """Build the nonlinear test ``name`` over ``data`` with ``options``."""
-    module, cls = _NONLINEAR_CLASSES[name]
+    module, cls = NONLINEAR_CLASSES[name]
     test = getattr(importlib.import_module(f"{__package__}.{module}"), cls)
     return test(data, **options)
 
@@ -1768,6 +1768,12 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+#: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
+CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
+    name
+    for name in SHIPPED_INDEP_TESTS
+    if name not in DISCRETE_INDEP_TESTS and name not in MIXED_INDEP_TESTS
+)
 _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,
@@ -1857,19 +1863,6 @@ def _has_nan(data: np.ndarray) -> bool:
     return arr.dtype.kind == "f" and bool(np.isnan(arr).any())
 
 
-def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:
-    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity, or on
-    fewer than ``min_rows`` rows."""
-    arr = np.asarray(data, dtype=np.float64)
-    if arr.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
-    if arr.shape[0] < min_rows:
-        raise ValueError(f"{test_name} needs at least {min_rows} rows, got {arr.shape[0]}")
-    if not np.isfinite(arr).all():
-        raise ValueError(f"data contains NaN or Inf; cannot run {test_name} test")
-    return arr
-
-
 def pins_blas(test: CITest) -> bool:
     """Whether a skeleton search runs ``test`` with BLAS pinned to one thread.
 
@@ -1889,7 +1882,7 @@ def pins_blas(test: CITest) -> bool:
 def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
     """Invert a ``(N, k, k)`` stack of correlation submatrices; raise if any is singular.
 
-    A submatrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    A submatrix is singular when its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its
     largest; :class:`ValueError` reports it. ``np.linalg.inv`` alone does not decide this: it raises
     only on an exactly zero pivot, which OpenBLAS reaches on a duplicated column while Apple
     Accelerate can return a finite inverse instead. The eigenvalues decide on every backend.
@@ -1898,12 +1891,12 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
     submatrix of a sample correlation matrix: unit diagonal, positive semidefinite up to rounding.
     So ``lambda_max(A) <= trace(A) <= k``. The eigenvalue of smallest magnitude is
     ``1 / ||A^-1||_2 >= 1 / (k * max |A^-1_ij|)``, and when that is far above the rounding it is
-    positive, so it is ``lambda_min(A)``. With ``c = _BOUND_MARGIN * _SINGULAR_RTOL``, a row whose
+    positive, so it is ``lambda_min(A)``. With ``c = BOUND_MARGIN * SINGULAR_RTOL``, a row whose
     inverse has every entry below ``1 / (c * k**2)`` thus has ``lambda_min > c * lambda_max`` and
     passes the eigenvalue test. The bound reads every entry of the computed inverse, not only its
     trace or diagonal, so a NaN, an infinity, or a single huge entry fails it. The LU inverse is
     backward stable on every LAPACK, so the computed inverse of a nearly singular matrix has
-    entries of order ``1 / lambda_min`` and fails the bound. ``_BOUND_MARGIN`` absorbs the rounding
+    entries of order ``1 / lambda_min`` and fails the bound. ``BOUND_MARGIN`` absorbs the rounding
     of the inverse and the eigenvalues.
 
     The rows that fail the bound take the eigenvalue test. When ``np.linalg.inv`` raises, the
@@ -1917,7 +1910,7 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
         _raise_if_singular(stack)
         return np.linalg.inv(stack)
     size = stack.shape[-1]
-    limit = 1.0 / (_BOUND_MARGIN * _SINGULAR_RTOL * size * size)
+    limit = 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size)
     unsettled = ~(np.abs(inv).max(axis=(1, 2)) < limit)  # NaN fails the comparison too
     if unsettled.any():
         _raise_if_singular(stack[unsettled])
@@ -1927,11 +1920,11 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
 def _raise_if_singular(stack: np.ndarray) -> None:
     """Raise :class:`ValueError` if a matrix of the ``(N, k, k)`` stack is singular.
 
-    A matrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    A matrix is singular when its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its
     largest.
     """
     w = np.linalg.eigvalsh(stack)  # (N, k), ascending per row
-    if (w[:, 0] <= w[:, -1] * _SINGULAR_RTOL).any():
+    if (w[:, 0] <= w[:, -1] * SINGULAR_RTOL).any():
         raise SingularCorrelationError(
             "correlation matrix is singular; cannot run a partial-correlation test"
         )

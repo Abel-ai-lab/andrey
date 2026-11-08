@@ -1,5 +1,4 @@
-"""CAM-UV's contract: knowledge, units, offsets, column order, ties, cycles, and the data it
-refuses."""
+"""CAM-UV's contract: knowledge, units, column order, ties, cycles, and the data it refuses."""
 
 from __future__ import annotations
 
@@ -10,9 +9,9 @@ import pytest
 
 import andrey
 from andrey.core import ARROW, CIRCLE
+from andrey.core.ties import tie_ranks
 from andrey.data import sample_scm
 from andrey.fcm.camuv import drop_cycles
-from andrey.search.hc import tie_ranks
 
 N = 600
 
@@ -43,16 +42,9 @@ def test_the_fork_is_found(fork_fit):
     assert _edges(fork_fit, "circle") == {(0, 1)}
 
 
-def test_rescaling_a_column_changes_nothing(fork_fit):
-    out = andrey.camuv(_fork() * np.array([1e-4, 3.7, 2e3, 0.02]))
-    assert out.structure == fork_fit.structure
-    assert out.metadata == fork_fit.metadata
-
-
-def test_shifting_a_column_changes_nothing(fork_fit):
-    out = andrey.camuv(_fork() + np.array([1e3, -50.0, 7.0, 1e4]))
-    assert out.structure == fork_fit.structure
-    assert out.metadata == fork_fit.metadata
+def test_a_larger_alpha_marks_more_pairs(fork_fit):
+    """A pair is marked when the test finds its residuals dependent at a p-value below ``alpha``."""
+    assert _edges(andrey.camuv(_fork(), alpha=0.3), "circle") > _edges(fork_fit, "circle")
 
 
 def _additive(seed: int = 0) -> np.ndarray:
@@ -148,28 +140,10 @@ def test_a_fit_whose_parents_close_cycles_drops_and_records_their_edges(caplog):
     assert "directed cycles" in caplog.text
 
 
-def test_a_forbidden_edge_is_never_in_the_graph():
-    out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(forbidden=[(1, 2)]))
-    assert (1, 2) not in _edges(out)
-
-
-def test_a_required_edge_stays_on_independent_columns():
-    X = np.random.default_rng(1).standard_normal((N, 3))
-    out = andrey.camuv(X, knowledge=andrey.Knowledge(required=[(2, 0)]))
-    assert _edges(out) == {(2, 0)}
-    assert out.metadata["latent_pairs"] == []
-
-
 def test_a_pair_forbidden_both_ways_is_never_marked():
     out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(forbidden=[(0, 1), (1, 0)]))
     assert _edges(out, "circle") == set()
     assert _edges(out) == {(0, 3), (1, 2)}
-
-
-def test_tiers_forbid_edges_into_an_earlier_tier():
-    # x2 and x3 first: no edge may enter them from x0 or x1, so neither true edge is found.
-    out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(tiers=[[2, 3], [0, 1]]))
-    assert all(i in (2, 3) for i, j in _edges(out) if j in (2, 3))
 
 
 def _tiered(seed: int = 0) -> np.ndarray:

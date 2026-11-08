@@ -82,7 +82,7 @@ def test_canonical_queries_match_the_scalar_loop(
     monkeypatch: pytest.MonkeyPatch, canonical, scalar, chunk, max_depth, in_column_order, seed
 ) -> None:
     if chunk is not None:
-        monkeypatch.setattr(_skeleton, "_CHUNK", chunk)
+        monkeypatch.setattr(_skeleton, "CHUNK", chunk)
     X, cpdag = _case(seed)
     results = []
     for kind in (canonical, scalar):

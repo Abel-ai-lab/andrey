@@ -16,7 +16,7 @@ from collections.abc import Callable
 import numpy as np
 
 from andrey.core import stats
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 #: The measures a DirectLiNGAM order search takes, in the order the facades list them.
 MEASURES = ("pwling", "skew", "tanh")
@@ -32,7 +32,7 @@ _TIE_TOL = 1e-10
 # entropy differs by CPU. Copies, exact or perturbed by 1e-12, measure < 2e-15 at every step;
 # rank-transformed near-copies with |corr| up to 0.999999 measure > 7e-6, and scoring both columns
 # of a pair gave orders that differed between CPUs only below 1e-14.
-_COPY_TOL = 1e-12
+COPY_TOL = 1e-12
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -157,7 +157,7 @@ def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
     ``scores`` are aligned with ``candidates`` and ``<= 0`` or NaN; two tie when their
     ``sqrt(-score)`` values both lie within ``_TIE_TOL`` of the best one. A NaN score ranks highest,
     as under ``np.argmax``; all NaN candidates then tie. ``ranks`` is indexed by column, as
-    :func:`~andrey.search.hc.tie_ranks` returns for the input data.
+    :func:`~andrey.core.ties.tie_ranks` returns for the input data.
     """
     norm = np.sqrt(-np.asarray(scores, dtype=np.float64))
     nan = np.isnan(norm)
@@ -168,7 +168,7 @@ def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
 def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> dict[int, list[int]]:
     """Each candidate in ``U`` that represents its copies, mapped to those copies.
 
-    Two columns are copies when, in any of ``groups``, one leaves at most ``_COPY_TOL`` of the
+    Two columns are copies when, in any of ``groups``, one leaves at most ``COPY_TOL`` of the
     other's variance unexplained; a copy group is a connected set of such pairs. Its
     representative is the column that ranks first by ``ranks`` (as :func:`pick` uses), and its
     copies follow in ``ranks`` order. Representatives keep their order in ``U``; a column without
@@ -179,7 +179,7 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
     for X in groups:
         cov = np.cov(X[:, U], rowvar=False, ddof=0).reshape(k, k)
         var = np.diag(cov)
-        linked |= cov * cov.T >= (1.0 - _COPY_TOL) * np.outer(var, var)
+        linked |= cov * cov.T >= (1.0 - COPY_TOL) * np.outer(var, var)
     np.fill_diagonal(linked, False)
     if not linked.any():
         return {u: [] for u in U}
@@ -210,7 +210,7 @@ def find_causal_order(
 
     Each pick is residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
-    Ties and copy representatives are decided by :func:`~andrey.search.hc.tie_ranks` of the input
+    Ties and copy representatives are decided by :func:`~andrey.core.ties.tie_ranks` of the input
     columns, which are identical on every machine and keep their ranks when the columns are
     reordered; residualized columns differ in the last bits across machines. Single-dataset;
     MultiGroupDirectLiNGAM runs its own group loop (per-group residualization), reusing

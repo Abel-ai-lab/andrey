@@ -10,30 +10,23 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, backend
+from andrey.core import GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
-from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, Score, make_score
+from andrey.core.orient import cpdag_of_pdag, pdag2dag, to_structure
+from andrey.core.score import Score, make_score
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_mask, tie_ranks
+from andrey.search import _parallel_ges
 from andrey.search import operators as ops
-from andrey.search.hc import tie_ranks
-
-
-def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
-    """Canonicalize a search PDAG to its CPDAG via a consistent DAG extension."""
-    return _cpdag_of_pdag(adj)
 
 
 def required_dag(constraints: Constraints) -> np.ndarray:
     """The DAG made of the required edges, as a mark matrix: where a search under knowledge starts,
     once taken to its equivalence class."""
-    dag = np.zeros(constraints.required.shape, dtype=np.int8)
-    dag[constraints.required] = TAIL
-    dag[constraints.required.T] = ARROW
-    return dag
+    return endpoint_marks(constraints.required)
 
 
-def _reachable(adj: np.ndarray):
+def reachability(adj: np.ndarray):
     """Return ``reachable(y, x, clique)`` for the CPDAG ``adj``, the full-rescan references' check.
 
     ``reachable(y, x, clique)`` is ``True`` when ``x`` is semi-directed reachable from ``y`` once
@@ -43,7 +36,7 @@ def _reachable(adj: np.ndarray):
     return lambda y, x, clique: not ops.blocks_semi_directed_paths(succ, y, x, clique)
 
 
-def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
+def recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
     """Total score of the CPDAG found: ``sum_v score(v, Pa_v)`` over a consistent DAG extension.
 
     The objective is recomputed from the final structure rather than accumulated from the search's
@@ -75,10 +68,6 @@ def _parent_limits(
     return (max_parents, None) if rule == "gate" else (None, max_parents)
 
 
-#: The local scores :func:`ges` accepts.
-GES_SCORES: tuple[str, ...] = SCORES
-
-
 def ges(
     data: np.ndarray,
     *,
@@ -90,6 +79,7 @@ def ges(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
+    sources: tuple[int, ...] = (),
     _parent_rule: str = "cap",
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -141,7 +131,12 @@ def ges(
         result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
-        ``andrey.config.n_jobs``.
+        ``andrey.config.n_jobs``. With ``sources``, every pass runs in this process.
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: no Insert adds an edge
+        into one, and after every move the edges at them are directed out of them, with Meek's
+        rules orienting what follows (:func:`~andrey.search._parallel_ges.out_of`), so the search
+        moves over partially directed graphs. Empty, the default, leaves every variable free.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
@@ -151,13 +146,12 @@ def ges(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and its total score.
+        The CPDAG (``kind="cpdag"``) and its total score; with ``sources``, the partially directed
+        graph that also directs their edges.
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     gate, cap = _parent_limits(n, max_parents, _parent_rule)
-    if score_func not in GES_SCORES:
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
     score = make_score(
         score_func,
         X,
@@ -169,22 +163,12 @@ def ges(
 
     adj = np.zeros((n, n), dtype=np.int8)
     if constraints is not None and constraints.required.any():
-        adj = _cpdag_of_pdag(required_dag(constraints))
-    if cap is not None and ops.exceeds_parent_cap(adj, cap):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents "
-            "in some graph of their class"
-        )
-    # Local import breaks the ges <-> _parallel_ges cycle.
-    from andrey.search import _parallel_ges
-
+        adj = cpdag_of_pdag(required_dag(constraints))
+    ops.check_parent_cap(adj, cap, in_class=True)
     # Pin BLAS to one thread for the score-diff loops (the covariance above is already computed):
     # multi-thread BLAS reduction order is not bit-stable, so pinning makes the score host- and
     # thread-count-reproducible and equal to the (1-thread) parallel workers.
-    mask = np.full(n, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        mask = column_mask(categorical, n)
-    ranks = tie_ranks(X, mask).tolist()
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, n)).tolist()
     with backend.one_blas_thread():
         workers = backend.worker_count(workers) if n > 1 else 1
         adj = _parallel_ges.run_ges(
@@ -196,8 +180,9 @@ def ges(
             ranks=ranks,
             constraints=constraints,
             cap=cap,
+            sources=sources,
         )
-        total = _recompute_objective(adj, score, n)
+        total = recompute_objective(adj, score, n)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

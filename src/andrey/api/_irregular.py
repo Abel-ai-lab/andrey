@@ -28,9 +28,9 @@ from ._marks import marks_from_signed
 
 
 def _coerce_float(value: Any) -> float:
-    """Coerce a p-value to a plain ``float`` (PNL returns each as a shape-``(1,)`` array).
+    """Return a p-value or a statistic as a plain ``float``.
 
-    ``_check_json_safe`` rejects numpy scalars / arrays, so metadata must hold Python ``float``.
+    PNL returns each as a shape-``(1,)`` array, which this flattens.
     """
     return float(np.asarray(value, dtype=np.float64).ravel()[0])
 
@@ -83,7 +83,7 @@ def _direction(
     return 1 if forward and not backward else -1 if backward and not forward else 0
 
 
-def _pairwise_output(
+def pairwise_output(
     pval_forward: Any,
     pval_backward: Any,
     *,
@@ -93,11 +93,14 @@ def _pairwise_output(
     labels: tuple[str, ...] | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> StructureOutput:
-    """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
+    """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    Test statistics, when given, decide a p-value tie and go in ``metadata["statistics"]`` under
-    the same keys; ``extra`` adds its entries after them.
+    Each test statistic, when given, is an HSIC statistic divided by its mean under independence:
+    with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without
+    them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the
+    same keys. A p-value or statistic may be a shape-``(1,)`` array (:func:`_coerce_float`).
+    ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -131,65 +134,10 @@ def _pairwise_output(
     )
 
 
-def _adapt_anm(
-    pval_forward: Any,
-    pval_backward: Any,
-    *,
-    stat_forward: Any = None,
-    stat_backward: Any = None,
-    alpha: float | None = None,
-    labels: tuple[str, ...] | None = None,
-    extra: Mapping[str, Any] | None = None,
-) -> StructureOutput:
-    """Convert ANM p-values, and the statistics when given, to a two-node ``dag`` and metadata.
-
-    Each statistic is an HSIC statistic divided by its mean under independence. With
-    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
-    gives no edge. ``extra`` adds metadata entries, such as ``rows_tested``.
-    """
-    return _pairwise_output(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=extra,
-    )
-
-
-def _adapt_pnl(
-    pval_forward: Any,
-    pval_backward: Any,
-    *,
-    stat_forward: Any = None,
-    stat_backward: Any = None,
-    alpha: float | None = None,
-    labels: tuple[str, ...] | None = None,
-    extra: Mapping[str, Any] | None = None,
-) -> StructureOutput:
-    """Convert PNL p-values, and the statistics when given, to a two-node ``dag`` and metadata.
-
-    Each statistic is an HSIC statistic divided by its mean under independence. With
-    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
-    gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
-    converts it to a Python ``float``. ``extra`` adds metadata entries, such as ``rows_tested``.
-    """
-    return _pairwise_output(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=extra,
-    )
-
-
 # ---- RCD (latent-confounder adjacency) ----------------------------------------------------------
 
 
-def _adapt_rcd(model: Any) -> StructureOutput:
+def adapt_rcd(model: Any) -> StructureOutput:
     """RCD ``adjacency_matrix_`` -> directed edges + bidirected ``<->`` for ``NaN`` cells.
 
     Finite nonzero ``B[i, j]`` is edge ``j -> i``; a ``NaN`` cell marks a latent confounder and
@@ -199,7 +147,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
     ``[i, j]`` lists, ride in ``metadata["confounded_pairs"]``.
     """
     B = _adjacency(model)
-    M = marks_from_signed(B, nan_mark="bidirected")
+    M = marks_from_signed(B, nan_mark=ARROW)
     structure = GraphStructure.from_numpy(M, kind="pag")
     return structure_output(
         structure,
@@ -211,7 +159,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
 
 
-def _adapt_bottom_up_parce(
+def adapt_bottom_up_parce(
     model: Any, arrowheads: np.ndarray | None = None, *, required: np.ndarray | None = None
 ) -> StructureOutput:
     """BottomUpParceLiNGAM adjacency -> directed edges + circle ``o-o`` at ``NaN`` cells.
@@ -227,7 +175,7 @@ def _adapt_bottom_up_parce(
     pair ``i - j``, and ``required[i, j]`` makes ``i -> j`` an edge even where its weight is ``0``.
     """
     B = _adjacency(model)
-    M = marks_from_signed(B, nan_mark="circle")
+    M = marks_from_signed(B, nan_mark=CIRCLE)
     if arrowheads is not None:
         M[arrowheads & (M == CIRCLE)] = ARROW
     if required is not None:

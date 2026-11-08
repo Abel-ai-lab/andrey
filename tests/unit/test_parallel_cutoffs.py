@@ -1,5 +1,5 @@
-"""The worker-pool cutoffs of GES and the skeleton search: the default warns once, explicit values
-do not, results hold.
+"""The worker-pool cutoffs of GES, the skeleton search, and the possible-d-separation search: the
+default warns once, explicit values do not, results hold.
 
 Controlled inputs only; the calibrator's search runs on fake timing functions, and its real timers
 run on the smallest passes.
@@ -7,6 +7,7 @@ run on the smallest passes.
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import json
 import os
@@ -44,9 +45,16 @@ def _cutoff_warnings(caught):
     return [w for w in caught if w.category is andrey.PerformanceWarning]
 
 
+def _once(fn, repeats):
+    """One timed run of ``fn``, standing in for the calibrator's median of several."""
+    t0 = time.perf_counter()
+    fn()
+    return time.perf_counter() - t0
+
+
 def _small_default(monkeypatch, method, cutoff):
     """Set the built-in cutoff of ``method`` so a six-variable fit reaches the warning threshold."""
-    monkeypatch.setattr(METHODS[method], "_DEFAULT_MIN_WORK", cutoff)
+    monkeypatch.setattr(METHODS[method], "MIN_POOL_GES_WORK", cutoff)
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -59,7 +67,6 @@ def test_default_cutoff_warns_once_naming_the_setting_and_command(method, monkey
     [warning] = _cutoff_warnings(caught)
     assert f"{cal.METHODS[method].variable}=300" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 
@@ -78,7 +85,7 @@ def test_the_default_cutoff_warns_once_the_largest_pass_reaches_a_tenth_of_it(d,
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         _fit("ges", workers=2, d=d)
-    reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg._DEFAULT_MIN_WORK
+    reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg.MIN_POOL_GES_WORK
     assert reached is warns  # the case lands on the side it names
     assert len(_cutoff_warnings(caught)) == int(reached)
 
@@ -92,7 +99,7 @@ def test_an_explicit_cutoff_never_warns(method, value, monkeypatch):
     """
     _small_default(monkeypatch, method, 300)
     if value == "default":
-        value = str(METHODS[method]._DEFAULT_MIN_WORK)
+        value = str(METHODS[method].MIN_POOL_GES_WORK)
     monkeypatch.setenv(cal.METHODS[method].variable, value)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -132,7 +139,7 @@ def test_a_fit_on_the_default_cutoff_runs_in_one_process(monkeypatch):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.PerformanceWarning)
         parallel = _fit("ges", workers=2, d=64)
-    assert 0 < pg.largest_pass_work < pg._DEFAULT_MIN_WORK
+    assert 0 < pg.largest_pass_work < pg.MIN_POOL_GES_WORK
     np.testing.assert_array_equal(parallel, _fit("ges", workers=1, d=64))
 
 
@@ -178,7 +185,7 @@ def test_bracket_extends_above_the_grid_and_stops_at_the_cap():
     serial, pooled = _timers(lambda d: 1.0, lambda d: 2.0, calls)  # the pool never pays
     c = cal.bracket(serial, pooled, grid=(16, 32, 64, 128))
     assert (c.below, c.above) == (cal._MAX_D, None)
-    assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg._DEFAULT_MIN_WORK)  # never below it
+    assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg.MIN_POOL_GES_WORK)  # never below it
     assert max(calls) == cal._MAX_D
 
 
@@ -207,12 +214,22 @@ def test_fits_never_run_the_calibrator(monkeypatch):
     def refuse(*args, **kwargs):
         raise AssertionError("a fit started calibration")
 
-    for name in ("bracket", "calibrate", "fit_timers", "skeleton_timers", "skeleton_pass", "_time"):
+    for name in (
+        "bracket",
+        "calibrate",
+        "fit_timers",
+        "skeleton_timers",
+        "skeleton_pass",
+        "dsep_timers",
+        "dsep_test",
+        "_time",
+    ):
         monkeypatch.setattr(cal, name, refuse)
     for method in METHODS:
         _fit(method, workers=2)
     with andrey.config(n_jobs=2):
         andrey.pc(cal.sample(12))
+        andrey.fci(cal.sample(8))
 
 
 def test_calibrate_command_prints_the_settings(capsys, monkeypatch):
@@ -313,7 +330,6 @@ def test_the_default_skeleton_cutoff_warns_once_naming_the_setting_and_command(p
     [warning] = _skeleton_warnings(probe)  # two pools, one warning
     assert f"{SKELETON_VARIABLE}={8 * probe.tests}" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 
@@ -374,13 +390,7 @@ def test_the_skeleton_timers_pool_only_the_pooled_arm_and_restore_the_cutoff(mon
 
 def test_the_skeleton_calibrator_measures_a_cutoff_and_the_pool_start(monkeypatch):
     """Run on the smallest passes: one timed run each, a probe that stops at 16 variables."""
-
-    def once(fn, repeats):
-        t0 = time.perf_counter()
-        fn()
-        return time.perf_counter() - t0
-
-    monkeypatch.setattr(cal, "_time", once)
+    monkeypatch.setattr(cal, "_time", _once)
     monkeypatch.setattr(cal, "GRID", (8, 12))
     monkeypatch.setattr(cal, "_MAX_D", 16)
     monkeypatch.setattr(cal, "SKELETON_SIZES", {2: 6})
@@ -438,6 +448,150 @@ def test_the_skeleton_cutoff_defaults_to_the_built_in_when_the_pool_never_wins()
     c = cal.bracket(lambda d: 1.0, lambda d: 2.0, grid=(16,), method="skeleton", work=lambda d: d)
     assert c.below == cal._MAX_D and c.above is None
     assert c.cutoff == sk.MIN_POOL_QUERIES  # the largest probe's work is far below the default
+
+
+# --- the possible-d-separation cutoff -----------------------------------------------------------
+#
+# The probe over eight variables searches the pair 0 and 1 over six candidates, 63 subsets, none of
+# which separates them. The gate reads the cutoff at the first search, so it is asked directly.
+
+DSEP_VARIABLE = cal.METHODS["possible_dsep"].variable
+DSEP_SUBSETS = 63
+
+
+@pytest.fixture(scope="module")
+def dsep_probe():
+    return cal.dsep_test(8)
+
+
+def _dsep_warnings(test, workers=2, searches=2):
+    """The cutoff warnings of ``searches`` gates of the probe's search, each on a pool of
+    ``workers``."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(searches):
+            pool = sk.SkeletonWorkerPool(test, workers)
+            try:
+                assert not pool.takes_search(DSEP_SUBSETS)  # every case keeps it in this process
+            finally:
+                pool.close()
+    return _cutoff_warnings(caught)
+
+
+def test_the_possible_dsep_calibrator_reads_the_built_in_cutoff(monkeypatch):
+    method = cal.METHODS["possible_dsep"]
+    assert method.variable == "ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK" and method.at_cutoff
+    assert method.default() == sk.MIN_POOL_DSEP_SUBSETS
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", 123)
+    assert method.default() == 123
+
+
+def test_the_possible_dsep_timers_test_every_subset_and_pool_only_the_pooled_arm(
+    dsep_probe, monkeypatch
+):
+    from andrey.constraint._skeleton import CHUNK, blocks, first_separating_subset
+
+    order = (block for size in range(1, 7) for block in blocks(6, size, CHUNK))
+    assert first_separating_subset(dsep_probe, 0, 1, range(2, 8), (0, 0, 0), order, 0.05) is None
+    created = []
+    real = sk.ProcessPoolExecutor
+    monkeypatch.setattr(
+        sk, "ProcessPoolExecutor", lambda *a, **k: created.append(k) or real(*a, **k)
+    )
+    serial, pooled, work = cal.dsep_timers(workers=2)
+    assert serial(8) > 0 and not created
+    assert pooled(8) > 0 and created
+    assert work(8) == DSEP_SUBSETS
+
+
+def test_the_possible_dsep_calibrator_measures_a_cutoff_in_subsets(monkeypatch):
+    """Run on the smallest searches: one timed run each, a probe from four to ten variables."""
+    monkeypatch.setattr(cal, "_time", _once)
+    tiny = dataclasses.replace(cal.METHODS["possible_dsep"], sizes=((6, 8), 4, 10))
+    monkeypatch.setitem(cal.METHODS, "possible_dsep", tiny)
+    c = cal.calibrate(2, ["possible_dsep"])["possible_dsep"]
+    assert c.method == "possible_dsep" and c.cutoff > 0 and c.start_s > 0
+    sizes = [d for d, _, _ in c.timings]
+    assert 4 <= min(sizes) and max(sizes) <= 10
+    assert all(c.work(d) == 2 ** (d - 2) - 1 for d in sizes)
+
+
+def test_bracket_stays_within_the_sizes_it_is_given():
+    work = lambda d: 2 ** (d - 2) - 1  # noqa: E731
+    never = cal.bracket(
+        lambda d: 1.0, lambda d: 2.0, (14, 16), work=work, method="possible_dsep", largest=22
+    )
+    assert (never.below, never.above) == (22, None)
+    assert never.cutoff == max(work(22) + 1, sk.MIN_POOL_DSEP_SUBSETS)
+    always = cal.bracket(lambda d: 2.0, lambda d: 1.0, (14, 16), work=work, smallest=6)
+    assert (always.below, always.above) == (None, 6)
+
+
+def test_calibrate_command_measures_the_possible_dsep_cutoff_in_subsets(capsys, monkeypatch):
+    """The pool wins from 16 candidates (65,535 subsets) and not at 15 (32,767)."""
+
+    def fake(workers, methods):
+        timings, works = ((17, 0.1, 0.2), (18, 0.3, 0.2)), ((17, 2**15 - 1), (18, 2**16 - 1))
+        return {m: cal.Crossover(17, 18, timings, works, m) for m in methods}
+
+    monkeypatch.setattr(cal, "calibrate", fake)
+    assert main(["calibrate", "--workers", "4", "--method", "possible_dsep", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["settings"] == {"ANDREY_N_JOBS": "4", DSEP_VARIABLE: "46000"}
+    assert report["methods"]["possible_dsep"]["pool_faster_at"] == {"d": 18, "work": 65535}
+
+
+def test_the_default_possible_dsep_cutoff_warns_once_naming_the_setting_and_command(
+    dsep_probe, monkeypatch
+):
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", 8 * DSEP_SUBSETS)
+    [warning] = _dsep_warnings(dsep_probe)  # two pools, one warning
+    assert f"{DSEP_VARIABLE}={8 * DSEP_SUBSETS}" in str(warning.message)
+    assert "`andrey calibrate`" in str(warning.message)
+    assert warning.filename == __file__
+
+
+@pytest.mark.parametrize("factor, warns", [(8, True), (20, False)])
+def test_the_default_possible_dsep_cutoff_warns_once_a_search_reaches_a_tenth_of_it(
+    factor, warns, dsep_probe, monkeypatch
+):
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", factor * DSEP_SUBSETS)
+    assert bool(_dsep_warnings(dsep_probe)) is warns
+
+
+@pytest.mark.parametrize("factor", [2, 8])
+def test_an_explicit_possible_dsep_cutoff_never_warns(factor, dsep_probe, monkeypatch):
+    """Any set value counts, including one equal to the built-in default (factor 8). The search
+    stays in process under each, and each would warn if treated as a default."""
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", 8 * DSEP_SUBSETS)
+    monkeypatch.setenv(DSEP_VARIABLE, str(factor * DSEP_SUBSETS))
+    assert not _dsep_warnings(dsep_probe)
+
+
+def test_a_serial_possible_dsep_pool_never_warns(dsep_probe, monkeypatch):
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", 8 * DSEP_SUBSETS)
+    assert not _dsep_warnings(dsep_probe, workers=1)
+
+
+def test_an_fci_fit_warns_on_the_default_possible_dsep_cutoff_and_not_on_an_override(monkeypatch):
+    """Eight sparse variables reach searches of up to seven subsets; a default of 1 subset warns
+    and pools them."""
+    monkeypatch.setattr(sk, "MIN_POOL_DSEP_SUBSETS", 1)
+    x = cal.sample(8)
+
+    def fit():
+        with warnings.catch_warnings(record=True) as caught, andrey.config(n_jobs=2):
+            warnings.simplefilter("always")
+            result = andrey.fci(x)
+        named = [w for w in _cutoff_warnings(caught) if DSEP_VARIABLE in str(w.message)]
+        return result.structure.to_numpy(), named
+
+    warned, caught = fit()
+    assert len(caught) == 1
+    monkeypatch.setenv(DSEP_VARIABLE, "1")
+    explicit, caught = fit()
+    assert not caught
+    np.testing.assert_array_equal(warned, explicit)
 
 
 # --- the RCoT cutoff -------------------------------------------------------------------------

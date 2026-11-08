@@ -8,41 +8,39 @@ score; lower is better.
 
 from __future__ import annotations
 
-import hashlib
 import random
-from collections import Counter
-from collections.abc import Collection
-from functools import cmp_to_key
-from itertools import compress, groupby
+from collections.abc import Callable, Collection
+from itertools import compress
 from operator import ne
 
 import numpy as np
 
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core import GraphStructure, backend
+from andrey.core._bitset import nodes
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
-from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
+from andrey.core.orient import dag2cpdag, orient_out_of, to_structure
+from andrey.core.score import MIXED_SCORES, LocalScore, make_score
+from andrey.core.score_delta import (
+    DeltaBICScore,
+    FullScoreDelta,
+    add_deltas,
+    make_delta,
+    remove_deltas,
 )
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.seeding import start_rng
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_mask, tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
+from andrey.search.operators import check_parent_cap
 
-# Moves are compared by ``delta / n_samples`` rounded to ``_KEY_DP`` decimal places; ``delta`` is
+# Moves are compared by ``delta / n_samples`` rounded to ``KEY_DP`` decimal places; ``delta`` is
 # the change in score, with lower values preferred. Under a score-equivalent score, adding
 # ``x -> y`` or ``y -> x`` from the empty graph ties mathematically, but computing their score
 # changes can introduce different rounding errors. If the rounded values tie, the lower
 # ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from :func:`tie_ranks`.
 # Schur updates compute BIC score changes from covariance submatrices. Their rounding error scales
 # as ~n_samples * cond(cov) * eps, where cond(cov) is the covariance condition number and eps is
-# machine precision. Dividing by n_samples leaves ~cond(cov) * eps; ``_KEY_DP`` = 9 usually absorbs
+# machine precision. Dividing by n_samples leaves ~cond(cov) * eps; ``KEY_DP`` = 9 usually absorbs
 # this error for condition numbers up to ~1e5, independent of sample count. Rounding mitigates
 # numerical differences but can still split a tie within one grid step: a value near a rounding
 # boundary can round either way.
@@ -50,18 +48,8 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 # from the final structure.
 __all__ = ["hc"]
 
-#: The local scores :func:`hc` accepts.
-HC_SCORES: tuple[str, ...] = SCORES
-
 #: A later start replaces the best DAG so far only when its total score is lower by more than this.
 START_EPS = 1e-6
-
-# Standardized values enter a column's tie-break key rounded to _Z_DP decimal places, so copies of
-# one column in other units, which differ in their last bits, share it; two columns sharing it are
-# ordered by the first row where they differ by more than _Z_TOL.
-_Z_DP = 6
-_Z_TOL = 1e-12
-
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
 # ``(u, v)`` with a remove.
@@ -69,298 +57,6 @@ ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
 # Out-neighbor bitset rows, ``tuple(adj_int)``, used as tabu keys.
 StructureKey = tuple[int, ...]
-
-
-def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
-    """Each column's rank for choosing between moves with equal rounded score changes.
-
-    A column's rank comes from what the data say about it in any row order, unit, or sign. A
-    continuous column enters by its ranks within the column, doubled and centered so that they are
-    integers summing to zero, and a categorical column by which rows share a category. Each pair of
-    columns has one relation, an integer or a list of integers:
-
-    - two continuous columns: the absolute sum of their centered ranks' products, the numerator of
-      Spearman's correlation without its sign;
-    - a categorical and a continuous column: each category's count and the absolute sum of the
-      continuous column's centered ranks over its rows;
-    - two categorical columns: the counts of their joint table.
-
-    A column's key is the sorted list of its relations to the other columns. Where two columns'
-    keys are equal, as they always are with two columns or fewer, each of them adds its marginal:
-    a continuous column's absolute skewness and kurtosis rounded to 9 decimal places, or a
-    categorical column's category counts. Where keys are still equal, each of them adds its pattern
-    in row order: a continuous column's rise, fall, or tie from each row to the next, or a
-    categorical column's categories numbered in order of first appearance; and where they are equal
-    after that, a continuous column adds its standardized values, its values minus their mean over
-    their root mean square, rounded to 6 decimal places. Columns are ordered by a hash of their
-    keys, so the rank is arbitrary with respect to causal structure. Continuous columns whose keys
-    stay equal are ordered by their standardized values at the first row where these differ by more
-    than ``1e-12``, the lower first, and columns left equal are ordered by position: identical
-    columns, copies of one column in other units, and categorical columns that group the rows
-    alike. A missing value (NaN) takes the middle rank of its continuous column and forms a
-    category of its own in a categorical column.
-
-    The ranks stay the same when the rows are shuffled, when a column's units change to
-    ``a * x + b`` with ``a > 0``, when a column's sign flips, and when a categorical column's
-    categories are relabeled; a new column order reorders the ranks with the columns. The limits:
-
-    - A change of units can round two distinct values to one, which changes the column's ranks.
-    - The marginal is rounded, so in rare cases a change of units or a sign flip moves it across a
-      rounding boundary.
-    - Columns that no row order, unit, or sign tells apart rank by their pattern in row order, then
-      by their standardized values in row order, so a row shuffle can change which of them ranks
-      first, while a new column order still relabels them. These are copies of one column in the
-      other sign, two columns whose rows also appear with the two swapped, and columns that share
-      their ranks and whose marginals agree to 9 decimal places, such as a copy whose standardized
-      values are nudged by more than ``1e-12``.
-    - Identical columns, copies of one column in other units, and categorical columns that group
-      the rows alike rank by position, so a new column order changes which of them ranks first. A
-      copy whose offset is large next to its spread keeps fewer bits of the column, so in rare cases
-      its standardized values differ by more than ``1e-12`` or round to a different sixth decimal,
-      and it ranks by them instead.
-    - The relations are exact integers and agree on every machine. The marginal and the
-      standardized values come from floating-point sums, so in rare cases they differ between
-      machines.
-
-    Under ``tie_break="position"`` (:data:`andrey.config`, ``ANDREY_TIE_BREAK``), each column's
-    rank is its position, so the methods that order ties by these ranks order them by column
-    position.
-
-    Parameters
-    ----------
-    x : ndarray, shape (n_samples, n_features)
-        Data matrix; rows are observations, columns are variables.
-    categorical : ndarray of bool, shape (n_features,), optional
-        Marks the categorical columns, whose distinct values are their categories. ``None`` treats
-        all columns as continuous.
-
-    Returns
-    -------
-    ndarray of int, shape (n_features,)
-        Each column's position in the tie-break order, from zero to ``n_features - 1``. Lower ranks
-        take precedence when moves have equal rounded score changes.
-    """
-    if backend.config.tie_break == "position":
-        return np.arange(x.shape[1])
-    x = np.asarray(x, dtype=np.float64)
-    mask = (
-        np.zeros(x.shape[1], dtype=bool) if categorical is None else np.asarray(categorical, bool)
-    )
-    keys = _relation_keys(x, mask)
-    for extend in (_marginal_key, _row_pattern, _values):  # only where the keys so far are equal
-        shared = {key for key, count in Counter(keys).items() if count > 1}
-        keys = [
-            key + extend(col, is_categorical) if key in shared else key
-            for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
-        ]
-    digests = [hashlib.blake2b(key, digest_size=8).digest() for key in keys]
-    by_digest = sorted(range(len(digests)), key=digests.__getitem__)
-    order = []
-    for _, run in groupby(by_digest, digests.__getitem__):
-        tied = list(run)
-        if len(tied) > 1 and not mask[tied[0]]:  # equal digests: the standardized values decide
-            z = {j: _standardized(x[:, j]) for j in tied}
-            tied.sort(key=cmp_to_key(lambda i, j: _first_difference(z[i], z[j])))
-        order.extend(tied)
-    ranks = np.empty(len(order), dtype=np.intp)
-    ranks[order] = np.arange(len(order))
-    return ranks
-
-
-def _relation_keys(x: np.ndarray, mask: np.ndarray) -> list[bytes]:
-    """Each column's type and sorted relations to the other columns (:func:`tie_ranks`)."""
-    continuous, categorical = np.flatnonzero(~mask), np.flatnonzero(mask)
-    ranks = _centered_ranks(x[:, continuous])
-    c = len(continuous)
-    products = _abs_products(ranks)[~np.eye(c, dtype=bool)].reshape(c, max(c - 1, 0))
-    sorted_products = dict(zip(continuous.tolist(), np.sort(products, axis=1), strict=True))
-    relations = _categorical_relations(
-        x[:, categorical], ranks, continuous, categorical, x.shape[1]
-    )
-    keys = []
-    for j, is_categorical in enumerate(mask.tolist()):
-        if is_categorical:  # its relations with every other column
-            head, others = b"K", np.delete(relations[np.searchsorted(categorical, j)], j)
-        else:  # its products with the other continuous columns, its relations with the categorical
-            head, others = b"C" + sorted_products[j].astype("<u8").tobytes(), relations[:, j]
-        keys.append(head + np.sort(others).tobytes())
-    return keys
-
-
-def _categorical_relations(
-    x: np.ndarray, ranks: np.ndarray, continuous: np.ndarray, categorical: np.ndarray, d: int
-) -> np.ndarray:
-    """``out[a, k]``: the 16-byte hash of the relation of categorical column ``a`` and column ``k``:
-    each category's count and absolute centered rank sum with a continuous column, or the sorted
-    joint counts with another categorical column (:func:`tie_ranks`)."""
-    n, q = x.shape
-    out = np.zeros((q, d), dtype="S16")
-    if not n:  # no rows: every relation is the empty list
-        out[:, continuous] = _digests(b"m", np.zeros((1, 0)))
-        out[:, categorical] = _digests(b"t", np.zeros((1, 0)))
-        return out
-    if not q:
-        return out
-    codes = np.column_stack([np.unique(col, return_inverse=True)[1].reshape(-1) for col in x.T])
-    sizes = codes.max(axis=0) + 1
-    start = np.concatenate([[0], np.cumsum(sizes)])
-    # One 0/1 column per category of each categorical column. Their products and their sums of
-    # centered ranks are whole numbers below 2**53, which float64 holds exactly.
-    indicators = np.zeros((n, start[-1]))
-    indicators[np.arange(n)[:, None], start[:-1] + codes] = 1.0
-    counts = indicators.sum(axis=0).astype(np.int64)
-    sums = np.abs(indicators.T @ ranks)  # each category's sum of each continuous column's ranks
-    # With a continuous column: the (count, |sum|) pairs of the categories, sorted.
-    for a in range(q):
-        rows = slice(start[a], start[a + 1])
-        held = np.broadcast_to(counts[rows, None], (sizes[a], len(continuous)))
-        order = np.lexsort((sums[rows], held), axis=0)
-        pairs = np.stack(
-            [np.take_along_axis(held, order, 0), np.take_along_axis(sums[rows], order, 0)]
-        )
-        out[a, continuous] = _digests(
-            b"m", pairs.transpose(2, 1, 0).reshape(len(continuous), 2 * sizes[a])
-        )
-    # The joint table of two categorical columns, from the products of the indicators of all but
-    # each column's last category, which give all but the table's last row and column, and the
-    # counts, which complete them.
-    last = start[1:] - 1
-    kept = np.setdiff1d(np.arange(start[-1]), last)
-    inner = np.cumsum(np.concatenate([[0], sizes - 1]))
-    products = indicators[:, kept].T @ indicators[:, kept]
-    first, second = np.triu_indices(q, 1)
-    for ka, kb in set(zip(sizes[first].tolist(), sizes[second].tolist(), strict=True)):
-        pick = (sizes[first] == ka) & (sizes[second] == kb)
-        a, b = first[pick], second[pick]
-        block = products[
-            (inner[a][:, None] + np.arange(ka - 1))[:, :, None],
-            (inner[b][:, None] + np.arange(kb - 1))[:, None, :],
-        ]
-        ca = counts[start[a][:, None] + np.arange(ka)]
-        cb = counts[start[b][:, None] + np.arange(kb)]
-        table = np.empty((len(a), ka, kb))
-        table[:, :-1, :-1] = block
-        table[:, :-1, -1] = ca[:, :-1] - block.sum(axis=2)
-        table[:, -1, :-1] = cb[:, :-1] - block.sum(axis=1)
-        table[:, -1, -1] = cb[:, -1] - ca[:, :-1].sum(axis=1) + block.sum(axis=(1, 2))
-        digests = _digests(b"t", np.sort(table.reshape(len(a), -1), axis=1))
-        out[a, categorical[b]] = digests
-        out[b, categorical[a]] = digests
-    return out
-
-
-def _centered_ranks(x: np.ndarray) -> np.ndarray:
-    """Each column's doubled average ranks minus ``m + 1``, ``m`` its count of values that are not
-    NaN: integers summing to zero, which a sign flip negates. A NaN takes 0, the middle."""
-    n, d = x.shape
-    out = np.zeros((d, n))
-    for col, ranks in zip(np.ascontiguousarray(x.T), out, strict=True):
-        present = ~np.isnan(col)
-        if n > 1 and present.all():  # without NaN or ties, a value's rank is its sorted place
-            order = np.argsort(col)
-            ordered = col[order]
-            if (ordered[1:] != ordered[:-1]).all():
-                ranks[order] = 2 * np.arange(1, n + 1) - (n + 1)
-                continue
-        _, inverse, counts = np.unique(col[present], return_inverse=True, return_counts=True)
-        doubled = 2 * np.cumsum(counts) - counts + 1  # a value's first plus last place, from 1
-        ranks[present] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
-    return np.ascontiguousarray(out.T)
-
-
-def _abs_products(ranks: np.ndarray) -> np.ndarray:
-    """``|ranks.T @ ranks|`` as exact unsigned 64-bit integers.
-
-    Every partial sum of two columns' products of centered ranks is an integer of magnitude at most
-    ``(n**3 - n) / 3``, so float64 sums them exactly while that bound is below ``2**53``. Past it,
-    unsigned integers sum them exactly modulo ``2**64``, and the smaller of a sum and its negative
-    removes the sign; the two agree on every sum below ``2**63``.
-    """
-    n = len(ranks)
-    if (n**3 - n) // 3 < 2**53:
-        return np.abs(ranks.T @ ranks).astype(np.uint64)
-    wide = ranks.astype(np.int64).view(np.uint64)
-    sums = wide.T @ wide
-    return np.minimum(sums, -sums)
-
-
-def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
-    """A column's marginal, which tells apart columns with equal relations (:func:`tie_ranks`)."""
-    if is_categorical:
-        return _digest(b"k", np.sort(np.unique(col, return_counts=True)[1]))
-    values = np.sort(col[~np.isnan(col)])
-    if values.size == 0 or values[0] == values[-1]:
-        return f"V{values.size} constant".encode()
-    z = values - values.mean()
-    z /= np.sqrt(np.mean(z**2))
-    return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
-
-
-def _row_pattern(col: np.ndarray, is_categorical: bool) -> bytes:
-    """A column's pattern in row order, which tells apart columns with equal relations and marginals
-    (:func:`tie_ranks`)."""
-    if is_categorical:
-        return b"R" + _first_appearance(col).astype("<i8").tobytes()
-    steps = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
-    return b"R" + steps.tobytes()
-
-
-def _values(col: np.ndarray, is_categorical: bool) -> bytes:
-    """A continuous column's standardized values rounded to ``_Z_DP`` decimal places, which tell
-    apart columns with equal relations, marginals, and patterns, or a categorical column's
-    categories numbered in order of first appearance, which its pattern already holds
-    (:func:`tie_ranks`)."""
-    if is_categorical:
-        return b"X" + _first_appearance(col).astype("<f8").tobytes()
-    return b"X" + (np.round(_standardized(col), _Z_DP) + 0.0).astype("<f8").tobytes()
-
-
-def _first_appearance(col: np.ndarray) -> np.ndarray:
-    """A categorical column's categories numbered from zero in order of first appearance."""
-    _, first, codes = np.unique(col, return_index=True, return_inverse=True)
-    seen = np.empty(first.size, dtype=np.int64)
-    seen[np.argsort(first)] = np.arange(first.size)
-    return seen[codes.reshape(-1)]
-
-
-def _standardized(col: np.ndarray) -> np.ndarray:
-    """A continuous column minus its mean over its root mean square, zero where all its values are
-    equal; a NaN stays NaN."""
-    present = ~np.isnan(col)
-    values = col[present]
-    z = np.full(col.shape, np.nan)
-    z[present] = 0.0
-    if values.size and values.min() != values.max():
-        centered = values - values.mean()
-        z[present] = centered / np.sqrt(np.mean(centered**2))
-    return z
-
-
-def _first_difference(a: np.ndarray, b: np.ndarray) -> int:
-    """-1 or 1 as standardized column ``a`` or ``b`` is lower at the first row where they differ by
-    more than ``_Z_TOL``, or 0 where no row does (:func:`tie_ranks`)."""
-    far = np.flatnonzero(np.abs(a - b) > _Z_TOL)
-    if not far.size:
-        return 0
-    return -1 if a[far[0]] < b[far[0]] else 1
-
-
-def _digest(tag: bytes, ints: np.ndarray) -> bytes:
-    """A 16-byte hash of ``tag`` and ``ints`` as little-endian 64-bit integers."""
-    return hashlib.blake2b(tag + ints.astype("<i8").tobytes(), digest_size=16).digest()
-
-
-def _digests(tag: bytes, rows: np.ndarray) -> np.ndarray:
-    """:func:`_digest` of each row of ``rows``, a 2-D array of whole numbers, as 16-byte strings."""
-    data = np.ascontiguousarray(rows, dtype="<i8")
-    tagged = np.empty((len(data), 1 + 8 * data.shape[1]), dtype=np.uint8)
-    tagged[:, 0] = tag[0]
-    tagged[:, 1:] = data.view(np.uint8)
-    raw, width, blake = memoryview(tagged.tobytes()), tagged.shape[1], hashlib.blake2b
-    return np.array(
-        [blake(raw[i : i + width], digest_size=16).digest() for i in range(0, len(raw), width)],
-        dtype="S16",
-    )
 
 
 def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
@@ -384,14 +80,14 @@ class MoveScanner:
     (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
     Every scanner computes the same deltas for the same target and parents.
 
-    ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
-    ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
-    ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
-    categorical scores, and the mixed-data scores, all score-equivalent. Its finite delta is set to
-    zero to prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement. A
-    BIC delta is ``inf`` when the move enters an unavailable family
-    (:func:`~andrey.core.score.local_score_bic`), so no move does.
+    ``score`` is the local score of ``delta``. ``single[v, u]`` is the add or remove delta of
+    ``u -> v``, or ``inf`` when ``v -> u`` exists or ``v`` reaches ``u``; ``low[v]`` is the row
+    minimum. Reverses use the edge list and sum an add of ``v`` at target ``u`` with a remove of
+    ``u`` at target ``v``. A covered edge ``u -> v`` (``pa(v) = pa(u) + u``) reverses to a Markov
+    equivalent DAG with equal score under BIC, the categorical scores, and the mixed-data scores,
+    all score-equivalent. Its finite delta is set to zero to prevent rounding noise exceeding
+    ``EPS_IMPROVE`` from creating a false improvement. A BIC delta is ``inf`` when the move enters
+    an unavailable family (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none. ``required[v, u]`` marks edges ``u -> v`` no move removes or
@@ -418,9 +114,9 @@ class MoveScanner:
         max_parents: int | None = None,
     ) -> None:
         self._delta = delta
-        self._score = delta.score_obj
+        self.score = delta.score_obj
         self._d = d
-        self._inv_n = 1.0 / self._score.n
+        self._inv_n = 1.0 / self.score.n
         self._ranks: list[int] = np.asarray(ranks).tolist()
         self._add = np.full((d, d), np.inf)
         self._rem = np.full((d, d), np.inf)
@@ -447,12 +143,12 @@ class MoveScanner:
         adj_int: list[int],
         parents_of: dict[int, list[int]],
         *,
-        floor: float = -_EPS_IMPROVE,
+        floor: float = -EPS_IMPROVE,
         tabu: Collection[StructureKey] | None = None,
     ) -> ScannedMove | None:
         """The best legal move with delta below ``floor``.
 
-        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, ranks[u], ranks[v],
+        Moves are keyed ``(delta / n_samples rounded to KEY_DP places, ranks[u], ranks[v],
         op_rank)``, a strict total order that moves with the columns. The default ``floor`` admits
         improving moves only; ``floor=inf`` admits every legal move. A move that leads to a
         structure in ``tabu`` is skipped.
@@ -499,8 +195,8 @@ class MoveScanner:
         gained: list[tuple[int, int]] = []
         lost: list[tuple[int, int]] = []
         for u in range(d) if first else compress(range(d), map(ne, adj_int, old)):
-            gained += [(u, v) for v in _bits(adj_int[u] & ~old[u])]
-            lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
+            gained += [(u, v) for v in nodes(adj_int[u] & ~old[u])]
+            lost += [(u, v) for v in nodes(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
             self._add[v], self._rem[v] = self._deltas(v, pa)
@@ -558,7 +254,7 @@ class MoveScanner:
             )
         adds = [u for u in range(self._d) if u != v and u not in pa and not self._forbidden[v, u]]
         sets = [pa, *(sorted([*pa, u]) for u in adds), *([p for p in pa if p != u] for u in pa)]
-        scores = np.array(self._score.score_many(v, sets))
+        scores = np.array(self.score.score_many(v, sets))
         add = np.full(self._d, np.inf)
         rem = np.full(self._d, np.inf)
         add[adds] = scores[1 : 1 + len(adds)] - scores[0]
@@ -575,9 +271,9 @@ class MoveScanner:
         reach, parent = self._reach, self._parent
         hit = np.logical_or.reduce(reach[:, tails], axis=1)
         hit[tails] = True
-        nodes = np.flatnonzero(hit)
+        stale = np.flatnonzero(hit)
         changed = []
-        for x in nodes[np.argsort(reach[nodes].sum(axis=1), kind="stable")].tolist():
+        for x in stale[np.argsort(reach[stale].sum(axis=1), kind="stable")].tolist():
             kids = parent[:, x]
             row = reach[kids].any(axis=0) | kids
             if not np.array_equal(row, reach[x]):
@@ -625,7 +321,7 @@ class MoveScanner:
             return None
         # Monotone rounding puts every lowest-key tie within one grid step of the raw minimum.
         inv_n = self._inv_n
-        near = lowest * inv_n + 2 * 10.0**-_KEY_DP
+        near = lowest * inv_n + 2 * 10.0**-KEY_DP
         found: list[tuple[float, int, int, int, str]] = []
         for v in np.flatnonzero(low * inv_n <= near).tolist():
             us = np.flatnonzero(single[v] * inv_n <= near).tolist()
@@ -644,20 +340,10 @@ class MoveScanner:
         best_key: tuple[float, int, int, int] | None = None
         for value, u, v, rank, op in found:
             if value < floor:
-                key = (round(value * inv_n, _KEY_DP), ranks[u], ranks[v], rank)
+                key = (round(value * inv_n, KEY_DP), ranks[u], ranks[v], rank)
                 if best_key is None or key < best_key:
                     best, best_key = (key[0], u, v, rank, (op, u, v)), key
         return best
-
-
-def _bits(row: int) -> list[int]:
-    """The positions of the set bits of ``row``, lowest first."""
-    out = []
-    while row:
-        lsb = row & -row
-        out.append(lsb.bit_length() - 1)
-        row ^= lsb
-    return out
 
 
 def start_dag(
@@ -674,14 +360,13 @@ def start_dag(
         for u, v in zip(*np.nonzero(constraints.required)):
             adj_int[u] |= 1 << int(v)
             parents_of[int(v)].append(int(u))  # row-major: each parent list stays sorted
-    if max_parents is not None and any(len(pa) > max_parents for pa in parents_of.values()):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
     return adj_int, parents_of
 
 
-def _apply_move(
+def apply_move(
     adj_int: list[int], parents_of: dict[int, list[int]], move: tuple[str, int, int]
 ) -> None:
     """Apply ``move`` in place to the bitset adjacency and the sorted parent-set mirror.
@@ -711,7 +396,7 @@ def _reaches(adj_int: list[int], a: int, b: int) -> bool:
         if row >> b & 1:
             return True
         seen |= row
-        frontier += _bits(row)
+        frontier += nodes(row)
     return False
 
 
@@ -733,14 +418,13 @@ def perturb(
     """Make ``changes`` random edge changes to the DAG in place, in at most ``3 * changes`` draws.
 
     Each draw takes an operation uniformly from add, remove, and reverse, then one of the edges it
-    can apply to uniformly, as bnlearn's restarts do. An add joins two non-adjacent nodes. No add or
-    reverse makes an edge ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than
-    ``max_parents`` parents, and no remove or reverse touches an edge that ``required[v, u]`` holds;
-    a draw whose add or reverse would close a cycle changes nothing. Nodes are indexed by their
-    place in the order of ``ranks`` (:func:`tie_ranks`), so the draws move with the columns. A draw
-    tries up to ``_TRIES`` uniform candidates and lists the legal ones only when all of them fail,
-    which keeps the pick uniform and its cost independent of the number of nodes while most
-    candidates are legal.
+    can apply to uniformly. An add joins two non-adjacent nodes. No add or reverse makes an edge
+    ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than ``max_parents`` parents, and
+    no remove or reverse touches an edge that ``required[v, u]`` holds; a draw whose add or reverse
+    would close a cycle changes nothing. Nodes are indexed by their place in the order of ``ranks``
+    (:func:`tie_ranks`), so the draws move with the columns. A draw tries up to ``_TRIES`` uniform
+    candidates and lists the legal ones only when all of them fail, which keeps the pick uniform and
+    its cost independent of the number of nodes while most candidates are legal.
     """
     d = len(adj_int)
     by_rank = np.argsort(ranks, kind="stable")  # place -> column
@@ -807,7 +491,7 @@ def perturb(
             rest[u] &= ~(1 << v)
             if _reaches(rest, u, v):
                 continue
-        _apply_move(adj_int, parents_of, (op, u, v))
+        apply_move(adj_int, parents_of, (op, u, v))
         made += 1
         if op == "add":
             edge[i, j] = True
@@ -842,9 +526,149 @@ def _climb(
         best = scanner.best(adj_int, parents_of)
         if best is None:
             break
-        _apply_move(adj_int, parents_of, best[4])
+        apply_move(adj_int, parents_of, best[4])
         moves += 1
     return moves
+
+
+def move_rules(
+    score_func: str,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    d: int,
+    sources: tuple[int, ...] = (),
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+    """The tie mask of ``score_func`` and the edges a DAG search never adds and never removes.
+
+    Returns ``(mask, forbidden, required)``: ``mask`` is :func:`~andrey.core.ties.tie_mask`'s;
+    ``forbidden[v, u]`` bars an edge ``u -> v``, one from a continuous into a categorical column
+    under a mixed-data score, one the knowledge forbids, or one into a column of ``sources``;
+    ``required[v, u]`` holds an edge the knowledge requires. Each is ``None`` when it bars or holds
+    none. Raises ``ValueError`` when the knowledge requires an edge the mixed-data score does not
+    allow.
+    """
+    mask = tie_mask(score_func, categorical, d)
+    forbidden = None
+    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
+        forbidden = mask[:, None] & ~mask[None, :]
+        if constraints is not None and (constraints.required & forbidden.T).any():
+            raise ValueError(
+                "knowledge requires an edge from a continuous into a categorical column, which a "
+                "mixed-data score does not allow"
+            )
+    if sources:
+        into_sources = np.zeros((d, d), dtype=bool)
+        into_sources[list(sources)] = True  # [v, u]: no u -> v for a source v
+        np.fill_diagonal(into_sources, False)
+        forbidden = into_sources if forbidden is None else forbidden | into_sources
+    if constraints is None:
+        return mask, forbidden, None
+    knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
+    forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
+    return mask, forbidden, constraints.required.T
+
+
+#: One start's search: ``search(scanner, adj_int, parents_of, max_iter)`` takes the moves of
+#: ``scanner`` from the DAG ``adj_int`` (bitset rows) and ``parents_of`` (sorted parent sets),
+#: changes both in place to the DAG it ends on, and returns the number of moves it took.
+StartSearch = Callable[[MoveScanner, list[int], dict[int, list[int]], int | None], int]
+
+
+def greedy_search(
+    data: np.ndarray,
+    search: StartSearch,
+    *,
+    method: str,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    equivalent_sample_size: float,
+    max_iter: int | None,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+    n_starts: int,
+    n_perturbations: int,
+    seed: int,
+    sources: tuple[int, ...] = (),
+) -> tuple[GraphStructure, float]:
+    """Run ``search`` from the start DAG and from changed copies of the best DAG so far.
+
+    The first start begins from the required edges of ``constraints`` (:func:`start_dag`); each
+    later one from the best DAG so far after :func:`perturb` makes ``n_perturbations`` changes to
+    it, and replaces it only when its DAG scores lower by more than :data:`START_EPS`. Every start
+    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`, so no
+    move gives a column of ``sources`` a parent. The search warns once, naming ``method``, if any
+    start takes ``max_iter`` moves. Returns the best DAG's CPDAG, with the edges at ``sources``
+    directed out of them (:func:`~andrey.core.orient.orient_out_of`) and narrowed by the knowledge,
+    and the DAG's total score. The other arguments are those of :func:`hc`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    d = X.shape[1]
+
+    def new_score() -> LocalScore:
+        return make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            categorical=categorical,
+        )
+
+    score = new_score()
+    mask, forbidden, required = move_rules(score_func, categorical, constraints, d, sources)
+    adj_int, parents_of = start_dag(d, constraints, max_parents)
+    ranks = tie_ranks(X, mask)
+    best: tuple[list[int], dict[int, list[int]], float] | None = None
+    capped = False
+    for start in range(n_starts):
+        if start > 0:
+            assert best is not None  # set by start 0
+            # Each start builds its own score, deltas, and tables; the last start's are dropped.
+            score = new_score()
+            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in best[1].items()}
+            perturb(
+                adj_int,
+                parents_of,
+                n_perturbations,
+                start_rng(seed, start),
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+        # One BLAS thread keeps the Schur updates reproducible across thread counts.
+        with backend.one_blas_thread():
+            scanner = MoveScanner(
+                make_delta(score),
+                d,
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+            moves = search(scanner, adj_int, parents_of, max_iter)
+        capped |= max_iter is not None and moves == max_iter
+        total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
+        if best is None or total < best[2] - START_EPS:
+            best = (adj_int, parents_of, total)
+        del scanner
+    if capped and max_iter is not None:
+        warn_search_limit(method, "max_iter", max_iter, "moves")
+    assert best is not None  # n_starts >= 1
+    _, parents_of, total = best
+
+    # The best DAG, reduced to the CPDAG of its equivalence class.
+    dag = np.zeros((d, d), dtype=bool)
+    for v in range(d):
+        dag[parents_of[v], v] = True
+    cpdag = dag2cpdag(endpoint_marks(dag))
+    if sources:
+        cpdag = orient_out_of(cpdag, sources)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    return to_structure(cpdag, kind="cpdag"), total
 
 
 def hc(
@@ -860,7 +684,8 @@ def hc(
     max_parents: int | None = None,
     n_starts: int = 1,
     n_perturbations: int = 1,
-    random_state: int = 0,
+    seed: int = 0,
+    sources: tuple[int, ...] = (),
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -916,98 +741,34 @@ def hc(
         Number of climbs, at least ``1``.
     n_perturbations : int
         Random changes to the best DAG so far before each start after the first, at least ``1``.
-    random_state : int
+    seed : int
         Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
+    sources : tuple of int
+        Columns no other column may cause, such as an environment index: no move or change gives
+        one a parent, and their edges are then directed out of them, with Meek's rules orienting
+        what follows (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every
+        variable free.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
+        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG; with ``sources``,
+        the partially directed graph that also directs their edges.
     """
-    X = np.asarray(data, dtype=np.float64)
-    d = X.shape[1]
-
-    if score_func not in HC_SCORES:
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
-
-    def new_score() -> LocalScore:
-        return make_score(
-            score_func,
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            categorical=categorical,
-        )
-
-    score = new_score()
-    forbidden = None
-    mask = np.full(d, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
-        mask = column_mask(categorical, d)
-        forbidden = mask[:, None] & ~mask[None, :]
-    if constraints is not None:
-        if forbidden is not None and (constraints.required & forbidden.T).any():
-            raise ValueError(
-                "knowledge requires an edge from a continuous into a categorical column, which a "
-                "mixed-data score does not allow"
-            )
-        knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
-        forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
-    required = None if constraints is None else constraints.required.T
-
-    start_adj, start_parents = start_dag(d, constraints, max_parents)
-    ranks = tie_ranks(X, mask)
-    best: tuple[list[int], dict[int, list[int]], float] | None = None
-    capped = False
-    for start in range(n_starts):
-        if start == 0:
-            adj_int, parents_of = start_adj, start_parents
-        else:
-            assert best is not None  # set by start 0
-            # Each start builds its own score, deltas, and tables; the last start's are dropped.
-            score = new_score()
-            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in best[1].items()}
-            perturb(
-                adj_int,
-                parents_of,
-                n_perturbations,
-                start_rng(random_state, start),
-                ranks=ranks,
-                forbidden=forbidden,
-                required=required,
-                max_parents=max_parents,
-            )
-        delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
-        # One BLAS thread keeps the Schur updates reproducible across thread counts.
-        with backend.one_blas_thread():
-            scanner = MoveScanner(
-                delta,
-                d,
-                ranks=ranks,
-                forbidden=forbidden,
-                required=required,
-                max_parents=max_parents,
-            )
-            moves = _climb(scanner, adj_int, parents_of, max_iter)
-        capped |= max_iter is not None and moves == max_iter
-        total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
-        if best is None or total < best[2] - START_EPS:
-            best = (adj_int, parents_of, total)
-        del scanner, delta
-    if capped and max_iter is not None:
-        warn_search_limit("hc", "max_iter", max_iter, "moves")
-    assert best is not None  # n_starts >= 1
-    _, parents_of, total = best
-
-    # Emit the discovered DAG as an unsigned endpoint-mark matrix (u -> v: TAIL at u, ARROW at v),
-    # then reduce it to the CPDAG of its equivalence class.
-    dag = np.full((d, d), NULL, dtype=np.int8)
-    for v in range(d):
-        for p in parents_of[v]:
-            dag[p, v] = TAIL
-            dag[v, p] = ARROW
-    cpdag = dag2cpdag(dag)
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), total
+    return greedy_search(
+        data,
+        _climb,
+        method="hc",
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_iter=max_iter,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        n_perturbations=n_perturbations,
+        seed=seed,
+        sources=sources,
+    )

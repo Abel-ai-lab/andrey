@@ -1,6 +1,7 @@
 """Record Andrey outputs as regression baselines in ``tests/recovery/baselines/``.
 
-Each runner mirrors its regression test and uses the shared output projection.
+``tests/recovery/test_regression_baselines.py`` fits each recorded output with its runner here,
+which uses the shared output projection.
 Capture runs on demand; committed fixtures are checked in CI.
 
 Recapturing rewrites committed values, so a diff is the point: read it before committing. Numeric
@@ -19,10 +20,10 @@ import argparse
 import json
 import os
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 
+import andrey
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import BASELINES_DIR, SCHEMA_VERSION
 from tests.recovery.helpers.project import project_output
@@ -30,7 +31,7 @@ from tests.recovery.helpers.project import project_output
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-# --- Runners mirror the Andrey calls made by the regression tests ------------------
+# --- Runners --------------------------------------------------------------------------------------
 
 
 def _facade(name: str, **kwargs):
@@ -48,6 +49,13 @@ def _run_cdnod(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.cdnod(X, datagen.domain_index("gauss_5v")), algorithm)
 
 
+def _run_fci_jci(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    shifted, index = datagen.domain_shift("gauss_5v", (0,))
+    return project_output(andrey.fci_jci(shifted, index), algorithm)
+
+
 def _run_gnies(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -60,33 +68,6 @@ def _run_icp(X: np.ndarray, algorithm: str) -> dict:
 
     target = int(datagen.column_of("gauss_5v")[3])  # the column of x3, whose parents are x1, x2
     return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
-
-
-def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
-    from andrey.api._temporal import _adapt_var_lingam
-    from andrey.lingam.var import var_lingam
-
-    order, adj = var_lingam(X)
-    model = SimpleNamespace(adjacency_matrices_=adj, causal_order_=order)
-    return project_output(_adapt_var_lingam(model), algorithm)
-
-
-def _run_varmalingam(X: np.ndarray, algorithm: str, *, prune: bool = False) -> dict:
-    from andrey.temporal.varma import varma_lingam
-
-    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=prune)
-    return {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)}
-
-
-def _run_varmalingam_pruned(X: np.ndarray, algorithm: str) -> dict:
-    return _run_varmalingam(X, algorithm, prune=True)
-
-
-def _run_granger(X: np.ndarray, algorithm: str) -> dict:
-    from andrey.temporal.granger import granger_f_test
-
-    coeff = np.asarray(granger_f_test(X, maxlag=2)[0], dtype=np.float64)
-    return {"coeff": coeff, "adj": (coeff != 0.0).astype(int)}
 
 
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
@@ -126,7 +107,10 @@ ALGORITHMS = {
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
+    "BOSSFCI": (_facade("boss_fci"), "gauss_5v"),
+    "GRaSPFCI": (_facade("grasp_fci"), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
+    "FCIJCI": (_run_fci_jci, "gauss_5v"),
     "ICP": (_run_icp, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
@@ -146,10 +130,9 @@ ALGORITHMS = {
     "UT-IGSP": (_run_ut_igsp, "gauss_5v_noise_shift"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
     "CAM": (_facade("cam"), "nonmonotone_4v"),
-    "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
-    "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
-    "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),
-    "Granger": (_run_granger, "var_4v_stable"),
+    "VARMALiNGAM": (_facade("varma_lingam", order=(1, 1), prune=False), "varma_3v"),
+    "VARMALiNGAMPruned": (_facade("varma_lingam", order=(1, 1), prune=True), "varma_3v"),
+    "Granger": (_facade("granger", tau_max=2, fdr_method="none"), "var_4v_stable"),
     "DYNOTEARS": (_facade("dynotears"), "svar_4v_gauss"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
@@ -167,11 +150,12 @@ ALGORITHMS = {
     "GPDC": (_run_ci_test, "nonmonotone_4v"),
 }
 
-# Multi-group and panel methods take a list of matrices (runner receives
+# Multi-group, panel, and multi-dataset methods take a list of matrices (runner receives
 # ``generate_groups(case)``).
 GROUP_ALGORITHMS = {
     "MultiGroupDirectLiNGAM": (_run_multi_group_direct_lingam, "mgdl_2groups"),
     "LongitudinalLiNGAM": (_facade("longitudinal_lingam"), "panel_4v"),
+    "JPCMCIplus": (_facade("jpcmciplus", tau_max=1), "context_var_4v"),
 }
 
 
@@ -195,48 +179,51 @@ def capture(args: argparse.Namespace) -> None:
 
     out_root = Path(args.out_dir) if args.out_dir else BASELINES_DIR
     algorithms = args.algorithms or (list(ALGORITHMS) + list(GROUP_ALGORITHMS))
-    for name in algorithms:
-        # Branch so each runner is called with its concrete input type (one matrix vs a list).
-        if name in GROUP_ALGORITHMS:
-            group_runner, case = GROUP_ALGORITHMS[name]
-            groups = datagen.generate_groups(case)
-            spec = datagen.GROUP_CASES[case]
-            seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
-            input_block = {
-                "case": case,
-                "seeds": seeds,
-                "column_order": datagen.column_order(case).tolist(),
-                "shapes": [list(X.shape) for X in groups],
-                "sha256": datagen.input_sha256(case),
-            }
-            output = group_runner(groups, name)
-        else:
-            runner, case = ALGORITHMS[name]
-            X = datagen.generate(case)
-            input_block = {
-                "case": case,
-                "seed": datagen.CASES[case]["seed"],
-                "column_order": datagen.column_order(case).tolist(),
-                "shape": list(X.shape),
-                "sha256": datagen.input_sha256(case),
-            }
-            output = runner(X, name)
+    # Baselines record NumPy numerics whatever the ANDREY_* variables pin; the recovery suite
+    # compares under the same pin (tests/recovery/conftest.py).
+    with andrey.config(backend="numpy"):
+        for name in algorithms:
+            # Branch so each runner is called with its concrete input type (one matrix vs a list).
+            if name in GROUP_ALGORITHMS:
+                group_runner, case = GROUP_ALGORITHMS[name]
+                groups = datagen.generate_groups(case)
+                spec = datagen.GROUP_CASES[case]
+                seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
+                input_block = {
+                    "case": case,
+                    "seeds": seeds,
+                    "column_order": datagen.column_order(case).tolist(),
+                    "shapes": [list(X.shape) for X in groups],
+                    "sha256": datagen.input_sha256(case),
+                }
+                output = group_runner(groups, name)
+            else:
+                runner, case = ALGORITHMS[name]
+                X = datagen.generate(case)
+                input_block = {
+                    "case": case,
+                    "seed": datagen.CASES[case]["seed"],
+                    "column_order": datagen.column_order(case).tolist(),
+                    "shape": list(X.shape),
+                    "sha256": datagen.input_sha256(case),
+                }
+                output = runner(X, name)
 
-        doc = {
-            "schema_version": SCHEMA_VERSION,
-            "algorithm": name,
-            "case": case,
-            "input": input_block,
-            "output": _jsonable(output),
-        }
+            doc = {
+                "schema_version": SCHEMA_VERSION,
+                "algorithm": name,
+                "case": case,
+                "input": input_block,
+                "output": _jsonable(output),
+            }
 
-        out_path = out_root / name / f"{case}.json"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_path, "w") as fh:
-            json.dump(doc, fh, indent=2, sort_keys=True)
-            fh.write("\n")
-        rel = out_path.relative_to(_REPO_ROOT) if out_root is BASELINES_DIR else out_path
-        print(f"  wrote {rel}")
+            out_path = out_root / name / f"{case}.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_path, "w") as fh:
+                json.dump(doc, fh, indent=2, sort_keys=True)
+                fh.write("\n")
+            rel = out_path.relative_to(_REPO_ROOT) if out_root is BASELINES_DIR else out_path
+            print(f"  wrote {rel}")
 
 
 def main() -> None:

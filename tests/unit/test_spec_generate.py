@@ -18,6 +18,22 @@ from andrey.spec import (
 
 _SPEC_NAMES = sorted(REGISTRY)
 
+#: The JSON Schema type of each parameter type.
+JSON_TYPE = {
+    "float": "number",
+    "int": "integer",
+    "str": "string",
+    "bool": "boolean",
+    "int_pair": "array",
+    "str_list": "array",
+    "knowledge": "object",
+    "targets": "object",
+}
+
+
+def types_of(schema: dict) -> set[str]:
+    return set(schema["type"]) if isinstance(schema["type"], list) else {schema["type"]}
+
 
 def test_help_schema_is_json_serializable_and_complete():
     ctx = help_schema()
@@ -49,12 +65,11 @@ def test_method_schema_matches_spec(name):
 
     for p in spec.params:
         entry = props[p.name]
-        assert "default" in entry and "description" in entry
+        assert entry["default"] == json.loads(json.dumps(p.default)) and "description" in entry
+        assert types_of(entry) == {JSON_TYPE[p.type], *(["null"] if p.nullable else [])}
         if p.choices:
             expected = [*p.choices, None] if p.nullable else list(p.choices)
             assert entry["enum"] == expected
-        if p.nullable and isinstance(entry["type"], list):
-            assert "null" in entry["type"]
 
     assert schema["status"] == spec.status
 
@@ -74,6 +89,19 @@ def test_skill_lists_every_method_and_env_var():
     # The guide names the executable discovery and introspection commands.
     assert "andrey config" in skill
     assert "andrey list" in skill and "--help --json" in skill
+
+
+def test_skill_calls_each_command_as_the_contract_does():
+    """The agent guide gives the invocation of run, bootstrap, and markov-check that
+    ``--help --json`` gives, every flag included."""
+    skill = render_skill()
+    cli = help_schema()["cli"]
+    for invocation in (
+        cli["invocation"],
+        cli["bootstrap"]["invocation"],
+        cli["markov_check"]["invocation"],
+    ):
+        assert f"`{invocation}`" in skill
 
 
 def test_skill_is_an_installable_skill_that_explains_every_edge_type():
