@@ -787,6 +787,9 @@ def _panel_method(name: str) -> bool:
 
 
 def _input(name: str, effects: dict = SERIES_EFFECTS, columns: list[str] = SERIES):
+    if name == "jpcmciplus":  # a list of series, not of time points
+        series = _simulate(effects, columns, panel=False)
+        return [series.iloc[k * 333 : (k + 1) * 333].reset_index(drop=True) for k in range(3)]
     return _simulate(effects, columns, panel=_panel_method(name))
 
 
@@ -797,6 +800,8 @@ def _fit_series(name: str, data, lags: int = 2, **kwargs):
         return andrey.varma_lingam(data, order=(lags, 0), prune=True, max_iter=1, **kwargs)
     if name == "longitudinal_lingam":
         return andrey.longitudinal_lingam(data, tau_max=lags, **kwargs)
+    if name == "jpcmciplus":
+        return andrey.jpcmciplus(data, tau_max=lags, time_dummy=False, **kwargs)
     return getattr(andrey, name)(data, tau_max=lags, **kwargs)
 
 

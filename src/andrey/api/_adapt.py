@@ -345,7 +345,7 @@ def _listed_mask(data: npt.ArrayLike, categorical: object) -> np.ndarray:
         shape = ()
     if len(shape) != 2:
         data_matrix(data)
-    return _column_mask(categorical, column_labels(data), shape[1])
+    return column_mask(categorical, column_labels(data), shape[1])
 
 
 def checked_data(
@@ -661,9 +661,9 @@ def mixed_matrix(
         mask = typed if typed.size else np.zeros(X.shape[1], dtype=bool)
     elif names is None:
         X = data_matrix(data, name=name, method=method, missing=missing, reads_categories=True)
-        mask = _column_mask(categorical, None, X.shape[1])
+        mask = column_mask(categorical, None, X.shape[1])
     else:
-        mask = _column_mask(categorical, labels, len(names))
+        mask = column_mask(categorical, labels, len(names))
         X = data_matrix(
             _encode_categories(data, mask, setting, name, method=method, missing=missing),
             name=name,
@@ -740,18 +740,17 @@ def _categorical_dtypes(data: object) -> np.ndarray:
     return np.array([categorical(dtype) for dtype in dtypes], dtype=bool)
 
 
-def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) -> np.ndarray:
-    """Mark the columns ``categorical`` lists by label or 0-based position."""
-    if isinstance(categorical, (str, bytes)) or not isinstance(
-        categorical, (list, tuple, np.ndarray)
-    ):
+def column_mask(
+    columns: object, labels: tuple[str, ...] | None, d: int, name: str = "categorical"
+) -> np.ndarray:
+    """Mark the columns the argument ``name`` lists by label or 0-based position."""
+    if isinstance(columns, (str, bytes)) or not isinstance(columns, (list, tuple, np.ndarray)):
         raise TypeError(
-            "categorical must be a list of column names or positions, got "
-            f"{type(categorical).__name__}"
+            f"{name} must be a list of column names or positions, got {type(columns).__name__}"
         )
     mask = np.zeros(d, dtype=bool)
-    for item in categorical:
-        mask[column_position(as_node(item, "categorical"), labels, d, "categorical")] = True
+    for item in columns:
+        mask[column_position(as_node(item, name), labels, d, name)] = True
     return mask
 
 

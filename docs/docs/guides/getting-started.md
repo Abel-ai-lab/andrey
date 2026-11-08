@@ -357,9 +357,9 @@ result; `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`
 `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies` and `igsp` also take
 `env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
 learns which variables each environment's interventions changed, `icp` takes `env` and `target`, the
-variable whose parents it finds, and `multi_group_direct_lingam` and `longitudinal_lingam` take a
-list of datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each
-one returns.
+variable whose parents it finds, and `multi_group_direct_lingam`, `longitudinal_lingam`, and
+`jpcmciplus` take a list of datasets. `andrey list` names the methods, and {doc}`graph-types`
+explains which graph each one returns.
 
 `ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. It calls the rows
 of one environment of `env` a setting. Map an observational environment to `[]`, a setting to the
@@ -562,7 +562,7 @@ Every other method raises a `ValueError` that names it: its score or loss reads 
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
 methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM, Granger, and DYNOTEARS, fill in the missing steps first.
+VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, fill in the missing steps first.
 
 ## Backends and parallelism
 

@@ -767,7 +767,9 @@ class Job:
     named: dict[str, str]  # row-aligned arguments that name a column of data, by keyword
     kwargs: dict[str, Any]
     seed: int
-    unit: str  # "rows", "blocks", "units" (one draw for every array), or "groups" (one each)
+    # "rows", "blocks", "units" (one draw for every array), "groups" (one each), or "steps" (one
+    # draw of blocks for every array)
+    unit: str
     block_length: int | None
     seeded: bool  # the method takes a seed, derived per resample
     backend: str
@@ -775,6 +777,10 @@ class Job:
     resampling: str  # "subsample" or "bootstrap", resolved
     sample_fraction: float  # a subsample's share of the rows
     strata: tuple[np.ndarray, ...] | None = None  # each environment's rows, drawn on their own
+
+
+_PANEL_UNITS = ("units", "groups", "steps")  # the data is a list of arrays
+_BLOCK_UNITS = ("blocks", "steps")  # the rows are time steps
 
 
 def _take(x: Any, idx: np.ndarray) -> Any:
@@ -805,20 +811,20 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
         else:
             picks = [rows[rng.integers(0, len(rows), size=len(rows))] for rows in job.strata]
         return [np.sort(np.concatenate(picks))]
-    sizes = [len(x) for x in job.data] if job.unit in ("units", "groups") else [len(job.data)]
+    sizes = [len(x) for x in job.data] if job.unit in _PANEL_UNITS else [len(job.data)]
     if job.resampling == "subsample":
         kept = [_kept(n, job.sample_fraction) for n in sizes]
-        if job.unit == "blocks":  # one stretch of consecutive rows, as in Politis et al. (1999)
+        if job.unit in _BLOCK_UNITS:  # one stretch of consecutive rows, as in Politis et al. (1999)
             start = int(rng.integers(0, sizes[0] - kept[0] + 1))
-            return [np.arange(start, start + kept[0])]
+            return [np.arange(start, start + kept[0])] * len(sizes)
         if job.unit == "units":
             return [np.sort(rng.choice(sizes[0], size=kept[0], replace=False))] * len(sizes)
         return [np.sort(rng.choice(n, size=m, replace=False)) for n, m in zip(sizes, kept)]
-    if job.unit == "blocks":
+    if job.unit in _BLOCK_UNITS:
         n, length = sizes[0], job.block_length
         assert length is not None
         starts = rng.integers(0, n - length + 1, size=math.ceil(n / length))
-        return [(starts[:, None] + np.arange(length)).ravel()[:n]]
+        return [(starts[:, None] + np.arange(length)).ravel()[:n]] * len(sizes)
     if job.unit == "units":
         return [rng.integers(0, sizes[0], size=sizes[0])] * len(sizes)
     return [rng.integers(0, n, size=n) for n in sizes]
@@ -827,7 +833,7 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
 def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     """Fit resample ``b``; return the fit and the warnings it raised."""
     idx = _draw(job, b)
-    if job.unit in ("units", "groups"):
+    if job.unit in _PANEL_UNITS:
         data = [_take(x, ix) for x, ix in zip(job.data, idx)]
     else:
         data = _take(job.data, idx[0])
@@ -925,18 +931,21 @@ def bootstrap(
     returns a CPDAG (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a
     CPDAG without the targets, so an edge that only the interventions orient is undirected there;
     the edge frequencies keep its direction. A time-series method on one series subsamples one
-    stretch of consecutive rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam``
-    resamples whole units, and ``multi_group_direct_lingam`` resamples each dataset on its own.
+    stretch of consecutive rows (and bootstraps blocks of consecutive rows), ``jpcmciplus`` takes
+    the same stretch or blocks from every dataset, so a time context stays the same in all of them,
+    ``longitudinal_lingam`` resamples whole units, and ``multi_group_direct_lingam`` resamples each
+    dataset on its own.
 
     Parameters
     ----------
     method : str or callable
         A method's name, such as ``"pc"``, or the callable itself, such as ``andrey.pc``.
     data : array-like of shape (n_samples, n_variables), or a sequence of them
-        The data, as the method takes it. ``multi_group_direct_lingam`` and
-        ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
-        each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
-        and resampled within each environment, even by a method that reads ``env`` as numbers.
+        The data, as the method takes it. ``multi_group_direct_lingam``, ``longitudinal_lingam``,
+        and ``jpcmciplus`` take a sequence of arrays; ``longitudinal_lingam`` and ``jpcmciplus``
+        need datasets of one length here. A method that takes ``env`` also takes each environment's
+        rows apart, as a list or a mapping, pooled into one table and ``env`` and resampled within
+        each environment, even by a method that reads ``env`` as numbers.
     n_resamples : int, default=100
         The number of resamples and fits.
     seed : int or None, default=None
@@ -954,18 +963,18 @@ def bootstrap(
         ``ValueError``.
     resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
-        distinct rows, kept in their original order; for a time-series method on one series it is
-        one stretch of consecutive rows at a random start [4]_ [5]_. ``"bootstrap"`` draws
-        ``n_samples`` rows with replacement; for a time-series method on one series it draws blocks
-        of ``block_length`` consecutive rows (a moving block bootstrap).
+        distinct rows, kept in their original order; for a time-series method it is one stretch of
+        consecutive rows at a random start [4]_ [5]_. ``"bootstrap"`` draws ``n_samples`` rows with
+        replacement; for a time-series method it draws blocks of ``block_length`` consecutive rows
+        (a moving block bootstrap). ``longitudinal_lingam``, whose rows are units, is none of these.
     sample_fraction : float, default=0.5
         The share of the rows in a subsample, in ``(0, 1]``, so that ``round(sample_fraction *
         n_samples)`` is at least 2; for ``longitudinal_lingam``, the share of the units, and for
         ``multi_group_direct_lingam``, the share of each dataset's rows, and for a resample drawn
         within environments, the share of each environment's rows. Not used by ``"bootstrap"``.
     block_length : int or None, default=None
-        For ``resampling="bootstrap"`` of a time-series method on one series, the number of
-        consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
+        For ``resampling="bootstrap"`` of a time-series method on one series or of ``jpcmciplus``,
+        the number of consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
         ``max(ceil(n_samples ** (1/3)), 10 * tau_max)`` for a method with a ``tau_max``, and
         ``ceil(n_samples ** (1/3))`` for the others, at most ``n_samples``. A block break puts rows
         that were not neighbors side by side, which weakens a link that many steps long or longer,
@@ -1302,9 +1311,9 @@ def build_job(
     if panel:
         data = list(data)
         sizes = [len(x) for x in data]
+        unit = "steps" if spec.data.steps else "units" if temporal else "groups"
         if temporal and len(set(sizes)) > 1:
-            raise ValueError(f"every dataset needs the same units, got {sizes} rows")
-        unit = "units" if temporal else "groups"
+            raise ValueError(f"every dataset needs the same {unit}, got {sizes} rows")
     else:
         sizes = [len(data)]
         unit = "blocks" if temporal else "rows"
@@ -1315,9 +1324,11 @@ def build_job(
                 f"sample_fraction {sample_fraction} of {too_few[0]} rows is "
                 f"{_kept(too_few[0], sample_fraction)}; a subsample needs at least 2 rows"
             )
-    if unit != "blocks" and block_length is not None:
-        raise ValueError(f"block_length is for a time-series method on one series, not {spec.name}")
-    if unit == "blocks" and resampling == "bootstrap":
+    if unit not in _BLOCK_UNITS and block_length is not None:
+        raise ValueError(
+            f"block_length is for a time-series method on one series or jpcmciplus, not {spec.name}"
+        )
+    if unit in _BLOCK_UNITS and resampling == "bootstrap":
         n = sizes[0]
         length = _default_block_length(spec, kwargs, n) if block_length is None else block_length
         block_length = int_in_range(length, "block_length", 1, n)

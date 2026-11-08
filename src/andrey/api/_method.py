@@ -302,10 +302,13 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | No
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
     """Return the values ``param`` takes at run time where they differ from its spec, else ``None``.
 
-    An ``indep_test`` that takes the shipped tests also takes the ones registered with
+    An ``indep_test`` takes its shipped choices and the tests registered with
     :func:`~andrey.core.ci.register_indep_test`.
     """
-    return available_indep_tests() if param.choices == SHIPPED_INDEP_TESTS else None
+    if param.concept != "indep_test" or param.choices is None:
+        return None
+    registered = [name for name in available_indep_tests() if name not in SHIPPED_INDEP_TESTS]
+    return (*param.choices, *registered)
 
 
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:

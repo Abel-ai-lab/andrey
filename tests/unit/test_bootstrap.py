@@ -673,6 +673,34 @@ def test_a_panel_subsample_keeps_the_same_units_in_every_dataset_and_each_groups
     assert (len(first), len(second)) == (60, 90) and len(set(second.tolist())) == 90
 
 
+def test_a_panel_of_series_takes_the_same_consecutive_rows_from_every_dataset():
+    stretch = job_of("jpcmciplus", [np.zeros((50, 2))] * 3, "steps", "subsample", 0.4)
+    idx = _draw(stretch, 0)
+    assert len(idx) == 3 and all(np.array_equal(ix, idx[0]) for ix in idx)
+    assert np.array_equal(np.diff(idx[0]), np.ones(19, dtype=int))
+    blocks = job_of("jpcmciplus", [np.zeros((50, 2))] * 3, "steps", "bootstrap", block_length=10)
+    idx = _draw(blocks, 0)
+    assert len(idx) == 3 and all(np.array_equal(ix, idx[0]) for ix in idx)
+    assert all((np.diff(block) == 1).all() for block in idx[0].reshape(5, 10))
+
+
+def test_a_resample_of_several_series_keeps_their_lagged_links():
+    rng = np.random.default_rng(0)
+    panel = []
+    for _ in range(6):
+        x = rng.standard_normal(300)
+        panel.append(
+            np.column_stack([x, np.r_[0.0, 0.9 * x[:-1]] + 0.3 * rng.standard_normal(300)])
+        )
+    for resampling in ("subsample", "bootstrap"):
+        out = bootstrap(
+            "jpcmciplus", panel, n_resamples=5, seed=0, resampling=resampling, time_dummy=False
+        )
+        assert out.frequency("->", lag=1)[0, 1] == 1.0
+    with pytest.raises(ValueError, match="same steps"):
+        bootstrap("jpcmciplus", [panel[0], panel[1][:100]], n_resamples=2, time_dummy=False)
+
+
 def test_resampling_defaults_to_a_subsample_for_every_method():
     data = lingam_data()
     default = bootstrap("hc", data, n_resamples=2)

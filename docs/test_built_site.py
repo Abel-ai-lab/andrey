@@ -64,6 +64,7 @@ PUBLIC_MODULES = (
     (andrey.data.discrete, "data."),
     (andrey.data.mixed, "data."),
     (andrey.data.scm, "data."),
+    (andrey.data.contexts, "data."),
     (andrey.data.interventions, "data.interventions."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),

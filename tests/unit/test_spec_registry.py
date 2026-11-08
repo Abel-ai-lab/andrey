@@ -348,14 +348,18 @@ def test_every_env_var_has_one_parser():
 
 
 def test_every_indep_test_takes_the_shipped_tests():
-    """Every method's ``indep_test`` choices are the shipped CI-registry names it dispatches, so
-    the CLI/JSON schema the registry renders cannot drift from what the facades accept."""
+    """Every method's ``indep_test`` choices are the shipped CI-registry names it dispatches, all of
+    them unless the concept records a deviation, so the CLI/JSON schema the registry renders cannot
+    drift from what the facades accept."""
     from andrey.core.ci import SHIPPED_INDEP_TESTS
+    from andrey.spec.concepts import CONCEPTS
 
     params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "indep_test"}
     assert {"pc", "pcmci", "pcmciplus", "lpcmci"} <= set(params)
     for name, p in params.items():
-        assert p.choices == SHIPPED_INDEP_TESTS, name
+        deviation = CONCEPTS["indep_test"].deviation(name)
+        assert p.choices == (SHIPPED_INDEP_TESTS if deviation is None else deviation.choices), name
+        assert set(p.choices) <= set(SHIPPED_INDEP_TESTS), name
 
 
 # --- support status -------------------------------------------------------------------------------

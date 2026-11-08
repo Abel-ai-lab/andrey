@@ -363,6 +363,7 @@ UNIT_CASES = {
     "longitudinal_lingam": "panel_4v",
     "pcmci": "var_3v_lag2",
     "pcmciplus": "var_4v_stable",
+    "jpcmciplus": "mgdl_2groups",
     "lpcmci": "var_6v_hidden",
     "granger": "var_4v_stable",
     "gin": "measurement_chain_9v",
@@ -524,7 +525,8 @@ def used_settings(method: str, table: pd.DataFrame, **kwargs) -> dict[str, tuple
         warning_policy._warned.clear()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            out = facade(method)(*args_for(method, [table] * 3), **kwargs)
+            settings = {**SHORT.get(method, {}), **kwargs}
+            out = facade(method)(*args_for(method, [table] * 3), **settings)
     keys = [k for k in ("indep_test", "score_func") if k in out.metadata]
     return {k: (out.metadata[k], set(names[k])) for k in keys}
 
@@ -696,7 +698,7 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
 #: that changes the best DAG at random.
 RANDOMIZED = {
-    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)},
+    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus")},
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }
 
@@ -714,6 +716,8 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 
 #: The CI searches whose score search visits the variables in a random order on every fit.
 ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
+#: The search whose dummies enter its tests as numeric columns, so it reads continuous data only.
+CONTINUOUS_ONLY = ("jpcmciplus",)
 
 
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
@@ -742,7 +746,8 @@ def named_setting(method: str, key: str) -> str:
 @pytest.mark.parametrize("method", CONCEPTS["chosen_settings"].suitable)
 def test_a_named_test_or_score_is_the_one_recorded_and_built(method):
     named = {key: named_setting(method, key) for key in wanted_settings(method)}
-    found = used_settings(method, typed_frame("mixed"), **named)
+    kind = "continuous" if method in CONTINUOUS_ONLY else "mixed"
+    found = used_settings(method, typed_frame(kind), **named)
     assert agrees(found, set(named))
     assert {key: recorded for key, (recorded, _) in found.items()} == named
 

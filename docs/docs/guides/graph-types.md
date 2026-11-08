@@ -175,7 +175,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
 edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD
@@ -195,6 +195,11 @@ partially directed by the index, with the same `index_edges` and `changing_varia
 environments and no other variable explains the change; under hidden common causes that does not
 make it a target of the change, so `fci_jci` lists no `changing_variables`. With `env`, `gfci`,
 `boss_fci`, and `grasp_fci` return their PAG and `index_edges` the same way.
+
+`jpcmciplus` returns a `TemporalStructure` over the system variables alone, and lists no
+`changing_variables` either: the links of its dummies, in `metadata["index_edges"]` and
+`metadata["time_index_edges"]`, stand in for the hidden contexts, and the links of the measured
+contexts are in `metadata["context_links"]`.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.
