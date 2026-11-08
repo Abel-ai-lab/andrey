@@ -24,8 +24,9 @@ Multi-domain data come from several environments, such as sites, batches, or the
 experiment, that share one causal structure and differ in the mechanisms of some variables. With
 each row's environment recorded as an environment index, a method can tell a dependence that
 changing mechanisms create from a causal edge, and it can orient edges that one environment leaves
-undirected. FCI-JCI learns from these data while allowing hidden common causes, and BOSS-FCI and
-GRaSP-FCI allow them too. In our comparisons with their authors' code, none of the three made
+undirected. FCI-JCI learns from these data while allowing hidden common causes, BOSS-FCI and
+GRaSP-FCI allow them too, and J-PCMCI+ learns from time series of several datasets. In our
+comparisons with their authors' code, in the settings their papers study, none of the four made
 significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
 BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
 
@@ -41,7 +42,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 43 supported methods, each one function call.
+- **One API**: 44 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -71,7 +72,7 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 43 supported methods. Data types: continuous,
+    <img alt="Andrey: accelerated, accurate, agentic. 44 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
       confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
@@ -95,7 +96,7 @@ You install andrey-core and then `import andrey`.
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html)\*, [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html)\*, [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`boss_fci`](https://andrey.abel.ai/docs/api/andrey.boss_fci.html), [`grasp_fci`](https://andrey.abel.ai/docs/api/andrey.grasp_fci.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG, PAG |
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html) | DAG |
-| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html)\*, [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
+| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html), [`camuv`](https://andrey.abel.ai/docs/api/andrey.camuv.html) | DAG, PAG |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html) | Two-node DAG |
 
