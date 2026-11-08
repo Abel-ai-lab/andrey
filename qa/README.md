@@ -49,9 +49,9 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
   IGSP, and FCI-JCI are not refit: their data hold each row's environment in one column, and ICP's
   target is the last variable.
-- `--workers N` refits PC, FCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL on `N`
-  workers, with every GES pass and every skeleton pass of conditioning size two or more sent to
-  the worker pool.
+- `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
+  on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
+  every possible-d-sep search sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.

@@ -20,8 +20,8 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
-from functools import partial
-from itertools import chain, combinations, islice
+from functools import cache, partial
+from itertools import chain, combinations, groupby, islice
 from math import comb
 from typing import TYPE_CHECKING
 
@@ -554,6 +554,127 @@ def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
     return (
         comb(neighbors[x].size - 1, size) + comb(neighbors[y].size - 1, size) - comb(shared, size)
     )
+
+
+# ---- possible-d-sep subsets ---------------------------------------------------------------------
+#
+# FCI's possible-d-sep step searches the subsets of a pair's candidate set by increasing size, each
+# size in ``combinations`` order, for the first that separates the pair. The subsets are cut into
+# blocks of positions in the candidate list, enumerated as arrays, and asked in batched calls.
+
+#: A block ``(prefix, rest)`` of a size holds every subset of the candidates that starts with the
+#: candidates at the positions ``prefix`` and takes its ``rest`` other members from the positions
+#: after the last of them, in ``combinations`` order.
+Block = tuple[tuple[int, ...], int]
+
+#: The most candidates a search enumerates as arrays: a subset's positions form a non-negative
+#: int64 bit mask.
+MASK_BITS = 63
+
+
+def block_subsets(n: int, block: Block) -> int:
+    """The subsets ``block`` holds of ``n`` candidates."""
+    prefix, rest = block
+    return comb(n - (prefix[-1] + 1 if prefix else 0), rest)
+
+
+def blocks(n: int, size: int, most: int) -> Iterator[Block]:
+    """``combinations(range(n), size)`` cut into contiguous blocks of at most ``most`` subsets, in
+    order: a block too large is split by the position its next member takes."""
+
+    def split(prefix: tuple[int, ...], start: int, rest: int) -> Iterator[Block]:
+        if comb(n - start, rest) <= most:
+            yield prefix, rest
+            return
+        for i in range(start, n - rest + 1):
+            yield from split((*prefix, i), i + 1, rest - 1)
+
+    return split((), 0, size)
+
+
+@cache
+def _combination_table(m: int, r: int) -> np.ndarray:
+    """``combinations(range(m), r)`` as a ``(comb(m, r), r)`` array. A block holds at most a few
+    thousand subsets, and ``m`` is at most :data:`MASK_BITS`, so the tables stay small."""
+    count = comb(m, r)
+    flat = np.fromiter(chain.from_iterable(combinations(range(m), r)), np.intp, count * r)
+    return flat.reshape(count, r)
+
+
+def block_positions(n: int, block: Block) -> np.ndarray:
+    """The subsets of ``block`` of ``n`` candidates as rows of positions, in order."""
+    prefix, rest = block
+    start = prefix[-1] + 1 if prefix else 0
+    tail = _combination_table(n - start, rest)
+    rows = np.empty((len(tail), len(prefix) + rest), dtype=np.intp)
+    rows[:, : len(prefix)] = prefix
+    rows[:, len(prefix) :] = tail + start
+    return rows
+
+
+def _runs(groups: Iterable[Iterable[np.ndarray]], first: int, most: int) -> Iterator[np.ndarray]:
+    """The rows of each group's arrays, in order, in runs of ``first``, twice that, and so on up to
+    ``most`` rows. A run holds the rows of one group, and a group's last run the rest of them."""
+    run = first
+    for arrays in groups:
+        held: list[np.ndarray] = []
+        count = 0
+        for array in arrays:
+            held.append(array)
+            count += len(array)
+            while count >= run:
+                rows = np.concatenate(held)
+                yield rows[:run]
+                held, count = [rows[run:]], count - run
+                run = min(2 * run, most)
+        if count:
+            yield np.concatenate(held)
+            run = min(2 * run, most)
+
+
+def first_separating_subset(
+    test: CITest,
+    x: int,
+    y: int,
+    candidates: Sequence[int],
+    within: Sequence[int],
+    subsets: Iterable[Block],
+    alpha: float,
+    first: int = 1,
+) -> tuple[int, ...] | None:
+    """The first subset of ``candidates`` in ``subsets`` that separates ``x`` and ``y``
+    (``p > alpha``), or ``None``.
+
+    ``subsets`` are blocks of positions in ``candidates`` (:data:`Block`), in the order they are
+    tested; a subset whose positions all lie in one of the bit masks ``within`` is left out. There
+    are at most :data:`MASK_BITS` candidates. Each size's subsets are enumerated as arrays and
+    asked in runs of ``first``, twice that, and so on up to :data:`CHUNK` subsets, each run one
+    ``separating_prefix`` call over the sorted members, which answers it up to its first separating
+    subset with the p-values of scalar calls, as :func:`~andrey.core.ci._separating_prefix` does. A
+    test raises only from a subset that comes before every separating one. The subset returned
+    lists its members in ``candidates`` order.
+    """
+    labels = np.asarray(candidates, dtype=np.intp)
+    n = len(labels)
+    bits = np.left_shift(np.int64(1), np.arange(n, dtype=np.int64))
+    outside = [np.int64(~mask) for mask in within if mask]
+
+    def kept(block: Block) -> np.ndarray:
+        rows = block_positions(n, block)
+        if outside:
+            masks = bits[rows].sum(axis=1)
+            keep = np.logical_and.reduce([(masks & mask) != 0 for mask in outside])
+            rows = rows[keep]
+        return rows
+
+    groups = (map(kept, same) for _, same in groupby(subsets, key=lambda b: len(b[0]) + b[1]))
+    for rows in _runs(groups, first, CHUNK):
+        pvalues = test.separating_prefix(  # ty: ignore[unresolved-attribute]  # gated by the type
+            x, y, np.sort(labels[rows], axis=1), alpha
+        )
+        if pvalues and pvalues[-1] > alpha:
+            return tuple(labels[rows[len(pvalues) - 1]].tolist())
+    return None
 
 
 def separate_apart(

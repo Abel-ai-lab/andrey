@@ -115,6 +115,12 @@ names its pull request.
 - `grasp` adds or removes a parent only when it changes the score by more than the `1e-6`
   tolerance, as `boss` does, so its graph can differ on data whose scores tie within it. ([#749])
 - The `andrey` command needs Typer 0.12.4 or later. ([#755])
+- `fci`, `fci_jci`, and `gfci` run their possible-d-separation step faster, with the same graphs and
+  separating sets on any number of workers: a search of many subsets asks them in batched calls,
+  the second endpoint's search leaves out the subsets the first endpoint's search found dependent,
+  and with more than one worker a search of at least 250,000 subsets with the `fisherz`,
+  `student_t`, or `normal_scores` test runs on the worker processes
+  (`ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK` sets the cutoff). ([#PR])
 
 ### Fixed
 

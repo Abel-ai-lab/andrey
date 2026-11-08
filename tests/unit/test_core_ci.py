@@ -72,6 +72,25 @@ def test_batched_matches_scalar_exactly(test_class, seed):
     np.testing.assert_array_equal(batched_p, scalar_p)
 
 
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize(
+    "conds",
+    [
+        [(2, 3, 4), (2, 5, 9), (3, 4, 8)],
+        [(4, 3, 2), (9, 2, 5), (8, 4, 3)],
+        np.array([(4, 3, 2), (9, 2, 5), (8, 4, 3)]),
+        [(2, 2, 3), (2, 5, 9), (3, 4, 8)],
+        [(), (), ()],
+    ],
+    ids=["sorted", "unsorted", "array", "repeated-member", "empty"],
+)
+def test_batched_sets_of_one_size_match_scalar_exactly(test_class, conds):
+    # A batch of one set size is sorted as one array; a repeated member sends it down the per-set
+    # path, which drops the repeat. Either way each p-value is the scalar call's.
+    test = test_class(np.random.default_rng(0).standard_normal((200, 10)))
+    assert test.batched_call(1, 0, conds) == [test(1, 0, c) for c in conds]
+
+
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
 @pytest.mark.parametrize("seed", range(15))
 def test_prescreen_pvalues_match_canonical_scalar_exactly(test_class, seed):
@@ -315,6 +334,8 @@ def test_variable_in_condition_set_is_assertion_error(data):
         test(0, 1, (0, 2))
     with pytest.raises(AssertionError, match="condition_set"):
         test.batched_call(0, 1, [(2,), (1, 3)])
+    with pytest.raises(AssertionError, match="condition_set"):
+        test.batched_call(0, 1, [(2, 3), (1, 3)])
 
 
 # ---- singularity guard -------------------------------------------------------------------

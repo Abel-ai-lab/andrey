@@ -8,7 +8,11 @@ definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-read
 
 from __future__ import annotations
 
-from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES, MIN_POOL_RCOT_WORK
+from andrey.constraint._parallel_skeleton import (
+    MIN_POOL_DSEP_SUBSETS,
+    MIN_POOL_QUERIES,
+    MIN_POOL_RCOT_WORK,
+)
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
@@ -50,10 +54,12 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES, GFCI (its GES phase), the fits of `andrey.bootstrap`, and "
+            "Worker processes for GES, GFCI (its GES phase), the fits of `andrey.bootstrap`, "
             "the skeleton searches of PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 "
-            '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and worker '
-            "threads for the two directions of `pnl`; `0` or `1` runs serially. "
+            '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and the '
+            "possible-d-separation searches of FCI, FCI-JCI, and GFCI with `fisherz`, `student_t`, "
+            "or `normal_scores`, and worker threads for the two directions of `pnl`; `0` or `1` "
+            "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -85,6 +91,19 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
             "worker warns once on the default when a pass reaches a tenth of it; `andrey "
             "calibrate --method skeleton` measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK",
+        values="integer (subsets per possible-d-separation search)",
+        default=str(MIN_POOL_DSEP_SUBSETS),
+        effect=(
+            "Per-search crossover gate for the parallel possible-d-separation step of FCI, "
+            "FCI-JCI, and GFCI with `fisherz`, `student_t`, or `normal_scores`: a pair's search "
+            "runs on the worker pool only when its candidate set has at least this many subsets, "
+            "counted over every size it tests, else in-process. `0` sends every search to the "
+            "pool. No effect unless the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1."
         ),
         group="backend",
     ),
