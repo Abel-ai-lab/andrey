@@ -353,12 +353,13 @@ adds each row's rerun.
 ## Known differences
 
 - **The fix.** tigramite 5.2.10.1's `JPCMCIplus` gives both ends of a same-step link between two
-  observed contexts the assumption `-->` and then raises "Inconsistent link assumptions". It does
-  so whenever such a link is found, as in most draws with both space contexts observed.
-  `patches/tigramite-jpcmciplus-context-links.patch` leaves that link `o?o`, and the lane applies
-  it in memory. Every fit that finished without the fix gave the same graph with it (Context
-  above). Links between contexts are not scored, and Andrey does not test them, following the
-  paper's text.
+  observed contexts the assumption `-->` and then raises "Inconsistent link assumptions". It does so
+  whenever such a link is found, as in most draws with both space contexts observed. The defect is
+  reported upstream as [tigramite issue 503](https://github.com/jakobrunge/tigramite/issues/503),
+  open when this page was written. `patches/tigramite-jpcmciplus-context-links.patch` leaves that
+  link `o?o`, and the lane applies it in memory. Every fit that finished without the fix gave the
+  same graph with it (Context above). Links between contexts are not scored, and Andrey does not
+  test them, following the paper's text.
 - **No same-step links in the claim.** The authors' script draws every link between system
   variables at lag 1 or 2, so in the claimed cells, as in the paper's figures, the same-step part
   of the error counts false links only. Same-step recovery is measured outside the claim, on
