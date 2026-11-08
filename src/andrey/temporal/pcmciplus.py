@@ -99,7 +99,7 @@ class PCMCIPlusResult:
         return tuple((int(i), int(j)) for i, j in np.argwhere(np.triu(both)))
 
 
-class _Recorder:
+class Recorder:
     """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic."""
 
     def __init__(self, test: LinkTest) -> None:
@@ -177,13 +177,15 @@ def skeleton(
     pc_alpha: float,
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
+    pool: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]]]:
     """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets)``.
 
     The p-value array holds ``-1`` for a link phase 2 never tested. With ``constraints``, the lag-0
     links start from the pairs they allow, and no required link is tested or removed. Every test
-    conditions on the lagged parents of both ends and on a subset of the lag-0 neighbors;
-    ``max_p_global`` caps the size of that subset, the conditions beyond the parents.
+    conditions on the entries of ``parents`` for both ends and on a subset of the lag-0 neighbors;
+    ``max_p_global`` caps the size of that subset, the conditions beyond the parents. ``pool``, a
+    mask over the variables, limits the neighbors a subset draws from.
     """
     shape = (tau_max + 1, n_vars, n_vars)
     adjacency = np.zeros(shape, dtype=bool)
@@ -200,7 +202,8 @@ def skeleton(
     statistics = np.zeros(shape)
     strength = np.full(shape, np.inf)
     sepsets: dict[tuple[int, int, int], tuple[int, ...]] = {}
-    neighbors = [tuple(np.flatnonzero(adjacency[0, :, j]).tolist()) for j in range(n_vars)]
+    pool = np.ones(n_vars, dtype=bool) if pool is None else pool
+    neighbors = [tuple(np.flatnonzero(adjacency[0, :, j] & pool).tolist()) for j in range(n_vars)]
     p = 0
     while max_p_global is None or p <= max_p_global:
         pairs = [
@@ -212,7 +215,7 @@ def skeleton(
             (i, 0, j)  # in order of (i, j): a pair first meets its higher variable's neighbors
             for i in range(n_vars)
             for j in range(n_vars)
-            if adjacency[0, i, j] and not kept[0, i, j] and len(neighbors[j]) - 1 >= p
+            if adjacency[0, i, j] and not kept[0, i, j] and len(neighbors[j]) - int(pool[i]) >= p
         ]
         if not pairs:
             break
@@ -243,7 +246,8 @@ def skeleton(
         neighbors = [
             tuple(
                 sorted(
-                    np.flatnonzero(adjacency[0, :, j]).tolist(), key=lambda k: -strength[0, k, j]
+                    np.flatnonzero(adjacency[0, :, j] & pool).tolist(),
+                    key=lambda k: -strength[0, k, j],
                 )
             )
             for j in range(n_vars)
@@ -266,13 +270,17 @@ def _separating_subsets(
     lag: int,
     j: int,
     max_p_global: int | None = None,
+    middles: Sequence[int] | None = None,
 ) -> list[frozenset[int]]:
     """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that separates.
 
     A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test, with the phase-2 conditions
-    added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size.
+    added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
+    subset draws only from ``middles`` when it is given.
     """
     families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
+    if middles is not None:
+        families = [[k for k in family if k in middles] for family in families]
     largest = max(len(family) for family in families)
     separating = []
     for size in range(largest + 1 if max_p_global is None else min(largest, max_p_global) + 1):
@@ -316,13 +324,15 @@ def colliders(
     collider_rule: str,
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
+    middles: Sequence[int] | None = None,
 ) -> tuple[np.ndarray, frozenset[Triple]]:
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
     one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
     set to read and is ambiguous. ``max_p_global`` caps the subsets the majority and conservative
-    votes read.
+    votes read. With ``middles``, a triple's last two variables are among them, and so are the
+    subsets the votes read; any variable can open a triple.
     """
     tau_max = adjacency.shape[0] - 1
     marks = np.where(adjacency[0], TAIL, NULL).astype(np.int8)
@@ -336,9 +346,14 @@ def colliders(
     cache: dict[tuple[int, int, int], list[frozenset[int]]] = {}
     requests: list[tuple[int, int]] = []
     ambiguous: set[Triple] = set()
-    for k in range(n_vars):
-        for j in _neighbors(adjacency, k):
-            far = [(i, 0) for i in _neighbors(adjacency, k) if i < j and not adjacency[0, i, j]]
+    inner = range(n_vars) if middles is None else middles
+    for k in inner:
+        for j in (j for j in _neighbors(adjacency, k) if j in inner):
+            far = [
+                (i, 0)
+                for i in _neighbors(adjacency, k)
+                if (i < j or i not in inner) and not adjacency[0, i, j]
+            ]
             far += [
                 (i, lag)
                 for lag in range(1, tau_max + 1)
@@ -354,7 +369,7 @@ def colliders(
                     key = (min(i, j), 0, max(i, j)) if lag == 0 else (i, lag, j)
                     if key not in cache:
                         cache[key] = _separating_subsets(
-                            test, n_vars, parents, adjacency, pc_alpha, *key, max_p_global
+                            test, n_vars, parents, adjacency, pc_alpha, *key, max_p_global, middles
                         )
                     verdict = collider_verdict(cache[key], k, collider_rule)
                 if verdict == "collider":
@@ -516,7 +531,7 @@ def run_phases(
     ``fdr_method`` corrects the lagged ``p_values`` once the phases have recorded them, and only
     them: lag 0 is left as tested, and the corrected values decide no link.
     """
-    recorder = _Recorder(test)
+    recorder = Recorder(test)
     parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
     adjacency, p_values, statistics, sepsets = skeleton(
         test, n_vars, parents, tau_max, pc_alpha, constraints, max_p_global

@@ -152,29 +152,30 @@ choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, 
 `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear
 tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
-`"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and `lpcmci` run each test on the lagged
-values of the series, and order the candidate conditions by the test's statistic, as tigramite does:
-the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual
-information estimate, or GPDC's distance correlation. A test you register that reports only p-values
-is ordered by its p-value, smallest first.
+`"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
+dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
+test on the lagged values of the series, and order the candidate conditions by the test's statistic,
+as tigramite does: the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's
+conditional mutual information estimate, or GPDC's distance correlation. A test you register that
+reports only p-values is ordered by its p-value, smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
 `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
-`granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a
-{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
-temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
-in the result, whatever its weight, test, or score says. For the time-series methods, an edge
-`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
-[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`,
+`jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
+`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
+be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
+required edge is in the result, whatever its weight, test, or score says. For the time-series
+methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
+time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
-the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points
-of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its
-name.
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take
+`tau_max`, the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts
+time points of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and
+keeps its name.
 
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
@@ -194,30 +195,31 @@ from outside, as in a randomized experiment (FCI-JCI123), so every edge the inde
 of it.
 
 % concept: fdr_method
-`pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the
-lagged links' p-values for the number of links tested. `"fdr_bh"`, the default, replaces them with
-their Benjamini-Hochberg adjusted values over all the lagged links together, which holds the false
-discovery rate at or below the level when the tests are independent or positively dependent.
-`"none"` keeps each p-value as tested, so about `alpha` of the absent links appear as links. `pcmci`
-and `granger` keep a link when its adjusted p-value is at most `alpha`; `pcmciplus` decides its
-links in the skeleton phase and reports the adjusted values in `metadata["p_values"]` without
-changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
+`pcmci`, `pcmciplus`, `jpcmciplus`, and `granger` take `fdr_method`, tigramite's name for the
+correction of the lagged links' p-values for the number of links tested. `"fdr_bh"`, the default,
+replaces them with their Benjamini-Hochberg adjusted values over all the lagged links together,
+which holds the false discovery rate at or below the level when the tests are independent or
+positively dependent. `"none"` keeps each p-value as tested, so about `alpha` of the absent links
+appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`;
+`pcmciplus` and `jpcmciplus` decide their links in the skeleton phase and report the adjusted values
+in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
-`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum
-conditioning-set size of their conditional-independence tests; `None`, the default, sets no cap.
-`mmhc` and `rsmax2` cap their restrict phase and `pcmci` and `pcmciplus` their PC1 step; the
-blankets of `iamb` and `inter_iamb` stop growing at the cap. `rcd`'s cap is the most variables it
-regresses out together, and `camuv`'s the most variables a sink test adds together as a variable's
-candidate parents, each with a default of 2, its paper's setting.
+`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and `camuv` take `max_depth`, the
+maximum conditioning-set size of their conditional-independence tests; `None`, the default, sets no
+cap. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`, and `jpcmciplus` their
+PC1 step; the blankets of `iamb` and `inter_iamb` stop growing at the cap. `rcd`'s cap is the most
+variables it regresses out together, and `camuv`'s the most variables a sink test adds together as a
+variable's candidate parents, each with a default of 2, its paper's setting.
 
 % concept: max_p_global
-`lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
-beyond the default conditions, the parents of both ends, which every test includes. `lpcmci` caps
-all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_depth` caps the
-lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
-skeleton and collider phases, whose sets add the lagged parents of both ends.
+`lpcmci`, `pcmciplus`, and `jpcmciplus` take `max_p_global`, tigramite's name for the most
+conditions a test takes beyond the default conditions, the parents of both ends, which every test
+includes. `lpcmci` caps all of its removal phases with it. `pcmciplus` and `jpcmciplus` split their
+caps by phase: `max_depth` caps the lagged phase, whose sets hold no default conditions, and
+`max_p_global` caps the same-step skeleton and collider phases, whose sets add the lagged parents of
+both ends.
 
 % concept: structure
 `iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
@@ -237,9 +239,9 @@ and Spirtes 2006) and `"majority"` (Colombo and Maathuis 2014) test `x` and `y` 
 subset of either one's neighbors and, if at least one subset separates them, make `z` a collider
 when none, or fewer than half, of the separating subsets contain it. A triple the vote cannot decide
 is ambiguous: no rule orients through it, and `metadata["ambiguous_triples"]` lists it. Each
-method's Notes give every outcome.
-`pcmciplus` takes the same three rules for its same-step colliders, with `"majority"` as its
-default, as in tigramite, since its orientations do not depend on the order of the variables.
+method's Notes give every outcome. `pcmciplus` and `jpcmciplus` take the same three rules for their
+same-step colliders, with `"majority"` as their default, as in tigramite, since their orientations
+do not depend on the order of the variables.
 
 % concept: edge_removal
 `gfci`, `boss_fci`, and `grasp_fci` take `edge_removal`: which edges of the score search's CPDAG
@@ -267,15 +269,15 @@ tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
-`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
-random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
-phase visits the variables in a random order on every fit, the methods that test independence draw
-random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and `ut_igsp` also
-with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes
-nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on
-`ANDREY_SEED`. Every other method is deterministic and takes no seed.
+`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
+`hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes
+their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
+unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
+whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
+independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and
+`ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise
+`seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend
+on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -546,12 +548,21 @@ its first call in a process.
 
    notears
    dagma
+   jpcmciplus
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+J-PCMCI+ (Gunther, Ninad, and Runge 2023) runs PCMCI+ on several datasets of the same variables,
+such as sites or subjects. Pass the datasets as a list; `time_contexts` names the columns that
+change over time and are the same in every dataset, and `space_contexts` those fixed within a
+dataset. One-hot dummies of the dataset and of the time step stand in for the contexts you did not
+measure. It returns the temporal structure of PCMCI+ over the other columns, and lists the context
+links in `metadata["context_links"]` and the dummies' links in `metadata["index_edges"]` and
+`metadata["time_index_edges"]`.
 
 A method becomes supported once it has:
 
@@ -684,8 +695,10 @@ orient is undirected there; the edge frequencies keep its direction. `multi_grou
 resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
 resamples the units, the same rows of every dataset. A time-series method on one series subsamples
 one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
-consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
-take, since its number of latent nodes differs from fit to fit.
+consecutive rows, by default at least ten times its `tau_max`. `jpcmciplus` does the same with the
+same rows of every dataset, so a time context stays the same in all of them, and needs datasets of
+one length. `gin` is the one method it does not take, since its number of latent nodes differs from
+fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
@@ -915,6 +928,9 @@ scores, and `andrey.data.sample_mixed` a network of categorical and continuous v
 for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
 an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
 the causal order; `shuffle=False` keeps the order in which the graph was drawn.
+`andrey.data.sample_context_series` draws linear time series from several datasets with time and
+space contexts, the model that Gunther, Ninad, and Runge (2023) describe, with their links. Here
+each context drives exactly one variable, so no hidden context is a common cause of two.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
@@ -927,6 +943,8 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    SCM
    sample_discrete
    sample_mixed
+   sample_context_series
+   ContextSeries
    interventions.hard
    interventions.soft
    interventions.HardIntervention

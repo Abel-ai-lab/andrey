@@ -485,6 +485,7 @@ PROSE_NAMES = {
     "longitudinal_lingam": "Longitudinal LiNGAM",
     "pcmci": "PCMCI",
     "pcmciplus": "PCMCI+",
+    "jpcmciplus": "J-PCMCI+",
     "lpcmci": "LPCMCI",
     "granger": "Granger",
     "dynotears": "DYNOTEARS",

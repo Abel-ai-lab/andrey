@@ -1220,3 +1220,57 @@ def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsy
     assert code == 0 and env["metadata"]["categorical"] == []
     messages = [w["message"] for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
     assert any("columns 'g' hold at most 10" in m for m in messages)
+
+
+def _context_files(tmp_path, header):
+    """Three datasets of ``x`` and ``y`` that a time context ``c`` drives, as ``--data`` flags."""
+    rng = np.random.default_rng(0)
+    c = rng.standard_normal(120)
+    flags = []
+    for k in range(3):
+        x = 2 * c + rng.standard_normal(120)
+        y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(120)
+        path = tmp_path / f"{header}{k}.csv"
+        rows = [f"{a},{b},{d}" for a, b, d in zip(x, y, c)]
+        path.write_text("\n".join([*([header] if header else []), *rows]))
+        flags += ["--data", str(path)]
+    return flags
+
+
+def test_contexts_name_columns_by_the_header_or_by_position(tmp_path, capsys):
+    named = ["run", "jpcmciplus", *_context_files(tmp_path, "x,y,c"), "time_dummy=false"]
+    code, out, err = _run([*named, "time_contexts=[c]"], capsys)
+    env = json.loads(out)
+    assert code == 0, err
+    assert env["metadata"]["context_links"] == [["c", 0, "x"]]
+    assert env["structure"]["labels"] == ["x", "y"]
+    code, again, err = _run([*named, "time_contexts=[2]"], capsys)
+    assert code == 0, err
+    assert json.loads(again)["metadata"]["context_links"] == [["c", 0, "x"]]
+    plain = ["run", "jpcmciplus", *_context_files(tmp_path, ""), "time_dummy=false"]
+    code, out, err = _run([*plain, "time_contexts=[2]"], capsys)
+    assert code == 0, err
+    assert json.loads(out)["metadata"]["context_links"] == [[2, 0, 0]]
+    code, _, err = _run([*named, "time_contexts=[d]"], capsys)
+    assert code != 0 and "unknown_column" in err
+
+
+def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, capsys):
+    argv = [
+        "bootstrap",
+        "jpcmciplus",
+        *_context_files(tmp_path, "x,y,c"),
+        "--n-resamples",
+        "3",
+        "--seed",
+        "0",
+        "--resampling",
+        "bootstrap",
+        "--block-length",
+        "20",
+        "time_contexts=[c]",
+        "time_dummy=false",
+    ]
+    code, out, err = _run(argv, capsys)
+    assert code == 0, err
+    assert json.loads(out)["structure"]["labels"] == ["x", "y"]
