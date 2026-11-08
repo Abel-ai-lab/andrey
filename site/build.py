@@ -502,14 +502,28 @@ NOT_SHOWN_LANES = {
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
 # assumptions that match FCI-JCI's non-default confounded_index=False; an earlier Tetrad release,
-# 7.6.3 in causal-cmd 1.12.0, measured as context; and Tetrad 7.6.3 against the
-# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI.
+# 7.6.3 in causal-cmd 1.12.0, measured as context; Tetrad 7.6.3 against the
+# edge_removal="triangles" option of BOSS-FCI and GRaSP-FCI; and lingam's CAM-UV at its default
+# set size of 2, beside the paper's size of 3, Andrey's default.
 NOT_SHOWN_COMPARATORS = {
     "graphical-model-learning 0.1a8, patched to Definition 4.2",
     'pcalg 2.7-12, jci = "123"',
     "causal-cmd 1.12.0 bfci (tetrad-lib 7.6.3)",
     "causal-cmd 1.12.0 grasp-fci (tetrad-lib 7.6.3)",
     "Tetrad 7.6.3",
+    "lingam 1.13.0 at its default set size",
+}
+# The package each comparator names in the speed panel's legend, without the version or setting
+# its release card gives; every other comparator is a package's name already.
+PACKAGE_NAMES = {
+    "CAM 1.0": "CAM",
+    "InvariantCausalPrediction 0.8": "InvariantCausalPrediction",
+    "causal-learn 0.1.4.8": "causal-learn",
+    "lingam 1.13.0": "lingam",
+    "lingam RESIT": "lingam",
+    'pcalg 2.7-12, jci = "1"': "pcalg",
+    "tetrad-lib 7.6.10 BossFci": "Tetrad",
+    "tetrad-lib 7.6.10 GraspFci": "Tetrad",
 }
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear", "boss_grasp_fci"}
@@ -2525,6 +2539,15 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
     )
 
 
+def package_name(comparator: str) -> str:
+    """The package ``comparator`` names, without a version or setting, from ``PACKAGE_NAMES``;
+    a name that still holds a digit raises ``ValueError``."""
+    name = PACKAGE_NAMES.get(comparator, comparator)
+    if re.search(r"\d", name):
+        raise ValueError(f"name the package of {comparator!r} in PACKAGE_NAMES")
+    return name
+
+
 def method_key(name: str) -> str:
     """A method's key in its figure, distinct for every method: PCMCI+ is not PCMCI."""
     return slug(name.replace("+", " plus"))
@@ -2624,7 +2647,9 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     Scores are errors divided by the empty graph's error count, or one minus link F1 for temporal
     methods. Each line spans the measured sizes, with a larger marker at the largest size.
     Andrey's lines use the accent color; other packages use gray and a marker shape each, from
-    ``FRONTIER_SHAPES``, and a family with more packages than shapes raises ``ValueError``.
+    ``FRONTIER_SHAPES``, and a family with more packages than shapes raises ``ValueError``. The
+    legend names each package once, by :func:`package_name`; a tooltip keeps the comparator's
+    version and setting.
     Each method uses different data, so comparisons apply within a method. The shaded corner
     shares the position set by ``frontier_frame`` across families.
     """
@@ -2670,7 +2695,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         )
     if span >= 1 and not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
-    packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
+    packages = list(dict.fromkeys(package_name(p["package"]) for p in points if not p["ours"]))
     if len(packages) > len(FRONTIER_SHAPES):
         raise ValueError(f"{title}: {len(packages)} packages, {len(FRONTIER_SHAPES)} marker shapes")
     shapes = dict(zip(packages, FRONTIER_SHAPES, strict=False))
@@ -2703,7 +2728,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
                     f'r="{5 if last else 3}"{tip}/>'
                 )
             else:
-                kind = shapes[p["package"]]
+                kind = shapes[package_name(p["package"])]
                 body.append(
                     f'<path class="pf-other pf-{kind}" '
                     f'd="{shape(kind, cx, cy, 4.5 if last else 3)}"{tip}/>'

@@ -136,7 +136,9 @@ names its pull request.
 - The homepage speed panel shows FCI-JCI, IAMB, MMPC, ICP, and CAM-UV. A speed chart groups a
   method's comparisons only when they share a size and Andrey's times agree there, and draws
   Andrey at every size they measure, instead of also grouping comparisons that share no size,
-  drawing Andrey from the first alone, and leaving the method off the panel. ([#PR])
+  drawing Andrey from the first alone, and leaving the method off the panel. The panel's legend
+  names each package once, without its version or setting, so a package keeps one marker shape per
+  family; lingam's CAM-UV at its default set size stays on the 0.14.0 card. ([#PR])
 
 ### New contributors
 

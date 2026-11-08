@@ -414,7 +414,7 @@ def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
         ours = [p for p in points if p["ours"]]
         sizes = sum(len(p["sizes"]) for p in ours)
         assert figure.count('class="pf-andrey"') == sizes + 1  # plus the legend marker
-        packages = {p["package"] for p in points if not p["ours"]}
+        packages = {build.package_name(p["package"]) for p in points if not p["ours"]}
         shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
         assert len(shapes) == len(packages), family
         assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
@@ -424,9 +424,37 @@ def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
             assert figure.count(f">{build.escape(p['method'])}</text>") == 1
     # A figure with more packages than shapes is refused rather than drawn with a shape twice.
     points = every["constraint"]
-    extra = [dict(p, package=f"package {k}") for k, p in enumerate(points) if not p["ours"]]
+    extra = [dict(p, package=f"package {'x' * k}") for k, p in enumerate(points) if not p["ours"]]
     with pytest.raises(ValueError, match="marker shapes"):
         build.frontier_chart("constraint", points + extra, frame)
+
+
+def test_every_family_legend_names_each_package_once():
+    summaries = placeholder_summaries()
+    panel = build.speed_panel(summaries)
+    points = build.frontier_points(summaries)
+    for info in build.family_tiles(summaries):
+        family = info["family"]
+        body = panel[panel.index(f'id="speed-{family}"') :]
+        body = body[: body.index('class="seg-panel"') if 'class="seg-panel"' in body else None]
+        if 'class="tc-legend"' not in body:
+            continue
+        legend = body[body.index('class="tc-legend"') :]
+        legend = legend[: legend.index("</p>")]
+        keys = re.findall(r'class="pf-other pf-(\w+)" d="[^"]*"/></svg>([^<]*)</span>', legend)
+        names = [html.unescape(name) for _, name in keys]
+        # Each package has one entry and one shape, named without a version or setting.
+        assert len(names) == len(set(names)) == len({k for k, _ in keys}), (family, names)
+        assert not any(re.search(r"\d", name) for name in names), (family, names)
+        shown = [p for p in points[family] if not p["ours"]]
+        assert set(names) == {build.package_name(p["package"]) for p in shown}, family
+        # A method's lines name different packages, so no two of its lines share a shape.
+        for method in {p["method"] for p in shown}:
+            named = [build.package_name(p["package"]) for p in shown if p["method"] == method]
+            assert len(named) == len(set(named)), (family, method, named)
+    # A comparator with a version and no PACKAGE_NAMES entry is refused, not shown with it.
+    with pytest.raises(ValueError, match="PACKAGE_NAMES"):
+        build.package_name("somepackage 1.0")
 
 
 def test_errors_compare_as_a_share_rounded_against_andrey():
