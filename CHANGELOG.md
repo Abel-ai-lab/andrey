@@ -131,7 +131,7 @@ names its pull request.
   tenth of it, and `andrey calibrate --method possible_dsep` measures the value for the machine it
   runs on. On two-domain data with 80 to 100 variables, where the step takes most of the fit, the
   step ran about 1.5 times faster on one core and up to 6 and 12 times faster on 4 and 8 workers; a
-  step of a few seconds gains little. ([#PR])
+  step of a few seconds gains little. ([#798])
 
 ### Fixed
 
@@ -2020,3 +2020,4 @@ First alpha release.
 [#791]: https://github.com/Abel-ai-lab/andrey/pull/791
 [#796]: https://github.com/Abel-ai-lab/andrey/pull/796
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
+[#798]: https://github.com/Abel-ai-lab/andrey/pull/798
