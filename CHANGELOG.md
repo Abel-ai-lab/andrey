@@ -10,7 +10,7 @@ names its pull request.
 
 ## [Unreleased]
 
-## [0.15.0] - 2026-11-07
+## [0.15.0] - 2026-11-08
 
 ### Highlights
 
