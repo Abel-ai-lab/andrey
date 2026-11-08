@@ -272,7 +272,8 @@ def draw(
         Any kind (``dag`` / ``cpdag`` / ``pag`` / ``mag`` / ``digraph`` / ``undirected``). Its
         ``.node_types`` flag latent variables, which are drawn hollow and dashed. If every label
         has at most two characters, all labels sit inside nodes; otherwise, all labels sit below
-        them.
+        them, outlined in the palette's ``paper`` color, so an edge that passes under a label
+        never crosses its letters.
     dark : bool, default=False
         Select the built-in dark palette instead of the light one. Ignored when ``palette`` is set.
     palette : Palette or None, default=None

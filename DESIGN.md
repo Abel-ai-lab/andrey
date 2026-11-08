@@ -134,7 +134,8 @@ post or a release card gets the tint and the bold at build time (`_comparison_ta
   directed edges, causes on the left; without it, nodes sit in layers, or on a circle when no edge
   is directed.
 - Labels sit inside the nodes when every label has at most two characters, and below them
-  otherwise, the same for the whole figure.
+  otherwise, the same for the whole figure. A label below its node is outlined in the ground color
+  (`paper`), so an edge that passes under it never crosses its letters.
 - A highlighted endpoint lights up: its mark and its half of the edge turn accent, a little
   heavier, over a soft accent glow. The highlight is drawn in strokes, so it keeps its proportions
   at any size.
