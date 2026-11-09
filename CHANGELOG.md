@@ -12,6 +12,17 @@ names its pull request.
 
 ### Highlights
 
+- Missing data: `andrey.data.missingness` simulates missing values whose missingness graph is
+  known, and one argument, `missing`, names how each method handles them. Experimental,
+  `pc(missing="mvpc")` corrects PC where missingness depends on other variables (Tu et al., 2019),
+  and `missing="em"` fits the BIC score searches, `notears`, `dagma`, and `calm` on incomplete data
+  by structural EM. ([#826], [#828], [#832], [#842])
+- Background knowledge states causal paths and hidden common causes, experimentally:
+  `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
+  DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three
+  parts, and `direct_lingam` narrows its causal order. ([#829], [#835])
+- `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
+  et al. (2023), whose noise scale changes with the cause. ([#830])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
   in the middle of each edge into a target, and `to_graphviz(structure, targets=)` draws the
   targets as squares. The graph types guide has a legend of every mark. ([#806])
@@ -64,9 +75,9 @@ names its pull request.
   `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
   it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
   indicator; `missingness.draw` masks any complete data. ([#826])
-- One package-wide argument, `missing`, on the twelve methods that accept missing values: `pc`,
+- One package-wide argument, `missing`, on the thirteen methods that accept missing values: `pc`,
   `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
-  and `pnl`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  `pnl`, and `loci`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
   method's default handling, `"testwise"`, so no result changes; a value a method does not list
   raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
   values. ([#828])

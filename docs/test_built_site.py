@@ -371,7 +371,7 @@ def _front_matter(path: pathlib.Path) -> dict[str, str]:
 
 
 def test_the_blog_features_the_newest_post_then_lists_the_others(html):
-    # The newest dated post, by date and then version, leads with its cover and its description;
+    # The newest dated post, by date, version, and file name, leads with its cover and description;
     # every other dated post follows once, in a row with its cover, newest first.
     posts = {}
     for path in (DOCS / "blog").glob("*.md"):
@@ -394,8 +394,8 @@ def test_the_blog_features_the_newest_post_then_lists_the_others(html):
         assert cover and _resolve(html, index, cover[1]).is_file(), f"{shown[-1]} has no cover"
         assert posts[shown[-1]][2] in unescape(block), f"{shown[-1]} lacks its description"
     assert sorted(shown) == sorted(posts)
-    assert shown[0] == max(posts, key=lambda post: posts[post][:2])
-    dates = [posts[post][:2] for post in shown[1:]]
+    assert shown[0] == max(posts, key=lambda post: (*posts[post][:2], post))
+    dates = [(*posts[post][:2], post) for post in shown[1:]]
     assert dates == sorted(dates, reverse=True)
     # The newest post's cover is the one under its title.
     post = html / "blog" / f"{shown[0]}.html"
