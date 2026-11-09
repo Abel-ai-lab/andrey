@@ -36,6 +36,10 @@ The data of CD-NOD, MultiGroupDirectLiNGAM, and GIN are drawn by :mod:`andrey_be
 instead (functional ``domain_shift``, ``multi_group``, or ``measurement``); that module gives each
 layout, truth, and column order.
 
+The synthetic pair sets of Tagasovska et al. (2020) that the LOCI paper uses are drawn by
+:mod:`andrey_bench.pair_models` (functional ``an2020``, ``ans2020``, ``ls2020``, ``lss2020``, or
+``mnu2020``; topology ``pair``, ``d = 2``, density 1.0).
+
 A key's ``shuffle`` lists the columns in an order drawn from the seed, with the truth permuted the
 same way, so the column order does not follow the graph's construction (:class:`DatasetKey`).
 """
@@ -57,7 +61,7 @@ import numpy as np
 import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
-from andrey_bench import lingam_models, regime_models, svar_models, temporal_models
+from andrey_bench import lingam_models, pair_models, regime_models, svar_models, temporal_models
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -132,6 +136,25 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # Cause-effect pairs from the location-scale generator, ``y = f(x) + s(x) e`` with the noise
+    # scale ``s`` between the bounds of the LOCI paper's location-scale benchmark (Immer et al.
+    # 2023): Gaussian, Gumbel, and Laplace noise, z-scored, and rescaled so the cause has unit
+    # variance before the effect reads it. At ``d = 2`` and density 1.0 every pair has one edge, in
+    # a direction the seed draws.
+    "lsnm_pair": ("er", "lsnm", "gaussian", "standardized"),
+    "lsnm_gumbel_pair": ("er", "lsnm", "gumbel", "standardized"),
+    "lsnm_laplace_pair": ("er", "lsnm", "laplace", "standardized"),
+    "lsnm_rescaled_pair": ("er", "lsnm", "gaussian", "ancestral"),
+    "lsnm_gumbel_rescaled_pair": ("er", "lsnm", "gumbel", "ancestral"),
+    "lsnm_laplace_rescaled_pair": ("er", "lsnm", "laplace", "ancestral"),
+    # The synthetic pair sets of Tagasovska et al. (2020), Sect. 3.2, which the LOCI paper uses:
+    # additive (AN, AN-s), location-scale (LS, LS-s), and multiplicative (MN-U) noise, each column
+    # z-scored as the LOCI paper does (andrey_bench.pair_models; ``d = 2``, density 1.0).
+    "tagasovska_an_pair": ("pair", "an2020", "gaussian", "standardized"),
+    "tagasovska_ans_pair": ("pair", "ans2020", "gaussian", "standardized"),
+    "tagasovska_ls_pair": ("pair", "ls2020", "gaussian", "standardized"),
+    "tagasovska_lss_pair": ("pair", "lss2020", "gaussian", "standardized"),
+    "tagasovska_mnu_pair": ("pair", "mnu2020", "uniform", "standardized"),
     # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
     "anm_er": ("er", "anm", "gaussian", "standardized"),
     # The regimes of the functional-causal-model lanes (CAM, RESIT): additive noise with Gaussian and
@@ -516,6 +539,29 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             **DISCRETE_SETTINGS,
             **shuffle,
         }
+    if key.functional in pair_models.MODELS:
+        spec = pair_models.MODELS[key.functional]
+        if (
+            key.d != 2
+            or key.density != 1.0
+            or key.latents
+            or key.times
+            or key.noise != spec.noise
+            or key.standardize not in pair_models.SCALES
+        ):
+            raise ValueError(
+                f"{key.label}: {key.functional} is one pair: d 2, density 1.0, no hidden nodes, "
+                f"noise {spec.noise!r}, a scale in {pair_models.SCALES}"
+            )
+        return {
+            "generator": "andrey_bench.pair_models.sample",
+            "model": key.functional,
+            "setup": pair_models.model_params(key.functional),
+            "n": key.n,
+            "seed": key.seed,
+            "standardize": key.standardize,
+            **shuffle,
+        }
     if key.functional in regime_models.MODELS:
         if key.latents != regime_models.latents_for(key.functional, key.d):
             raise ValueError(f"{key.label}: latents must be the model's latent count")
@@ -571,6 +617,13 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "density": key.density,
             "params": regime_models.model_params(key.functional),
         }
+    if key.functional in pair_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": pair_models.model_params(key.functional),
+        }
     if key.functional in temporal_models.MODELS:
         return {
             "model": key.functional,
@@ -611,13 +664,23 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
     truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
-    the module docstring says, and a :mod:`~andrey_bench.regime_models` dataset's data and truth come
-    from that module. A network key's rows and truth come from ``andrey.data.load_dataset``.
+    the module docstring says, and a :mod:`~andrey_bench.regime_models` or
+    :mod:`~andrey_bench.pair_models` dataset's data and truth come from that module. A network
+    key's rows and truth come from ``andrey.data.load_dataset``.
 
     ``column_order[j]`` is the observed column that column ``j`` holds with ``shuffle`` off: the
     identity for an unshuffled key, and ``None`` for an :data:`ORDER_FREE` functional.
     """
     kwargs = generation_kwargs(key)
+    if key.functional in pair_models.MODELS:
+        data_arr, marks, columns = pair_models.sample(
+            key.functional,
+            n=key.n,
+            seed=key.seed,
+            standardize=key.standardize,
+            shuffle=key.shuffle,  # an unshuffled key's call leaves it out
+        )
+        return np.ascontiguousarray(data_arr, dtype=CANONICAL_DTYPE), marks, "dag", columns.tolist()
     if key.functional in regime_models.MODELS:
         data_arr, marks, kind, columns = regime_models.sample(
             key.functional,
