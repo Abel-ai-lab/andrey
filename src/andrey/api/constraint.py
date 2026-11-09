@@ -436,6 +436,7 @@ def pc(
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     assert indep_test is not None  # method_spec picks it from the column types
+    assert seed is not None  # method_spec resolves it
     if missing == "mvpc" and indep_test not in PERMC_TESTS:
         raise ValueError(
             'pc: missing="mvpc" corrects the partial-correlation tests, so indep_test must be '
