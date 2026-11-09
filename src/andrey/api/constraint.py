@@ -127,8 +127,8 @@ def pc(
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
         only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make, and of the permutations of
-        ``missing="mvpc"``; the other tests ignore it. With those tests or ``"mvpc"``,
-        ``metadata["seed"]`` records the seed used.
+        ``missing="mvpc"``; the other tests ignore it. With those tests, or with ``"mvpc"`` on data
+        with missing values, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -161,8 +161,9 @@ def pc(
         ``metadata["missingness_parents"]`` maps each column whose missingness indicator has
         parents to them, and ``metadata["corrected_edges"]`` lists the edges tested again
         (``"retested"``) and those removed (``"removed"``), as ``[x, y]`` pairs in ascending order;
-        both name a DataFrame's columns and number an array's from 0. With a randomized
-        ``indep_test`` or ``missing="mvpc"``, ``metadata["seed"]`` is the seed used.
+        both name a DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is
+        the seed of the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
 
@@ -469,15 +470,17 @@ def pc(
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
-        **_mvpc_metadata(found, labels),
+        **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
-def _mvpc_metadata(found: dict, labels: Sequence[str] | None) -> dict:
-    """Return MVPC's indicator parents and corrected edges as metadata, or ``{}`` without them.
+def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
+    """Return MVPC's indicator parents, corrected edges, and ``seed`` as metadata, or ``{}``.
 
-    A column is its label when ``labels`` is given, else its 0-based position.
+    ``found`` is empty when the correction did not run, on data without missing values, and the
+    fit then drew no random numbers. A column is its label when ``labels`` is given, else its
+    0-based position.
     """
     if not found:
         return {}
@@ -492,6 +495,7 @@ def _mvpc_metadata(found: dict, labels: Sequence[str] | None) -> dict:
         "corrected_edges": {
             key: [[name(x), name(y)] for x, y in found[key]] for key in ("retested", "removed")
         },
+        "seed": seed,
     }
 
 
