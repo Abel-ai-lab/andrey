@@ -5,7 +5,7 @@ deletion keeps every true edge of the skeleton but can keep extra ones: an extra
 needs the missingness indicator of a variable in a test to be a common effect of ``x`` and ``y``,
 or a descendant of one (Tu et al. 2019, Proposition 2). MVPC finds the parents of each indicator,
 marks the edges such an indicator could have kept, and tests those again on virtual data whose
-distribution is that of the complete data.
+distribution is that of the complete data on the rows where those parents are observed.
 """
 
 from __future__ import annotations

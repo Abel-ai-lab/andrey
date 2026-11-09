@@ -566,7 +566,10 @@ on, then tests again the edges such an indicator could have kept, on virtual dat
 rows where those variables are observed. It takes `fisherz` or `student_t`;
 `metadata["missingness_parents"]` names the parents it found and `metadata["corrected_edges"]` the
 edges it tested again and removed. The correction holds when no indicator causes a variable and no
-value causes its own missingness, which the data cannot check. `andrey.data.missingness` simulates
+value causes its own missingness, which the data cannot check. It also needs the rows it rebuilds
+from to be no selected sample for the pair it tests: when a variable it rebuilds from goes missing
+because of a common effect of that pair, as when two effects of the same causes each hide the
+other, the extra edge can stay. `andrey.data.missingness` simulates
 data whose missingness graph you know, to see where it helps.
 
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
