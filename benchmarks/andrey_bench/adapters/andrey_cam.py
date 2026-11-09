@@ -7,6 +7,7 @@ the DAG.
 
 The fits run in the interpreter named by ``$ANDREY_BENCH_CAM_PYTHON``, an environment holding the
 build under test, so a build that is not the driver's can be measured against the reference.
+:class:`AndreyCAMOrder` keeps the order instead, for the Stein-score screen.
 """
 
 from __future__ import annotations
@@ -67,3 +68,31 @@ class AndreyCAM:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyCAMOrder(AndreyCAM):
+    """Andrey's CAM order alone: the full DAG of ``ordering``, the order before pruning.
+
+    The DAG it returns joins each variable to every later one
+    (:mod:`~andrey_bench.adapters.order_dag`), so its arrowhead recall is the share of true edges
+    the order puts in the right direction.
+    """
+
+    name: str = "andrey.cam.order.numpy"
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run Andrey CAM; return the endpoint marks of its order's full DAG. The only timed region."""
+        import andrey
+        from andrey_bench.adapters.order_dag import order_dag
+
+        out = andrey.cam(np.asarray(data, dtype=np.float64), **{**_DEFAULTS, **params})
+        return _marks(order_dag(out.ordering))
+
+
+def _marks(adjacency: np.ndarray) -> np.ndarray:
+    """Endpoint marks of the 0/1 DAG `adjacency`: a tail at ``i`` and an arrow at ``j`` for ``i -> j``."""
+    marks = np.zeros(adjacency.shape, dtype=np.int8)
+    rows, cols = np.nonzero(adjacency)
+    marks[rows, cols] = 1
+    marks[cols, rows] = 2
+    return marks

@@ -23,6 +23,8 @@ benchmarks/.mvpc-r/
 benchmarks/.missdag/
 # The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
 benchmarks/.loci/
+# The authors' SCORE code that benchmarks/start_stein.sh fetches, read from disk and never committed.
+benchmarks/.score/
 env/
 
 .vscode/
