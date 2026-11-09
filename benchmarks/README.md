@@ -137,6 +137,20 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
+The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
+and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and
+extracts it into a git-ignored folder the adapters read from. MissDAG, the reference for
+`missing="em"`, fits in an environment of its own on Python 3.10; the MVPC authors' R code, the
+reference for `pc(missing="mvpc")`, adds its R packages to the R lane's library:
+
+```shell
+benchmarks/start_missdag.sh    # prints the two exports below
+export ANDREY_BENCH_MISSDAG=$PWD/benchmarks/.missdag/MissDAG-<commit>
+export ANDREY_BENCH_MISSDAG_PYTHON=$PWD/benchmarks/.venv-missdag/bin/python
+benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
+export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
+```
+
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
