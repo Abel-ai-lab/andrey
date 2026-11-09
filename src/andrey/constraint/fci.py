@@ -56,6 +56,7 @@ def fci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
@@ -77,15 +78,15 @@ def fci(
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
-    endpoints before the orientation rules, which change circles only. A triple over a non-adjacent
-    pair with no separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An arrowhead the knowledge puts at
-    ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
-    ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes share the adjacency
-    search's larger conditioning-size passes (:func:`~andrey.constraint.pc.adjacency_search`) and
-    the larger possible-d-sep searches (:func:`possible_dsep_step`); ``None`` reads
-    ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic
-    ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
+    endpoints before the orientation rules, which change circles only; ``label`` names a node in
+    its error. A triple over a non-adjacent pair with no separating set is neither a collider nor a
+    non-collider to any rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
+    arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
+    ``x`` to ``y`` raises ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
+    share the adjacency search's larger conditioning-size passes
+    (:func:`~andrey.constraint.pc.adjacency_search`) and the larger possible-d-sep searches
+    (:func:`possible_dsep_step`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes the draws
+    of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
     ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and
     all). The private ``_ambiguous`` sink receives the triples no orientation rule reads as a
     collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
@@ -109,7 +110,7 @@ def fci(
     )
 
     marks = circle_pag(skeleton)
-    knowledge_marks(marks, constraints)
+    knowledge_marks(marks, constraints, label)
     orient_colliders(marks, sepsets)
     marks = possible_dsep_step(
         marks,
@@ -124,6 +125,7 @@ def fci(
         max_depth=max_depth,
         constraints=constraints,
         workers=workers,
+        label=label,
     )
     ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
@@ -151,7 +153,9 @@ def circle_pag(support: np.ndarray) -> np.ndarray:
     return marks
 
 
-def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
+def knowledge_marks(
+    marks: np.ndarray, constraints: Constraints | None, label: Callable[[int], str] = str
+) -> None:
     """Set the endpoints ``constraints`` decide on the adjacent pairs, in place.
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
@@ -160,8 +164,8 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
     ``i``, and a pair of ``required_paths`` makes the edge ``i -> j``: in a maximal ancestral graph
     an edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
     (Richardson and Spirtes 2002). A ``required_paths`` pair on an edge the forbidden edges or the
-    tiers put an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`.
-    ``None`` leaves ``marks`` as they are.
+    tiers put an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`,
+    whose message names a node by ``label``. ``None`` leaves ``marks`` as they are.
     """
     if constraints is None:
         return
@@ -173,7 +177,7 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
     if constraints.required_paths is not None:
         claimed = adjacent & constraints.required_paths
         if (clash := claimed & (marks == ARROW)).any():
-            i, j = np.argwhere(clash)[0].tolist()
+            i, j = (label(v) for v in np.argwhere(clash)[0].tolist())
             raise KnowledgeError(
                 f"knowledge lists ({i}, {j}) in required_paths, but forbids the edge {i} -> {j} "
                 f"one way or by the tiers, which puts an arrowhead at {i} on the edge it keeps "
@@ -600,6 +604,7 @@ def possible_dsep_step(
     constraints: Constraints | None,
     keep: np.ndarray | None = None,
     workers: int = 1,
+    label: Callable[[int], str] = str,
 ) -> np.ndarray:
     """Remove the pairs a possible-d-sep subset separates; return the PAG re-circled for the
     orientation rules.
@@ -611,7 +616,8 @@ def possible_dsep_step(
     The pairs the required edges of ``constraints`` join, and those marked in the boolean ``keep``
     (both ways), are never tested. ``workers`` worker processes share the larger searches. Every
     kept edge then becomes ``o-o``, and
-    :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An arrowhead the knowledge
+    :func:`knowledge_marks` sets the endpoints ``constraints`` decide, naming a node by ``label`` in
+    its error. An arrowhead the knowledge
     puts at ``x`` on a kept edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
     :class:`~andrey.core.knowledge.KnowledgeError`
     (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
@@ -636,7 +642,7 @@ def possible_dsep_step(
             workers=workers,
         )
     marks = circle_pag(marks != NULL)
-    knowledge_marks(marks, constraints)
+    knowledge_marks(marks, constraints, label)
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     return marks

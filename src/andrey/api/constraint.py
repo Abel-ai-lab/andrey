@@ -744,6 +744,7 @@ def fci(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
+            label=column_namer(labels),
             _ambiguous=ambiguous,
         )
     metadata = {
@@ -794,7 +795,8 @@ def fci_hybrid(
         X, mask, constraints, index, "indep_test", indep_test
     )
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels, index_namer(labels, column)):
+    namer = index_namer(labels, column) or column_namer(labels)
+    with copies_named(labels, namer):
         pag = getattr(engines, name)(
             augmented,
             score_func=score_func,
@@ -804,6 +806,7 @@ def fci_hybrid(
             constraints=augmented_constraints,
             in_column_order=resolve_in_column_order(),
             context=column,
+            label=namer,
             _ambiguous=ambiguous,
             **settings,
         )
@@ -1879,11 +1882,9 @@ def fci_jci(
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
+    namer = lambda j: "env" if j == d else column(j)  # noqa: E731
     ambiguous: set[tuple[int, int, int]] = set()
-    with (
-        copies_named(labels, lambda j: "env" if j == d else column(j)),
-        rows_tested() as rows,
-    ):
+    with copies_named(labels, namer), rows_tested() as rows:
         pag, index_edges = _fci_jci(
             X,
             c,
@@ -1897,6 +1898,7 @@ def fci_jci(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
+            label=namer,
             _ambiguous=ambiguous,
         )
     variable = label_of(labels)

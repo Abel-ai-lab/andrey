@@ -200,6 +200,18 @@ def test_a_required_path_on_an_adjacent_pair_directs_it():
         knowledge_marks(np.where(np.eye(3, dtype=bool), NULL, CIRCLE).astype(np.int8), clash)
 
 
+@pytest.mark.parametrize("name", ["fci", "fci_jci", "gfci"])
+def test_a_required_path_on_an_edge_forbidden_one_way_names_the_columns(name):
+    # a -> b -> c: the tests keep a - b, and forbidding a -> b puts an arrowhead at a.
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(1000)
+    b = a + rng.standard_normal(1000)
+    data = pd.DataFrame({"a": a, "b": b, "c": b + rng.standard_normal(1000)})
+    knowledge = Knowledge(required_paths=[("a", "b")], forbidden=[("a", "b")])
+    with pytest.raises(KnowledgeError, match=r"\('a', 'b'\) in required_paths, .* 'a' -> 'b'"):
+        _fit(name, data, knowledge=knowledge)
+
+
 def test_a_claim_the_pag_contradicts_raises(independent):
     with pytest.raises(ValueError, match="no possibly directed path from 'a' to 'b'"):
         _fit("fci", independent, knowledge=Knowledge(required_paths=[("a", "b")]))
