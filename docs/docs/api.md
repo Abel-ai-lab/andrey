@@ -950,6 +950,13 @@ each context drives exactly one variable, so no hidden context is a common cause
    interventions.soft
    interventions.HardIntervention
    interventions.SoftIntervention
+   missingness.mcar
+   missingness.mar
+   missingness.mnar
+   missingness.self_masking
+   missingness.draw
+   missingness.Mechanism
+   missingness.Missingness
 ```
 
 #### Scale
@@ -1027,6 +1034,36 @@ graph and `params`:
 datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(weights="redraw")}])
             for s in range(10)]
 ```
+
+#### Missing values
+
+`missing=` on `SCM.sample` and `sample_scm` draws missing values whose missingness graph you know.
+The missingness indicator of a column is 1 where its value is missing, and the m-graph adds each
+indicator to the causal graph with its parents (Mohan, Pearl, and Tian, 2013). Four mechanisms in
+`andrey.data.missingness` set what an indicator may depend on: `mcar` on nothing, `mar` on columns
+that are always observed, `mnar` on other columns that can go missing, and `self_masking` on its
+own column. `observed` is the share of columns that are always observed, and the others lose about
+`rate` of their values. With `form="logistic"`, the default, an indicator is a logistic function of
+its parents, as in the masks of Muzellec et al. (2020); with `form="quantile"`, a value goes missing
+with probability 0.9 when its one parent is below a quantile and 0.01 otherwise, as in the
+simulations of Tu et al. (2019). `parents=` places the indicators yourself, for example at a common
+effect of two variables:
+
+```python
+import andrey.data as data
+from andrey.data import missingness
+
+ds = data.sample_scm(d=20, n=2000, seed=0, density=2, missing=missingness.mar(0.2))
+ds.data                # NaN where a value is missing
+ds.missing.mask        # True where a value is missing
+ds.missing.parents     # each column that can go missing: the parents of its indicator
+ds.missing.mechanism   # "mar"
+```
+
+The mask is drawn after the scaling and the column shuffle, from the seed's own stream, so the same
+seed without `missing` gives the complete data, and, for a sample drawn without `screen`,
+`missingness.draw(ds.data, mechanism, seed=)` draws its mask again. Every column keeps at least 2
+observed values.
 
 ## Metrics
 
