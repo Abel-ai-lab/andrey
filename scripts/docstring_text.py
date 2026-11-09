@@ -118,10 +118,10 @@ SHARED = {
         "Parameters",
         "knowledge",
         "last",
-        "In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which "
-        "each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that "
-        "no such DAG meets raise ``ValueError``.",
-        lambda m: "ancestors" in REGISTRY[m].knowledge,
+        "In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for "
+        "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; "
+        "claims that no such DAG meets raise ``ValueError``.",
+        lambda m: "required_paths" in REGISTRY[m].knowledge,
     ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(

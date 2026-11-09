@@ -2868,9 +2868,9 @@ _PATH_METHODS = (
     "mmpc",
 )
 _PATH_RULE = (
-    " With ancestors and non_ancestors, the result is the MPDAG of the DAGs in the class found "
-    "that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang et "
-    "al. 2025); claims that no such DAG meets raise."
+    " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
+    "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
+    "et al. 2025); claims that no such DAG meets raise."
 )
 _MAX_DEPTH = concept_param("max_depth")
 

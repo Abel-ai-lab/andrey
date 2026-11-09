@@ -424,14 +424,14 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
-Knowledge can also state causal paths rather than edges. `ancestors` lists the pairs `(a, b)` in
-which `a` causes `b`, directly or through other variables, and `non_ancestors` the pairs in which
-it does not:
+Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
+in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in
+which it does not:
 
 ```python
 knowledge = Knowledge(
-    ancestors=[("smoking", "cancer")],  # smoking causes cancer, directly or not
-    non_ancestors=[("tar", "age")],     # tar causes age by no path
+    required_paths=[("smoking", "cancer")],  # smoking causes cancer, directly or not
+    forbidden_paths=[("tar", "age")],        # tar causes age by no path
 )
 result = pc(data, knowledge=knowledge)
 result.metadata["ancestor_clauses"]
@@ -445,8 +445,9 @@ directing edges. If `smoking` causes `cancer` exactly when it is a direct cause 
 `gene`, and the data leave both edges undirected, `metadata["ancestor_clauses"]` lists the claim
 as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
 the result is the class the search found, restricted, not a new search for the best class that
-meets them. These two parts are experimental. `latent` lists pairs with a hidden common cause,
-and no method honors it; a method raises `NotImplementedError` for a part it does not honor.
+meets them. These two parts are experimental. `confounded` lists pairs with a hidden common cause,
+a variable that is not in the data; a common cause that is in the data does not make the pair
+adjacent. No method honors it; a method raises `NotImplementedError` for a part it does not honor.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`

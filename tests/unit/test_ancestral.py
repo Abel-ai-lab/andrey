@@ -63,9 +63,9 @@ def _acyclic(dag: np.ndarray) -> bool:
     return not np.diagonal(_reach(dag)).any()
 
 
-def _meets(dag: np.ndarray, ancestor: np.ndarray, non_ancestor: np.ndarray) -> bool:
+def _meets(dag: np.ndarray, required_paths: np.ndarray, forbidden_paths: np.ndarray) -> bool:
     reach = _reach(dag)
-    return bool(not (ancestor & ~reach).any() and not (non_ancestor & reach).any())
+    return bool(not (required_paths & ~reach).any() and not (forbidden_paths & reach).any())
 
 
 def _holds(dag: np.ndarray, clauses) -> bool:
@@ -95,8 +95,8 @@ def _claims(rng: np.random.Generator, truth: np.ndarray, cpdag: np.ndarray, true
     """
     d = len(truth)
     reach = _reach(truth)
-    ancestor = np.zeros((d, d), dtype=bool)
-    non_ancestor = np.zeros((d, d), dtype=bool)
+    required_paths = np.zeros((d, d), dtype=bool)
+    forbidden_paths = np.zeros((d, d), dtype=bool)
     starts = np.flatnonzero(((cpdag == TAIL) & (cpdag.T == TAIL)).sum(axis=1) >= 2)
     for _ in range(rng.integers(1, 4)):
         i, j = rng.choice(d, 2, replace=False)
@@ -104,28 +104,28 @@ def _claims(rng: np.random.Generator, truth: np.ndarray, cpdag: np.ndarray, true
             i = rng.choice(starts)
             j = rng.choice(np.delete(np.arange(d), i))
         is_ancestor = reach[i, j] if true else rng.random() < 0.5
-        (ancestor if is_ancestor else non_ancestor)[i, j] = True
-    return ancestor, non_ancestor
+        (required_paths if is_ancestor else forbidden_paths)[i, j] = True
+    return required_paths, forbidden_paths
 
 
-def _check(start: np.ndarray, members: list[np.ndarray], ancestor, non_ancestor) -> bool:
+def _check(start: np.ndarray, members: list[np.ndarray], required_paths, forbidden_paths) -> bool:
     """Check :func:`restrict` on the graph ``start`` against the enumeration; ``members`` is the
     class of its CPDAG. Returns whether no DAG met the claims, so that it had to raise."""
     stands_for = [m for m in members if _directed(start) <= _directed(m)]
-    kept = [m for m in stands_for if _meets(m, ancestor, non_ancestor)]
+    kept = [m for m in stands_for if _meets(m, required_paths, forbidden_paths)]
     if not kept:
         with pytest.raises(KnowledgeError):
-            restrict(start, ancestor, non_ancestor)
+            restrict(start, required_paths, forbidden_paths)
         return True
-    mpdag, clauses = restrict(start, ancestor, non_ancestor)
+    mpdag, clauses = restrict(start, required_paths, forbidden_paths)
     cpdag = dag2cpdag(members[0])
-    assert np.array_equal(mpdag, _expected(cpdag, kept)), (start, ancestor, non_ancestor)
+    assert np.array_equal(mpdag, _expected(cpdag, kept)), (start, required_paths, forbidden_paths)
     assert np.array_equal(meek(mpdag, rule4=True), mpdag)
     assert all(len(heads) >= 2 for _, heads in clauses), clauses
     within = [m for m in stands_for if _directed(mpdag) <= _directed(m)]
     assert [_holds(m, clauses) for m in within] == [
-        _meets(m, ancestor, non_ancestor) for m in within
-    ], (start, ancestor, non_ancestor, clauses)
+        _meets(m, required_paths, forbidden_paths) for m in within
+    ], (start, required_paths, forbidden_paths, clauses)
     return False
 
 
@@ -148,8 +148,8 @@ def test_every_restricted_class_matches_the_enumeration():
             start = cpdag.copy()
             start[j, i] = ARROW
             start = meek(start, rule4=True)
-        ancestor, non_ancestor = _claims(rng, truth, cpdag, true=checked % 3 != 0)
-        raised += _check(start, _members(cpdag), ancestor, non_ancestor)
+        required_paths, forbidden_paths = _claims(rng, truth, cpdag, true=checked % 3 != 0)
+        raised += _check(start, _members(cpdag), required_paths, forbidden_paths)
         checked += 1
     assert raised > 10  # the false claims reach the conflict
 
@@ -176,32 +176,32 @@ def test_claims_about_a_sink_match_the_enumeration():
         truth = _sink_dag(rng, d)
         reach = _reach(truth)
         x = int(rng.integers(d - 2))
-        ancestor = np.zeros((d, d), dtype=bool)
-        non_ancestor = np.zeros((d, d), dtype=bool)
-        (ancestor if reach[x, d - 2] != (k % 4 == 0) else non_ancestor)[x, d - 2] = True
+        required_paths = np.zeros((d, d), dtype=bool)
+        forbidden_paths = np.zeros((d, d), dtype=bool)
+        (required_paths if reach[x, d - 2] != (k % 4 == 0) else forbidden_paths)[x, d - 2] = True
         cpdag = dag2cpdag(truth)
-        if not _check(cpdag, _members(cpdag), ancestor, non_ancestor):
-            clauses += bool(restrict(cpdag, ancestor, non_ancestor)[1])
+        if not _check(cpdag, _members(cpdag), required_paths, forbidden_paths):
+            clauses += bool(restrict(cpdag, required_paths, forbidden_paths)[1])
     assert clauses > 10
 
 
-def test_a_non_ancestor_directs_its_critical_set_into_it():
+def test_a_forbidden_path_directs_its_critical_set_into_it():
     # Fang et al. (2025), Example 2: A is not a cause of Y, so B -> A and C -> A.
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
-    non_ancestor = np.zeros((7, 7), dtype=bool)
-    non_ancestor[A, Y] = True
-    mpdag, clauses = restrict(cpdag, None, non_ancestor)
+    forbidden_paths = np.zeros((7, 7), dtype=bool)
+    forbidden_paths[A, Y] = True
+    mpdag, clauses = restrict(cpdag, None, forbidden_paths)
     assert {(B, A), (C, A)} <= _directed(mpdag)
     assert clauses == []
 
 
-def test_an_ancestor_through_one_of_two_edges_stays_a_clause():
+def test_a_required_path_through_one_of_two_edges_stays_a_clause():
     # Fang et al. (2025), Example 2: D is a cause of Y exactly when D -> A or D -> X. Each way
     # directs A and X into B and C, and neither edge at D is the same in all three (Figure 7d-f).
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
-    ancestor = np.zeros((7, 7), dtype=bool)
-    ancestor[D, Y] = True
-    mpdag, clauses = restrict(cpdag, ancestor, None)
+    required_paths = np.zeros((7, 7), dtype=bool)
+    required_paths[D, Y] = True
+    mpdag, clauses = restrict(cpdag, required_paths, None)
     assert _directed(mpdag) - _directed(cpdag) == {(A, B), (A, C), (X, B), (X, C)}
     assert clauses == [(D, frozenset({A, X}))]
 
@@ -209,22 +209,22 @@ def test_an_ancestor_through_one_of_two_edges_stays_a_clause():
 def test_claims_no_dag_meets_together_raise():
     # Fang et al. (2025), Example 3: the two claims of Example 2 hold together in no DAG.
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
-    ancestor = np.zeros((7, 7), dtype=bool)
-    non_ancestor = np.zeros((7, 7), dtype=bool)
-    ancestor[D, Y] = non_ancestor[A, Y] = True
+    required_paths = np.zeros((7, 7), dtype=bool)
+    forbidden_paths = np.zeros((7, 7), dtype=bool)
+    required_paths[D, Y] = forbidden_paths[A, Y] = True
     with pytest.raises(KnowledgeError, match="together"):
-        restrict(cpdag, ancestor, non_ancestor)
+        restrict(cpdag, required_paths, forbidden_paths)
 
 
 @pytest.mark.parametrize(
-    ("part", "message"), [("ancestor", "no DAG"), ("non_ancestor", "every DAG")]
+    ("part", "message"), [("required_paths", "no DAG"), ("forbidden_paths", "every DAG")]
 )
 def test_a_claim_the_class_cannot_meet_names_itself(part, message):
     # a -> b <- d and b -> c, the class's one DAG: a is an ancestor of c, and c is not one of a.
     cpdag = dag2cpdag(_graph(4, arrows=[(0, 1), (3, 1), (1, 2)]))
     claim = np.zeros((4, 4), dtype=bool)
-    claim[(2, 0) if part == "ancestor" else (0, 2)] = True
-    claims = (claim, None) if part == "ancestor" else (None, claim)
+    claim[(2, 0) if part == "required_paths" else (0, 2)] = True
+    claims = (claim, None) if part == "required_paths" else (None, claim)
     with pytest.raises(KnowledgeError, match=message):
         restrict(cpdag, *claims)
 

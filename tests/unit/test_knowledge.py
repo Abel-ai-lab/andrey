@@ -36,8 +36,8 @@ METHODS = [
     for name, spec in REGISTRY.items()
     if spec.knowledge and spec.output.structure_type == "graph"
 ]
-# The methods that honor ancestors and non_ancestors, by restricting a CPDAG result.
-PATH_METHODS = [name for name in METHODS if "ancestors" in REGISTRY[name].knowledge]
+# The methods that honor required_paths and forbidden_paths, by restricting a CPDAG result.
+PATH_METHODS = [name for name in METHODS if "required_paths" in REGISTRY[name].knowledge]
 # The time-series searches that take knowledge, over the links between lagged variables.
 TEMPORAL = [
     name
@@ -405,14 +405,16 @@ def test_knowledge_checks_its_shape():
     with pytest.raises(TypeError, match="label or 0-based position"):
         Knowledge(required=[("a", 1.5)])
     with pytest.raises(TypeError, match="pairs"):
-        Knowledge(ancestors=["ab"])
+        Knowledge(required_paths=["ab"])
     with pytest.raises(ValueError, match="self-loop"):
-        Knowledge(latent=[("a", "a")])
-    paths = Knowledge(latent=[("a", "b")], non_ancestors=[("b", "a")], ancestors=[("a", "c")])
-    assert paths.parts() == ("ancestors", "non_ancestors", "latent")
+        Knowledge(confounded=[("a", "a")])
+    paths = Knowledge(
+        confounded=[("a", "b")], forbidden_paths=[("b", "a")], required_paths=[("a", "c")]
+    )
+    assert paths.parts() == ("required_paths", "forbidden_paths", "confounded")
     assert paths.edge_parts() == Knowledge()
-    kept = Knowledge.from_skeleton(np.ones((3, 3)), ancestors=[(0, 2)], latent=[(0, 1)])
-    assert kept.ancestors == ((0, 2),) and kept.latent == ((0, 1),)
+    kept = Knowledge.from_skeleton(np.ones((3, 3)), required_paths=[(0, 2)], confounded=[(0, 1)])
+    assert kept.required_paths == ((0, 2),) and kept.confounded == ((0, 1),)
 
 
 def test_resolve_reads_labels_and_positions():
@@ -432,16 +434,18 @@ def test_resolve_reads_labels_and_positions():
         (Knowledge(required=[("c", "a")], tiers=[["a"], ["c"]]), "also forbids"),
         (Knowledge(required=[("a", "b")], allowed=[("a", "c")]), "also forbids"),
         (Knowledge(required=[("a", "b"), ("b", "c"), ("c", "a")]), "cycle"),
-        (Knowledge(ancestors=[("a", "b")], required=[("b", "a")]), "cycle"),
-        (Knowledge(ancestors=[("a", "b"), ("b", "c"), ("c", "a")]), "cycle"),
+        (Knowledge(required_paths=[("a", "b")], required=[("b", "a")]), "cycle"),
+        (Knowledge(required_paths=[("a", "b"), ("b", "c"), ("c", "a")]), "cycle"),
         (
-            Knowledge(ancestors=[("a", "b")], required=[("b", "c")], non_ancestors=[("a", "c")]),
+            Knowledge(
+                required_paths=[("a", "b")], required=[("b", "c")], forbidden_paths=[("a", "c")]
+            ),
             "an ancestor of 'c'",
         ),
-        (Knowledge(required=[("a", "b")], non_ancestors=[("a", "b")]), "an ancestor of 'b'"),
-        (Knowledge(latent=[("a", "b")], forbidden=[("a", "b"), ("b", "a")]), "latent"),
-        (Knowledge(latent=[("b", "a")], allowed=[("a", "c")]), "latent"),
-        (Knowledge(ancestors=[("a", 0)]), "with itself"),
+        (Knowledge(required=[("a", "b")], forbidden_paths=[("a", "b")]), "an ancestor of 'b'"),
+        (Knowledge(confounded=[("a", "b")], forbidden=[("a", "b"), ("b", "a")]), "confounded"),
+        (Knowledge(confounded=[("b", "a")], allowed=[("a", "c")]), "confounded"),
+        (Knowledge(required_paths=[("a", 0)]), "with itself"),
     ],
 )
 def test_resolve_rejects_contradictions(knowledge, message):
@@ -450,14 +454,19 @@ def test_resolve_rejects_contradictions(knowledge, message):
 
 
 def test_resolve_reads_the_path_parts():
-    k = Knowledge(ancestors=[("a", "c")], non_ancestors=[(1, "a")], latent=[("c", "b")])
+    k = Knowledge(required_paths=[("a", "c")], forbidden_paths=[(1, "a")], confounded=[("c", "b")])
     c = resolve(k, 3, ["a", "b", "c"], method="pc")
-    assert c.ancestor[0, 2] and c.non_ancestor[1, 0] and c.latent[1, 2] and c.latent[2, 1]
-    assert c.ancestor.sum() == c.non_ancestor.sum() == 1 and not c.forbidden.any()
-    assert resolve(Knowledge(tiers=[["a"]]), 3, ["a", "b", "c"], method="pc").ancestor is None
-    assert c.permuted([2, 0, 1]).ancestor[1, 0] and c.padded(4).latent.shape == (4, 4)
+    assert (
+        c.required_paths[0, 2]
+        and c.forbidden_paths[1, 0]
+        and c.confounded[1, 2]
+        and c.confounded[2, 1]
+    )
+    assert c.required_paths.sum() == c.forbidden_paths.sum() == 1 and not c.forbidden.any()
+    assert resolve(Knowledge(tiers=[["a"]]), 3, ["a", "b", "c"], method="pc").required_paths is None
+    assert c.permuted([2, 0, 1]).required_paths[1, 0] and c.padded(4).confounded.shape == (4, 4)
     with pytest.raises(NotImplementedError, match="learns no time lags"):
-        resolve(Knowledge(ancestors=[("a", "c", 1)]), 3, ["a", "b", "c"], method="pc")
+        resolve(Knowledge(required_paths=[("a", "c", 1)]), 3, ["a", "b", "c"], method="pc")
 
 
 def test_names_need_column_labels():
@@ -585,11 +594,13 @@ def test_cli_reads_knowledge_from_a_file_and_inline(tmp_path, capsys, data):
         assert ("b", "f", "directed") in edges
         assert env["run"]["params"]["knowledge"]["required"] == [["b", "f"]]
     code = main(
-        ["run", "pc", "--data", str(path), 'knowledge={"non_ancestors": [["f", "a"]]}', "--json"]
+        ["run", "pc", "--data", str(path), 'knowledge={"forbidden_paths": [["f", "a"]]}', "--json"]
     )
     out, _ = capsys.readouterr()
     assert code == 0 and json.loads(out)["metadata"]["ancestor_clauses"] == []
-    code = main(["run", "pc", "--data", str(path), 'knowledge={"latent": [["f", "a"]]}', "--json"])
+    code = main(
+        ["run", "pc", "--data", str(path), 'knowledge={"confounded": [["f", "a"]]}', "--json"]
+    )
     _, err = capsys.readouterr()
     assert code == 2 and json.loads(err)["error"]["code"] == "unsupported_value"
     code = main(["run", "pc", "--data", str(path), 'knowledge={"must": []}', "--json"])
@@ -635,9 +646,9 @@ def test_a_part_the_method_does_not_honor_raises(name, part, data):
 
 
 @pytest.mark.parametrize("name", PATH_METHODS)
-def test_a_non_ancestor_claim_directs_the_class(name, data):
+def test_a_forbidden_path_directs_the_class(name, data):
     # a - f is undirected in the class of the truth; f is not an ancestor of a, so a -> f.
-    out = _fit(name, data, knowledge=Knowledge(non_ancestors=[("f", "a")]))
+    out = _fit(name, data, knowledge=Knowledge(forbidden_paths=[("f", "a")]))
     marks, labels = _marks(out)
     a, f = labels.index("a"), labels.index("f")
     if out.structure.kind != "cpdag":  # an undirected structure takes no path claims
@@ -648,16 +659,18 @@ def test_a_non_ancestor_claim_directs_the_class(name, data):
 
 
 def test_the_path_parts_are_experimental(data):
-    with pytest.warns(andrey.ExperimentalWarning, match="pc: knowledge ancestors is experimental"):
-        andrey.pc(data, knowledge=Knowledge(ancestors=[("a", "f")]))
+    with pytest.warns(
+        andrey.ExperimentalWarning, match="pc: knowledge required_paths is experimental"
+    ):
+        andrey.pc(data, knowledge=Knowledge(required_paths=[("a", "f")]))
 
 
 def test_a_path_the_result_cannot_have_raises(data):
     # a -> c -> d -> e is directed in every DAG of the class.
-    with pytest.raises(KnowledgeError, match=r"ancestors lists \('e', 'a'\)"):
-        _fit("pc", data, knowledge=Knowledge(ancestors=[("e", "a")]))
+    with pytest.raises(KnowledgeError, match=r"required_paths lists \('e', 'a'\)"):
+        _fit("pc", data, knowledge=Knowledge(required_paths=[("e", "a")]))
     with pytest.raises(KnowledgeError, match="cycle"):
-        _fit("ges", data, knowledge=Knowledge(ancestors=[("a", "e")], required=[("e", "a")]))
+        _fit("ges", data, knowledge=Knowledge(required_paths=[("a", "e")], required=[("e", "a")]))
 
 
 def _collider(seed: int = 0, n: int = 1000) -> pd.DataFrame:

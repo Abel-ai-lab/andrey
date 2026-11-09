@@ -604,7 +604,7 @@ def _valid_graph(
     ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
-    MPDAG, restricted by the knowledge's ``ancestors`` and ``non_ancestors``
+    MPDAG, restricted by the knowledge's ``required_paths`` and ``forbidden_paths``
     (:func:`~andrey.core.ancestral.restrict`), and a ``pag`` is oriented as ``fci`` orients one
     under knowledge: the vote and the PAG get the knowledge's endpoints (``knowledge_marks``)
     before the MAG step and before the orientation rules, which then run to a fixed point.
@@ -628,10 +628,10 @@ def _valid_graph(
     cpdag = cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
-        if constraints.ancestor is not None:
+        if constraints.required_paths is not None:
             from andrey.core.ancestral import restrict
 
-            cpdag, _ = restrict(cpdag, constraints.ancestor, constraints.non_ancestor)
+            cpdag, _ = restrict(cpdag, constraints.required_paths, constraints.forbidden_paths)
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 

@@ -171,8 +171,8 @@ def mmhc(
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
         pairs of the MMPC skeleton and of the required edges, less the pairs the knowledge makes
         non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The MMPC phase reads
-        the data alone. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph
-        stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
+        the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
+        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
         describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
@@ -401,8 +401,8 @@ def rsmax2(
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
         pairs the restrict phase keeps and the pairs of the required edges, less the pairs the
         knowledge makes non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The
-        restrict phase reads the data alone. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep
-        the DAGs the graph stands for in which each listed path holds or does not, as
+        restrict phase reads the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths``
+        keep the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns

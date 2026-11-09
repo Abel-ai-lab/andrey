@@ -157,8 +157,8 @@ def iamb(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph
-        stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
+        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
+        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
         describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
@@ -392,8 +392,8 @@ def inter_iamb(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph
-        stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
+        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
+        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
         describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
@@ -618,8 +618,8 @@ def mmpc(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph
-        stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
+        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
+        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
         describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
