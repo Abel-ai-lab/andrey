@@ -45,9 +45,7 @@ names its pull request.
   permutation-based correction: after the test-wise skeleton, it finds the parents of each
   missingness indicator and tests again, on virtual data that correct for them, the edges such an
   indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
-  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. On 8
-  simulated graphs of 10 variables with 2,000 rows, each indicator placed at a collider, it kept 2
-  extra edges where test-wise deletion kept 12. ([#832])
+  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
 - `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
   `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
   by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a

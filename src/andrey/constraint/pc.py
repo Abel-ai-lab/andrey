@@ -137,6 +137,7 @@ def pc(
     rule4 = constraints is not None
     ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
+        # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
         test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
@@ -196,6 +197,8 @@ def correct_skeleton(
     d = X.shape[1]
     adjacent = skeleton != NULL
     parents = indicator_parents(X, indep_test, alpha, max_depth, seed)
+    # Step 3 as the paper states it: the authors' code instead re-runs every edge, falling back
+    # to the test-wise test, and takes a common neighbor alone as a candidate.
     candidates = candidate_edges(adjacent, parents)
     kept = adjacent & ~candidates if keep is None else (adjacent & ~candidates) | keep
     corrected, more_sepsets, more_pvalues = adjacency_search(

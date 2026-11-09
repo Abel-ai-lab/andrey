@@ -25,9 +25,9 @@ def _labeled(out) -> dict:
 
 def test_on_complete_data_mvpc_gives_the_test_wise_result():
     X = np.nan_to_num(figure_1b(0), nan=0.0)
-    out = andrey.pc(X, missing="mvpc")
-    assert out.structure == andrey.pc(X).structure
-    assert not {"missingness_parents", "corrected_edges", "missing"} & set(out.metadata)
+    out, deletion = andrey.pc(X, missing="mvpc"), andrey.pc(X)
+    assert out.structure == deletion.structure
+    assert dict(out.metadata) == dict(deletion.metadata)
 
 
 @pytest.mark.parametrize("indep_test", ["chisq", "kci", "cond_gauss"])

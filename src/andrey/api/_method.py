@@ -21,7 +21,7 @@ from andrey.api._adapt import default_score, default_test
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
-from andrey.core.ci_missing import MVPC, TESTWISE
+from andrey.core.ci_missing import TESTWISE
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
@@ -201,18 +201,15 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
     ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
     random changes before a later start, with ``n_starts`` above 1; every other seeded method
-    always does. ``missing="mvpc"`` draws them too, for the permutations of its corrected tests.
+    always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values, which
+    this check does not read: ``pc`` records its seed itself when the correction ran.
     """
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
     later = starts is not None and arguments.get("n_starts", starts.default) > 1
     if test is not None and not order_search:
-        return (
-            later
-            or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
-            or arguments.get("missing") == MVPC
-        )
+        return later or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
     if any(p.concept == "n_perturbations" for p in spec.params):
         return later
     return True
