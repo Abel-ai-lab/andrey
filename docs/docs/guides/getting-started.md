@@ -446,9 +446,33 @@ claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly 
 cause of `tar` or of `gene`, and the data leave both edges undirected,
 `metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
 the result is the class the search found, restricted, not a new search for the best class that
-meets them. These two parts are experimental. `confounded` lists pairs with a hidden common cause,
-a variable that is not in the data; a common cause that is in the data does not make the pair
-adjacent. No method honors it; a method raises `NotImplementedError` for a part it does not honor.
+meets them. These two parts are experimental.
+
+When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
+that is not in the data; a common cause that is in the data does not make the pair adjacent. The
+PAG methods (FCI, FCI-JCI, GFCI, BOSS-FCI, GRaSP-FCI, and LPCMCI over lagged links) honor all three
+parts:
+
+```python
+from andrey import fci
+
+knowledge = Knowledge(
+    required_paths=[("smoking", "cancer")],
+    confounded=[("diet", "exercise")],  # a hidden common cause
+    forbidden_paths=[("diet", "exercise"), ("exercise", "diet")],  # neither causes the other
+)
+result = fci(data, knowledge=knowledge)  # diet <-> exercise
+```
+
+On a pair the tests keep, a required path makes the edge `smoking -> cancer` and a forbidden path
+puts an arrowhead at its cause; no test removes a `confounded` pair. A claim the PAG contradicts,
+such as a required path with no path that could lead to its effect, raises a `ValueError`. These
+marks and checks assume no selection bias: the samples were not kept or dropped by the value of a
+variable the measured ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths`
+and `forbidden_paths` to narrow the causal order, as their paper describes, and list the claims
+their DAG does not meet in `metadata["unmet_knowledge"]`. Every other method raises
+`NotImplementedError` for a part it does not honor, naming the methods that do. These parts are
+experimental for every method.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`

@@ -30,7 +30,7 @@ from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
-from andrey.core.structure import column_labels
+from andrey.core.structure import ARROW, TAIL, column_labels
 from andrey.core.warning_policy import DeprecatedArgumentWarning, ExperimentalWarning, warn_once
 
 if TYPE_CHECKING:
@@ -113,7 +113,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
             out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
-                out = restrict_paths(out, paths)
+                out = restrict_paths(out, paths) if spec.restricts_paths else meet_paths(out, paths)
             stamp.update(chosen)
             stamp.update(used_penalties(spec, bound.arguments, chosen.get("score_func")))
             if spec.tie_break:
@@ -191,9 +191,13 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
     :class:`~andrey.ExperimentalWarning` once. Knowledge with ``required_paths`` or
     ``forbidden_paths`` is resolved against the data's columns before the fit
     (:func:`~andrey.core.knowledge.resolve`, which raises
-    :class:`~andrey.core.knowledge.KnowledgeError` for knowledge that contradicts itself), and the
-    facade gets it without them; the return value then holds them for :func:`restrict_paths`,
-    else it is ``None``. Anything but a :class:`~andrey.Knowledge` is left to the facade.
+    :class:`~andrey.core.knowledge.KnowledgeError` for knowledge that contradicts itself). For a
+    method that ``restricts_paths``, the facade gets the knowledge without them and the return
+    value holds them for :func:`restrict_paths`; a method whose search reads them gets the whole
+    knowledge, checked with the ancestral reading of tiers, and the return value holds them for
+    :func:`meet_paths`. Without them the return value is ``None``. A method that learns time lags
+    resolves its own lagged claims. Anything but a :class:`~andrey.Knowledge` is left to the
+    facade.
     """
     knowledge = arguments.get("knowledge")
     if not isinstance(knowledge, Knowledge):
@@ -209,17 +213,26 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
                 "benchmark, and its meaning may change without deprecation.",
                 ExperimentalWarning,
             )
-    if not set(given) & set(PATH_PARTS):
+    if not set(given) & set(PATH_PARTS) or spec.family == "temporal":
         return None
     if (setting := undirected_setting(spec, arguments)) is not None:
         part = next(p for p in given if p in PATH_PARTS)
         raise NotImplementedError(unhonored_part(spec.name, part, setting))
-    arguments["knowledge"] = knowledge.edge_parts()
+    if spec.restricts_paths:
+        arguments["knowledge"] = knowledge.edge_parts()
     data = arguments[spec.data.inputs[0].name]
+    if isinstance(data, (list, tuple)) and data:  # groups of rows share their columns
+        data = data[0]
     shape = np.shape(data)
     if len(shape) != 2:  # the facade's data check names the problem
         return None
-    return resolve(knowledge, shape[1], column_labels(data), method=spec.name)
+    return resolve(
+        knowledge,
+        shape[1],
+        column_labels(data),
+        method=spec.name,
+        ancestral_tiers=not spec.restricts_paths,
+    )
 
 
 def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureOutput:
@@ -254,6 +267,50 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
     return dataclasses.replace(
         out, _structure=to_structure(mpdag, kind="cpdag", labels=labels), _metadata=metadata
     )
+
+
+def meet_paths(out: Any, constraints: Constraints) -> Any:
+    """Check ``out``, a result or a list of them, against the causal paths of ``constraints``.
+
+    A PAG that contradicts a claim raises :class:`~andrey.core.knowledge.KnowledgeError`
+    (:func:`~andrey.constraint.fci.check_path_claims`); a PAG with an index column after the data's
+    columns reads the claims over its first columns. A DAG gets ``metadata["unmet_knowledge"]``,
+    the claims it does not meet, each ``[part, a, b]``.
+    """
+    from andrey.constraint.fci import check_path_claims, reach
+
+    if isinstance(out, list):
+        return [meet_paths(each, constraints) for each in out]
+    structure = out.structure
+    kind = getattr(structure, "kind", None)
+    if kind not in ("pag", "dag"):
+        return out
+    marks = structure.to_numpy()
+    d = constraints.d
+    assert len(marks) >= d, (len(marks), d)
+    labels = structure.labels
+    name = label_of(labels)
+    claims = {}
+    for part, pairs in (
+        ("required_paths", constraints.required_paths),
+        ("forbidden_paths", constraints.forbidden_paths),
+    ):
+        full = np.zeros(marks.shape, dtype=bool)
+        if pairs is not None:
+            full[:d, :d] = pairs
+        claims[part] = full
+    if kind == "pag":
+        label = (lambda i: repr(name(i))) if labels is not None else str
+        check_path_claims(marks, claims["required_paths"], claims["forbidden_paths"], label)
+        return out
+    directed = (marks == TAIL) & (marks.T == ARROW)
+    unmet = [
+        [part, name(a), name(b)]
+        for part, pairs in claims.items()
+        for a, b in np.argwhere(pairs).tolist()
+        if bool(reach(directed, a)[b]) != (part == "required_paths")
+    ]
+    return dataclasses.replace(out, _metadata={**out.metadata, "unmet_knowledge": unmet})
 
 
 def removed_name_error(
