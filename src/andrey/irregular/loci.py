@@ -11,11 +11,11 @@ concave (Lemma 1), so it has one maximizer.
 The paper reaches it by a closed-form update of ``w_1`` and L-BFGS steps on ``w_2`` in turn. Here
 each step is a projected Newton step on both weight vectors at once (Bertsekas 1982): the Newton
 direction over the weights away from the bound ``w_2 = 0``, a gradient step scaled by the Hessian's
-diagonal on the weights at or near it whose gradient points toward it, then a backtracking search
-along the direction's projection onto ``w_2 >= 0``. Both reach the same maximizer, Newton in far
-fewer steps, as the mean and the variance weights are strongly coupled. The fit stops once the
-mean objective changes by less than ``1e-6`` in a full step, or after 100 steps (Supplementary
-Material D).
+diagonal on the weights at or near it whose gradient is positive, so that the objective falls
+toward the bound, then a backtracking search along the direction's projection onto ``w_2 >= 0``.
+Both reach the same maximizer, Newton in far fewer steps, as the mean and the variance weights are
+strongly coupled. The fit stops once the mean objective changes by less than ``1e-6`` in a full
+step, or after 100 steps (Supplementary Material D).
 
 References
 ----------
@@ -47,9 +47,9 @@ _PRIOR_PRECISION = 1e-6
 #: (Supplementary Material D).
 _MAX_STEPS = 100
 _TOLERANCE = 1e-6
-#: The largest distance from the bound at which a weight of ``w_2`` whose gradient points toward
-#: it takes the scaled gradient step instead of the Newton step (Bertsekas 1982, the
-#: epsilon-active set).
+#: The largest distance from the bound at which a weight of ``w_2`` with a positive gradient, so
+#: that the objective falls toward the bound, takes the scaled gradient step instead of the Newton
+#: step (Bertsekas 1982, the epsilon-active set).
 _ACTIVE_DISTANCE = 1e-3
 #: The sufficient-decrease constant of the backtracking search, and the smallest step it tries.
 _ARMIJO = 1e-4
