@@ -41,6 +41,14 @@ names its pull request.
   method's default handling, `"testwise"`, so no result changes; a value a method does not list
   raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
   values. ([#828])
+- `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
+  `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
+  by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a
+  linear-Gaussian model of the current graph, the E-step gives the expected covariance of the data,
+  the method's own search runs on it over every row, and the model is fit again to the graph it
+  returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
+  each. `missing=None` keeps refusing missing values, with a message that names `missing="em"`.
+  ([#842])
 
 ### Changed
 
@@ -2097,3 +2105,4 @@ First alpha release.
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#842]: https://github.com/Abel-ai-lab/andrey/pull/842
