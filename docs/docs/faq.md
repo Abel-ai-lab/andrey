@@ -1,10 +1,5 @@
----
-name: faq
-description: Frequently asked questions about Andrey - what data it learns from, its methods, speed and scale, the command line, and the project.
-meta:
-  type: guide
-  tags: [faq]
----
+--- name: faq description: Frequently asked questions about Andrey - what data it learns from, its
+methods, speed and scale, the command line, and the project. meta: type: guide tags: [faq] ---
 
 # FAQ
 
@@ -208,10 +203,12 @@ points from a later tier into an earlier one, such as nothing causing a person's
 takes it except {{ no_knowledge_methods }}. It can also say that one variable causes another,
 directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
-honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
-are supported in FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM and experimental in the other
-methods; a method given a part it does not honor raises an error naming the methods that do.
-[Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
+honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths.
+Forbidden paths are supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM;
+required paths in BOSS-FCI, LPCMCI, and DirectLiNGAM; and hidden common causes in FCI, GFCI,
+BOSS-FCI, and LPCMCI, and the parts are experimental elsewhere; a method given a part it does not
+honor raises an error naming the methods that do. [Background
+knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
 

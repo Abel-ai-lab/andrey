@@ -357,9 +357,17 @@ def ges(
     observed values. It runs the search 10 times, so it takes about 10 times as long, and under
     values missing not at random it has no guarantee. Before EM, only a column that repeats another
     up to scale and shift where both are observed raises; a column that is a linear function of
-    several others, which raises on complete data, is not caught, and the fit runs. The numbers are
-    a reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    several others, which raises on complete data, is not caught, and the fit runs. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
+    farther from the true DAG than without them in any setting. The claims direct edges of the graph
+    the search found, as their rules take the class as given: of the edges they directed, 1.1% with
+    required paths and 1.7% with forbidden paths pointed against the true DAG, each in a fit whose
+    graph had an edge missing or extra or a collider wrong. ``required_paths`` is experimental in
+    this method: a required path cannot restore an edge the search left out, and on simulated data a
+    required edge, which also states that the pair is adjacent, lowered the errors more. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
