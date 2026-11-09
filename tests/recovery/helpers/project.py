@@ -41,13 +41,18 @@ _MARKED_PAIRS = frozenset({"CAMUV"})
 # DAG and causal-order algorithms: candidate = the DAG and the order.
 _ORDERED_DAG = frozenset({"CAM", "RESIT"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
-_PAIRWISE = frozenset({"ANM", "PNL"})
+_PAIRWISE = frozenset({"ANM", "PNL", "LOCI"})
 # The recorded fields of the pairwise tests, by metadata key and direction.
 _PAIRWISE_FIELDS = {
     "pval_forward": ("p_values", "forward"),
     "pval_backward": ("p_values", "backward"),
     "stat_forward": ("statistics", "forward"),
     "stat_backward": ("statistics", "backward"),
+}
+# LOCI's added fields: the two models' mean log-likelihoods.
+_LIKELIHOOD_FIELDS = {
+    "ll_forward": ("log_likelihoods", "forward"),
+    "ll_backward": ("log_likelihoods", "backward"),
 }
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
@@ -120,8 +125,9 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     if algorithm in _PAIRWISE:
         md = out.metadata
+        fields = _PAIRWISE_FIELDS | (_LIKELIHOOD_FIELDS if algorithm == "LOCI" else {})
         return {"graph": out.structure.to_numpy()} | {
-            field: md[key][direction] for field, (key, direction) in _PAIRWISE_FIELDS.items()
+            field: md[key][direction] for field, (key, direction) in fields.items()
         }
     if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
         return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["cluster_order"]}

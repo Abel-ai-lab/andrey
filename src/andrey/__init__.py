@@ -47,6 +47,7 @@ from .api import (
     igsp,
     inter_iamb,
     jpcmciplus,
+    loci,
     longitudinal_lingam,
     lpcmci,
     mmhc,
@@ -163,6 +164,7 @@ __all__ = [
     # Pairwise direction tests.
     "anm",
     "pnl",
+    "loci",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",

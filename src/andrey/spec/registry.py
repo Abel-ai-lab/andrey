@@ -2536,6 +2536,63 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="loci",
+        family="pairwise",
+        summary="Location-scale-noise-model pairwise direction test: decides whether column 0 "
+        "causes column 1, the reverse, or neither, from a two-column table.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+            missing=True,
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge under criterion independence. null: the "
+                "direction with the larger p-value, or with the smaller HSIC statistic when the "
+                "p-values are equal. A level such as 0.05: an edge only when exactly one "
+                "direction's p-value is above it. Must be null under criterion likelihood.",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="criterion",
+                type="str",
+                default="independence",
+                choices=("independence", "likelihood"),
+                doc="independence = an HSIC test of each direction's scaled residual against its "
+                "proposed cause decides (LOCI-H); likelihood = the direction whose model has the "
+                "larger likelihood (LOCI-M).",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata log_likelihoods maps "
+            "forward (x->y) and backward (y->x) to each model's mean log-likelihood, and under "
+            "criterion independence p_values and statistics map them to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Immer et al. 2023", "Gretton et al. 2008", "Mooij et al. 2016"),
+    )
+)
 
 # --- latent-variable family -----------------------------------------------------------------------
 
@@ -3024,6 +3081,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
+    "loci": ("log_likelihoods", "p_values", "statistics"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),

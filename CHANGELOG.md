@@ -21,6 +21,12 @@ names its pull request.
 
 ### Added
 
+- `loci`, experimental, decides the direction of a variable pair under the location-scale noise
+  model of Immer et al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose
+  mean and variance are spline functions of the proposed cause in each direction, and decides by
+  an HSIC test of the scaled residual against the cause (`criterion="independence"`, the default)
+  or by the larger likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows
+  where both columns are observed and takes `missing`. ([#830])
 - `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
   by position, as `square` nodes, as `draw` does. ([#806])
 - The graph types guide has a section, "How to read a causal graph", with a legend of every mark
@@ -2130,6 +2136,7 @@ First alpha release.
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#828]: https://github.com/Abel-ai-lab/andrey/pull/828
 [#829]: https://github.com/Abel-ai-lab/andrey/pull/829
+[#830]: https://github.com/Abel-ai-lab/andrey/pull/830
 [#832]: https://github.com/Abel-ai-lab/andrey/pull/832
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
