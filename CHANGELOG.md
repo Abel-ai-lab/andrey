@@ -48,6 +48,12 @@ names its pull request.
   `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
   it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
   indicator; `missingness.draw` masks any complete data. ([#826])
+- One package-wide argument, `missing`, on the twelve methods that accept missing values: `pc`,
+  `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
+  and `pnl`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  method's default handling, `"testwise"`, so no result changes; a value a method does not list
+  raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
+  values. ([#828])
 
 ### Changed
 
@@ -2103,4 +2109,5 @@ First alpha release.
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
+[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
 [#829]: https://github.com/Abel-ai-lab/andrey/pull/829

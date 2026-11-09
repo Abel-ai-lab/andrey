@@ -2876,6 +2876,16 @@ _PATH_RULE = (
 )
 _MAX_DEPTH = concept_param("max_depth")
 
+#: How missing values are handled, on every method the concept's template fits, after its
+#: categorical columns where it has them.
+_MISSING = concept_param("missing")
+for _name in CONCEPTS["missing"].conforming:
+    _params = REGISTRY[_name].params
+    _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={"params": (*_params[:_cut], _MISSING, *_params[_cut:])}
+    )
+
 for _name, _how in _KNOWLEDGE_HOW.items():
     _extra = PATH_PARTS if _name in _PATH_METHODS else ()
     _parts = (*EDGE_PARTS, *_extra)
@@ -2962,8 +2972,9 @@ _METADATA: dict[str, tuple[str, ...]] = {
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
-# column types a mixed-data setting read, the fewest rows a test used, the triples a collider
-# vote left ambiguous, and the clauses the path parts of knowledge leave.
+# column types a mixed-data setting read, the fewest rows a test used and how missing values were
+# handled, the triples a collider vote left ambiguous, and the clauses the path parts of knowledge
+# leave.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2980,6 +2991,7 @@ for _name, _spec in REGISTRY.items():
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
+        *(("missing",) if "missing" in _concepts else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
         *(("ancestor_clauses",) if _spec.knowledge_extra else ()),
     )
