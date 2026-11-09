@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS
+from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -2945,6 +2945,49 @@ _PATH_RULE = (
     "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
     "et al. 2025); claims that no such DAG meets raise."
 )
+_PAG_PATHS = (
+    " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
+    "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
+    "removes a confounded pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
+    "one the PAG contradicts raises: a required path with no possibly directed path, or a "
+    "forbidden path with a directed path. The marks and the checks assume no selection bias, as an "
+    "arrowhead at a says that a is an ancestor of neither b nor the selection variables "
+    "(Richardson and Spirtes 2002)."
+)
+_SCORE_PAG_PATHS = " The test phase also starts from every confounded pair." + _PAG_PATHS
+#: boss_fci and grasp_fci: their order search reads required_paths as it reads the tiers.
+_ORDER_PAG_PATHS = (
+    " The order search puts the cause of each required_paths pair before its effect in every order "
+    "it visits." + _SCORE_PAG_PATHS
+)
+_ORDER_PATHS = (
+    " With required_paths and forbidden_paths, the order search follows Shimizu et al. (2011, "
+    "Section 3.4): when the claims show that no remaining variable is an ancestor of some of "
+    "them, the next variable is one of those; otherwise it is none with a claimed ancestor among "
+    "the remaining. The regression drops each forbidden path as a parent, and metadata "
+    "unmet_knowledge lists the claims the DAG does not meet."
+)
+_LAGGED_PATHS = (
+    " required_paths [a, b, lag] puts a tail at a and an arrowhead at b on that link, and "
+    "forbidden_paths [a, b, lag] an arrowhead at a; the tests can still remove the link. "
+    "confounded [a, b, lag] keeps the link from every removal. Each claim names its lag. A claim "
+    "on a link the PAG lacks sets no mark, and one the PAG contradicts raises: a required path "
+    "with no possibly directed path, or a forbidden path with a directed path."
+)
+_PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "confounded")
+#: The methods that read the path parts and confounded in the search, with the sentence that says
+#: how.
+_ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
+    "fci": (_PAG_PARTS, _PAG_PATHS),
+    "fci_jci": (_PAG_PARTS, _PAG_PATHS),
+    "gfci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "boss_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
+    "grasp_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
+    "lpcmci": (_PAG_PARTS, _LAGGED_PATHS),
+    "direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+    "multi_group_direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+}
+_ORDER_PATH_METHODS = ("direct_lingam", "multi_group_direct_lingam")
 _MAX_DEPTH = concept_param("max_depth")
 
 #: How missing values are handled, on every method the concept's template fits, after its
@@ -2958,13 +3001,14 @@ for _name in CONCEPTS["missing"].conforming:
     )
 
 for _name, _how in _KNOWLEDGE_HOW.items():
-    _extra = PATH_PARTS if _name in _PATH_METHODS else ()
+    _extra, _rule = (
+        (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
+    )
     _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}"
-        + (_PATH_RULE if _extra else ""),
+        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}{_rule}",
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
@@ -2972,6 +3016,7 @@ for _name, _how in _KNOWLEDGE_HOW.items():
             "params": (*REGISTRY[_name].params, *_depth, _knowledge),
             "knowledge_extra": _extra,
             "knowledge_experimental": _extra,
+            "restricts_paths": _name in _PATH_METHODS,
         }
     )
 
@@ -3045,8 +3090,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
-# handled, the triples a collider vote left ambiguous, and the clauses the path parts of knowledge
-# leave.
+# handled, the triples a collider vote left ambiguous, the clauses the path parts of knowledge
+# leave, and the claims a causal order search does not meet.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -3065,7 +3110,8 @@ for _name, _spec in REGISTRY.items():
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("missing",) if "missing" in _concepts else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
-        *(("ancestor_clauses",) if _spec.knowledge_extra else ()),
+        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("unmet_knowledge",) if _spec.name in _ORDER_PATH_METHODS else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

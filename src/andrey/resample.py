@@ -615,7 +615,8 @@ def _valid_graph(
             from andrey.constraint.fci import knowledge_marks
 
             vote = vote.copy()
-            knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
+            name = (lambda i: repr(labels[i])) if labels is not None else str
+            knowledge_marks(vote, constraints, name)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
         return pag_of(mag, None, (), constraints)
     if ((vote == ARROW) & (vote.T == ARROW)).any():

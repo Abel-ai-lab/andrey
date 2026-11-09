@@ -214,8 +214,9 @@ class LPCMCISearch:
         )
         self.ranks = ranks
         self.absent, self.required, self.arrowheads = self._knowledge(constraints)
+        self.tails, self.kept = self._claims(constraints)
         self.locked = {(key, at_start) for key in self.required for at_start in (True, False)}
-        self.locked |= self.arrowheads
+        self.locked |= self.arrowheads | self.tails
         self.window = [(v, lag) for lag in range(tau_max + 1) for v in range(n_vars)]
         self.edges: dict[Key, Edge] = {}
         self.neighbors_of: dict[int, set[tuple[int, int]]] = {}
@@ -267,13 +268,48 @@ class LPCMCISearch:
                 arrowheads.add((key, bool(forbidden[0, i, j])))
         return absent, required, arrowheads
 
+    def _claims(
+        self, constraints: LaggedConstraints | None
+    ) -> tuple[set[tuple[Key, bool]], set[Key]]:
+        """Read the path and confounded claims of ``constraints`` as ``(tails, kept)``, adding
+        their arrowheads to ``self.arrowheads``.
+
+        A ``required_paths`` claim puts a tail at its cause and an arrowhead at its effect, and a
+        ``forbidden_paths`` claim an arrowhead at its cause, as marks ``(key, at_start)``; ``kept``
+        holds the ``confounded`` links, which no test removes. A claim is ``(cause, effect, lag)``:
+        the cause ``X^cause_{t-lag}`` is the start of the link, or at lag 0 the end when
+        ``cause > effect``.
+        """
+        tails: set[tuple[Key, bool]] = set()
+        kept: set[Key] = set()
+        if constraints is None or constraints.required_paths is None:
+            return tails, kept
+
+        def link(lag: int, cause: int, effect: int) -> tuple[Key, bool]:
+            if lag or cause < effect:
+                return (cause, effect, lag), True
+            return (effect, cause, 0), False
+
+        assert constraints.forbidden_paths is not None and constraints.confounded is not None
+        for lag, i, j in np.argwhere(constraints.required_paths).tolist():
+            key, cause_at_start = link(lag, i, j)
+            tails.add((key, cause_at_start))
+            self.arrowheads.add((key, not cause_at_start))
+        for lag, i, j in np.argwhere(constraints.forbidden_paths).tolist():
+            self.arrowheads.add(link(lag, i, j))
+        kept.update(
+            link(lag, i, j)[0] for lag, i, j in np.argwhere(constraints.confounded).tolist()
+        )
+        return tails, kept
+
     def initialize(self, directed: Iterable[tuple[Key, bool]] = ()) -> None:
         """Algorithm 1, line 1: the complete graph, with ``directed`` links oriented ``->``.
 
         ``directed`` holds ``(key, start_is_tail)`` pairs; their middle mark is ``"?"`` updated by
         MMR. The knowledge then leaves out the absent links, directs each required link with the
-        empty middle mark, and puts its arrowheads in place, updating the middle mark as MMR does.
-        Test memories and separating sets reset.
+        empty middle mark, puts its arrowheads and tails in place, updating the middle mark as MMR
+        does, and gives each confounded link the empty middle mark, so that no phase tests it. Test
+        memories and separating sets reset.
         """
         self.edges = {}
         for lag in range(self.tau_max + 1):
@@ -286,7 +322,14 @@ class LPCMCISearch:
             self.edges[key] = [TAIL, "L", ARROW] if start_is_tail else [ARROW, "R", TAIL]
         for key, start_is_tail in self.required.items():
             self.edges[key] = [TAIL, "", ARROW] if start_is_tail else [ARROW, "", TAIL]
+        for key in self.kept:
+            self.edges[key][1] = ""
+        for key, at_start in self.tails:
+            if key in self.edges:  # a claim on a link the knowledge leaves out sets no mark
+                self.edges[key][0 if at_start else 2] = TAIL
         for key, at_start in self.arrowheads:
+            if key not in self.edges:
+                continue
             edge = self.edges[key]
             edge[0 if at_start else 2] = ARROW
             edge[1] = _add_middle(edge[1], "R" if at_start else "L")
@@ -1385,6 +1428,44 @@ def run(
     search.ancestral_phase(search.preliminary_rules())
     search.non_ancestral_phase()
     return _result(search, kept)
+
+
+def check_claims(
+    result: LPCMCIResult, constraints: LaggedConstraints | None, label: Callable[[int], str] = str
+) -> None:
+    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when ``result`` contradicts a path
+    claim of ``constraints``.
+
+    The claims are read over the time window, with the node ``(i, lag)``, variable ``i`` at time
+    ``t - lag``, joined to every node by the links ``result`` repeats at each step
+    (:func:`~andrey.constraint.fci.check_path_claims`). ``label`` names a variable.
+    """
+    if constraints is None or constraints.required_paths is None:
+        return
+    from andrey.constraint.fci import check_path_claims
+
+    lags, n, _ = result.start_marks.shape
+    marks = np.zeros((lags * n, lags * n), dtype=np.int8)
+    for lag, i, j in np.argwhere(result.start_marks != NULL).tolist():
+        for shift in range(lags - lag):
+            start, end = (lag + shift) * n + i, shift * n + j
+            marks[start, end] = result.start_marks[lag, i, j]
+            marks[end, start] = result.end_marks[lag, i, j]
+
+    def window(claims: np.ndarray) -> np.ndarray:
+        out = np.zeros(marks.shape, dtype=bool)
+        for lag, i, j in np.argwhere(claims).tolist():
+            out[lag * n + i, j] = True
+        return out
+
+    def node(k: int) -> str:
+        lag, i = divmod(k, n)
+        return f"{label(i)} at t-{lag}" if lag else f"{label(i)} at t"
+
+    assert constraints.forbidden_paths is not None
+    check_path_claims(
+        marks, window(constraints.required_paths), window(constraints.forbidden_paths), node
+    )
 
 
 def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
