@@ -22,7 +22,7 @@ under Markov equivalence. Artificial Intelligence, 305, 103669.
 
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -172,30 +172,57 @@ def _simplicial(graph: ChainGraph, v: int, nodes: set[int]) -> bool:
     return all(near - {a} <= graph.sib[a] for a in near)
 
 
-def _potential_leaves(graph: ChainGraph, nodes: set[int], clauses: list[Clause]) -> list[int]:
-    """The potential leaf nodes of ``nodes`` (Fang et al. 2025, Definition 24): simplicial, and the
-    tail of no clause in ``clauses``, the reduced clauses over ``nodes``."""
-    tails = {t for t, _ in clauses}
-    return [v for v in sorted(nodes) if v not in tails and _simplicial(graph, v, nodes)]
-
-
 def _within(clauses: Iterable[Clause], nodes: set[int]) -> list[Clause]:
     """The clauses whose tail and heads lie in ``nodes`` (Fang et al. 2025, Equation 4)."""
     return [(t, heads) for t, heads in clauses if t in nodes and heads <= nodes]
 
 
-def _consistent_on(graph: ChainGraph, nodes: set[int], clauses: list[Clause]) -> bool:
-    """Algorithm 1 of Fang et al. (2025) on the vertices ``nodes`` with the reduced clauses over
-    them: remove potential leaf nodes, and with them the clauses they meet, until none is left."""
+def _eliminate(
+    graph: ChainGraph, nodes: set[int], clauses: list[Clause], keep: int | None = None
+) -> set[int]:
+    """Remove potential leaf nodes other than ``keep`` from ``nodes`` until none is left; return
+    the vertices that remain.
+
+    A potential leaf node (Fang et al. 2025, Definition 24) is simplicial among ``nodes`` and the
+    tail of no clause over them; removing it removes the clauses whose heads hold it, which it
+    meets. Removing a vertex keeps every other potential leaf node one, so the vertices left do not
+    depend on the order, and only the neighbors of a removed vertex and the tails of the clauses it
+    meets need a new look.
+    """
     nodes = set(nodes)
     clauses = _within(clauses, nodes)
-    while nodes:
-        leaves = _potential_leaves(graph, nodes, clauses)
-        if not leaves:
-            return False
-        nodes.discard(leaves[0])
-        clauses = [(t, heads) for t, heads in clauses if leaves[0] not in heads]
-    return True
+    tails = Counter(t for t, _ in clauses)
+    meets: dict[int, list[int]] = {}
+    for k, (_, heads) in enumerate(clauses):
+        for h in heads:
+            meets.setdefault(h, []).append(k)
+    live = [True] * len(clauses)
+
+    def leaf(v: int) -> bool:
+        return v != keep and not tails[v] and _simplicial(graph, v, nodes)
+
+    queue = deque(v for v in sorted(nodes) if leaf(v))
+    queued = set(queue)
+    while queue:
+        y = queue.popleft()
+        nodes.discard(y)
+        look = graph.sib[y] & nodes
+        for k in meets.get(y, ()):
+            if live[k]:
+                live[k] = False
+                tails[clauses[k][0]] -= 1
+                look |= {clauses[k][0]} & nodes
+        for v in sorted(look - queued):
+            if leaf(v):
+                queue.append(v)
+                queued.add(v)
+    return nodes
+
+
+def _consistent_on(graph: ChainGraph, nodes: set[int], clauses: list[Clause]) -> bool:
+    """Algorithm 1 of Fang et al. (2025) on the vertices ``nodes`` with the reduced clauses over
+    them: the clauses are consistent when removing potential leaf nodes leaves none."""
+    return not _eliminate(graph, nodes, clauses)
 
 
 def _components(graph: ChainGraph, clauses: list[Clause]) -> list[set[int]]:
@@ -213,18 +240,10 @@ def consistent(graph: ChainGraph, clauses: Iterable[Clause]) -> bool:
 
 
 def _orientation_component(graph: ChainGraph, x: int, clauses: list[Clause]) -> set[int]:
-    """The maximal orientation component for ``x`` (Fang et al. 2025, Algorithm 3): from the chain
-    component of ``x``, remove potential leaf nodes other than ``x`` until ``x`` is the only one.
-
-    ``clauses`` are reduced and consistent with the class, so a set with another potential leaf
-    node always has one to remove.
-    """
-    nodes = graph.members(x)
-    clauses = _within(clauses, nodes)
-    while others := [v for v in _potential_leaves(graph, nodes, clauses) if v != x]:
-        nodes.discard(others[0])
-        clauses = [(t, heads) for t, heads in clauses if others[0] not in heads]
-    return nodes
+    """The maximal orientation component for ``x`` (Fang et al. 2025, Algorithm 3 and Theorem 39):
+    the chain component of ``x`` less the potential leaf nodes other than ``x`` that can be removed
+    in turn. ``clauses`` are reduced and consistent with the class."""
+    return _eliminate(graph, graph.members(x), clauses, keep=x)
 
 
 def clause_mpdag(graph: ChainGraph, clauses: Iterable[Clause]) -> np.ndarray:
@@ -262,7 +281,14 @@ def residual_clauses(
     clauses, the restricted class of their Definition 28.
     """
     edges = _directed(mpdag, graph)
-    left = list(dict.fromkeys(_reduced(graph, clauses)))
+    into = (mpdag == ARROW) & (mpdag.T == TAIL)  # [t, h]: h -> t in every DAG kept
+    # A clause the MPDAG meets is implied by it, and a head the MPDAG directs into the tail can
+    # never be the one the clause names.
+    left = [
+        (t, frozenset(h for h in heads if not into[t, h]))
+        for t, heads in dict.fromkeys(_reduced(graph, clauses))
+        if not any(mpdag[t, h] == TAIL and mpdag[h, t] == ARROW for h in heads)
+    ]
 
     def implied(t: int, heads: frozenset[int], others: list[Clause]) -> bool:
         # Only the chain component of t changes; every clause lies within one component.

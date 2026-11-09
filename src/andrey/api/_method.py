@@ -186,11 +186,11 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
 
 
 def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureOutput:
-    """Return ``out`` restricted to the DAGs that meet the causal paths of ``constraints``.
+    """Return ``out`` with its CPDAG restricted by the causal paths of ``constraints``.
 
-    The DAGs are those the CPDAG ``out`` holds stands for (:func:`~andrey.core.ancestral.restrict`).
-    The structure becomes their MPDAG, and ``metadata["ancestor_clauses"]`` lists the clauses it
-    cannot show, each ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2,
+    Of the DAGs the CPDAG stands for, the structure becomes the MPDAG of those that meet
+    ``ancestors`` and ``non_ancestors`` (:func:`~andrey.core.ancestral.restrict`), and
+    ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2,
     ...``. An undirected structure, which the paths do not orient, is returned as it is.
     """
     from andrey.core.ancestral import restrict
