@@ -78,6 +78,44 @@ class SCMParams:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Missingness:
+    """The missing values drawn over a dataset, with the parents of each missingness indicator.
+
+    The missingness indicator ``R_i`` of column ``i`` is 1 where its value is missing. The m-graph
+    adds every indicator to the causal graph, with an edge into it from each of its parents
+    (Mohan, Pearl, and Tian 2013); :mod:`andrey.data.missingness` draws them.
+
+    Parameters
+    ----------
+    mask : np.ndarray of shape (n, d)
+        ``True`` where a value is missing; the data hold ``NaN`` there.
+    parents : dict of int to list of int
+        Each column that can go missing, mapped to the columns its indicator depends on, in
+        ascending order: ``[]`` under ``"mcar"``, always-observed columns under ``"mar"``, other
+        columns that can go missing under ``"mnar"``, and ``[i]`` for column ``i`` under
+        ``"self_masking"``. A column it does not list is always observed.
+    mechanism : str
+        ``"mcar"``, ``"mar"``, ``"mnar"``, or ``"self_masking"``.
+    form : str or None
+        How an indicator depends on its parents, ``"logistic"`` or ``"quantile"``; ``None`` under
+        ``"mcar"``.
+    rate : float
+        The expected share of missing values in each column that can go missing.
+
+    References
+    ----------
+    Mohan, K., Pearl, J., and Tian, J. (2013). Graphical models for inference with missing data.
+    Advances in Neural Information Processing Systems 26.
+    """
+
+    mask: np.ndarray
+    parents: dict[int, list[int]]
+    mechanism: str
+    form: str | None
+    rate: float
+
+
+@dataclass(frozen=True, kw_only=True)
 class CausalDataset:
     """Simulated data paired with its ground-truth causal graph.
 
@@ -107,6 +145,9 @@ class CausalDataset:
         Each environment's intervened columns, after the column shuffle: ``{0: [], 1: [3]}`` when
         environment 0 has no intervention and environment 1 intervenes on column 3. ``None`` when
         ``env`` is ``None``.
+    missing : Missingness or None, default=None
+        The missing values drawn by ``missing=`` on :meth:`~andrey.data.SCM.sample`, their mask
+        and the parents of each missingness indicator; ``None`` when the data are complete.
 
     Notes
     -----
@@ -121,6 +162,7 @@ class CausalDataset:
     params: SCMParams
     env: np.ndarray | None = None
     targets: dict[int, list[int]] | None = None
+    missing: Missingness | None = None
 
     @property
     def observed_graph(self) -> GraphStructure:

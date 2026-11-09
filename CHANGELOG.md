@@ -25,7 +25,8 @@ names its pull request.
   model of Immer et al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose
   mean and variance are spline functions of the proposed cause in each direction, and decides by
   an HSIC test of the scaled residual against the cause (`criterion="independence"`, the default)
-  or by the larger likelihood (`criterion="likelihood"`). ([#830])
+  or by the larger likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows
+  where both columns are observed and takes `missing`. ([#830])
 - `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
   by position, as `square` nodes, as `draw` does. ([#806])
 - The graph types guide has a section, "How to read a causal graph", with a legend of every mark
@@ -34,6 +35,18 @@ names its pull request.
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
   link preview, the wordmark and its release on navy. ([#809])
+- `andrey.data.missingness` draws missing values whose missingness graph is known: `mcar`, `mar`,
+  `mnar`, and `self_masking` masks, in a logistic form (Muzellec et al., 2020) or the quantile form
+  of the MVPC simulations (Tu et al., 2019), with `parents=` to place each indicator. `missing=` on
+  `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
+  it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
+  indicator; `missingness.draw` masks any complete data. ([#826])
+- One package-wide argument, `missing`, on the twelve methods that accept missing values: `pc`,
+  `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
+  and `pnl`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  method's default handling, `"testwise"`, so no result changes; a value a method does not list
+  raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
+  values. ([#828])
 
 ### Changed
 
@@ -2088,4 +2101,6 @@ First alpha release.
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
+[#826]: https://github.com/Abel-ai-lab/andrey/pull/826
+[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
 [#830]: https://github.com/Abel-ai-lab/andrey/pull/830
