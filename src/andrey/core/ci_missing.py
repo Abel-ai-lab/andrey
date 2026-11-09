@@ -67,6 +67,11 @@ from .score import (
 
 __all__ = ["TestwiseDeletion"]
 
+#: The values of ``missing=``, the ways a method can handle missing values: ``"testwise"``
+#: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
+TESTWISE = "testwise"
+MISSING_HANDLING = (TESTWISE,)
+
 # The most bytes of row blocks the tests one TestwiseDeletion keeps for reuse hold together.
 _CACHE_BYTES = 1 << 27
 

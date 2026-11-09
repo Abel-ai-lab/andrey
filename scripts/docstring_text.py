@@ -29,6 +29,7 @@ from typing import NamedTuple
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
 from andrey.spec import REGISTRY
+from andrey.spec.concepts import CONCEPTS
 
 ROOT = Path(__file__).resolve().parents[1]
 API = ROOT / "src" / "andrey" / "api"
@@ -155,6 +156,17 @@ SHARED = {
         lambda m: (
             any(i.name == "env" for i in REGISTRY[m].data.inputs) and m not in ("cdnod", "fci_jci")
         ),
+    ),
+    # A method whose missing takes more than the template's values words its own entry.
+    "missing": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
+        "reads only the rows where all of its variables are observed. ``None`` picks the method's "
+        'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
+        "handling used. See **Missing values.** in Notes.",
+        lambda m: m in CONCEPTS["missing"].conforming,
     ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
