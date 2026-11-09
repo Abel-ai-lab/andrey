@@ -434,13 +434,17 @@ def undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) ->
 def knowledge_masks(
     constraints: Constraints | None,
 ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
-    """The boolean pairs ``constraints`` allow, the pairs their required edges join (both ways),
-    and the pairs they make non-adjacent: the ``support``, ``keep``, and ``apart`` of
-    :func:`adjacency_search`. Without constraints, all three are ``None``."""
+    """The boolean pairs ``constraints`` allow, the pairs their required edges and their
+    ``confounded`` pairs join (both ways), and the pairs they make non-adjacent: the ``support``,
+    ``keep``, and ``apart`` of :func:`adjacency_search`. Without constraints, all three are
+    ``None``."""
     if constraints is None:
         return None, None, None
     allowed = constraints.support()
-    return allowed, constraints.required | constraints.required.T, ~allowed
+    keep = constraints.required | constraints.required.T
+    if constraints.confounded is not None:
+        keep = keep | constraints.confounded
+    return allowed, keep, ~allowed
 
 
 def adjacency_search(
