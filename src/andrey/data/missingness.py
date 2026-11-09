@@ -258,7 +258,8 @@ def draw(data: npt.ArrayLike, mechanism: Mechanism, *, seed: int) -> Missingness
 
     The draw comes from its own stream of ``seed``, the one ``missing=`` on
     :meth:`~andrey.data.SCM.sample` takes, so ``draw(ds.data, mechanism, seed=s)`` on a complete
-    sample ``ds`` with seed ``s`` gives the mask of the sample with ``missing=mechanism``. A draw
+    sample ``ds`` with seed ``s`` and no ``screen`` gives the mask of the sample with
+    ``missing=mechanism``. A draw
     that leaves a column that can go missing with fewer than 2 observed values is drawn again from
     the next stream of ``seed``.
 

@@ -1071,8 +1071,9 @@ ds.missing.mechanism   # "mar"
 ```
 
 The mask is drawn after the scaling and the column shuffle, from the seed's own stream, so the same
-seed without `missing` gives the complete data, and `missingness.draw(data, mechanism, seed=)`
-draws the same mask over any complete data. Every column keeps at least 2 observed values.
+seed without `missing` gives the complete data, and, for a sample drawn without `screen`,
+`missingness.draw(ds.data, mechanism, seed=)` draws its mask again. Every column keeps at least 2
+observed values.
 
 ## Metrics
 
