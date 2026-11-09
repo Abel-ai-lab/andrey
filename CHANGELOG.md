@@ -75,6 +75,10 @@ names its pull request.
 
 ### Fixed
 
+- `jpcmciplus` raises `SingularCorrelationError` when a system variable has a copy among a
+  test's conditions, such as a pulse every dataset shares that is not listed as a time
+  context, with the note to list it as one; it dropped that variable's links without an
+  error. ([#841])
 - The J-PCMCI+ comparison's same-graph counts for 0.15.0 are recounted after a fix to the
   benchmark harness, which recorded each conflict of Andrey's arm as `o-o` where tigramite marks it
   `x-x`. On the comparison page, 7 of the 21 counts in the claim go up, and no claim changes.
@@ -2105,4 +2109,5 @@ First alpha release.
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
