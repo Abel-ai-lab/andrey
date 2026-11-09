@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- A release without its own art has a default release-card cover: the navy ground, the "Release
+  card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
+  tile among the earlier releases shows the version on navy, and a post without art has the same
+  link preview, the wordmark and its release on navy. ([#809])
+
 ### Changed
 
 - `fci`'s **Limitations** paragraph says that test errors can give results that no MAG fits,
@@ -2050,3 +2057,4 @@ First alpha release.
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
 [#807]: https://github.com/Abel-ai-lab/andrey/pull/807
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
+[#809]: https://github.com/Abel-ai-lab/andrey/pull/809
