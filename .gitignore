@@ -21,6 +21,8 @@ benchmarks/.resit-r/
 benchmarks/.mvpc-r/
 # MissDAG's code that benchmarks/start_missdag.sh fetches, read from disk and never committed.
 benchmarks/.missdag/
+# The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
+benchmarks/.loci/
 env/
 
 .vscode/

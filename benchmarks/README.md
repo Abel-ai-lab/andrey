@@ -137,6 +137,17 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
+The authors' LOCI code, the reference for LOCI, has no license, so the harness runs it unmodified
+and keeps it out of the repository: `start_loci.sh` downloads the files of a pinned commit, checks
+each one's SHA-256, writes them to `benchmarks/.loci`, and builds an environment from the lock file
+`requirements-loci.txt` (see [LOCI](comparisons/loci.md)):
+
+```shell
+benchmarks/start_loci.sh
+export ANDREY_BENCH_LOCI_PYTHON=$PWD/benchmarks/.venv-loci/bin/python
+export ANDREY_BENCH_LOCI=$PWD/benchmarks/.loci
+```
+
 The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
 and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and
 extracts it into a git-ignored folder the adapters read from. MissDAG, the reference for
@@ -524,6 +535,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/datasets.py` - dataset store and regime vocabulary; every solution reads identical
   bytes.
 - `andrey_bench/regime_models.py` - the data of the domain, group, and latent-indicator regimes.
+- `andrey_bench/pair_models.py` - the synthetic cause-effect pair sets of Tagasovska et al. (2020).
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
 - `andrey_bench/oracle.py` - a solution returning the true graph; a correct pipeline scores SHD 0.
