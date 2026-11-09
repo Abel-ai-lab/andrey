@@ -135,13 +135,13 @@ LINGAM = (
     "varma_lingam",
     "longitudinal_lingam",
 )
-RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
 TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -230,7 +230,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl")
+                for m in ("anm", "pnl", "loci")
             ),
             Deviation(
                 method="cam",
@@ -541,6 +541,7 @@ _CONCEPTS = (
                 "bottom_up_parce_lingam",
                 "anm",
                 "pnl",
+                "loci",
             ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
@@ -895,7 +896,9 @@ _CONCEPTS = (
         suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
-            *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
+            *_exempt(
+                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+            ),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -985,6 +988,7 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
             "anm",
             "pnl",
+            "loci",
             *EM_METHODS,
         ),
         exempt=(
@@ -1159,7 +1163,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "camuv", "anm", "pnl"),
+                *("cam", "resit", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),

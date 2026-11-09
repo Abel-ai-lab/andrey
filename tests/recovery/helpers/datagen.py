@@ -187,6 +187,22 @@ def _panel_process(
     return panel
 
 
+def _lsnm_pair(seed: int, n_samples: int) -> np.ndarray:
+    """Location-scale noise pair ``x -> y`` with ``y = x + x**2 / 2 + (0.2 + 1 / (1 + x**2)) n``.
+
+    ``x`` and ``n`` are independent standard Gaussians, so the cause has the unbounded support
+    LOCI's identifiability needs, and the noise scale changes with ``x``. Products and quotients
+    only, each exactly rounded on every machine (see :func:`_anm_pair`). Returns an
+    ``(n_samples, 2)`` matrix with column 0 = cause, column 1 = effect.
+    """
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal(n_samples)
+    n = rng.standard_normal(n_samples)
+    square = x * x
+    y = x + 0.5 * square + (0.2 + 1.0 / (1.0 + square)) * n
+    return np.column_stack([x, y]).astype(np.float64)
+
+
 def _anm_pair(seed: int, n_samples: int, x_range: float, noise_scale: float) -> np.ndarray:
     """Nonlinear additive-noise pair ``x -> y`` with ``y = x**3 + n``.
 
@@ -525,6 +541,8 @@ CASES: dict[str, dict] = {
         "x_range": 1.0,
         "noise_scale": 0.3,
     },
+    # Location-scale noise cause->effect pair, a Gaussian cause - LOCI.
+    "lsnm_pair": {"model": "lsnm", "seed": 20261108, "n_samples": 500},
     # Linear non-Gaussian SEM whose hidden confounder h drives two observed variables that share no
     # direct edge: h -> x0, h -> x1, x0 -> x3, x1 -> x2 (h is column 0 of the full order and is
     # dropped). The confounded pair is (x0, x1); x2 and x3 each descend from one member of it. RCD
@@ -747,7 +765,7 @@ def _n_columns(spec: dict) -> int:
     model = spec.get("model")
     if model == "lagged_var":
         return len(spec["lags"][0])
-    if model == "anm":
+    if model in ("anm", "lsnm"):
         return 2
     if model in ("nonmonotone", "nonlinear_fork"):
         return 4
@@ -853,6 +871,8 @@ def _generate(case_id: str, replicate: int) -> np.ndarray:
             noise=spec["noise"],
             burn_in=spec["burn_in"],
         )
+    if model == "lsnm":
+        return _lsnm_pair(seed=seed, n_samples=spec["n_samples"])
     if model == "anm":
         return _anm_pair(
             seed=seed,
@@ -916,7 +936,7 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         effect, cause = np.nonzero(np.any(np.asarray(spec["lags"]) != 0, axis=0))
         keep = effect != cause
         return len(spec["lags"][0]), len(spec["lags"][0]), np.stack([cause, effect], 1)[keep]
-    if model == "anm":
+    if model in ("anm", "lsnm"):
         return 2, 2, np.array([[0, 1]])
     if model == "nonmonotone":
         return 4, 4, np.array(spec["edges"])

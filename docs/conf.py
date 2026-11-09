@@ -491,6 +491,7 @@ PROSE_NAMES = {
     "dynotears": "DYNOTEARS",
     "anm": "ANM",
     "pnl": "PNL",
+    "loci": "LOCI",
     "gin": "GIN",
     "rcd": "RCD",
     "bottom_up_parce_lingam": "BottomUpParceLiNGAM",

@@ -138,6 +138,7 @@ ALGORITHMS = {
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
     "ANM": (_facade("anm"), "anm_pair_cubic"),
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
+    "LOCI": (_facade("loci"), "lsnm_pair"),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
     "CAMUV": (_facade("camuv"), "nonlinear_fork_4v"),
