@@ -44,6 +44,13 @@ names its pull request.
   changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
   `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
 
+### Fixed
+
+- The J-PCMCI+ comparison's same-graph counts for 0.15.0 are recounted after a fix to the
+  benchmark harness, which recorded each conflict of Andrey's arm as `o-o` where tigramite marks it
+  `x-x`. On the comparison page, 7 of the 21 counts in the claim go up, and no claim changes.
+  ([#821])
+
 ## [0.15.0] - 2026-11-08
 
 ### Highlights
@@ -2066,3 +2073,4 @@ First alpha release.
 [#807]: https://github.com/Abel-ai-lab/andrey/pull/807
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
+[#821]: https://github.com/Abel-ai-lab/andrey/pull/821
