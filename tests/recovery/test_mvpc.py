@@ -6,7 +6,10 @@ common effect ``w``, so it finds ``x`` and ``y`` dependent and keeps an edge bet
 finds ``w`` as the parent of ``y``'s indicator and removes it. On seeded ground truth, each
 indicator's parent is a collider and the indicator belongs to one of the collider's parents, as in
 the paper's simulations: MVPC finds every placed parent, keeps no more extra edges than test-wise
-deletion on any dataset, and makes fewer errors over all of them.
+deletion on any dataset, and makes fewer errors over all of them. Two fixed cases check the steps
+those graphs leave untested: an indicator whose parent can itself go missing (MNAR), whose
+corrected test reads the parents of that parent's indicator too, and a pair that only the
+indicators they both cause make a candidate for the corrected test.
 """
 
 from __future__ import annotations
@@ -65,6 +68,81 @@ def test_independent_columns_with_a_mar_mask_give_no_edge():
     mask = missingness.draw(X, missingness.mar(0.3, form="quantile", parents={1: [0]}), seed=0)
     out = andrey.pc(np.where(mask.mask, np.nan, X), missing="mvpc")
     assert out.structure.oriented_edges() == []
+
+
+# The parents of the indicators of y, w, and v in :func:`two_colliders`.
+TWO_COLLIDERS = {1: [2], 2: [3], 3: [2]}
+
+
+def two_colliders(seed: int, n: int = 3000) -> np.ndarray:
+    """``x -> w <- y`` and ``x -> v <- y`` in columns 0, 1, 2, 3, with ``y`` missing when ``w`` is
+    low, ``w`` when ``v`` is, and ``v`` when ``w`` is: the parent of ``y``'s indicator can go
+    missing, and the parent of its indicator is the other collider (MNAR)."""
+    rng = np.random.default_rng(seed)
+    x, y = rng.standard_normal(n), rng.standard_normal(n)
+    w = x + y + 0.5 * rng.standard_normal(n)
+    v = x - 0.5 * y + 0.5 * rng.standard_normal(n)
+    X = np.column_stack([x, y, w, v])
+    mechanism = missingness.mnar(0.4, form="quantile", parents=TWO_COLLIDERS)
+    return np.where(missingness.draw(X, mechanism, seed=seed).mask, np.nan, X)
+
+
+@pytest.fixture(scope="module")
+def two_collider_fits():
+    """Each seed's test-wise deletion and MVPC fits of :func:`two_colliders`."""
+    return [(andrey.pc(X), andrey.pc(X, missing="mvpc")) for X in map(two_colliders, range(8))]
+
+
+def test_mvpc_reads_the_parents_of_an_indicator_parent_that_can_go_missing(two_collider_fits):
+    # The query x, y reads W = {w}, the parent of y's indicator, and, as w can go missing, the
+    # parent v of w's indicator; without v, the rows the regressions read are selected on v, a
+    # common effect of x and y, and the corrected test finds x and y dependent on 7 of the 8
+    # seeds. With v, it removes the edge on 5: W's values are drawn from rows selected on W's own
+    # indicators, so the correction is partial here.
+    removed = 0
+    for deletion, corrected in two_collider_fits:
+        assert deletion.structure.to_numpy()[0, 1] != 0
+        found = corrected.metadata["missingness_parents"]
+        assert all(set(pa) <= set(found[c]) for c, pa in TWO_COLLIDERS.items())
+        removed += [0, 1] in corrected.metadata["corrected_edges"]["removed"]
+    assert removed >= 3
+
+
+def chain(seed: int, n: int = 5000) -> np.ndarray:
+    """``x -> s -> t -> y`` in columns 0, 2, 3, 1, with ``s`` and ``t`` missing when ``x + y`` is
+    high.
+
+    Every test that separates ``x`` and ``y`` reads ``s`` or ``t``, so test-wise deletion reads
+    rows selected on a common effect of ``x`` and ``y`` and keeps an edge between them. In the
+    deletion skeleton ``x`` and ``y`` share no adjacent variable: only the indicators they both
+    cause make the pair a candidate. The mask is built by hand, as the logistic form's weights,
+    scaled to standard deviation 1, select too weakly to keep the edge.
+    """
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal(n)
+    s = x + 0.6 * rng.standard_normal(n)
+    t = s + 0.6 * rng.standard_normal(n)
+    y = t + 0.6 * rng.standard_normal(n)
+    X = np.column_stack([x, y, s, t])
+    high = x + y > np.quantile(x + y, 0.6)
+    X[high & (rng.random(n) < 0.9), 2] = np.nan
+    X[high & (rng.random(n) < 0.9), 3] = np.nan
+    return X
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_mvpc_retests_a_pair_that_shares_only_an_indicator_and_recovers_the_chain(seed):
+    X = chain(seed)
+    assert andrey.pc(X).structure.to_numpy()[0, 1] != 0
+    out = andrey.pc(X, missing="mvpc")
+    assert out.structure.oriented_edges() == [
+        (0, 2, "undirected"),
+        (1, 3, "undirected"),
+        (2, 3, "undirected"),
+    ]
+    found = out.metadata["missingness_parents"]
+    assert {0, 1} <= set(found[2]) and {0, 1} <= set(found[3])
+    assert [0, 1] in out.metadata["corrected_edges"]["removed"]
 
 
 def _collider_mask(ds, most: int = 3) -> dict[int, list[int]]:
