@@ -67,6 +67,9 @@ $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --cell d20-n
     --seeds 100 120 --out outputs/kp-rep-cpdag-d20-n500-deg2
 ```
 
+`--part required_paths`, `--part forbidden_paths`, or `--part confounded` keeps only that part of
+each true claim set and leaves out the false arm, so each part is measured on its own.
+
 Each run writes `records.jsonl`, one line per fit with its status, claim counts, and error columns;
 `run_meta.json`; `provenance.json`; and `done.json`. A run resumes from its records. `--workers`
 fits that many datasets at once, each in its own process; set one BLAS thread per process.
