@@ -446,7 +446,9 @@ claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly 
 cause of `tar` or of `gene`, and the data leave both edges undirected,
 `metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. The result is
 the class the search found, restricted, not a new search for the best class that meets the claims.
-These two parts are experimental.
+In these methods the two parts are experimental. A claim directs edges of the graph the search
+found, and where that graph is wrong, a true claim can direct an edge the wrong way: in our
+measurements, true claims added errors to PC and BOSS on some graphs.
 
 When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
 that is not in the data; a common cause that is in the data does not make the pair adjacent. The
@@ -469,8 +471,11 @@ puts an arrowhead at its cause; no test removes a `confounded` pair. These marks
 no selection bias: the samples were not kept or dropped by the value of a variable the measured
 ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths`
 to narrow the causal order, as their paper describes. Every other method raises
-`NotImplementedError` for a part it does not honor, naming the methods that do. These parts are
-experimental for every method.
+`NotImplementedError` for a part it does not honor, naming the methods that do. In FCI, GFCI,
+BOSS-FCI, LPCMCI, and DirectLiNGAM these parts are supported: with true claims, each measured no
+worse than the same fit without them, on the
+[0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims). In FCI-JCI, GRaSP-FCI,
+and multi-group DirectLiNGAM, which we have not measured, they are experimental.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite

@@ -217,8 +217,8 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
     for part in given:
         if part in spec.knowledge_experimental:
             warn_once(
-                f"andrey.{spec.name}: knowledge {part} is experimental: it has no published "
-                "benchmark, and its meaning may change without deprecation.",
+                f"andrey.{spec.name}: knowledge {part} is experimental: no published benchmark "
+                "of it has passed, and its meaning may change without deprecation.",
                 ExperimentalWarning,
             )
     if not set(given) & set(PATH_PARTS) or spec.family == "temporal":

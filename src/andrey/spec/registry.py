@@ -3024,6 +3024,17 @@ for _name in EM_METHODS:
         update={"params": (*_params[:_cut], _MISSING_EM, *_params[_cut:])}
     )
 
+#: The path and confounder parts a method honors as supported: the method ran in the lanes of
+#: benchmarks/knowledge_paths.py, and the part passed them. A part a method honors beyond the edge
+#: parts and does not list here is experimental.
+_SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
+    "fci": _PAG_PARTS,
+    "gfci": _PAG_PARTS,
+    "boss_fci": _PAG_PARTS,
+    "lpcmci": _PAG_PARTS,
+    "direct_lingam": PATH_PARTS,
+}
+
 for _name, _how in _KNOWLEDGE_HOW.items():
     _extra, _rule = (
         (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
@@ -3039,7 +3050,9 @@ for _name, _how in _KNOWLEDGE_HOW.items():
         update={
             "params": (*REGISTRY[_name].params, *_depth, _knowledge),
             "knowledge_extra": _extra,
-            "knowledge_experimental": _extra,
+            "knowledge_experimental": tuple(
+                part for part in _extra if part not in _SUPPORTED_PARTS.get(_name, ())
+            ),
             "restricts_paths": _name in _PATH_METHODS,
         }
     )

@@ -17,10 +17,12 @@ names its pull request.
   `pc(missing="mvpc")` corrects PC where missingness depends on other variables (Tu et al., 2019),
   and `missing="em"` fits the BIC score searches, `notears`, `dagma`, and `calm` on incomplete data
   by structural EM. ([#826], [#828], [#832], [#842])
-- Background knowledge states causal paths and hidden common causes, experimentally:
+- Background knowledge states causal paths and hidden common causes:
   `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
   DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three
-  parts, and `direct_lingam` narrows its causal order. ([#829], [#835])
+  parts, and `direct_lingam` narrows its causal order. The parts are supported in `fci`, `gfci`,
+  `boss_fci`, `lpcmci`, and `direct_lingam`, where true claims measured no worse than the same fit
+  without them, and experimental in the other methods. ([#829], [#835], [#852])
 - `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
   et al. (2023), whose noise scale changes with the cause. ([#830])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
@@ -57,18 +59,22 @@ names its pull request.
   the fit warns with the new `KnowledgeWarning`, naming the claims, and lists them in
   `metadata["unmet_knowledge"]`; when only some claims hold together, they are kept in order,
   `required_paths` and then `forbidden_paths`. `bootstrap` drops them from the averaged graph alike.
-  ([#829], [#850])
+  With true claims, `pc` and `boss` made more errors than without on some graphs, so the
+  parts stay experimental in every CPDAG method. ([#829], [#850], [#852])
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
-  `forbidden_paths`, and `confounded`, experimentally: on a pair the tests keep, a required path
+  `forbidden_paths`, and `confounded`: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
   rules, no test removes a `confounded` pair, and a claim the PAG does not meet is dropped with a
   `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`; the marks and the checks assume
-  no selection bias. `lpcmci` takes each claim with its lag. ([#835], [#850])
-- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
-  experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
+  no selection bias. `lpcmci` takes each claim with its lag. The three parts are supported in
+  `fci`, `gfci`, `boss_fci`, and `lpcmci`, and experimental in `fci_jci` and `grasp_fci`, which
+  the benchmark does not run. ([#835], [#850], [#852])
+- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`
+  as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
   the variables the causal order may place next, a forbidden path is no parent, and a claim the DAG
   does not meet is dropped with a `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`.
-  ([#835], [#850])
+  The parts are supported in `direct_lingam` and experimental in `multi_group_direct_lingam`,
+  which the benchmark does not run. ([#835], [#850], [#852])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
   another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
   `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
@@ -1040,7 +1046,7 @@ names its pull request.
   climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
   already leaves out most false edges; exact search's fell by 0.24 at 20 variables. GES's median
   errors fell from 87 to 25 over 299 datasets. `gfci` keeps `ebic_gamma=0.0`: its
-  errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
+  errors fell by only 0.06 per true edge, and rose on some graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
 - Every method checks its arguments in one shared step before it reads the data: a value of the
   wrong type raises `TypeError`, and a value outside its range or not one of its choices raises
@@ -2170,3 +2176,4 @@ First alpha release.
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
+[#852]: https://github.com/Abel-ai-lab/andrey/pull/852

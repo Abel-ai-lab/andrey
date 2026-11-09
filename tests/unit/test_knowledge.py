@@ -682,11 +682,16 @@ def test_an_undirected_result_refuses_the_path_parts(name, setting, part, data):
             raise
 
 
-def test_the_path_parts_are_experimental(data):
+def test_a_part_warns_exactly_where_it_is_experimental(data):
+    knowledge = Knowledge(required_paths=[("a", "f")])
     with pytest.warns(
         andrey.ExperimentalWarning, match="pc: knowledge required_paths is experimental"
     ):
-        andrey.pc(data, knowledge=Knowledge(required_paths=[("a", "f")]))
+        andrey.pc(data, knowledge=knowledge)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.ExperimentalWarning)
+        warnings.simplefilter("ignore", andrey.KnowledgeWarning)
+        andrey.fci(data, knowledge=knowledge)
 
 
 @pytest.mark.parametrize("name", ["pc", "ges", "boss"])

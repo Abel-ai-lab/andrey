@@ -87,3 +87,101 @@ $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py summarize --runs outputs/kp-c
 
 A cell is `worse` when the interval lies above 0. A worse cell counts only when the same cell on
 fresh seeds, the runs `--replicate` names, is worse too.
+
+## Results
+
+Andrey's pre-release build of 9 November 2026 on the 0.16.0 release branch, on AMD EPYC 7713
+processors with one BLAS thread per fit. Every number below is in
+[`published/0.16.0/knowledge-paths.json`](../published/0.16.0/knowledge-paths.json), with every
+row of every cell and the false-claims arm.
+
+### Exactness
+
+| Lane | Graphs | Checked | Failures |
+|---|---|---|---|
+| `cpdag` | 32,824: all 543 DAGs on 4 nodes, all 29,281 on 5, and 3,000 random on 6 to 8 | 131,296 claim sets: 103,315 kept every claim and gave the exact MPDAG with its clauses, and 27,981 dropped a claim where no DAG of the class meets them all | 0 |
+| `pag` | 7,473: all 5,973 with 4 observed nodes and one hidden parent, and 1,500 random with 5 to 8 observed | 14,946 fits each of `fci`, `gfci`, and `boss_fci`, every mark sound | 0 |
+
+`pc` with d-separation returned the true CPDAG on all 32,824 graphs, and 493 claim sets left
+clauses. In `pag`, the class was small enough to list for 14,042 fits of each method: 12,685 set
+every mark the kept MAGs share, and the others left 2,417 circles that every kept MAG fills alike.
+With `--max-circles 8` the counts are 7,956, 7,030, and 1,631, and the fits are as sound.
+
+### One part at a time
+
+True claims of one part alone, seeds 0 to 19. A row is a cell at one fraction; every fit returned
+a graph, so each row pairs all its datasets (in `pag` at 10 observed, 19: on one seed's graph the
+generator could not hide two variables). D is the mean over a row's datasets of the errors
+with the claims minus the errors without. Worse counts the rows whose 95 % interval of D lies above
+0, Worse again those that were worse on seeds 100 to 119 too, and Above floor the rows whose
+interval of errors minus the empty graph's errors reaches 0. Claims dropped is the share of the
+true claims the fits dropped because the graph they found does not meet them. A part passes with
+no row worse again and no row above the floor.
+
+| Method | Part | Rows | Datasets | Worse | Worse again | Better | D, least to most | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pc` | `required_paths` | 36 | 720 of 720 | 13 | 9 | 0 | 0 to +1.90 | 0 | 22,615 of 37,726 (59.9 %) | no |
+| `pc` | `forbidden_paths` | 36 | 720 of 720 | 8 | 7 | 0 | 0 to +2.50 | 0 | 12,434 of 52,320 (23.8 %) | no |
+| `ges` | `required_paths` | 36 | 720 of 720 | 2 | 0 | 0 | 0 to +0.50 | 18 | 6,747 of 37,726 (17.9 %) | no |
+| `ges` | `forbidden_paths` | 36 | 720 of 720 | 2 | 0 | 0 | 0 to +0.80 | 18 | 4,935 of 52,320 (9.4 %) | no |
+| `boss` | `required_paths` | 36 | 720 of 720 | 4 | 2 | 0 | 0 to +0.90 | 0 | 1,100 of 37,726 (2.9 %) | no |
+| `boss` | `forbidden_paths` | 36 | 720 of 720 | 4 | 2 | 0 | 0 to +0.90 | 0 | 418 of 52,320 (0.8 %) | no |
+| `fci` | `required_paths` | 8 | 156 of 156 | 0 | 0 | 6 | -4.05 to -0.16 | 0 | 238 of 2,454 (9.7 %) | yes |
+| `fci` | `forbidden_paths` | 8 | 156 of 156 | 0 | 0 | 0 | -0.15 to +0.42 | 0 | 13 of 3,686 (0.4 %) | yes |
+| `fci` | `confounded` | 8 | 156 of 156 | 0 | 0 | 0 | -0.50 to +0.15 | 0 | 0 of 206 (0.0 %) | yes |
+| `gfci` | `required_paths` | 8 | 156 of 156 | 0 | 0 | 5 | -1.85 to -0.11 | 0 | 195 of 2,454 (7.9 %) | yes |
+| `gfci` | `forbidden_paths` | 8 | 156 of 156 | 0 | 0 | 0 | -0.10 to +0.42 | 0 | 16 of 3,686 (0.4 %) | yes |
+| `gfci` | `confounded` | 8 | 156 of 156 | 0 | 0 | 1 | -0.55 to 0 | 0 | 0 of 206 (0.0 %) | yes |
+| `boss_fci` | `required_paths` | 8 | 156 of 156 | 0 | 0 | 4 | -1.55 to 0 | 0 | 171 of 2,454 (7.0 %) | yes |
+| `boss_fci` | `forbidden_paths` | 8 | 156 of 156 | 0 | 0 | 0 | -0.15 to +0.42 | 0 | 11 of 3,686 (0.3 %) | yes |
+| `boss_fci` | `confounded` | 8 | 156 of 156 | 0 | 0 | 2 | -0.55 to -0.05 | 0 | 0 of 206 (0.0 %) | yes |
+| `lpcmci` | `required_paths` | 8 | 160 of 160 | 0 | 0 | 3 | -1.90 to -0.20 | 0 | 59 of 2,027 (2.9 %) | yes |
+| `lpcmci` | `forbidden_paths` | 8 | 160 of 160 | 0 | 0 | 1 | -1.50 to +0.45 | 0 | 3 of 1,960 (0.2 %) | yes |
+| `lpcmci` | `confounded` | 8 | 160 of 160 | 0 | 0 | 6 | -1.80 to -0.10 | 0 | 0 of 345 (0.0 %) | yes |
+| `direct_lingam` | `required_paths` | 12 | 240 of 240 | 0 | 0 | 0 | -0.25 to 0 | 0 | 0 of 10,616 (0.0 %) | yes |
+| `direct_lingam` | `forbidden_paths` | 12 | 240 of 240 | 0 | 0 | 1 | -0.55 to +0.10 | 0 | 131 of 23,280 (0.6 %) | yes |
+
+In the `cpdag` lane an undirected edge is never an error, so a claim can only add errors there, by
+directing an edge against the truth; what it gains shows as directed edges, on average 2 to 14 more
+per graph. The class a search finds on finite data can differ from the true one, and restricting it
+by true claims then directs some edges the wrong way. With `pc` this repeated in six cells, five of
+them at expected degree 4, by 0.6 to 2.5 errors per graph where the fit without claims makes 16 to
+70. With `boss` it repeated in two cells at degree 4, by 0.6 to 0.9 errors where the fit without
+claims makes 5 and 9. `ges` has no row worse again, but in the six cells at degree 4 its fit does
+not beat the empty graph with or without the claims, so those cells say nothing about them. `pc`
+also drops the most claims: the tests remove an edge on the only path a required path needs.
+
+In the `pag` and `lpcmci` lanes a claim can set a mark that was a circle, right or wrong, and
+`direct_lingam` returns a DAG. No row is worse, with one part or with all, and required paths
+lower the errors of `fci`, `gfci`, `boss_fci`, and `lpcmci` in 18 of their 32 rows. No fit dropped
+a `confounded` pair.
+
+### All parts together
+
+Every part of each true claim set at once, the same seeds and columns.
+
+| Method | Part | Rows | Datasets | Worse | Worse again | Better | D, least to most | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pc` | all parts | 36 | 720 of 720 | 14 | 11 | 0 | 0 to +1.90 | 0 | 35,228 of 90,046 (39.1 %) | no |
+| `ges` | all parts | 36 | 720 of 720 | 2 | 0 | 0 | 0 to +0.50 | 18 | 11,757 of 90,046 (13.1 %) | no |
+| `boss` | all parts | 36 | 720 of 720 | 5 | 2 | 0 | 0 to +1.00 | 0 | 1,583 of 90,046 (1.8 %) | no |
+| `fci` | all parts | 8 | 156 of 156 | 0 | 0 | 6 | -4.70 to -0.58 | 0 | 242 of 6,346 (3.8 %) | yes |
+| `gfci` | all parts | 8 | 156 of 156 | 0 | 0 | 7 | -2.10 to -0.53 | 0 | 202 of 6,346 (3.2 %) | yes |
+| `boss_fci` | all parts | 8 | 156 of 156 | 0 | 0 | 6 | -1.90 to -0.53 | 0 | 175 of 6,346 (2.8 %) | yes |
+| `lpcmci` | all parts | 8 | 160 of 160 | 0 | 0 | 7 | -5.25 to -0.45 | 0 | 59 of 4,332 (1.4 %) | yes |
+| `direct_lingam` | all parts | 12 | 240 of 240 | 0 | 0 | 1 | -0.75 to +0.05 | 0 | 130 of 33,896 (0.4 %) | yes |
+
+### DirectLiNGAM and lingam
+
+lingam's DirectLiNGAM takes the same claims as `prior_knowledge`. With `required_paths` alone it
+fit every dataset, and Andrey tied it in all 12 rows. With `forbidden_paths` alone it raised
+`ValueError` on 140 of 240 datasets; on the 100 it fit, Andrey made fewer errors in 5 of the 6
+rows with pairs and tied the sixth. With all parts it fit 68 of 240, and Andrey tied 5 of those 6
+rows and made fewer errors in the sixth. Without claims the two tied in all 6 cells.
+`direct_lingam` returned a graph on every dataset.
+
+### Status
+
+`required_paths`, `forbidden_paths`, and `confounded` are supported in `fci`, `gfci`, `boss_fci`,
+and `lpcmci`, and the two path parts in `direct_lingam`. They are experimental in `pc`, `ges`, and
+`boss`, and in the methods the driver does not run.
