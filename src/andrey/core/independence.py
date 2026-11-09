@@ -404,6 +404,12 @@ def hsic_median_statistic_log_p(x: np.ndarray, y: np.ndarray) -> tuple[float, fl
     FloatingPointError
         If the test's value is not finite, so that no choice rests on it.
     """
+    # The LOCI paper decides by the p-values of HSIC tests but leaves three of the test's settings
+    # open. The bandwidth, sqrt(0.5 * median squared distance) over every row, is the one the LOCI
+    # authors' code computes; that code compares the statistics alone and has no null law. The
+    # null's gamma approximation is that of Gretton et al. (2007), and its variance is the
+    # bias-corrected estimate from the joint products of the centered grams, as Gretton et al.'s
+    # reference code of their test computes it.
     sides = (_as_columns(x), _as_columns(y))
     grams = [gamma_gram(side - side.mean(axis=0), median_rows=None) for side in sides]
     n = grams[0][0].shape[0]

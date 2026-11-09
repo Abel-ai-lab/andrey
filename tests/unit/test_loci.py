@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from andrey.api._irregular import likelihood_output
-from andrey.api.irregular import loci
+from andrey.api.irregular import _pair_matrix, loci
+from andrey.data import sample_scm
 from andrey.irregular.loci import _gradient_hessian, _maximize
 from tests.recovery.helpers import datagen
 
@@ -33,17 +34,24 @@ def test_equal_likelihoods_give_no_edge():
     assert likelihood_output(-1.0, -2.0).structure.oriented_edges() == [(0, 1, "directed")]
 
 
-def test_the_fit_ends_at_the_maximum():
+@pytest.mark.parametrize("seed", [None, 16, 24, 27])
+def test_the_fit_ends_at_the_maximum(seed):
     from sklearn.preprocessing import SplineTransformer
 
-    x, y = datagen.generate("lsnm_pair").T
-    x, y = (x - x.mean()) / x.std(), (y - y.mean()) / y.std()
-    features = SplineTransformer(n_knots=25, degree=5).fit_transform(x.reshape(-1, 1))
-    weights = _maximize(np.abs(features), y)
-    gradient, _ = _gradient_hessian(weights, np.abs(features), y)
-    dim = features.shape[1]
-    # Karush-Kuhn-Tucker conditions of the bound w_2 >= 0: a zero gradient off the bound, and one
-    # that points out of the feasible set on it.
-    on_bound = np.r_[np.zeros(dim, dtype=bool), weights[dim:] == 0]
-    assert np.abs(gradient[~on_bound]).max() < 1e-3
-    assert gradient[on_bound].min() > -1e-3
+    if seed is None:
+        pair = datagen.generate("lsnm_pair")
+    else:
+        pair = sample_scm(
+            functional="location_scale", d=2, n=500, seed=seed, density=1.0, scale="rescale"
+        ).data
+    columns, _, _ = _pair_matrix("loci", pair, standardize=True)
+    for cause, effect in (columns.T, columns.T[::-1]):
+        features = np.abs(SplineTransformer(n_knots=25, degree=5).fit_transform(cause[:, None]))
+        weights = _maximize(features, effect)
+        gradient, _ = _gradient_hessian(weights, features, effect)
+        dim = features.shape[1]
+        # Karush-Kuhn-Tucker conditions of the bound w_2 >= 0: a zero gradient off the bound and a
+        # nonnegative one on it, so that no feasible move lowers the objective.
+        on_bound = np.r_[np.zeros(dim, dtype=bool), weights[dim:] == 0]
+        assert np.abs(gradient[~on_bound]).max() < 1e-5
+        assert gradient[on_bound].min(initial=0.0) > -1e-5

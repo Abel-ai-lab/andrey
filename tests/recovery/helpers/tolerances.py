@@ -174,16 +174,17 @@ SPEC: dict[str, dict] = {
         },
     },
     # LOCI: the decided graph, both p-values and statistics, and both models' log-likelihoods. The
-    # Newton fit stops on a change of 1e-6 in its mean objective, so the fit's numbers get ANM's
-    # tolerance.
+    # Newton fit stops on a change of 1e-6 in its mean objective in a full step, so the fit's
+    # numbers get ANM's tolerance. A p-value can lie far below any absolute tolerance, so the two
+    # p-values are compared relatively, which bounds the change of their logarithms.
     "LOCI": {
         "structural": ["graph"],
         "numeric": {
-            field: {"atol": 1e-4, "rtol": 1e-4}
-            for field in (
-                *("pval_forward", "pval_backward", "stat_forward", "stat_backward"),
-                *("ll_forward", "ll_backward"),
-            )
+            **{field: {"atol": 0.0, "rtol": 1e-4} for field in ("pval_forward", "pval_backward")},
+            **{
+                field: {"atol": 1e-4, "rtol": 1e-4}
+                for field in ("stat_forward", "stat_backward", "ll_forward", "ll_backward")
+            },
         },
     },
     "RCD": {

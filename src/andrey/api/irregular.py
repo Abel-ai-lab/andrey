@@ -528,9 +528,9 @@ def loci(
     ``Phi`` is a B-spline basis of the cause with 25 knots, of degree 5, and ``w_2 >= 0``, so the
     log-likelihood is jointly concave [1]_. A Gaussian prior of precision ``1e-6`` on the weights
     makes it strictly concave [1]_. Projected Newton steps [4]_ maximize it until the mean
-    objective changes by less than ``1e-6`` in a step, or for at most 100 steps; the paper takes a
-    closed-form step in ``w_1`` and L-BFGS steps in ``w_2`` in turn, which approach the same
-    maximum in many more steps. The fit draws no random numbers, so it is deterministic.
+    objective changes by less than ``1e-6`` in a full step, or for at most 100 steps; the paper
+    takes a closed-form step in ``w_1`` and L-BFGS steps in ``w_2`` in turn, which approach the
+    same maximum in many more steps. The fit draws no random numbers, so it is deterministic.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
@@ -590,6 +590,8 @@ def loci(
     extra = {"log_likelihoods": {"forward": ll_forward, "backward": ll_backward}, **rows}
     if criterion == "likelihood":
         return likelihood_output(ll_forward, ll_backward, labels=labels, extra=extra)
+    # The paper leaves the HSIC test's bandwidth, null approximation, and variance open; the
+    # comment in hsic_median_statistic_log_p names the source of each choice.
     stat_forward, log_p_forward = hsic_median_statistic_log_p(x, residual_forward)
     stat_backward, log_p_backward = hsic_median_statistic_log_p(y, residual_backward)
     return pairwise_output(

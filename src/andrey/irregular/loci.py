@@ -10,10 +10,12 @@ concave (Lemma 1), so it has one maximizer.
 
 The paper reaches it by a closed-form update of ``w_1`` and L-BFGS steps on ``w_2`` in turn. Here
 each step is a projected Newton step on both weight vectors at once (Bertsekas 1982): the Newton
-direction over the weights not held at the bound ``w_2 = 0``, then a backtracking search along
-its projection onto ``w_2 >= 0``. Both reach the same maximizer, Newton in far fewer steps, as the
-mean and the variance weights are strongly coupled. The fit stops once the mean objective changes
-by less than ``1e-6`` in a step, or after 100 steps (Supplementary Material D).
+direction over the weights away from the bound ``w_2 = 0``, a gradient step scaled by the Hessian's
+diagonal on the weights at or near it whose gradient points toward it, then a backtracking search
+along the direction's projection onto ``w_2 >= 0``. Both reach the same maximizer, Newton in far
+fewer steps, as the mean and the variance weights are strongly coupled. The fit stops once the
+mean objective changes by less than ``1e-6`` in a full step, or after 100 steps (Supplementary
+Material D).
 
 References
 ----------
@@ -41,12 +43,13 @@ _KNOTS = 25
 _DEGREE = 5
 #: The prior precision ``delta`` on both weight vectors (Supplementary Material A).
 _PRIOR_PRECISION = 1e-6
-#: The most steps, and the change of the mean objective in a step below which the fit stops
+#: The most steps, and the change of the mean objective in a full step below which the fit stops
 #: (Supplementary Material D).
 _MAX_STEPS = 100
 _TOLERANCE = 1e-6
-#: The largest distance from the bound at which a weight of ``w_2`` whose gradient points out of
-#: the feasible set is held there (Bertsekas 1982, the epsilon-active set).
+#: The largest distance from the bound at which a weight of ``w_2`` whose gradient points toward
+#: it takes the scaled gradient step instead of the Newton step (Bertsekas 1982, the
+#: epsilon-active set).
 _ACTIVE_DISTANCE = 1e-3
 #: The sufficient-decrease constant of the backtracking search, and the smallest step it tries.
 _ARMIJO = 1e-4
@@ -112,10 +115,11 @@ def _gradient_hessian(
 def _maximize(features: np.ndarray, effect: np.ndarray) -> np.ndarray:
     """The weights ``(w_1, w_2)`` that minimize :func:`_objective`, by projected Newton steps.
 
-    The start is ``w_1 = 0`` and ``w_2 = 1``, that of the authors' code, where every row has
-    ``eta_2 < 0``; the backtracking search never leaves the model, so every iterate keeps it.
+    The start is ``w_1 = 0`` and ``w_2 = 1``, where every row has ``eta_2 < 0``; the backtracking
+    search never leaves the model, so every iterate keeps it.
     """
     dim = features.shape[1]
+    # The start point is the one the authors' code uses.
     weights = np.concatenate([np.zeros(dim), np.ones(dim)])
     value = _objective(weights, features, effect)
     bounded = np.arange(2 * dim) >= dim
@@ -125,7 +129,7 @@ def _maximize(features: np.ndarray, effect: np.ndarray) -> np.ndarray:
         projected[bounded] = np.maximum(projected[bounded], 0.0)
         distance = min(_ACTIVE_DISTANCE, float(np.linalg.norm(weights - projected)))
         free = ~(bounded & (weights <= distance) & (gradient > 0))
-        direction = np.zeros_like(weights)
+        direction = -gradient / np.diag(hessian)
         direction[free] = -cho_solve(cho_factor(hessian[np.ix_(free, free)]), gradient[free])
         step = 1.0
         while step >= _MIN_STEP:
@@ -139,7 +143,9 @@ def _maximize(features: np.ndarray, effect: np.ndarray) -> np.ndarray:
             return weights
         change = value - trial_value
         weights, value = trial, trial_value
-        if change < _TOLERANCE:
+        # Only a full step's change tells that the maximum is near: a backtracked step can change
+        # the objective little far from it.
+        if change < _TOLERANCE and step == 1.0:
             break
     return weights
 
