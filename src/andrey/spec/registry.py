@@ -156,7 +156,10 @@ _add(
             graph_kind="cpdag",
             doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
-            "[x, z, y] triples the rule left ambiguous, by 0-based position",
+            "[x, z, y] triples the rule left ambiguous, by 0-based position; with missing=mvpc on "
+            "data with missing values, metadata['missingness_parents'] maps each column whose "
+            "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
+            "edges tested again (retested) and removed (removed), by name or 0-based position",
         ),
         accel="numpy",
         status="supported",
@@ -2905,7 +2908,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
-    "pc": ("conflicts",),
+    "pc": ("conflicts", "missingness_parents", "corrected_edges"),
     "cdnod": ("conflicts", "index_edges", "changing_variables"),
     "fci_jci": ("index_edges",),
     "icp": (
