@@ -520,7 +520,7 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
 
 
-@pytest.mark.parametrize("name", ["anm", "pnl"])
+@pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
 def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
     x = np.random.default_rng(0).uniform(-1, 1, (300, 2))
     x[:, 1] = x[:, 0] ** 3 + 0.3 * x[:, 1]
@@ -536,7 +536,7 @@ def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
     }
 
 
-@pytest.mark.parametrize("name", ["anm", "pnl"])
+@pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
 def test_a_pair_test_with_too_few_rows_raises(name):
     x = _continuous(40)[:, :2]
     x[2:, 0] = np.nan
