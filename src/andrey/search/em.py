@@ -42,6 +42,7 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.orient import pdag2dag
+from andrey.core.score import copy_groups
 from andrey.core.structure import ARROW, TAIL
 from andrey.core.ties import tie_ranks
 
@@ -50,7 +51,7 @@ if TYPE_CHECKING:
 
     from andrey.core.structure import GraphStructure
 
-__all__ = ["ITERATIONS", "expected_moments", "fit_dag", "structural_em"]
+__all__ = ["ITERATIONS", "expected_moments", "fit_dag", "observed_copies", "structural_em"]
 
 #: The rounds of E-step and M-step, as Gao et al. (2022) run them.
 ITERATIONS = 10
@@ -106,6 +107,29 @@ def expected_moments(
     return expected_mean, (centered.T @ centered + extra) / n, loglik
 
 
+def observed_copies(X: np.ndarray) -> tuple[tuple[int, ...], ...]:
+    """The groups of columns of ``X`` that repeat one another up to scale and shift where observed.
+
+    Two columns are compared on the rows that observe both, and are copies when their correlation
+    there passes :func:`~andrey.core.score.copy_groups`; a pair observed together on at most two
+    rows, or constant on them, is no copy. The expected covariance blurs a copy whose values go
+    missing on other rows than the original's, so the linear-Gaussian BIC checks the observed
+    values for copies before EM, as it checks complete data.
+    """
+    observed = ~np.isnan(X)
+    centered = np.where(observed, X - np.nanmean(X, axis=0), 0.0)
+    both = observed.astype(np.float64)
+    count = both.T @ both  # count[i, j]: the rows that observe columns i and j
+    sums = centered.T @ both  # sums[i, j]: column i summed over those rows
+    squares = (centered**2).T @ both
+    rows = np.maximum(count, 1.0)
+    cross = centered.T @ centered / rows - (sums / rows) * (sums.T / rows)
+    spread = (squares / rows - (sums / rows) ** 2) * (squares.T / rows - (sums.T / rows) ** 2)
+    usable = (count > 2) & (spread > 0.0)
+    corr = np.where(usable, cross / np.sqrt(np.where(usable, spread, 1.0)), 0.0)
+    return copy_groups(corr, X.shape[0])
+
+
 def fit_dag(adjacency: np.ndarray, cov: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """The coefficients ``B`` and noise variances ``omega`` of the DAG ``adjacency`` fit on ``cov``.
 
@@ -149,7 +173,7 @@ def structural_em(
     ``X``, divided by the number of rows) and returns its result and the graph it learned, a DAG,
     CPDAG, or a CPDAG narrowed by knowledge. Returns the last M-step's result and the record
     ``{"iterations": iterations, "log_likelihood": [...]}``: the observed-data log-likelihood of
-    the model after each M-step, which a greedy search does not always raise.
+    the model after each M-step, which can fall in a round that changes the graph.
     """
     if iterations < 1:
         raise ValueError(f"iterations must be at least 1, got {iterations}")

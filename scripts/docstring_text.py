@@ -28,6 +28,7 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
+from andrey.core.ci_missing import EM_METHODS
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 
@@ -136,6 +137,17 @@ SHARED = {
         "handling used. See **Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming,
     ),
+    "missing_em": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by '
+        "structural expectation-maximization (EM) over the expected covariance of the data, which "
+        "assumes values missing completely at random or at random given observed values. ``None`` "
+        'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
+        'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        lambda m: m in EM_METHODS,
+    ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
@@ -144,8 +156,17 @@ SHARED = {
         "Drop the incomplete rows first, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: (
-            refuses_missing(m, series=False) and m not in (*FCI_SEARCHES, "icp", "igsp", "ut_igsp")
+            refuses_missing(m, series=False)
+            and m not in (*FCI_SEARCHES, *EM_METHODS, "icp", "igsp", "ut_igsp")
         ),
+    ),
+    "drop_rows_em": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        'Without ``"em"``, drop the incomplete rows first, which suits values missing completely at '
+        "random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
+        lambda m: m in EM_METHODS,
     ),
     "drop_rows_fci": Shared(
         "Notes",

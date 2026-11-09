@@ -8,6 +8,7 @@ and records the handling and the EM record on data with missing values.
 
 from __future__ import annotations
 
+import functools
 import warnings
 
 import numpy as np
@@ -17,9 +18,17 @@ import pytest
 import andrey
 from andrey import data
 from andrey.core.ci_missing import EM_METHODS
+from andrey.core.score import CopiedColumnsError
 from andrey.data import missingness
-from andrey.search.em import ITERATIONS, expected_moments, fit_dag, structural_em
+from andrey.search.em import (
+    ITERATIONS,
+    expected_moments,
+    fit_dag,
+    observed_copies,
+    structural_em,
+)
 from andrey.spec import REGISTRY
+from tests.unit.methods import SHORT
 
 nan = np.nan
 #: The methods that need no optional extra.
@@ -36,9 +45,10 @@ def _quiet():
 
 
 def _method(name: str):
+    """The facade ``name`` with the short schedule of a slow fit (``SHORT``)."""
     if name == "calm":
         pytest.importorskip("torch")
-    return getattr(andrey, name)
+    return functools.partial(getattr(andrey, name), **SHORT.get(name, {}))
 
 
 def _chain(n: int = 400, seed: int = 0) -> np.ndarray:
@@ -174,6 +184,17 @@ def test_em_takes_the_linear_gaussian_bic_only(name):
 def test_em_takes_no_environments(name):
     with pytest.raises(ValueError, match=rf'^{name}: missing="em" takes no env'):
         getattr(andrey, name)(_gaps(_chain(), 0.1), env=np.repeat([0, 1], 200), missing="em")
+
+
+def test_a_copy_among_the_observed_values_raises_as_on_complete_data():
+    x = _gaps(_chain(), 0.1)
+    x[:, 4] = 3.0 * x[:, 2] - 1.0
+    x[np.random.default_rng(5).random(len(x)) < 0.2, 4] = nan  # its own gaps hide it from EM
+    assert observed_copies(x) == ((2, 4),)
+    assert observed_copies(_gaps(_chain(), 0.1)) == ()
+    for name in ("ges", "xges", "exact_search", "boss"):
+        with pytest.raises(CopiedColumnsError, match=r"\b4 repeats 2\b"):
+            getattr(andrey, name)(x, missing="em")
 
 
 def _labeled_marks(out) -> dict:

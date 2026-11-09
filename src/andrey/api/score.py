@@ -131,6 +131,12 @@ def ges(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -183,7 +189,8 @@ def ges(
         and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
         or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold
         one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
-        categorical or mixed-data score, holds a number that is not whole.
+        categorical or mixed-data score, holds a number that is not whole. Also if ``missing="em"``
+        is given with a ``score_func`` other than ``"bic"`` or with ``env``.
 
     Warns
     -----
@@ -202,11 +209,12 @@ def ges(
     every variable has few parents [2]_; it returns a CPDAG. When unmeasured common causes are
     plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
     oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
-    :func:`~andrey.gies`. With ``env``, it takes data from several environments, such as
-    sites, batches, or experiments, whose shifts change variables it does not know;
-    :func:`~andrey.gies` takes the changed variables when they are known, :func:`~andrey.cdnod` runs
-    PC with the same index, and :func:`~andrey.gfci` takes ``env`` when unmeasured common causes are
-    plausible.
+    :func:`~andrey.gies`. With ``env``, it takes data from several environments, such as sites,
+    batches, or experiments, whose shifts change variables it does not know; :func:`~andrey.gies`
+    takes the changed variables when they are known, :func:`~andrey.cdnod` runs PC with the same
+    index, and :func:`~andrey.gfci` takes ``env`` when unmeasured common causes are plausible. With
+    values missing completely at random or at random given observed values, ``missing="em"`` fits it
+    on every row by structural EM [11]_ [12]_.
 
     **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``penalty_discount *
     log(n_samples)`` per parent and adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``,
@@ -283,11 +291,24 @@ def ges(
     ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
     each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
-    variable, each over every row, and terms over different rows do not add up to the score of one
-    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
+    score adds one term per variable, each over every row, and terms over different rows do not add
+    up to the score of one dataset, so the search cannot delete rows per test as the
+    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [11]_
+    [12]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
+    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
+    observed ones, and their conditional means and covariances give the expected covariance of the
+    data (the E-step); the search runs on it over every row, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
+    returns (the M-step). It runs 10 rounds, as Gao et al. [12]_ do, from no edges and each column's
+    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
+    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
+    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -323,9 +344,12 @@ def ges(
     middle environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can
     change the result. ``max_parents`` counts the index as a parent of each variable it points into.
     The conditions under which an Insert or a Delete is valid are proved for CPDAGs [1]_; with
-    ``env`` the search applies them to the partially directed graphs the index gives. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    ``env`` the search applies them to the partially directed graphs the index gives.
+    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10 variables
+    with 500 rows and up to 30% of the values missing, completely at random or at random given
+    observed values. It runs the search 10 times, so it takes about 10 times as long, and under
+    values missing not at random it has no guarantee. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -352,6 +376,12 @@ def ges(
     .. [10] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
        Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
        1-53.
+    .. [11] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [12] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -1116,6 +1146,12 @@ def xges(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1154,7 +1190,8 @@ def xges(
         function of other columns. One message names every group of copies and says to keep one
         column per group. Also if a given ``max_parents`` is below the parents some graph of the
         required edges of ``knowledge`` gives a node, or if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``missing="em"``
+        is given with a ``score_func`` other than ``"bic"``.
 
     Warns
     -----
@@ -1166,14 +1203,16 @@ def xges(
     Notes
     -----
     **When to use.** XGES makes the assumptions of :func:`~andrey.ges`: i.i.d. observational data,
-    no unmeasured common causes and, with the default BIC score on continuous data, linear
-    relations with Gaussian noise. Categorical and mixed data take the scores and defaults of
+    no unmeasured common causes and, with the default BIC score on continuous data, linear relations
+    with Gaussian noise. Categorical and mixed data take the scores and defaults of
     :func:`~andrey.ges`; its moves need only a score that adds one term per variable and gives
-    equivalent graphs the same score [1]_, which each of these does. It suits the same sparse
-    graphs as GES and on linear-Gaussian data often finds a graph with a better score; it returns a
-    CPDAG. When unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is
+    equivalent graphs the same score [1]_, which each of these does. It suits the same sparse graphs
+    as GES and on linear-Gaussian data often finds a graph with a better score; it returns a CPDAG.
+    When unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is
     non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`; when some
-    rows come from interventions, use :func:`~andrey.gies`.
+    rows come from interventions, use :func:`~andrey.gies`. With values missing completely at random
+    or at random given observed values, ``missing="em"`` fits it on every row by structural EM [5]_
+    [6]_.
 
     **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
     else addition; the search stops when no move improves the score [1]_. The extended search then
@@ -1198,11 +1237,24 @@ def xges(
     variables and rows measured: 8 against 199 with 200 variables and 2,000 rows (200 true
     edges).
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
-    variable, each over every row, and terms over different rows do not add up to the score of one
-    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
+    score adds one term per variable, each over every row, and terms over different rows do not add
+    up to the score of one dataset, so the search cannot delete rows per test as the
+    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [5]_
+    [6]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
+    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
+    observed ones, and their conditional means and covariances give the expected covariance of the
+    data (the E-step); the search runs on it over every row, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
+    returns (the M-step). It runs 10 rounds, as Gao et al. [6]_ do, from no edges and each column's
+    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
+    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
+    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
@@ -1223,9 +1275,13 @@ def xges(
     or more variables fits its child exactly, so the search never selects one, nor any parent set
     that leaves its child a residual variance of at most ``1e-12`` times its variance. The
     categorical and mixed-data scores are not benchmarked with XGES yet: its tests run them on small
-    fixed networks. Under them, each candidate parent is scored by two full local scores rather
-    than a rank-one update. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    fixed networks. Under them, each candidate parent is scored by two full local scores rather than
+    a rank-one update. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on
+    up to 10 variables with 500 rows and up to 30% of the values missing, completely at random or at
+    random given observed values. It runs the search 10 times, so it takes about 10 times as long,
+    and under values missing not at random it has no guarantee. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1237,6 +1293,12 @@ def xges(
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
     .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [5] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [6] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -1283,7 +1345,7 @@ def xges(
         return found, found[0]
 
     with copies_named(labels):
-        (cpdag, score), em = fit_missing(X, missing, fit)
+        (cpdag, score), em = fit_missing(X, missing, fit, bic=True)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -1388,6 +1450,12 @@ def hc(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1437,7 +1505,8 @@ def hc(
         contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a mixed-data score,
         requires an edge from a continuous into a categorical column. Also if ``env`` does not hold
         one label per row, misses a label or is infinite, or mixes strings and numbers, or, with a
-        categorical or mixed-data score, holds a number that is not whole.
+        categorical or mixed-data score, holds a number that is not whole. Also if ``missing="em"``
+        is given with a ``score_func`` other than ``"bic"`` or with ``env``.
 
     Warns
     -----
@@ -1459,11 +1528,12 @@ def hc(
     that scores worse than the true one. It returns the CPDAG of the DAG found. When unmeasured
     common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every
     edge should be oriented, use :func:`~andrey.direct_lingam`; with nonlinear effects, use
-    :func:`~andrey.cam`. With ``env``, it takes data from several environments, such as
-    sites, batches, or experiments, whose shifts change variables it does not know;
-    :func:`~andrey.gies` takes the changed variables when they are known, and :func:`~andrey.cdnod`
-    runs PC with the same index. With ``env``, set ``n_starts`` above ``1`` (see **Several
-    environments.**).
+    :func:`~andrey.cam`. With ``env``, it takes data from several environments, such as sites,
+    batches, or experiments, whose shifts change variables it does not know; :func:`~andrey.gies`
+    takes the changed variables when they are known, and :func:`~andrey.cdnod` runs PC with the same
+    index. With ``env``, set ``n_starts`` above ``1`` (see **Several environments.**). With values
+    missing completely at random or at random given observed values, ``missing="em"`` fits it on
+    every row by structural EM [7]_ [8]_.
 
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set; with ``n_starts``, each climb stops so. Under a mixed-data
@@ -1521,11 +1591,24 @@ def hc(
     such a DAG, so with ``env`` set ``n_starts`` above ``1``. :func:`~andrey.tabu`, which also takes
     moves that do not improve the score, can leave it in one run.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
-    variable, each over every row, and terms over different rows do not add up to the score of one
-    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
+    score adds one term per variable, each over every row, and terms over different rows do not add
+    up to the score of one dataset, so the search cannot delete rows per test as the
+    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [7]_
+    [8]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
+    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
+    observed ones, and their conditional means and covariances give the expected covariance of the
+    data (the E-step); the search runs on it over every row, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
+    returns (the M-step). It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's
+    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
+    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
+    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -1556,9 +1639,12 @@ def hc(
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
     result. ``max_parents`` counts the index as a parent of each variable it points into. At the
     default ``n_starts=1``, ``changing_variables`` often lists variables the environments change
-    only through their causes (see **Several environments.**). The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    only through their causes (see **Several environments.**). ``missing="em"`` is experimental and
+    not benchmarked yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the
+    values missing, completely at random or at random given observed values. It runs the search 10
+    times, so it takes about 10 times as long, and under values missing not at random it has no
+    guarantee. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1576,6 +1662,12 @@ def hc(
     .. [6] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
        Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
        1-53.
+    .. [7] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [8] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -1718,6 +1810,12 @@ def tabu(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1766,7 +1864,8 @@ def tabu(
         ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists. Also if ``env`` does not hold one label per row, misses a
         label or is infinite, or mixes strings and numbers, or, with a categorical or mixed-data
-        score, holds a number that is not whole.
+        score, holds a number that is not whole. Also if ``missing="em"`` is given with a
+        ``score_func`` other than ``"bic"`` or with ``env``.
 
     Warns
     -----
@@ -1789,9 +1888,11 @@ def tabu(
     best-scoring DAG visited. When unmeasured common causes are plausible, use :func:`~andrey.fci`;
     when the noise is non-Gaussian and every edge should be oriented, use
     :func:`~andrey.direct_lingam`; with nonlinear effects, use :func:`~andrey.cam`. With ``env``, it
-    takes data from several environments, such as sites, batches, or experiments, whose
-    shifts change variables it does not know; :func:`~andrey.gies` takes the changed variables when
-    they are known, and :func:`~andrey.cdnod` runs PC with the same index.
+    takes data from several environments, such as sites, batches, or experiments, whose shifts
+    change variables it does not know; :func:`~andrey.gies` takes the changed variables when they
+    are known, and :func:`~andrey.cdnod` runs PC with the same index. With values missing completely
+    at random or at random given observed values, ``missing="em"`` fits it on every row by
+    structural EM [9]_ [10]_.
 
     The search starts from the empty graph. Each step adds the current DAG to the tabu list, which
     keeps the last ``tabu_length`` DAGs visited, then takes the best improving move outside the
@@ -1842,11 +1943,24 @@ def tabu(
     ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
     each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
-    variable, each over every row, and terms over different rows do not add up to the score of one
-    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
+    score adds one term per variable, each over every row, and terms over different rows do not add
+    up to the score of one dataset, so the search cannot delete rows per test as the
+    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [9]_
+    [10]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
+    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
+    observed ones, and their conditional means and covariances give the expected covariance of the
+    data (the E-step); the search runs on it over every row, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
+    returns (the M-step). It runs 10 rounds, as Gao et al. [10]_ do, from no edges and each column's
+    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
+    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
+    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -1871,8 +1985,12 @@ def tabu(
     reads a numeric ``env`` as a number, so with three or more environments a shift that does not
     follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
     go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
-    a parent of each variable it points into. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    a parent of each variable it points into. ``missing="em"`` is experimental and not benchmarked
+    yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the values missing,
+    completely at random or at random given observed values. It runs the search 10 times, so it
+    takes about 10 times as long, and under values missing not at random it has no guarantee. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1895,6 +2013,12 @@ def tabu(
     .. [8] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
        Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
        1-53.
+    .. [9] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [10] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -1998,6 +2122,12 @@ def exact_search(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
@@ -2032,7 +2162,8 @@ def exact_search(
         repeats another up to scale and shift given more than two rows or, with more rows than
         columns, is a linear function of other columns. One message names every group of copies and
         says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``missing="em"`` is given
+        with a ``score_func`` other than ``"bic"``.
 
     Warns
     -----
@@ -2052,10 +2183,11 @@ def exact_search(
     i.i.d. continuous observational data, no unmeasured common causes, and linear relations with
     Gaussian noise; the categorical and mixed-data scores below make theirs. Its run time grows
     exponentially with the number of variables, so it suits a few variables, roughly 20 or fewer,
-    where it finds a DAG with the best score [1]_ [2]_ rather than a greedy search's local
-    optimum. It returns the CPDAG of that DAG's equivalence class and keeps the DAG in
-    ``metadata["dag"]``. With more variables, use :func:`~andrey.ges` or :func:`~andrey.boss`;
-    when unmeasured common causes are plausible, use :func:`~andrey.fci`.
+    where it finds a DAG with the best score [1]_ [2]_ rather than a greedy search's local optimum.
+    It returns the CPDAG of that DAG's equivalence class and keeps the DAG in ``metadata["dag"]``.
+    With more variables, use :func:`~andrey.ges` or :func:`~andrey.boss`; when unmeasured common
+    causes are plausible, use :func:`~andrey.fci`. With values missing completely at random or at
+    random given observed values, ``missing="em"`` fits it on every row by structural EM [8]_ [9]_.
 
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
     own pick among them would follow last-bit rounding and the column order. The returned CPDAG
@@ -2087,11 +2219,24 @@ def exact_search(
     rows measured: 2.0 against 9.6 with 200 rows and 20 true edges. Larger graphs were not
     measured.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
-    variable, each over every row, and terms over different rows do not add up to the score of one
-    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
+    score adds one term per variable, each over every row, and terms over different rows do not add
+    up to the score of one dataset, so the search cannot delete rows per test as the
+    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [8]_
+    [9]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
+    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
+    observed ones, and their conditional means and covariances give the expected covariance of the
+    data (the E-step); the search runs on it over every row, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
+    returns (the M-step). It runs 10 rounds, as Gao et al. [9]_ do, from no edges and each column's
+    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
+    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
+    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB
@@ -2107,8 +2252,11 @@ def exact_search(
     memory doubles as well. With fewer rows than columns the standard BIC is unreliable. A parent
     set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
     one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    variance. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10
+    variables with 500 rows and up to 30% of the values missing, completely at random or at random
+    given observed values. It runs the search 10 times, so it takes about 10 times as long, and
+    under values missing not at random it has no guarantee. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2126,6 +2274,12 @@ def exact_search(
        461-464.
     .. [7] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [8] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [9] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -2173,7 +2327,7 @@ def exact_search(
         return found, found
 
     with copies_named(labels):
-        dag, em = fit_missing(X, missing, fit)
+        dag, em = fit_missing(X, missing, fit, bic=True)
     marks = dag.to_numpy()
     cpdag = dag2cpdag(marks)
     if constraints is not None:
@@ -2264,6 +2418,12 @@ def calm(
         The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc` (the
         :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
         seed used.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The candidate edges are the pairs
@@ -2315,15 +2475,16 @@ def calm(
     Notes
     -----
     **When to use.** CALM suits i.i.d. continuous observational data from a linear model with
-    Gaussian noise, each variable with its own noise variance, and no unmeasured common causes
-    [1]_; the Fisher-Z tests of its screen assume the same model. Under that model the data
-    identify the DAG only up to its Markov equivalence class, so an edge the class leaves
-    undirected gets a direction the data do not determine. The screen keeps only the edges of the
-    estimated moral graph, which joins each variable to its parents, its children, and its
-    children's other parents, so it suits sparse graphs; it returns a DAG with the coefficient of
-    each edge. When the equivalence class is enough, :func:`~andrey.ges` returns it as a CPDAG; when
-    the noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`;
-    with nonlinear effects, use :func:`~andrey.cam`.
+    Gaussian noise, each variable with its own noise variance, and no unmeasured common causes [1]_;
+    the Fisher-Z tests of its screen assume the same model. Under that model the data identify the
+    DAG only up to its Markov equivalence class, so an edge the class leaves undirected gets a
+    direction the data do not determine. The screen keeps only the edges of the estimated moral
+    graph, which joins each variable to its parents, its children, and its children's other parents,
+    so it suits sparse graphs; it returns a DAG with the coefficient of each edge. When the
+    equivalence class is enough, :func:`~andrey.ges` returns it as a CPDAG; when the noise is
+    non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`; with
+    nonlinear effects, use :func:`~andrey.cam`. With values missing completely at random or at
+    random given observed values, ``missing="em"`` fits it on every row by structural EM [7]_ [8]_.
 
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
     the variable most dependent on it given those already added (Fisher-Z at level
@@ -2354,10 +2515,24 @@ def calm(
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
     larger ``max_iter`` runs that schedule.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
-    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
+    fits every variable over the same rows, so a row with a missing value has no place in it. The
+    loss reads the data only through their covariance, and so does the screen, whose Fisher-Z tests
+    read the expected correlations over every row, so ``missing="em"``, experimental, runs
+    structural EM [7]_ [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model
+    of the current graph, each row's missing values are Gaussian given its observed ones, and their
+    conditional means and covariances give the expected covariance of the data (the E-step); the fit
+    runs on it, with all of its settings, and the model's coefficients and noise variances are fit
+    again by least squares on the parents the fit returns (the M-step). ``standardize`` scales the
+    expected covariance to unit variances. It runs 10 rounds, as Gao et al. [8]_ do, from no edges
+    and each column's mean and variance over its observed values, and ``metadata["em"]`` records
+    ``iterations``, the rounds, and ``log_likelihood``, the observed-data log-likelihood of the
+    model after each round, which can fall in a round that changes the graph. EM holds when values
+    are missing completely at random or at random given observed values; when whether a value is
+    missing depends on the missing values themselves, the expected covariance is biased, and the
+    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
+    ``"em"``, drop the incomplete rows first, which suits values missing completely at random, or
+    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
@@ -2376,8 +2551,11 @@ def calm(
     75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
     local optimum: on a collider whose two parents are independent, it can return both edges
     reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10 variables
+    with 500 rows and up to 30% of the values missing, completely at random or at random given
+    observed values. It runs the fit 10 times, so it takes about 10 times as long, and under values
+    missing not at random it has no guarantee. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2395,6 +2573,12 @@ def calm(
     .. [6] Ng, I., Lachapelle, S., Ke, N. R., Lacoste-Julien, S., and Zhang, K. (2022). On the
        convergence of continuous constrained optimization for structure learning. AISTATS 2022,
        PMLR 151, 8176-8198.
+    .. [7] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [8] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------

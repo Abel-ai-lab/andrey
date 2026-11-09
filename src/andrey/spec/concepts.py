@@ -959,8 +959,10 @@ _CONCEPTS = (
         key="missing",
         summary="How a fit handles missing values: a NaN cell, pandas' NA, or an empty, NA, or N/A "
         "field of a CSV file. testwise deletes rows per test, each test reading the rows that "
-        "observe its variables. None picks the method's default handling, which is testwise for "
-        "every method that takes the argument; each method lists the values it accepts.",
+        "observe its variables; em fits a search that reads only a covariance by structural EM "
+        "over the expected covariance. None picks the method's default handling: testwise for the "
+        "methods that delete rows per test, and a refusal for those that take only em; each method "
+        "lists the values it accepts.",
         param=_template(
             "missing",
             "str",
