@@ -137,6 +137,19 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
+The references of the Stein-score screen, `stein_cpu.py`, need NumPy 1 and share an environment
+built from the lock file `requirements-stein.txt`: the authors' SCORE code, NoGAM in dodiscover at
+a pinned commit, and CausalDisco. SCORE has no package release, so `start_stein.sh` downloads its
+files at a pinned commit, checks each one's SHA-256, and keeps them in the git-ignored
+`benchmarks/.score`, from which the benchmark imports them. SCORE prunes with mgcv through Rscript,
+so load R as `start_r.sh --env` prints before a run:
+
+```shell
+benchmarks/start_stein.sh
+export ANDREY_BENCH_STEIN_PYTHON=$PWD/benchmarks/.venv-stein/bin/python
+export ANDREY_BENCH_SCORE=$PWD/benchmarks/.score
+```
+
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
