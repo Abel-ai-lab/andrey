@@ -19,6 +19,8 @@ import numpy as np
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from .missingness import Mechanism
+
 import andrey
 from andrey.core.structure import LATENT, OBSERVED
 
@@ -71,14 +73,15 @@ _TEMPORAL_SCALES = ("raw", "standardize")
 _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
-# selection, the temporal lag matrices, the column shuffle, and the intervention draws each get an
-# independent stream, so a change to one component's draws never shifts another's. Environment
+# selection, the temporal lag matrices, the column shuffle, the intervention draws, and the
+# missing values each get an independent stream, so a change to one component's draws never
+# shifts another's. Draw ``k`` of the missing values comes from ``(MISSING, k)``. Environment
 # ``k >= 1`` draws its noise from ``(NOISE, k)`` and environment ``k`` its intervention values from
 # ``(INTERVENTION, k)`` and its redrawn weights from ``(WEIGHTS, k)``; environment 0 draws from
 # ``NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
 # latents, lags, columns) come off the model seed's root, the rows' streams off the seed's root;
 # without a model seed the two are one root.
-GRAPH, WEIGHTS, NOISE, _LATENT, _LAG, _COLUMNS, INTERVENTION = 0, 1, 2, 3, 4, 5, 6
+GRAPH, WEIGHTS, NOISE, _LATENT, _LAG, _COLUMNS, INTERVENTION, MISSING = 0, 1, 2, 3, 4, 5, 6, 7
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
 
@@ -240,6 +243,7 @@ class SCM:
         screen: FaithfulnessScreen | None = None,
         dtype: npt.DTypeLike = np.float64,
         shuffle: bool = True,
+        missing: Mechanism | None = None,
     ) -> CausalDataset:
         """Draw ``n`` rows; return a :class:`~andrey.data.dataset.CausalDataset`.
 
@@ -313,12 +317,23 @@ class SCM:
             index column ``j`` has with ``shuffle=False``, where the order follows how the graph
             was drawn (a scale-free graph's hubs come first, a small-world graph keeps its ring
             order).
+        missing : Mechanism or None, default=None
+            Missing values, from :func:`~andrey.data.missingness.mcar`,
+            :func:`~andrey.data.missingness.mar`, :func:`~andrey.data.missingness.mnar`, or
+            :func:`~andrey.data.missingness.self_masking`: the mask is drawn over the returned
+            values, after the scaling and the column shuffle, from the seed's own stream, so the
+            observed values, the true graph, and ``params`` are those of the sample without
+            ``missing``. Columns in its ``parents`` are columns of the returned data. ``None``
+            gives complete data.
 
         Returns
         -------
         CausalDataset
             Under interventions, ``env`` holds each row's environment and ``targets`` each
             environment's intervened columns; the true graph is the graph without interventions.
+            With ``missing``, ``data`` holds ``NaN`` where a value is missing, ``missing`` holds
+            the mask and the parents of each missingness indicator, ``provenance["config"]
+            ["missing"]`` records the mechanism, and ``report`` describes the complete values.
 
         Raises
         ------
@@ -331,7 +346,7 @@ class SCM:
             not an observed column, ``hard()`` on a variable has no ``value``, or ``soft()``
             changes nothing. Also if ``"unitless"`` is given a positive-weight functional, noise
             with a ``variance_range``, or ``soft(weights="redraw")``, or ``screen`` is given with
-            ``model_seed``.
+            ``model_seed``. Also as :func:`~andrey.data.missingness.draw` raises on ``missing``.
 
         References
         ----------
@@ -389,9 +404,28 @@ class SCM:
         root = np.random.SeedSequence(seed)
         if screen is None:
             model = root if model_seed is None else np.random.SeedSequence(model_seed)
-            return self._sample_once(
+            ds = self._sample_once(
                 rows, root, model, scale=scale, dtype=dtype, shuffle=shuffle, envs=pooled
             )
+        else:  # the accepted attempt's root, whose streams cannot meet another attempt's
+            ds, root = self._screened(rows, root, screen, scale=scale, dtype=dtype, shuffle=shuffle)
+        return ds if missing is None else with_missing(ds, missing, root)
+
+    def _screened(
+        self,
+        n: int,
+        root: np.random.SeedSequence,
+        screen: FaithfulnessScreen,
+        *,
+        scale: str,
+        dtype: npt.DTypeLike,
+        shuffle: bool,
+    ) -> tuple[CausalDataset, np.random.SeedSequence]:
+        """Draw datasets from ``root``'s attempt streams until ``screen`` accepts one.
+
+        Return it with the root of its attempt.
+        """
+        rows = n
         for attempt in range(screen.max_attempts):
             attempt_root = np.random.SeedSequence(
                 entropy=root.entropy, spawn_key=(*root.spawn_key, attempt)
@@ -405,8 +439,9 @@ class SCM:
                 (edges[:, 0] < n_obs) & (edges[:, 1] < n_obs)
             ]  # latents dropped from data
             if screen.accepts(qa.faithfulness_margin(ds.data, obs_edges)):
-                return replace(
-                    ds, report=replace(ds.report, faithfulness_accept_rate=1.0 / (attempt + 1))
+                rate = 1.0 / (attempt + 1)
+                return replace(ds, report=replace(ds.report, faithfulness_accept_rate=rate)), (
+                    attempt_root
                 )
         raise RuntimeError(
             f"faithfulness screen (min_abs_corr={screen.min_abs_corr}) "
@@ -686,6 +721,28 @@ _GRAPH_BUILDERS = {
 }
 
 
+def with_missing(
+    ds: CausalDataset, mechanism: Mechanism, root: np.random.SeedSequence
+) -> CausalDataset:
+    """Return ``ds`` with the missing values of ``mechanism`` drawn from ``root``'s streams."""
+    from .missingness import draw_from
+
+    record = draw_from(ds.data, mechanism, root)
+    data = ds.data.copy()
+    data[record.mask] = np.nan
+    config = {
+        **ds.provenance["config"],
+        "missing": {
+            "mechanism": record.mechanism,
+            "form": record.form,
+            "rate": record.rate,
+            "observed": mechanism.observed,
+            "parents": {str(c): pa for c, pa in record.parents.items()},
+        },
+    }
+    return replace(ds, data=data, missing=record, provenance={**ds.provenance, "config": config})
+
+
 def named_graph(graph: str, d: int, density: float) -> GraphSpec:
     """Return the graph spec ``graph`` names, on ``d`` nodes at mean total degree ``density``.
 
@@ -709,6 +766,7 @@ def sample_scm(
     latents: int = 0,
     dtype: npt.DTypeLike = np.float64,
     shuffle: bool = True,
+    missing: Mechanism | None = None,
 ) -> CausalDataset:
     """One-shot convenience: build an :class:`SCM` from string axes and sample it.
 
@@ -738,6 +796,9 @@ def sample_scm(
         Output dtype of the sampled ``data``; forwarded to :meth:`SCM.sample`.
     shuffle : bool, default=True
         Shuffle the column order with the true graph; forwarded to :meth:`SCM.sample`.
+    missing : Mechanism or None, default=None
+        Missing values drawn over the sample, from :mod:`andrey.data.missingness`; forwarded to
+        :meth:`SCM.sample`.
 
     Returns
     -------
@@ -772,4 +833,4 @@ def sample_scm(
         noise=noise_specs[noise](),
         latents=latents,
     )
-    return scm.sample(n=n, seed=seed, scale=scale, dtype=dtype, shuffle=shuffle)
+    return scm.sample(n=n, seed=seed, scale=scale, dtype=dtype, shuffle=shuffle, missing=missing)

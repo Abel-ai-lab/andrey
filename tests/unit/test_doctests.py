@@ -36,6 +36,7 @@ DOCUMENTED = [
     "andrey.data",
     "andrey.data.discrete",
     "andrey.data.interventions",
+    "andrey.data.missingness",
     "andrey.data.mixed",
     "andrey.data.real",
     "andrey.data.scm",

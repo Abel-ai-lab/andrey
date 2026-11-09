@@ -30,6 +30,7 @@ import andrey.core.ci_kernel
 import andrey.core.ci_missing
 import andrey.data.discrete
 import andrey.data.interventions
+import andrey.data.missingness
 import andrey.data.mixed
 import andrey.data.real
 import andrey.data.scm
@@ -66,6 +67,7 @@ PUBLIC_MODULES = (
     (andrey.data.scm, "data."),
     (andrey.data.contexts, "data."),
     (andrey.data.interventions, "data.interventions."),
+    (andrey.data.missingness, "data.missingness."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),

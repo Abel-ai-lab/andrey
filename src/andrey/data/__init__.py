@@ -19,7 +19,8 @@ conditional probability tables, the data for the discrete tests and scores. :fun
 samples categorical and continuous variables from a conditional linear Gaussian network, the data
 for the mixed-data tests and scores. :meth:`SCM.do` and ``envs=`` on :meth:`SCM.sample`,
 :func:`sample_discrete`, and :func:`sample_mixed` draw data under the hard and soft interventions
-of :mod:`interventions`.
+of :mod:`interventions`. ``missing=`` on :meth:`SCM.sample` and :func:`sample_scm` draws missing
+values with a known missingness graph, from :mod:`missingness`.
 :func:`sample_context_series` draws time series from several datasets with shared contexts, the
 data for :func:`~andrey.jpcmciplus`.
 """
@@ -32,13 +33,14 @@ from . import (
     graphs,
     interventions,
     latent,
+    missingness,
     noise,
     qa,
     sortability,
     temporal,
 )
 from .contexts import ContextSeries, sample_context_series
-from .dataset import CausalDataset, QAReport, SCMParams
+from .dataset import CausalDataset, Missingness, QAReport, SCMParams
 from .discrete import sample_discrete
 from .generate import Ensemble, generate
 from .mixed import sample_mixed
@@ -56,6 +58,7 @@ __all__ = [
     "Ensemble",
     "generate",
     "CausalDataset",
+    "Missingness",
     "QAReport",
     "SCMParams",
     "FaithfulnessScreen",
@@ -66,6 +69,7 @@ __all__ = [
     "functional",
     "noise",
     "interventions",
+    "missingness",
     "latent",
     "sortability",
     "qa",
