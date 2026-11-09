@@ -355,3 +355,48 @@ def test_lpcmci_claims_need_their_lag():
             _fit("lpcmci", data, tau_max=2, knowledge=knowledge)
     with pytest.raises(ValueError, match="no possibly directed path from 2 at t-2 to 0 at t"):
         _fit("lpcmci", data, tau_max=2, knowledge=Knowledge(required_paths=[(2, 0, 2)]))
+
+
+@pytest.mark.parametrize(
+    ("knowledge", "message"),
+    [
+        # a at t-1 causes b at t, which causes c at t: a at t-1 causes c at t.
+        (
+            Knowledge(
+                required_paths=[("a", "b", 1), ("b", "c", 0)], forbidden_paths=[("a", "c", 1)]
+            ),
+            r"forbidden_paths lists \('a', 'c', 1\)",
+        ),
+        (
+            Knowledge(
+                required_paths=[("a", "b", 1), ("b", "c", 1)], forbidden_paths=[("a", "c", 2)]
+            ),
+            r"forbidden_paths lists \('a', 'c', 2\)",
+        ),
+        (
+            Knowledge(
+                required=[("a", "b", 1)],
+                required_paths=[("b", "c", 1)],
+                forbidden_paths=[("a", "c", 2)],
+            ),
+            r"forbidden_paths lists \('a', 'c', 2\)",
+        ),
+        # c, in no tier, carries a path from the later tier of b back to a.
+        (
+            Knowledge(tiers=[["a"], ["b"]], required_paths=[("b", "c", 0), ("c", "a", 1)]),
+            r"cause of \('b', 'a', 1\) an ancestor .* later tier is no ancestor",
+        ),
+    ],
+)
+def test_lagged_claims_are_followed_through_one_another(knowledge, message):
+    with pytest.raises(KnowledgeError, match=message):
+        andrey.core.knowledge.resolve_lagged(knowledge, 3, list("abc"), 2, method="lpcmci")
+
+
+def test_a_lagged_path_past_the_largest_lag_meets_no_claim():
+    # a at t-2 causes b, and b at t-1 causes c: a path at lag 3, which no claim at lags 0-2 names.
+    knowledge = Knowledge(
+        required_paths=[("a", "b", 2), ("b", "c", 1)],
+        forbidden_paths=[("a", "c", 1), ("a", "c", 2)],
+    )
+    andrey.core.knowledge.resolve_lagged(knowledge, 3, list("abc"), 2, method="lpcmci")

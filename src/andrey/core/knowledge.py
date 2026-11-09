@@ -897,9 +897,26 @@ def _check_lagged_paths(
     label: Callable[[int], str],
 ) -> None:
     """Raise :class:`KnowledgeError` when the lagged path and confounded claims contradict the edge
-    parts: a claim and its denial on one link, a later tier as an ancestor of an earlier one, a
-    confounded link the knowledge leaves out, or an ancestor at lag ``0`` whose edge the knowledge
-    forbids one way, which puts an arrowhead at the ancestor on a link the search starts from."""
+    parts: a denied link that the required paths and links lead along, a later tier as an ancestor
+    of an earlier one, a confounded link the knowledge leaves out, or an ancestor at lag ``0`` whose
+    edge the knowledge forbids one way, which puts an arrowhead at the ancestor on a link the search
+    starts from.
+
+    The required paths and links are followed through one another: ``a`` at ``t - l1`` an ancestor
+    of ``b`` at ``t``, and ``b`` at ``t - l2`` of ``c`` at ``t``, make ``a`` at ``t - l1 - l2`` an
+    ancestor of ``c`` at ``t``. A path whose lag passes the largest lag learned is dropped, since no
+    claim can name it.
+    """
+    lags = len(required_paths)
+    reach = required_paths | required
+    while True:  # the transitive closure over the lags learned
+        grown = reach.copy()
+        for first_lag in range(lags):
+            for second_lag in range(lags - first_lag):
+                grown[first_lag + second_lag] |= reach[first_lag] @ reach[second_lag]
+        if np.array_equal(grown, reach):
+            break
+        reach = grown
     later = (tier[:, None] > tier[None, :]) & (tier[None, :] >= 0)
 
     def first(found: np.ndarray, message: str) -> None:
@@ -908,14 +925,15 @@ def _check_lagged_paths(
             raise KnowledgeError(message.format(link=f"({label(i)}, {label(j)}, {lag})"))
 
     first(
-        (required_paths | required) & forbidden_paths,
-        "knowledge forbidden_paths lists {link}, but its required_paths or required links make the "
-        "cause an ancestor of the effect",
+        reach & forbidden_paths,
+        "knowledge forbidden_paths lists {link}, but its required_paths and required links make "
+        "the cause an ancestor of the effect",
     )
     first(
-        required_paths & later[None],
-        "knowledge required_paths lists {link}, but the tiers put the cause later, and a later "
-        "tier is no ancestor of an earlier one",
+        reach & later[None],
+        "knowledge required_paths and required links make the cause of {link} an ancestor of the "
+        "effect, but the tiers put the cause later, and a later tier is no ancestor of an earlier "
+        "one",
     )
     absent = forbidden.copy()
     absent[0] &= forbidden[0].T
