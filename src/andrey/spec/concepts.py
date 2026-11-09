@@ -24,7 +24,7 @@ from pydantic import model_validator
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.ci_missing import MISSING_HANDLING
+from andrey.core.ci_missing import MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -1012,6 +1012,16 @@ _CONCEPTS = (
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
+        ),
+        deviations=(
+            Deviation(
+                method="pc",
+                name="missing",
+                default=None,
+                choices=(*MISSING_HANDLING, MVPC),
+                reason="mvpc, Missing-Value PC, corrects the test-wise deletion skeleton of PC "
+                "under causal sufficiency (Tu et al. 2019); its theory covers PC only.",
+            ),
         ),
     ),
     Concept(
