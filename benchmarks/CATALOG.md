@@ -58,11 +58,11 @@ whose Reproduce table lists the driver.
 
 ## Release cards
 
-Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
-hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
-fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
-fix. The 0.14.0 summary draws its rows from the lane files
-[`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
+Each release card publishes its numbers from a summary in `published/<release>/`; the 0.16.0 card
+measures nothing new and has none. Two more folders hold measurements no card of their own presents:
+`published/0.2.0-small-fits/`, the faster small fits the 0.2.0 card links, and `published/0.4.1/`,
+DirectLiNGAM's causal-order search in the 0.4.1 fix. The 0.14.0 summary draws its rows from the lane
+files [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
 [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json), UT-IGSP with
 graphical-model-learning, [`published/0.14.0/igsp.json`](published/0.14.0/igsp.json), IGSP with
 graphical-model-learning, [`published/0.14.0/icp.json`](published/0.14.0/icp.json), ICP with
@@ -87,6 +87,7 @@ fit times, link F1, and the counts and means of its floor intervals from the run
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | None: nothing new measured |
 | 0.15.0 | [Multi-domain data](../docs/docs/benchmarks/0.15.0.md) | [`published/0.15.0/summary.json`](published/0.15.0/summary.json) |
 | 0.14.0 | [Interventional data](../docs/docs/benchmarks/0.14.0.md) | [`published/0.14.0/summary.json`](published/0.14.0/summary.json) |
 | 0.13.0 | [Functional causal models](../docs/docs/benchmarks/0.13.0.md) | [`published/0.13.0/summary.json`](published/0.13.0/summary.json) |

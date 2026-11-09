@@ -216,6 +216,12 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    [`benchmarks/CATALOG.md`](../benchmarks/CATALOG.md), and the release to the cards column of each
    comparison its Reproduce table names.
 
+A release that measures nothing new, such as 0.16.0, has a card with no summary: the card says so
+and describes what the release changes, its title is the version alone (`0.16.0 release card`, and
+`0.16.0` in the toctree), its TL;DR has no numbers, and it skips step 6. A feature post it updates
+carries its version (see "The blog"), so the navbar's dot on Release cards dates its week from that
+post; with no such post, from the newest post with a version.
+
 ## The documentation sidebars
 
 The left sidebar ([`_templates/docs-nav.html`](_templates/docs-nav.html)) groups the docs index's
