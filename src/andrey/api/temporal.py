@@ -1190,10 +1190,11 @@ def jpcmciplus(
         scale and shift, as any two do over two datasets; or if ``data`` holds ``NaN``. With
         ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, also if a variable repeats another
         up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, or a test
-        finds a system variable in the span of its conditions, as with one that sums others. Also if
-        ``knowledge`` names a column that is not a system variable, such as a context, contradicts
-        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links into
-        a directed cycle over the links the fit kept.
+        finds a system variable in the span of its conditions, as with one that sums others or a
+        pulse every dataset shares that is not a time context. Also if ``knowledge`` names a column
+        that is not a system variable, such as a context, contradicts itself, requires a link
+        without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle over
+        the links the fit kept.
 
     Warns
     -----
