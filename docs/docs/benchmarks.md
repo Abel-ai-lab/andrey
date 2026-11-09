@@ -35,14 +35,16 @@ width="190" height="40"></p>
 
 ::::{div} release-tldr
 
-0.16.0 is here: fixes, with no new benchmarks. Drawings mark each edge into an intervention target
-with a cross in its middle, and `to_graphviz` draws the targets too. Every method that tests with
-HSIC keeps its p-values precise far below 1e-16, and FCI's documentation says when it returns a
-graph that is not a PAG.
+0.16.0 is here. Simulate missing values with a known cause, and fit incomplete data with MVPC for
+PC and EM for the score searches. State causal paths and hidden common causes in background
+knowledge, and read the direction of a pair whose noise changes with the cause with LOCI, all
+experimental. Drawings mark intervened variables, and HSIC p-values stay precise far below 1e-16.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.16.0.md)
-[Read the post](../blog/20261015-andrey-0-4-0.md)
+[Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+[Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
+[Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::
 :::::

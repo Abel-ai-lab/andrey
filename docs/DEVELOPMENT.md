@@ -145,8 +145,9 @@ leaves out; a dated post is published in every build, even before its date.
 The blog's front page lists the dated posts from their front matter (the `blog-index` directive in
 `blog/index.md`, filled by `_blog_index` in `conf.py`): the newest post with its cover, title,
 date, tags, and description, then the earlier ones, newest first, each with a small copy of its art
-(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie. A
-new post needs no change to the page.
+(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie,
+and then the later file name, which starts with the date the post first appeared: of the posts a
+release updates, the one first published last leads. A new post needs no change to the page.
 
 A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
 shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
@@ -216,11 +217,12 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    [`benchmarks/CATALOG.md`](../benchmarks/CATALOG.md), and the release to the cards column of each
    comparison its Reproduce table names.
 
-A release that measures nothing new, such as 0.16.0, has a card with no summary: the card says so
-and describes what the release changes, its title is the version alone (`0.16.0 release card`, and
-`0.16.0` in the toctree), its TL;DR has no numbers, and it skips step 6. A feature post it updates
-carries its version (see "The blog"), so the navbar's dot on Release cards dates its week from that
-post; with no such post, from the newest post with a version.
+A release that measures nothing new, such as 0.16.0, has a card with no summary: the card describes
+what the release adds and says which earlier numbers still hold, its title is the version alone
+(`0.16.0 release card`, and `0.16.0` in the toctree), its TL;DR has no numbers, and it skips step 6.
+A feature post it updates carries its version (see "The blog"), so the navbar's dot on Release cards
+dates its week from that post; with no such post, from the newest post with a version. The latest
+block links each post the release updates after the card's button.
 
 ## The documentation sidebars
 

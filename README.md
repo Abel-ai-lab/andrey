@@ -20,14 +20,18 @@ banner links the website's homepage. -->
 
 ## ⭐ What's new in 0.16.0
 
-0.16.0 is a release of fixes. Drawings mark each edge into an intervention target with a cross in
-its middle, and `to_graphviz` draws the targets too; the graph types guide shows how to read every
-mark. Every method that tests with HSIC keeps its p-values precise far below 1e-16, so ANM and PNL
-pick the direction with the larger p-value even where both used to round to 0. FCI's documentation
-says when test errors make it return a graph that is not a PAG.
+0.16.0 takes missing data, background knowledge, and pair direction further. Simulate missing
+values whose cause you know, then fit incomplete data with MVPC, which corrects PC when missingness
+depends on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM. Tell a
+method that one variable causes another by some path, that it does not, or that two share a hidden
+common cause. LOCI reads the direction of a pair whose noise changes with the cause. These are
+experimental. Drawings also mark intervened variables, and every HSIC p-value stays precise far
+below 1e-16.
 
-**[Read the post](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)**
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
+**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
+**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
+**[Pairwise direction](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)**
 
 ---
 

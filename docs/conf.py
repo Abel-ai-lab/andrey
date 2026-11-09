@@ -924,20 +924,18 @@ DOCS_ONLY = {
 WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
-def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
+def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...], str]:
     """When a post, (docname, ISO date, version), was published: its date, then its version, so a
-    later version breaks a tie in date. A post without a version ("") comes before one with."""
-    return post[1], tuple(int(part) for part in post[2].split(".") if part)
+    later version breaks a tie in date, then its docname. A post without a version ("") comes
+    before one with. A post's file name starts with the date it first appeared, so of the posts a
+    release updates, which share its date and version, the one first published last leads."""
+    return post[1], tuple(int(part) for part in post[2].split(".") if part), post[0]
 
 
 def _newest_post(posts: list[tuple[str, str, str]]) -> tuple[str, str]:
     """The newest of ``posts``, each (docname, ISO date, version): its docname and version, by
-    ``_post_key``. Posts that tie in both date and version fail, rather than let file order pick
-    one."""
+    ``_post_key``."""
     newest = max(posts, key=_post_key)
-    tied = sorted(post[0] for post in posts if _post_key(post) == _post_key(newest))
-    if len(tied) > 1:
-        raise ValueError(f"{', '.join(tied)} are all the newest post; date one of them later")
     return newest[0], newest[2]
 
 
@@ -953,8 +951,7 @@ def _blog(app) -> Blog:  # noqa: ANN001
 
 def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
     """The docnames of ``posts``, each as for ``_newest_post``: the newest post, then the others
-    newest first by ``_post_key``. Others that tie in both date and version keep their order in
-    ``posts``."""
+    newest first by ``_post_key``."""
     newest = _newest_post(posts)[0]
     others = sorted((post for post in posts if post[0] != newest), key=_post_key, reverse=True)
     return [newest, *(post[0] for post in others)]
