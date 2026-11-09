@@ -46,9 +46,7 @@ def svg(
 
     ``options`` go to ``draw``, such as ``targets`` or ``highlight``.
     """
-    markup = str(
-        draw(g, palette=PALETTE, width=width, height=height, background=False, **options)
-    )
+    markup = str(draw(g, palette=PALETTE, width=width, height=height, background=False, **options))
     ET.register_namespace("", "http://www.w3.org/2000/svg")
     root = ET.fromstring(markup)
     root.set("role", "img")
@@ -195,24 +193,31 @@ def legend() -> str:
         node_types=np.array([LATENT, OBSERVED], dtype=np.int8),
     )
     items = [
-        (graph([[0, 1], [2, 0]], "dag", xy), {}, "X -> Y", "X causes Y."),
+        (
+            graph([[0, 1], [2, 0]], "dag", xy),
+            {},
+            "X -> Y",
+            "In a DAG, X is a direct cause of Y; in a PAG, an ancestor of Y.",
+        ),
         (
             graph([[0, 1], [1, 0]], "cpdag", xy),
             {},
             "X - Y",
-            "X and Y are adjacent; the data leave the direction open.",
+            "In a CPDAG, X and Y are adjacent, and the equivalence class holds DAGs with either "
+            "direction.",
         ),
         (
             graph([[0, 3], [2, 0]], "pag", xy),
             {},
             "X o-> Y",
-            "Y does not cause X; the circle leaves open whether X causes Y.",
+            "Y is not an ancestor of X; the circle is a tail in some graphs of the class and an "
+            "arrowhead in others.",
         ),
         (
             graph([[0, 2], [2, 0]], "pag", xy),
             {},
             "X <-> Y",
-            "Neither causes the other; a hidden common cause links them.",
+            "In a PAG, neither is an ancestor of the other, and a latent common cause links them.",
         ),
         (
             graph([[0, 2], [2, 0]], "digraph", xy),
@@ -220,18 +225,19 @@ def legend() -> str:
             "X -> Y, Y -> X",
             "Feedback: each causes the other.",
         ),
-        (latent, {}, "Dashed ring", "L is a latent variable, never measured."),
+        (latent, {}, "Dashed ring", "L is a latent (unmeasured) variable."),
         (
             graph([[0, 1], [2, 0]], "dag", xy),
             {"targets": ["Y"]},
             "Square and cross",
-            "An experiment set Y; the cross marks each edge into Y that the intervention acts on.",
+            "Y is an intervention target; a cross marks each edge into it.",
         ),
         (
             graph([[0, 1], [2, 0]], "dag", xy),
             {"highlight": [(1, 0)]},
             "Accent",
-            "A highlighted mark, which a demo or a page points to.",
+            "The accent lights an endpoint mark and its half of the edge, for a demo or a page to "
+            "point to.",
         ),
     ]
     cells = ['<div class="graph-legend">']

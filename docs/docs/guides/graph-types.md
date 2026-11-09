@@ -220,19 +220,19 @@ from andrey.viz import draw
 Path("graph.svg").write_text(draw(pag), encoding="utf-8")
 ```
 
-Every kind of graph is drawn with the same marks, and each mark is a shape, so you can read a
-drawing in print or without telling colors apart; the edge colors only repeat what the marks say.
+We use the same marks for every graph kind. Each mark is a shape, so you can read drawings in
+print and without color. Edge colors only repeat what the marks say.
 
 ```{raw} html
 :file: ../../_static/graph-types-legend.html
 ```
 
-`draw(structure, targets=["Y"])` marks the variables an experiment set. A hard intervention cuts
-the edges into its targets, and a soft one keeps them; the marks are the same, so the cross shows
-which edges an intervention acts on, not that an edge was removed. A label longer than two
-characters sits below its node. `andrey.viz.to_graphviz` writes the same nodes and edge marks in
-DOT, for Graphviz and other tools, with squares for the targets; Graphviz marks only an edge's
-ends, so the cross is left out.
+`draw(structure, targets=["Y"])` draws each intervention target as a square and puts a cross in
+the middle of each edge with an arrowhead into it. A hard intervention cuts the edges into its
+targets, and a soft one keeps them; both get the same marks, so a cross does not mean the edge was
+removed. If any label is longer than two characters, every label sits below its node.
+`andrey.viz.to_graphviz` writes the same nodes and edge marks in DOT, for Graphviz and other tools,
+with squares for the targets. It leaves out the cross because Graphviz marks only an edge's ends.
 
 ## References
 
