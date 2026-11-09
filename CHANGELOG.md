@@ -83,6 +83,10 @@ names its pull request.
   returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
   each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
   values, with a message that names `missing="em"` where EM would run. ([#842])
+- The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
+  that listing every small graph gives, with d-separation in place of the tests, and on simulated
+  data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`,
+  `boss_fci`, `lpcmci`, and `direct_lingam` (`benchmarks/knowledge_paths.py`). ([#848])
 
 ### Changed
 
@@ -2149,3 +2153,4 @@ First alpha release.
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
+[#848]: https://github.com/Abel-ai-lab/andrey/pull/848
