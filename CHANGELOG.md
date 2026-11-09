@@ -29,6 +29,19 @@ names its pull request.
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
   link preview, the wordmark and its release on navy. ([#809])
+- `andrey.Knowledge` takes `required_paths` and `forbidden_paths`, the pairs `(cause, effect)` with
+  and without a directed path from `cause` to `effect`, and `confounded`, the pairs with a hidden
+  common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+  `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` honor
+  `required_paths` and `forbidden_paths`, experimentally: the result is the MPDAG of the DAGs of
+  the class found that meet them (Fang, Zhao, Liu, and He 2025), and
+  `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. Knowledge that contradicts
+  itself raises `ValueError` before the search, and claims that no DAG of the class meets raise it
+  after; no method honors `confounded`. ([#829])
+- Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
+  another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
+  `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
+  undirected `structure`. ([#829])
 - `andrey.data.missingness` draws missing values whose missingness graph is known: `mcar`, `mar`,
   `mnar`, and `self_masking` masks, in a logistic form (Muzellec et al., 2020) or the quantile form
   of the MVPC simulations (Tu et al., 2019), with `parents=` to place each indicator. `missing=` on
@@ -2114,6 +2127,7 @@ First alpha release.
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#829]: https://github.com/Abel-ai-lab/andrey/pull/829
 [#832]: https://github.com/Abel-ai-lab/andrey/pull/832
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842

@@ -115,6 +115,16 @@ SHARED = {
         "pairs allowed to be adjacent, and temporal tiers, all honored.",
         lambda m: takes(m, "knowledge") and REGISTRY[m].family != "temporal" and m != "gnies",
     ),
+    # The methods whose result can be a CPDAG honor the path parts of knowledge.
+    "knowledge_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for "
+        "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; "
+        "claims that no such DAG meets raise ``ValueError``.",
+        lambda m: "required_paths" in REGISTRY[m].knowledge,
+    ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
         "Parameters",
