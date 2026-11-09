@@ -19,6 +19,7 @@ from andrey.core.score import (
     LINEAR_SCORES,
     MIXED_SCORES,
     CopiedColumnsError,
+    copies_error,
     copies_message,
 )
 from andrey.core.structure import EDGE_TYPES, column_labels, relabel
@@ -559,7 +560,11 @@ def check_em(name: str, missing: str | None, score_func: str | None, env: object
 
 
 def fit_missing(
-    X: np.ndarray, missing: str | None, fit: Callable[[np.ndarray | None], tuple[R, GraphStructure]]
+    X: np.ndarray,
+    missing: str | None,
+    fit: Callable[[np.ndarray | None], tuple[R, GraphStructure]],
+    *,
+    bic: bool = False,
 ) -> tuple[R, dict[str, object]]:
     """Run a fit on ``X``, by structural EM when ``missing="em"`` and ``X`` holds ``NaN``.
 
@@ -567,12 +572,17 @@ def fit_missing(
     rows, in place of the data's, or over the data's own with ``None``, and returns its result and
     the graph it learned. Without a missing value, or without ``"em"``, ``fit(None)`` runs once and
     the metadata are empty. Otherwise :func:`~andrey.search.em.structural_em` runs it on each
-    expected covariance, and the metadata hold its record under ``"em"``.
+    expected covariance, and the metadata hold its record under ``"em"``. With ``bic``, the fit
+    scores by the linear-Gaussian BIC, so copies among the observed values raise
+    :class:`~andrey.core.score.CopiedColumnsError` first
+    (:func:`~andrey.search.em.observed_copies`), as on complete data.
     """
     if missing != EM or not np.isnan(X).any():
         return fit(None)[0], {}
-    from andrey.search.em import structural_em
+    from andrey.search.em import observed_copies, structural_em
 
+    if bic and (groups := observed_copies(X)):
+        raise copies_error(groups)
     result, record = structural_em(X, fit)
     return result, {"em": record}
 
@@ -639,7 +649,7 @@ def cpdag_search(
         return found, found[0]
 
     with copies_named(labels, index_namer(labels, column)):
-        (cpdag, score), em = fit_missing(augmented, missing, fit)
+        (cpdag, score), em = fit_missing(augmented, missing, fit, bic=True)
     cpdag, index_edges = split_index(cpdag, column)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     if "n_perturbations" in settings and settings["n_starts"] != 1:

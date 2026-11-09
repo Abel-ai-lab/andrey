@@ -1,14 +1,15 @@
 """Recovery by structural EM, ``missing="em"``, on values missing at random or completely at random.
 
 The fixed case is ``x -> w <- y`` with ``y`` missing when ``w`` is low, ``w`` always observed: the
-values are missing at random. The complete rows are a sample selected on the collider ``w``, so
-the search on them keeps an edge between ``x`` and ``y``, and so does the search on the data with
-each missing value replaced by its column's mean; EM learns the collider. ``hc`` is left out of
-the fixed case: on the tie-break order of these data its climb stops at the complete graph, on the
-complete data's covariance too. On seeded ground truth, 10 variables with 500 rows, the searches
-over the BIC and ``notears`` make fewer errors in total by EM than on the complete rows, than with
-mean imputation, and than the empty graph. ``dagma``, on 8 variables, makes no more errors by EM
-than on the complete rows and fewer than with mean imputation.
+values are missing at random. The complete rows are a sample selected on the collider ``w``, so the
+search on them keeps an edge between ``x`` and ``y``, and so does the search on the data with each
+missing value replaced by its column's mean; EM learns the collider. ``hc`` is left out of the fixed
+case: on the tie-break order of these data its climb stops at the complete graph, on the complete
+data's covariance too. On seeded ground truth, 10 variables with 500 rows, EM gives the
+complete-data fit when nothing is missing, and with values missing the searches over the BIC and
+``notears`` make fewer errors in total by EM than on the complete rows, than with mean imputation,
+and than the empty graph. ``dagma``, on 8 variables, makes no more errors by EM than on the complete
+rows and fewer than with mean imputation.
 """
 
 from __future__ import annotations
@@ -69,6 +70,11 @@ def test_the_continuous_searches_learn_the_collider_by_em(name):
     )
 
 
+def test_calm_learns_the_collider_by_em():
+    pytest.importorskip("torch")
+    assert andrey.calm(selected_collider(0), missing="em").structure.oriented_edges() == COLLIDER
+
+
 def test_a_fit_of_the_fixed_case_records_its_output():
     out = andrey.ges(selected_collider(0), missing="em")
     record = out.metadata["em"]
@@ -106,6 +112,15 @@ def _errors(fit, mechanism, *, d: int = 10, seeds: int = 8) -> np.ndarray:
             )
         )
     return np.array(rows)
+
+
+@pytest.mark.parametrize("name", [*BIC_SEARCHES, "notears", "dagma"])
+def test_with_nothing_missing_em_gives_the_complete_data_fit(name):
+    fit = getattr(andrey, name)
+    for seed in range(2):
+        sample = data.sample_scm(d=10, n=500, density=2.0, seed=seed)
+        X = np.asarray(sample.data)
+        assert fit(X, missing="em") == fit(X)
 
 
 @pytest.mark.parametrize("mechanism", ["mar", "mcar"])
