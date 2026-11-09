@@ -518,7 +518,10 @@ def fci(
         reads its unshielded triples as colliders or non-colliders. In the PAG, a forbidden
         ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``,
         and a required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge
-        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
+        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``. In the
+        PAG, ``ancestors`` makes an adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at
+        the cause, and no test removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a
+        claim the PAG contradicts raises ``ValueError``.
 
     Returns
     -------
@@ -964,7 +967,10 @@ def gfci(
         :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
         removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
         arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``. With
-        ``env``, the environment index is unconstrained.
+        ``env``, the environment index is unconstrained. In the PAG, ``ancestors`` makes an adjacent
+        pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no test removes a
+        ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG contradicts raises
+        ``ValueError``.
 
     Returns
     -------
@@ -1685,7 +1691,10 @@ def fci_jci(
         pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and
         can leave a circle at ``b``, and a required one is ``a -> b``; knowledge that puts an
         arrowhead at ``a`` on an edge ``a - b`` while its required edges lead from ``a`` to ``b``
-        raises ``ValueError``. The environment index is unconstrained.
+        raises ``ValueError``. The environment index is unconstrained. In the PAG, ``ancestors``
+        makes an adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no
+        test removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
+        contradicts raises ``ValueError``.
 
     Returns
     -------

@@ -37,7 +37,10 @@ METHODS = [
     if spec.knowledge and spec.output.structure_type == "graph"
 ]
 # The methods that honor ancestors and non_ancestors, by restricting a CPDAG result.
-PATH_METHODS = [name for name in METHODS if "ancestors" in REGISTRY[name].knowledge]
+PATH_METHODS = [name for name in METHODS if REGISTRY[name].restricts_paths]
+# The methods whose search reads the path parts: the PAG methods also read latent.
+PAG_PATH_METHODS = ["fci", "fci_jci", "gfci", "boss_fci", "grasp_fci", "lpcmci"]
+ORDER_PATH_METHODS = ["direct_lingam", "multi_group_direct_lingam"]
 # The time-series searches that take knowledge, over the links between lagged variables.
 TEMPORAL = [
     name
@@ -605,7 +608,9 @@ def test_schema_lists_the_parts_each_method_honors():
 
     for name in (*METHODS, *TEMPORAL):
         schema = to_json_schema(REGISTRY[name])
-        paths = list(PATH_PARTS) if name in PATH_METHODS else []
+        paths = list(PATH_PARTS) if name in (*PATH_METHODS, *ORDER_PATH_METHODS) else []
+        if name in PAG_PATH_METHODS:
+            paths = [*PATH_PARTS, "latent"]
         assert schema["knowledge"] == [*EDGE_PARTS, *paths]
         assert schema["params"]["properties"]["knowledge"]["type"] == ["object", "null"]
         assert list(schema["params"]["properties"]["knowledge"]["properties"]) == list(

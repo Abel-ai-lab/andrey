@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS
+from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -2872,16 +2872,52 @@ _PATH_RULE = (
     "that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang et "
     "al. 2025); claims that no such DAG meets raise."
 )
+_PAG_PATHS = (
+    " On an adjacent pair, ancestors (a, b) makes the edge a -> b and non_ancestors (a, b) puts an "
+    "arrowhead at a, before the rules; the tests can still remove the pair. No test removes a "
+    "latent pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and one the PAG "
+    "contradicts raises: an ancestor with no possibly directed path, or a non-ancestor with a "
+    "directed path."
+)
+_SCORE_PAG_PATHS = " The test phase also starts from every latent pair." + _PAG_PATHS
+_ORDER_PATHS = (
+    " With ancestors and non_ancestors, the order search follows Shimizu et al. (2011, Section "
+    "3.4): when the claims show that no remaining variable is an ancestor of some of them, the "
+    "next variable is one of those; otherwise it is none with a claimed ancestor among the "
+    "remaining. The regression drops each non-ancestor as a parent, and metadata unmet_knowledge "
+    "lists the claims the DAG does not meet."
+)
+_LAGGED_PATHS = (
+    " ancestors [a, b, lag] puts a tail at a and an arrowhead at b on that link, and non_ancestors "
+    "[a, b, lag] an arrowhead at a; the tests can still remove the link. latent [a, b, lag] keeps "
+    "the link from every removal. Each claim names its lag. A claim on a link the PAG lacks sets "
+    "no mark, and one the PAG contradicts raises: an ancestor with no possibly directed path, or a "
+    "non-ancestor with a directed path."
+)
+_PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "latent")
+#: The methods that read the path parts, and latent, in the search, with the sentence that says how.
+_ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
+    "fci": (_PAG_PARTS, _PAG_PATHS),
+    "fci_jci": (_PAG_PARTS, _PAG_PATHS),
+    "gfci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "boss_fci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "grasp_fci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "lpcmci": (_PAG_PARTS, _LAGGED_PATHS),
+    "direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+    "multi_group_direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+}
+_ORDER_PATH_METHODS = ("direct_lingam", "multi_group_direct_lingam")
 _MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
-    _extra = PATH_PARTS if _name in _PATH_METHODS else ()
+    _extra, _rule = (
+        (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
+    )
     _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}"
-        + (_PATH_RULE if _extra else ""),
+        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}{_rule}",
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
@@ -2889,6 +2925,7 @@ for _name, _how in _KNOWLEDGE_HOW.items():
             "params": (*REGISTRY[_name].params, *_depth, _knowledge),
             "knowledge_extra": _extra,
             "knowledge_experimental": _extra,
+            "restricts_paths": _name in _PATH_METHODS,
         }
     )
 
@@ -2961,7 +2998,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used, the triples a collider
-# vote left ambiguous, and the clauses the path parts of knowledge leave.
+# vote left ambiguous, the clauses the path parts of knowledge leave, and the claims a causal order
+# search does not meet.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2979,7 +3017,8 @@ for _name, _spec in REGISTRY.items():
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
-        *(("ancestor_clauses",) if _spec.knowledge_extra else ()),
+        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("unmet_knowledge",) if _spec.name in _ORDER_PATH_METHODS else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

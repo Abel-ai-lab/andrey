@@ -27,15 +27,32 @@ def direct_lingam(
     ``measure`` is one of :data:`~andrey.lingam.pwling.MEASURES` and raises ``ValueError``
     otherwise; every measure is deterministic. With background knowledge ``constraints``, the order
     keeps
-    :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges and tiers), and the
+    :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges, ancestor claims, and
+    tiers) and reads the non-ancestor claims (:func:`~andrey.lingam.pwling.eligible`), and the
     regression drops forbidden parents and keeps required ones unpenalized
-    (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` has no forbidden edge. A required edge's
-    least-squares weight can be ``0``; :func:`andrey.direct_lingam` still puts the edge in its DAG.
+    (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` has no forbidden edge. A non-ancestor
+    ``a`` of ``b`` is no parent of ``b``: the claim forbids the edge ``a -> b`` (Lemma 5 of Shimizu
+    et al. 2011). A required edge's least-squares weight can be ``0``; :func:`andrey.direct_lingam`
+    still puts the edge in its DAG.
     """
     X = np.asarray(X, dtype=np.float64)
     if constraints is None:
         order = pwling.find_causal_order(X, measure=measure)
         return order, adjacency.estimate(X, order)
-    order = pwling.find_causal_order(X, precedence=constraints.precedence(), measure=measure)
-    B = adjacency.estimate(X, order, forbidden=constraints.forbidden, required=constraints.required)
+    order = pwling.find_causal_order(
+        X,
+        precedence=constraints.precedence(),
+        non_ancestor=constraints.non_ancestor,
+        measure=measure,
+    )
+    B = adjacency.estimate(
+        X, order, forbidden=forbidden_parents(constraints), required=constraints.required
+    )
     return order, B
+
+
+def forbidden_parents(constraints: Constraints) -> np.ndarray:
+    """``[a, b]``: ``a`` is no parent of ``b``, by a forbidden edge or a non-ancestor claim."""
+    if constraints.non_ancestor is None:
+        return constraints.forbidden
+    return constraints.forbidden | constraints.non_ancestor

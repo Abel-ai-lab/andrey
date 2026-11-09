@@ -1535,7 +1535,10 @@ def boss_fci(
         :func:`~andrey.boss` does, and the test phase starts from the adjacencies BOSS found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained.
+        With ``env``, the environment index is unconstrained. In the PAG, ``ancestors`` makes an
+        adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no test
+        removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
+        contradicts raises ``ValueError``.
 
     Returns
     -------
@@ -1862,7 +1865,10 @@ def grasp_fci(
         :func:`~andrey.grasp` does, and the test phase starts from the adjacencies GRaSP found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained.
+        With ``env``, the environment index is unconstrained. In the PAG, ``ancestors`` makes an
+        adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no test
+        removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
+        contradicts raises ``ValueError``.
 
     Returns
     -------

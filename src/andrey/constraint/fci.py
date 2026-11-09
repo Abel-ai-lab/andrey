@@ -30,6 +30,7 @@ from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core.knowledge import KnowledgeError
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -155,13 +156,77 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
     ``i -> j``), and a required ``i -> j`` is ``i -> j``: a tail at ``i`` and, as its reverse is
-    forbidden, an arrowhead at ``j``. ``None`` leaves ``marks`` as they are.
+    forbidden, an arrowhead at ``j``. A non-ancestor claim ``(i, j)`` puts an arrowhead at ``i``,
+    and an ancestor claim ``(i, j)`` makes the edge ``i -> j``: in a maximal ancestral graph an
+    edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
+    (Richardson and Spirtes 2002). An ancestor claim on an edge the forbidden edges or the tiers put
+    an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`. ``None``
+    leaves ``marks`` as they are.
     """
     if constraints is None:
         return
     adjacent = marks != NULL
     marks[adjacent & constraints.forbidden & ~constraints.forbidden.T] = ARROW
+    if constraints.non_ancestor is not None:
+        marks[adjacent & constraints.non_ancestor] = ARROW
     marks[adjacent & constraints.required] = TAIL
+    if constraints.ancestor is not None:
+        claimed = adjacent & constraints.ancestor
+        if (clash := claimed & (marks == ARROW)).any():
+            i, j = np.argwhere(clash)[0].tolist()
+            raise KnowledgeError(
+                f"knowledge lists ({i}, {j}) in ancestors, but forbids the edge {i} -> {j} one way "
+                f"or by the tiers, which puts an arrowhead at {i} on the edge it keeps between them"
+            )
+        marks[claimed] = TAIL
+        marks[claimed.T] = ARROW
+
+
+def check_path_claims(
+    marks: np.ndarray,
+    ancestor: np.ndarray | None,
+    non_ancestor: np.ndarray | None,
+    label: Callable[[int], str] = str,
+) -> None:
+    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when the PAG ``marks`` contradict a
+    path claim.
+
+    ``ancestor[a, b]`` claims that ``a`` is an ancestor of ``b``, which needs a possibly directed
+    path from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not out of
+    ``v`` (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral graph the
+    PAG stands for. ``non_ancestor[a, b]`` claims the opposite, which a directed path
+    ``a -> ... -> b`` denies in every such graph. ``label`` names a node in the message.
+    """
+    for claims, steps, holds, what in (
+        (ancestor, (marks != NULL) & (marks != ARROW) & (marks.T != TAIL), False, "no possibly"),
+        (non_ancestor, (marks == TAIL) & (marks.T == ARROW), True, "a"),
+    ):
+        if claims is None or not claims.any():
+            continue
+        for a in np.flatnonzero(claims.any(axis=1)).tolist():
+            reached = reach(steps, a)
+            if (found := claims[a] & (reached == holds)).any():
+                b = int(np.flatnonzero(found)[0])
+                part = "ancestors" if claims is ancestor else "non_ancestors"
+                raise KnowledgeError(
+                    f"knowledge lists ({label(a)}, {label(b)}) in {part}, but the PAG has {what} "
+                    f"directed path from {label(a)} to {label(b)}"
+                )
+
+
+def reach(steps: np.ndarray, source: int) -> np.ndarray:
+    """The nodes a path of one or more ``steps[u, v]`` leads to from ``source``, as a mask."""
+    reached = np.zeros(len(steps), dtype=bool)
+    frontier = steps[source].copy()
+    while frontier.any():
+        reached |= frontier
+        frontier = steps[frontier].any(axis=0) & ~reached
+    return reached
+
+
+def _pattern_decides(pattern: np.ndarray, a: int, b: int, c: int) -> bool:
+    """Whether ``pattern`` holds the triple ``a - b - c`` with ``a`` and ``c`` non-adjacent."""
+    return not _adjacent(pattern, a, c) and _adjacent(pattern, a, b) and _adjacent(pattern, c, b)
 
 
 def _adjacent(marks: np.ndarray, a: int, b: int) -> bool:
@@ -236,8 +301,10 @@ def orient_colliders(
     ascending order), ``b`` is a collider iff a separating set for ``a`` and ``c`` is recorded and
     does not contain ``b``, and the triple is not ``ambiguous``. With ``pattern``, the CPDAG of a
     score search, a pair the pattern leaves non-adjacent is decided by the pattern instead: ``b``
-    is a collider iff the pattern has ``a -> b <- c``. The endpoint at ``b`` on both edges is then
-    set to an arrowhead; an already-directed tail at ``b`` blocks the orientation.
+    is a collider iff the pattern has ``a -> b <- c``, when the pattern also joins ``b`` to both:
+    a triple over an edge the pattern lacks, such as a latent pair the knowledge adds, is decided
+    by the separating sets. The endpoint at ``b`` on both edges is then set to an arrowhead; an
+    already-directed tail at ``b`` blocks the orientation.
     """
     for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
@@ -245,7 +312,7 @@ def orient_colliders(
                 a, c = adj[i], adj[k]
                 if _adjacent(marks, a, c) or _is_def_collider(marks, a, b, c):
                     continue
-                if pattern is not None and not _adjacent(pattern, a, c):
+                if pattern is not None and _pattern_decides(pattern, a, b, c):
                     collider = pattern[b, a] == ARROW and pattern[b, c] == ARROW
                 else:
                     sep = separating_set(sepsets, a, c)
@@ -265,7 +332,7 @@ def orient_colliders(
 # ---- possible-d-separation refinement -----------------------------------------------------------
 
 
-def _semidirected_reach(marks: np.ndarray) -> Callable[[int], int]:
+def _semidirectedreach(marks: np.ndarray) -> Callable[[int], int]:
     """``reach(src)``: the bitmask of every node ``dst`` with a semidirected path
     ``src o-> ... o-> dst`` of one or more steps, searched once per ``src``.
 
@@ -658,7 +725,7 @@ def _remove_in_node_order(
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     # The lists and the reach read the marks, which only a removal changes.
-    neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
+    neighbors, reach = _neighbor_lists(marks), _semidirectedreach(marks)
     for na, nb in edges:
         if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
@@ -669,7 +736,7 @@ def _remove_in_node_order(
             if _try_remove_by_dsep(
                 marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth, pool, tested
             ):
-                neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
+                neighbors, reach = _neighbor_lists(marks), _semidirectedreach(marks)
                 break
             tested = set(dsep)
 

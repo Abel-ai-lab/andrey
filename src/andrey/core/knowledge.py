@@ -451,17 +451,20 @@ class Constraints:
     def precedence(self) -> np.ndarray:
         """``[i, j]``: ``i`` comes before ``j`` in every causal order an order search visits.
 
-        Holds the required edges and every pair of tiered columns in tier order. Raises
-        :class:`KnowledgeError` when they form a cycle, so that no order satisfies them.
+        Holds the required edges, the ``ancestors`` pairs, and every pair of tiered columns in tier
+        order. Raises :class:`KnowledgeError` when they form a cycle, so that no order satisfies
+        them.
         """
         tiered = self.tier >= 0
         before = self.required | (
             tiered[:, None] & tiered[None, :] & (self.tier[:, None] < self.tier[None, :])
         )
+        if self.ancestor is not None:
+            before = before | self.ancestor
         if has_cycle(before):
             raise KnowledgeError(
-                "the required edges and the tiers admit no causal order: following them leads "
-                "from a column back to itself through an untiered column"
+                "the required edges, ancestors, and tiers admit no causal order: following them "
+                "leads from a column back to itself through an untiered column"
             )
         return before
 
@@ -568,12 +571,15 @@ def resolve(
     labels: Sequence[str] | None,
     *,
     method: str,
+    ancestral_tiers: bool = False,
 ) -> Constraints | None:
     """Resolve ``knowledge`` against ``d`` columns named ``labels``; ``None`` when it sets nothing.
 
     ``method`` names the caller in messages. Raises ``TypeError`` when ``knowledge`` is not a
     :class:`Knowledge`, and :class:`KnowledgeError` when it names a missing column or contradicts
-    itself.
+    itself. With ``ancestral_tiers``, for a method that reads a later tier as no ancestor of an
+    earlier one, ``ancestors`` and required edges that lead from a later tier into an earlier one
+    contradict the tiers.
     """
     if knowledge is None or not _given(knowledge):
         return None
@@ -617,7 +623,7 @@ def resolve(
         for part in ("ancestors", "non_ancestors", "latent")
     )
     latent |= latent.T
-    _check_paths(ancestor, non_ancestor, latent, constraints, label)
+    _check_paths(ancestor, non_ancestor, latent, constraints, label, ancestral_tiers)
     return Constraints(forbidden, required, tier, ancestor, non_ancestor, latent)
 
 
@@ -645,12 +651,14 @@ def _check_paths(
     latent: np.ndarray,
     constraints: Constraints,
     label: Callable[[int], str],
+    ancestral_tiers: bool = False,
 ) -> None:
     """Raise :class:`KnowledgeError` when the path and latent parts contradict the knowledge.
 
     ``ancestors`` and the required edges, followed through other pairs, must not lead from a
-    column back to itself nor to a pair ``non_ancestors`` lists; a ``latent`` pair is adjacent in
-    a maximal ancestral graph, so the knowledge must not make it non-adjacent.
+    column back to itself nor to a pair ``non_ancestors`` lists, nor, with ``ancestral_tiers``,
+    from a later tier into an earlier one; a ``latent`` pair is adjacent in a maximal ancestral
+    graph, so the knowledge must not make it non-adjacent.
     """
     reach = ancestor | constraints.required
     for k in range(len(reach)):  # Warshall's transitive closure
@@ -665,6 +673,14 @@ def _check_paths(
         raise KnowledgeError(
             f"knowledge non_ancestors lists ({label(i)}, {label(j)}), but its ancestors and "
             f"required edges make {label(i)} an ancestor of {label(j)}"
+        )
+    tier = constraints.tier
+    later = (tier[:, None] > tier[None, :]) & (tier[None, :] >= 0)
+    if ancestral_tiers and (back := reach & later).any():
+        i, j = np.argwhere(back)[0].tolist()
+        raise KnowledgeError(
+            f"knowledge ancestors and required edges make {label(i)} an ancestor of {label(j)}, "
+            "but the tiers put it later, and a later tier is no ancestor of an earlier one"
         )
     if (apart := latent & ~constraints.support()).any():
         i, j = np.argwhere(apart)[0].tolist()
@@ -683,12 +699,19 @@ class LaggedConstraints:
     holds the forbidden links, the links from a later tier into an earlier one, both directions of
     every pair outside the allowed set at every lag (a variable's links to its own past stay), and
     at lag ``0`` the reverse of every required link. ``required[lag, i, j]`` requires that link.
-    ``tier[i]`` is column ``i``'s tier, ``-1`` for none.
+    ``tier[i]`` is column ``i``'s tier, ``-1`` for none. ``ancestor[lag, i, j]`` holds when the
+    knowledge lists ``(i, j, lag)`` in ``ancestors``: ``i`` at time ``t - lag`` is an ancestor of
+    ``j`` at ``t``. ``non_ancestor`` holds the ``non_ancestors`` links, and ``latent`` the
+    ``latent`` ones, symmetric at lag ``0``; the three are ``None`` when the knowledge sets none of
+    those parts.
     """
 
     forbidden: np.ndarray
     required: np.ndarray
     tier: np.ndarray
+    ancestor: np.ndarray | None = None
+    non_ancestor: np.ndarray | None = None
+    latent: np.ndarray | None = None
 
     def contemporaneous(self) -> Constraints:
         """The lag-0 constraints, as :class:`Constraints` over the ``d`` series."""
@@ -697,8 +720,17 @@ class LaggedConstraints:
     def permuted(self, order: npt.ArrayLike) -> LaggedConstraints:
         """These constraints with series ``order[k]`` as series ``k``."""
         idx = np.asarray(order, dtype=np.intp)
+
+        def move(links: np.ndarray | None) -> np.ndarray | None:
+            return None if links is None else links[:, idx][:, :, idx]
+
         return LaggedConstraints(
-            self.forbidden[:, idx][:, :, idx], self.required[:, idx][:, :, idx], self.tier[idx]
+            self.forbidden[:, idx][:, :, idx],
+            self.required[:, idx][:, :, idx],
+            self.tier[idx],
+            move(self.ancestor),
+            move(self.non_ancestor),
+            move(self.latent),
         )
 
     def lagged_forbidden(self) -> tuple[int, int, int] | None:
@@ -724,9 +756,10 @@ def resolve_lagged(
     Returns ``None`` when it sets nothing. An edge without a lag is forbidden at every lag; a
     forbidden link beyond ``tau_max`` constrains nothing the method learns and is dropped. A
     required link needs its lag, at most ``tau_max``, and above ``0`` when ``contemporaneous`` is
-    false (a method that learns no lag-0 links). ``method`` acts as for :func:`resolve`. Raises
-    :class:`KnowledgeError` when the knowledge names a missing column, contradicts itself, or
-    requires a link the method does not learn.
+    false (a method that learns no lag-0 links). ``ancestors``, ``non_ancestors``, and ``latent``
+    links need their lag too, and a later tier is no ancestor of an earlier one at any lag.
+    ``method`` acts as for :func:`resolve`. Raises :class:`KnowledgeError` when the knowledge
+    names a missing column, contradicts itself, or requires a link the method does not learn.
     """
     if knowledge is None or not _given(knowledge):
         return None
@@ -767,7 +800,93 @@ def resolve_lagged(
     if (required[0] & required[0].T).any() or has_cycle(required[0]):
         raise KnowledgeError("knowledge requires lag-0 links that form a directed cycle")
     forbidden[0] |= required[0].T
-    return LaggedConstraints(forbidden, required, tier)
+    if not any((knowledge.ancestors, knowledge.non_ancestors, knowledge.latent)):
+        return LaggedConstraints(forbidden, required, tier)
+    ancestor, non_ancestor, latent = (
+        _lagged_pairs(getattr(knowledge, part), part, (lags, d, d), position, label, method)
+        for part in ("ancestors", "non_ancestors", "latent")
+    )
+    latent[0] |= latent[0].T
+    lag0 = Constraints(forbidden[0], required[0], tier)
+    _check_paths(ancestor[0], non_ancestor[0], latent[0], lag0, label, ancestral_tiers=True)
+    _check_lagged_paths(ancestor, non_ancestor, latent, forbidden, required, tier, label)
+    return LaggedConstraints(forbidden, required, tier, ancestor, non_ancestor, latent)
+
+
+def _lagged_pairs(
+    edges: tuple[Edge, ...],
+    part: str,
+    shape: tuple[int, int, int],
+    position: Callable[[Node, str], int],
+    label: Callable[[int], str],
+    method: str,
+) -> np.ndarray:
+    """The ``(lags, d, d)`` mask of the links a knowledge ``part`` lists; raises
+    :class:`KnowledgeError` for a link without a lag, beyond the lags learned, or from a column to
+    itself at lag ``0``."""
+    mask = np.zeros(shape, dtype=bool)
+    lags = shape[0]
+    for edge in edges:
+        i, j = position(edge[0], part), position(edge[1], part)
+        if len(edge) == 2:
+            raise KnowledgeError(
+                f"knowledge {part} lists ({label(i)}, {label(j)}) without a lag; {method} needs "
+                "the lag of each claim, as (cause, effect, lag)"
+            )
+        lag = edge[2]
+        if lag >= lags:
+            raise KnowledgeError(
+                f"knowledge {part} lists ({label(i)}, {label(j)}) at lag {lag}, but {method} "
+                f"learns the links at lags 0 to {lags - 1}"
+            )
+        if i == j and lag == 0:
+            raise KnowledgeError(f"knowledge {part} pairs column {label(i)} with itself at lag 0")
+        mask[lag, i, j] = True
+    return mask
+
+
+def _check_lagged_paths(
+    ancestor: np.ndarray,
+    non_ancestor: np.ndarray,
+    latent: np.ndarray,
+    forbidden: np.ndarray,
+    required: np.ndarray,
+    tier: np.ndarray,
+    label: Callable[[int], str],
+) -> None:
+    """Raise :class:`KnowledgeError` when the lagged path and latent claims contradict the edge
+    parts: a claim and its denial on one link, a later tier as an ancestor of an earlier one, a
+    latent link the knowledge leaves out, or an ancestor at lag ``0`` whose edge the knowledge
+    forbids one way, which puts an arrowhead at the ancestor on a link the search starts from."""
+    later = (tier[:, None] > tier[None, :]) & (tier[None, :] >= 0)
+
+    def first(found: np.ndarray, message: str) -> None:
+        if found.any():
+            lag, i, j = np.argwhere(found)[0].tolist()
+            raise KnowledgeError(message.format(link=f"({label(i)}, {label(j)}, {lag})"))
+
+    first(
+        (ancestor | required) & non_ancestor,
+        "knowledge non_ancestors lists {link}, but its ancestors or required links make the cause "
+        "an ancestor of the effect",
+    )
+    first(
+        ancestor & later[None],
+        "knowledge ancestors lists {link}, but the tiers put the cause later, and a later tier is "
+        "no ancestor of an earlier one",
+    )
+    absent = forbidden.copy()
+    absent[0] &= forbidden[0].T
+    first(
+        latent & absent,
+        "knowledge latent lists {link}, a link a hidden common cause keeps, which the knowledge "
+        "also leaves out (forbidden, by the tiers, or outside allowed)",
+    )
+    first(
+        ancestor[:1] & forbidden[:1] & ~forbidden[:1].transpose(0, 2, 1),
+        "knowledge ancestors lists {link}, but it forbids that edge one way, which puts an "
+        "arrowhead at the cause",
+    )
 
 
 # ---- applying constraints to an equivalence class -----------------------------------------------
