@@ -118,17 +118,30 @@ def test_the_paper_simulation_draws_its_own_noise_only() -> None:
         regime_models.sample("camuv2021", d=14, n=50, seed=0, density=2.7, noise="gaussian")
 
 
-#: SHA-256 of the data and truth of the paper's simulation at seeds 0 to 2, 50 rows. A change to any
-#: drawn value changes it, and with it the datasets a campaign has stored.
-PAPER_DRAWS = "4f054bc3d4f7c9b4f6ca0e8687b548e70e9054ea9e36853dbbc5d2ad04e9477a"
+#: SHA-256 of the truth of the paper's simulation at seeds 0 to 2, and the column sums of its data,
+#: 50 rows, one row of sums per seed. A change to any drawn edge or value changes one of them, and
+#: with it the datasets a campaign has stored. The sums hold to 1e-9 rather than to the last bit:
+#: NumPy's vectorized math rounds the last bits differently on different CPUs.
+PAPER_MARKS = "2f43304406df7e1a0872b13fd249dcb3bf48f989848ac40e34ac4366ed7d376d"
+PAPER_SUMS = (
+    (24.1979288302, 35.7513597957, -46.3530380899, 9.05727030758, 84.4784618184,
+     -22.1468098867, 13.8828502502, -4.12812906304, -23.4169842827, 18.3314403836),
+    (-2.04459485704, 72.7661055361, 44.1575136354, -5.52488207426, 76.7719968871,
+     28.1507105109, -27.0898342879, -10.1360860812, -14.7146908023, -45.3068079364),
+    (27.2278103787, -54.6785471623, -14.4603993801, 35.0914881878, -27.4279531622,
+     100.651809015, 5.58575067973, -47.3398097267, 44.5659941668, 61.2770051943),
+)  # fmt: skip
 
 
 def test_the_paper_simulation_keeps_its_draws() -> None:
     digest = hashlib.sha256()
+    sums = []
     for seed in range(3):
         data, marks = _paper(seed, n=50)
-        digest.update(np.ascontiguousarray(data).tobytes() + marks.tobytes())
-    assert digest.hexdigest() == PAPER_DRAWS
+        digest.update(marks.tobytes())
+        sums.append(data.sum(axis=0))
+    assert digest.hexdigest() == PAPER_MARKS
+    np.testing.assert_allclose(sums, PAPER_SUMS, rtol=1e-9)
 
 
 def test_a_seed_that_cannot_hide_its_nodes_is_skipped() -> None:
