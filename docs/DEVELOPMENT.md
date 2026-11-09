@@ -177,7 +177,31 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    `release_art` in `site/cards.py`, and add a `release-art-<release>` rule (dots as dashes) to
    `_static/benchmarks.css`. The card's cover and the Release cards page's featured cover take both
    classes, `release-art release-art-<release>`; the release's tile keeps the second when it moves
-   to the earlier releases. A cover without art shows the stipple ground (`release_ground_jpeg`).
+   to the earlier releases. A release without art takes the default cover instead, the class
+   `release-default` in place of both, with the wordmark's image in the title's place. The image
+   sits in a `sd-card-text` paragraph, so the version stays the cover's third line; its path is
+   `../_static/` on the Release cards page, as here, and `../../_static/` on the card:
+
+   ```markdown
+   :::{card}
+   :link: benchmarks/0.16.0
+   :link-type: doc
+   :link-alt: The 0.16.0 release card
+   :class-card: release-cover release-default
+   :shadow: none
+   :margin: 0
+
+   Release card
+
+   <p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
+   width="190" height="40"></p>
+
+   0.16.0
+   :::
+   ```
+
+   The tile, `release-tile release-default`, shows the version alone. A post without art (no
+   `cover` in its front matter) gets the default link preview, the wordmark and its line on navy.
 5. Open the card with the same cover, without its link, beside the opening paragraphs in a
    `release-opening` block.
 6. Add the summary's folder to `RELEASES` in `site/build.py`, so the homepage and the README count

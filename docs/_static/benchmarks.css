@@ -12,9 +12,10 @@
 }
 
 /* ---------- the cover and the tile: the brand's stipple ground ---------- */
-/* A release without its own art shows the stipple ground in the covers' tones, shaded where the
-   text sits (`release-ground.jpg`, site/cards.py), so it matches the art covers. `.bd-content
-   .sd-card` is the theme's selector; the extra class wins over it. */
+/* A cover or tile that names neither art nor the default (0.1.0's tile) shows the stipple ground in
+   the covers' tones, shaded where the text sits (`release-ground.jpg`, site/cards.py), so it
+   matches the art covers. `.bd-content .sd-card` is the theme's selector; the extra class wins
+   over it. */
 .bd-content .sd-card.release-cover,
 .bd-content .sd-card.release-tile {
   isolation: isolate;
@@ -53,7 +54,8 @@
 }
 
 /* The latest release's cover: a printed issue, bound on the left. A masthead along the top edge,
-   the title below it, and the version at the bottom under an amber dot. */
+   the title below it, and the version at the bottom under an amber dot; the default cover, for a
+   release without art, has the wordmark in the title's place and no dot (`.release-default`). */
 .release-cover {
   aspect-ratio: 8.5 / 11;
   border-radius: 3px 7px 7px 3px;
@@ -76,7 +78,8 @@ html[data-theme="dark"] .release-cover {
 
 /* The release's own art, `release-cards/<release>.jpg`, in place of the ground; navy shows until it
    loads. The bare class keeps 0.2.0's art, which its released card uses; each later card, and
-   each earlier release's tile, adds `release-art-<release>`. A tile shows the art's middle. */
+   each earlier release's tile, adds `release-art-<release>`, or `release-default` (below) for a
+   release without art. A tile shows the art's middle. */
 .bd-content .sd-card.release-cover.release-art {
   background:
     url("release-cards/0.2.0.jpg") center / cover no-repeat,
@@ -164,6 +167,24 @@ html[data-theme="dark"] .release-cover {
   background:
     url("release-cards/0.15.0.jpg") center 62% / cover no-repeat,
     var(--andrey-ground-navy);
+}
+
+/* A release without its own art: the navy ground, and on the cover the wordmark's image
+   (`_static/wordmark-dark.svg`, in a `sd-card-text` paragraph) in the title's place. It has no
+   amber dot: the wordmark's amber stroke is the composition's one accent (`DESIGN.md`, "Node and
+   edge"). A tile shows the version alone, as the art tiles do. */
+.bd-content .sd-card:is(.release-cover, .release-tile).release-default {
+  background: var(--andrey-ground-navy);
+}
+
+.release-cover.release-default .sd-card-text:nth-of-type(2) img {
+  display: block;
+  width: 70%;
+  height: auto;
+}
+
+.release-cover.release-default .sd-card-text:nth-of-type(3)::before {
+  display: none;
 }
 
 .bd-content .sd-card.release-cover .sd-card-body {

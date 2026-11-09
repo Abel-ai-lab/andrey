@@ -16,12 +16,33 @@ names its pull request.
   by position, as `square` nodes, as `draw` does. ([#806])
 - The graph types guide has a section, "Reading a drawing", with a legend of every mark `draw`
   uses. ([#806])
+- A release without its own art has a default release-card cover: the navy ground, the "Release
+  card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
+  tile among the earlier releases shows the version on navy, and a post without art has the same
+  link preview, the wordmark and its release on navy. ([#809])
 
 ### Changed
 
 - `andrey.viz.draw` marks each edge with an arrowhead into an intervened variable by a cross in
   its middle, where it put a bar by the arrowhead, and marks a target that no arrowhead points
   into by its square alone, where it drew a short barred arrow from outside into it. ([#806])
+- `fci`'s **Limitations** paragraph says that test errors can give results that no MAG fits,
+  and the `pag` it returns is then not the PAG of any MAG: of 200 simulated datasets with 10
+  variables, mean degree 3, and 2,000 rows, 36 fits with `"fisherz"` and 36 with `"normal_scores"`
+  returned one. On 28 and 29 of them, the MAG that Zhang's construction builds from the `pag` is
+  not ancestral, and a graph query such as `m_separated` raised `ValueError`. `bootstrap`'s Notes
+  name a `pag` from which Zhang's construction builds no MAG among the fits its averaged graph
+  passes over for the nearest valid resample. ([#807])
+- `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, and `indep_test="kci"` without conditions
+  compute their HSIC p-values from the gamma law's upper tail through its logarithm, as `resit` and
+  `camuv` do, instead of as one minus the lower tail, which rounded every p-value below about 1e-16
+  to 0. `anm` and `pnl` compare the logarithms of their two p-values, which keep their order where
+  both p-values fall below about 1e-308 and read 0, and `bottom_up_parce_lingam` and `gin` pool a
+  finite logarithm by Fisher's method where they pooled infinity or the smallest double. A result
+  can therefore change where both p-values were below 1e-16 and the HSIC statistics decided; on
+  970 pairs drawn as the ANM and PNL benchmarks draw theirs, from 200 to 16,000 rows, no direction
+  changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
+  `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2042,3 +2063,6 @@ First alpha release.
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
 [#806]: https://github.com/Abel-ai-lab/andrey/pull/806
+[#807]: https://github.com/Abel-ai-lab/andrey/pull/807
+[#808]: https://github.com/Abel-ai-lab/andrey/pull/808
+[#809]: https://github.com/Abel-ai-lab/andrey/pull/809

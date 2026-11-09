@@ -606,7 +606,7 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
-    # A release cover or tile without its own art (_static/benchmarks.css).
+    # A release cover or tile that names neither art nor the default (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
     # Brand kit downloads (`_static/brand/`) and colors from the palette.
     for name, data in cards.brand_kit().items():
