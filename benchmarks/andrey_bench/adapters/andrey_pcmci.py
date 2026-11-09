@@ -133,13 +133,20 @@ def pcmciplus_link_strings(out: Any) -> np.ndarray:
 
     The layout of tigramite's ``results["graph"]``: lag 0 holds ``-->`` and ``<--`` for an oriented
     link, ``o-o`` for an unoriented one, and ``x-x`` for a conflict, which the structure shows as
-    undirected and ``metadata["conflicts"]`` lists; lags ``>= 1`` hold ``-->``.
+    undirected and ``metadata["conflicts"]`` lists as an ``[i, 0, j]`` link; lags ``>= 1`` hold
+    ``-->``. Raises ``RuntimeError`` on a conflict that is not an undirected lag-0 link.
     """
     structure = out.structure
     n, tau_max = structure.n_nodes, max(structure.lags)
     graph = np.full((n, n, tau_max + 1), "", dtype="<U3")
     marks = np.asarray(structure.lag(0).to_numpy())
-    conflicts = {tuple(sorted(int(v) for v in pair)) for pair in out.metadata["conflicts"]}
+    conflicts: set[tuple[int, int]] = set()
+    for i, lag, j in out.metadata["conflicts"]:
+        if lag != 0 or (marks[i, j], marks[j, i]) != (TAIL, TAIL):
+            raise RuntimeError(
+                f"pcmciplus listed the conflict {[i, lag, j]}, not an undirected link"
+            )
+        conflicts.add((min(i, j), max(i, j)))
     names = {(TAIL, ARROW): "-->", (ARROW, TAIL): "<--", (TAIL, TAIL): "o-o"}
     for i, j in zip(*np.nonzero(marks), strict=True):
         pair = (int(marks[i, j]), int(marks[j, i]))
