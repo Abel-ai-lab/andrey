@@ -1633,10 +1633,12 @@ def test_the_newest_release_post_is_the_latest_version(conf):
         ("blog/20261012-andrey-0-2-0", "2026-10-12", "0.2.0"),
     ]
     assert newest(posts) == ("blog/20261012-andrey-0-2-0", "0.2.0")
-    # A later version breaks a tie in date; a tie in both names the posts.
+    # A later version breaks a tie in date, and the later file name a tie in both.
     assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
-    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
-        newest(posts[:2])
+    assert newest(posts[:2]) == ("blog/20261008-why-andrey-is-fast", "0.1.0")
+    moved = [("blog/20261029-andrey-0-11-0", "2026-11-09", "0.16.0"), *posts]
+    moved.append(("blog/20261015-andrey-0-4-0", "2026-11-09", "0.16.0"))
+    assert newest(moved)[0] == "blog/20261029-andrey-0-11-0"
 
 
 def test_the_blog_lists_the_newest_post_first(conf):
@@ -1648,7 +1650,7 @@ def test_the_blog_lists_the_newest_post_first(conf):
         ("blog/a-note", "2026-10-10", ""),
         ("blog/20261012-andrey-0-3-0", "2026-10-12", "0.3.0"),
     ]
-    # By date, then version; posts that tie in both keep their order.
+    # By date, then version, then file name.
     assert newest_first(posts) == [
         "blog/20261012-andrey-0-3-0",
         "blog/20261012-andrey-0-2-0",
@@ -1660,8 +1662,7 @@ def test_the_blog_lists_the_newest_post_first(conf):
     # same day.
     assert newest_first([*posts, ("blog/later", "2026-10-13", "")])[0] == "blog/later"
     assert newest_first([*posts, ("blog/same-day", "2026-10-12", "")])[2] == "blog/same-day"
-    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
-        newest_first(posts[:2])
+    assert newest_first(posts[1::-1]) == newest_first(posts[:2])
 
 
 def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):

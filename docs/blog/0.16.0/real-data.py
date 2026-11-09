@@ -57,9 +57,9 @@ if __name__ == "__main__":  # worker processes re-import this script
     before, after = into_age_or_sex(every_adult), into_age_or_sex(guided)
     print(f"arrows into age or sex: {before} without it, {after} with it")
 
-    # How sure each edge is: 100 fits on bootstrap samples, four at a time.
-    with andrey.config(num_workers=4):
-        boot = andrey.bootstrap("pc", data, n_boot=100, seed=0, knowledge=known)
+    # How sure each edge is: 100 fits on subsamples of half the rows, four at a time.
+    with andrey.config(n_jobs=4):
+        boot = andrey.bootstrap("pc", data, n_resamples=100, seed=0, knowledge=known)
     print("edges in at least half the fits:")
     MARK = {"directed": "->", "undirected": "--"}
     for edge in boot.table(min_frequency=0.5):
