@@ -133,7 +133,10 @@ def pc(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, giving the maximally
         oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
-        the search kept into a directed cycle raises ``ValueError``.
+        the search kept into a directed cycle raises ``ValueError``. In a CPDAG, ``ancestors`` and
+        ``non_ancestors`` keep the DAGs the graph stands for in which each listed path holds or does
+        not, as :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise
+        ``ValueError``.
 
     Returns
     -------
@@ -1310,7 +1313,10 @@ def cdnod(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
-        a directed cycle raises ``ValueError``. The environment index is unconstrained.
+        a directed cycle raises ``ValueError``. The environment index is unconstrained. In a CPDAG,
+        ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which each listed
+        path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no such DAG
+        meets raise ``ValueError``.
 
     Returns
     -------

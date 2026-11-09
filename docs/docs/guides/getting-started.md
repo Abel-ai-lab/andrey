@@ -424,6 +424,30 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
+Knowledge can also state causal paths rather than edges. `ancestors` lists the pairs `(a, b)` in
+which `a` causes `b`, directly or through other variables, and `non_ancestors` the pairs in which
+it does not:
+
+```python
+knowledge = Knowledge(
+    ancestors=[("smoking", "cancer")],  # smoking causes cancer, directly or not
+    non_ancestors=[("tar", "age")],     # tar causes age by no path
+)
+result = pc(data, knowledge=knowledge)
+result.metadata["ancestor_clauses"]
+```
+
+The methods whose result is a CPDAG (PC, CD-NOD, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP,
+exact search, and IAMB, Inter-IAMB, and MMPC with `structure="cpdag"`) honor them: of the DAGs
+the graph they found stands for, they keep those that meet every claim and return their MPDAG, so
+an edge is directed when all of those DAGs direct it alike. Some claims cannot be shown by
+directing edges. If `smoking` causes `cancer` exactly when it is a direct cause of `tar` or of
+`gene`, and the data leave both edges undirected, `metadata["ancestor_clauses"]` lists the claim
+as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
+the result is the class the search found, restricted, not a new search for the best class that
+meets them. These two parts are experimental. `latent` lists pairs with a hidden common cause,
+and no method honors it; a method raises `NotImplementedError` for a part it does not honor.
+
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
 is the same step, except in PCMCI and Granger, which learn no same-step links. A forbidden pair

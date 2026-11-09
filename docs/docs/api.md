@@ -169,7 +169,15 @@ reports only p-values is ordered by its p-value, smallest first.
 be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
 required edge is in the result, whatever its weight, test, or score says. For the time-series
 methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
-time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+time `t`. Three more parts state causal paths and hidden common causes: `ancestors` and
+`non_ancestors` list the pairs `(cause, effect)` with and without a directed path from `cause` to
+`effect`, and `latent` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
+`structure="cpdag"` honor `ancestors` and `non_ancestors`, experimentally: the result is the MPDAG of
+the DAGs of the class found that meet them (Fang et al. 2025), and `metadata["ancestor_clauses"]`
+lists the claims no MPDAG can show. No method honors `latent`. A method given a part it does not
+honor raises `NotImplementedError`, naming the methods that honor it.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take

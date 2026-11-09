@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -2849,17 +2849,47 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
+#: The methods whose result is a CPDAG (for iamb, inter_iamb, and mmpc, with structure="cpdag"):
+#: they honor the path parts by restricting the class they found (Fang et al. 2025).
+_PATH_METHODS = (
+    "pc",
+    "cdnod",
+    "ges",
+    "xges",
+    "hc",
+    "tabu",
+    "mmhc",
+    "rsmax2",
+    "boss",
+    "grasp",
+    "exact_search",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
+)
+_PATH_RULE = (
+    " With ancestors and non_ancestors, the result is the MPDAG of the DAGs in the class found "
+    "that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang et "
+    "al. 2025); claims that no such DAG meets raise."
+)
 _MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
+    _extra = PATH_PARTS if _name in _PATH_METHODS else ()
+    _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(KNOWLEDGE_PARTS)}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}"
+        + (_PATH_RULE if _extra else ""),
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*REGISTRY[_name].params, *_depth, _knowledge)}
+        update={
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
+            "knowledge_extra": _extra,
+            "knowledge_experimental": _extra,
+        }
     )
 
 #: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
@@ -2930,8 +2960,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
-# column types a mixed-data setting read, the fewest rows a test used, and the triples a collider
-# vote left ambiguous.
+# column types a mixed-data setting read, the fewest rows a test used, the triples a collider
+# vote left ambiguous, and the clauses the path parts of knowledge leave.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2949,6 +2979,7 @@ for _name, _spec in REGISTRY.items():
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
+        *(("ancestor_clauses",) if _spec.knowledge_extra else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

@@ -139,6 +139,9 @@ def boss(
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
+        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
+        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
+        such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -468,6 +471,9 @@ def grasp(
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
+        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
+        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
+        such DAG meets raise ``ValueError``.
 
     Returns
     -------
