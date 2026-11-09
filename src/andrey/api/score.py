@@ -2551,11 +2551,12 @@ def calm(
     75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
     local optimum: on a collider whose two parents are independent, it can return both edges
     reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
-    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10 variables
-    with 500 rows and up to 30% of the values missing, completely at random or at random given
-    observed values. It runs the fit 10 times, so it takes about 10 times as long, and under values
-    missing not at random it has no guarantee. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on a collider of 3
+    variables with 1,000 rows and 30% of one variable's values missing at random, where a fit took
+    about 95 s, and on 5 variables with a shortened schedule. It runs the fit 10 times, so it takes
+    about 10 times as long, and under values missing not at random it has no guarantee. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

@@ -70,6 +70,11 @@ def test_the_continuous_searches_learn_the_collider_by_em(name):
     )
 
 
+def test_calm_learns_the_collider_by_em():
+    pytest.importorskip("torch")
+    assert andrey.calm(selected_collider(0), missing="em").structure.oriented_edges() == COLLIDER
+
+
 def test_a_fit_of_the_fixed_case_records_its_output():
     out = andrey.ges(selected_collider(0), missing="em")
     record = out.metadata["em"]
