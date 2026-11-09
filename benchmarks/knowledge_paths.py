@@ -25,11 +25,17 @@ check them against exact answers and against the same fit without the claims.
 
 ``run`` runs the no-worse lanes on simulated data in each method's setting, with claims drawn from
 the truth at several fractions. Each dataset is fitted without claims (``bare``), with true claims
-at each fraction (``true``), and with false claims (``false``, context only). ``errors`` counts
-the pairs adjacent in one graph and not the other plus every tail or arrowhead, on a pair adjacent
-in both, that differs from the true DAG (``cpdag``, ``lingam``), the true MAG over the observed
-variables (``pag``), or the true window MAG (``lpcmci``); an undirected edge or a circle claims
-nothing and is never wrong, so a claim that orients an edge correctly lowers ``errors``.
+at each fraction (``true``), and with false claims (``false``, context only). In ``pag``,
+``lpcmci``, and ``lingam``, ``errors`` counts the pairs adjacent in one graph and not the other
+plus every tail or arrowhead, on a pair adjacent in both, that differs from the true MAG over the
+observed variables (``pag``), the true window MAG (``lpcmci``), or the true DAG (``lingam``); a
+circle claims nothing and is never wrong. In ``cpdag`` a fit is scored against the class the truth
+and its claims define (:func:`class_errors`): ``errors`` is the structural Hamming distance to the
+true CPDAG for a fit without true claims and, for a fit with them, to the MPDAG of the DAGs of the
+true class that meet them, so an edge the claims direct as the true DAG does is no error and an
+edge left undirected where they imply a direction is one; ``dag_errors`` is the endpoint-aware
+distance to the true DAG, the same measure for every arm, in which an edge directed the right way
+costs 0, an undirected one 1, and a reversed, missing, or extra one 2.
 ``empty_errors`` is the empty graph's count, the floor. A fit drops the claims its result cannot
 meet and records how many as ``unmet``; a fit that raises ``KnowledgeError`` (knowledge no graph
 meets) is recorded as ``knowledge_error``, never as a graph.
@@ -49,9 +55,10 @@ once as ``no_dataset`` and left out.
   500, 2000; claims on 10 and 30 % of ordered pairs.
 
 ``summarize`` pairs each ``true`` fit with the ``bare`` fit of its dataset: the mean difference in
-``errors`` and its 95 % interval over :data:`RESAMPLES` bootstrap resamples. A cell is ``worse``
-when the interval lies above 0; a worse cell counts only when the same cell on fresh seeds
-(``--replicate``) is worse too.
+``errors``, and in ``cpdag`` in ``dag_errors`` too, with its 95 % interval over :data:`RESAMPLES`
+bootstrap resamples. A cell is ``worse`` when the interval lies above 0; a worse cell counts only
+when the same cell on fresh seeds (``--replicate``) is worse too. A cell outside a method's stated
+setting (:data:`OUT_OF_SETTING`) is reported with ``in_setting`` false and left out of its verdict.
 
     $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py oracle --lane cpdag --out outputs/kp-oracle
     $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --cell d20-n500-deg2 \\
@@ -135,6 +142,10 @@ LANES = {
 }
 #: The share of ordered pairs the false-claims arm states wrongly.
 FALSE_FRACTION = 0.1
+#: The cells outside a method's stated setting, by lane and method. GES suits sparse graphs: its
+#: release checks run at expected degree 2, and at degree 4 its fit with the default settings does
+#: not beat the empty graph with or without claims, so those cells say nothing about the claims.
+OUT_OF_SETTING = {("cpdag", "ges"): lambda cell: cell["degree"] >= 4}
 
 
 def _log(msg: str) -> None:
@@ -230,6 +241,43 @@ def static_errors(est: np.ndarray, truth: np.ndarray, *, undirected_open: bool) 
         "definite_marks": int(counted.sum()),
         "true_adjacencies": int((upper & adj_t).sum()),
         "empty_errors": int((upper & adj_t).sum()),
+    }
+
+
+def class_errors(est: np.ndarray, dag: np.ndarray, claims: dict | None) -> dict[str, int]:
+    """The counts of a CPDAG fit ``est`` against the true ``dag`` and the true ``claims`` it took.
+
+    ``errors`` is the structural Hamming distance (:func:`andrey.metrics.shd`) to the class the
+    truth and the claims define: the true CPDAG without claims and, with them, the MPDAG of the
+    DAGs of the true class that meet them (:func:`andrey.core.ancestral.restrict` on the true
+    CPDAG, the step the ``cpdag`` oracle checks against the listed class). A pair costs 1 when its
+    edge is missing, extra, reversed, or directed where the target leaves it undirected or the
+    reverse. ``dag_errors`` is the endpoint-aware distance to the true DAG, which does not depend
+    on the claims: an edge directed as the DAG directs it costs 0, an undirected one 1, and a
+    reversed, missing, or extra one 2. ``empty_errors`` and ``empty_dag_errors`` are the empty
+    graph's counts. The other counts are those of :func:`static_errors` against the true DAG.
+    """
+    from andrey import GraphStructure, metrics
+    from andrey.core.ancestral import restrict
+    from andrey.core.orient import dag2cpdag
+
+    d = len(dag)
+    masks = {part: np.zeros((d, d), dtype=bool) for part in ("required_paths", "forbidden_paths")}
+    for part, mask in masks.items():
+        for a, b in (claims or {}).get(part, []):
+            mask[a, b] = True
+    target, _, dropped = restrict(dag2cpdag(dag), masks["required_paths"], masks["forbidden_paths"])
+    assert not dropped, "a claim drawn from the truth holds in a DAG of the true class"
+
+    def graph(marks: np.ndarray, kind: str) -> GraphStructure:
+        return GraphStructure.from_numpy(marks, kind=kind)
+
+    counts = static_errors(est, dag, undirected_open=True)
+    return {
+        **counts,
+        "errors": metrics.shd(graph(est, "cpdag"), graph(target, "cpdag")),
+        "dag_errors": metrics.shd(graph(est, "cpdag"), graph(dag, "dag"), endpoint_aware=True),
+        "empty_dag_errors": 2 * counts["true_adjacencies"],
     }
 
 
@@ -448,8 +496,9 @@ def _lingam_reference(data: np.ndarray, claims: dict | None) -> np.ndarray:
     return marks
 
 
-def scored(lane: str, result: dict, truth: np.ndarray) -> dict:
-    """``result`` with its marks replaced by its error counts against ``truth``."""
+def scored(lane: str, result: dict, truth: np.ndarray, claims: dict | None = None) -> dict:
+    """``result`` with its marks replaced by its error counts against ``truth``; ``claims`` are the
+    true claims the fit took, which set the class a ``cpdag`` fit is scored against."""
     marks = result.pop("marks", None)
     if marks is None:
         return result
@@ -457,7 +506,9 @@ def scored(lane: str, result: dict, truth: np.ndarray) -> dict:
         return {**result, **window_errors(marks, truth)}
     d = len(truth)
     marks = marks[:d, :d]
-    return {**result, **static_errors(marks, truth, undirected_open=lane == "cpdag")}
+    if lane == "cpdag":
+        return {**result, **class_errors(marks, truth, claims)}
+    return {**result, **static_errors(marks, truth, undirected_open=False)}
 
 
 def run_unit(task: tuple) -> list[dict]:
@@ -485,7 +536,12 @@ def run_unit(task: tuple) -> list[dict]:
         for arm, fraction, claims in arms:
             if method.startswith("lingam.") and claims is not None and claims.get("confounded"):
                 claims = {**claims, "confounded": []}
-            result = scored(lane, fit(method, prob["data"], claims, cell, seed), truth)
+            result = scored(
+                lane,
+                fit(method, prob["data"], claims, cell, seed),
+                truth,
+                claims if arm == "true" else None,
+            )
             rows.append(
                 {
                     "lane": lane,
@@ -936,6 +992,15 @@ def bootstrap_95(values: np.ndarray) -> list[float]:
     return [float(lo), float(hi)]
 
 
+def _verdict(interval: list[float]) -> str:
+    return "worse" if interval[0] > 0 else "better" if interval[1] < 0 else "tie"
+
+
+def _outside(lane: str, method: str, cell: str) -> bool:
+    rule = OUT_OF_SETTING.get((lane, method))
+    return rule is not None and cell in LANES[lane]["cells"] and rule(LANES[lane]["cells"][cell])
+
+
 def compare(records: list[dict]) -> list[dict]:
     """Each (lane, method, cell, arm, fraction) against the bare fits of the same datasets."""
     bare = {(r["method"], r["dataset_id"]): r for r in records if r["arm"] == "bare"}
@@ -958,6 +1023,7 @@ def compare(records: list[dict]) -> list[dict]:
             "part": part,
             "arm": arm,
             "fraction": fraction,
+            "in_setting": not _outside(lane, method, cell),
             "datasets": len(rs),
             "paired": len(ok),
             "knowledge_error": sum(r["status"] == "knowledge_error" for r, _ in pairs),
@@ -974,13 +1040,25 @@ def compare(records: list[dict]) -> list[dict]:
                 bootstrap_95=interval,
                 fewer=int((D < 0).sum()),
                 more=int((D > 0).sum()),
-                verdict="worse" if interval[0] > 0 else "better" if interval[1] < 0 else "tie",
+                verdict=_verdict(interval),
                 definite_with=float(np.mean([r["definite_marks"] for r, _ in ok])),
                 definite_without=float(np.mean([b["definite_marks"] for _, b in ok])),
                 floor_with=bootstrap_95(np.array([r["errors"] - r["empty_errors"] for r, _ in ok])),
                 floor_without=bootstrap_95(
                     np.array([b["errors"] - b["empty_errors"] for _, b in ok])
                 ),
+            )
+        if ok and all("dag_errors" in r for pair in ok for r in pair):
+            D = np.array([r["dag_errors"] - b["dag_errors"] for r, b in ok], dtype=float)
+            interval = bootstrap_95(D)
+            row.update(
+                dag_errors_with=float(np.mean([r["dag_errors"] for r, _ in ok])),
+                dag_errors_without=float(np.mean([b["dag_errors"] for _, b in ok])),
+                dag_mean_D=float(D.mean()),
+                dag_bootstrap_95=interval,
+                dag_verdict=_verdict(interval),
+                reversed_with=float(np.mean([r["wrong_marks"] for r, _ in ok])) / 2,
+                reversed_without=float(np.mean([b["wrong_marks"] for _, b in ok])) / 2,
             )
         rows.append(row)
     return rows
@@ -995,17 +1073,16 @@ def cmd_summarize(args: argparse.Namespace) -> int:
         (r["lane"], r["method"], r["cell"], r["part"], r["arm"], r["fraction"]): r
         for r in compare(pool(args.replicate or []))
     }
+    kept = ("paired", "mean_D", "bootstrap_95", "verdict")
+    kept += ("dag_mean_D", "dag_bootstrap_95", "dag_verdict")
     for row in main_rows:
-        if row.get("verdict") == "worse" and row["arm"] == "true":
+        worse = [v for v in ("verdict", "dag_verdict") if row.get(v) == "worse"]
+        if worse and row["arm"] == "true":
             again = replicate.get(
                 (row["lane"], row["method"], row["cell"], row["part"], row["arm"], row["fraction"])
             )
-            row["replicate"] = (
-                None
-                if again is None
-                else {k: again.get(k) for k in ("paired", "mean_D", "bootstrap_95", "verdict")}
-            )
-            row["counts"] = again is not None and again.get("verdict") == "worse"
+            row["replicate"] = None if again is None else {k: again[k] for k in kept if k in again}
+            row["counts"] = again is not None and any(again.get(v) == "worse" for v in worse)
     oracle = {
         f"{Path(d).name}/{p.name}": json.loads(p.read_text())
         for d in (args.oracle or [])

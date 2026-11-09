@@ -54,6 +54,33 @@ def test_an_open_mark_is_never_wrong_and_a_reversed_edge_is():
     )
 
 
+def test_a_cpdag_fit_is_scored_against_the_class_its_claims_leave():
+    # The class of the chain leaves every edge undirected; that 0 is an ancestor of 3 directs all.
+    line = CHAIN.copy()
+    line[CHAIN == kp.ARROW] = kp.TAIL
+    claims = {"required_paths": [[0, 3]], "forbidden_paths": []}
+    reversed_ = _dag(4, [(1, 0), (1, 2), (2, 3)])
+    cases = [  # fit, claims, errors, dag_errors
+        (line, None, 0, 3),  # the true class: nothing more can be directed
+        (line, claims, 3, 3),  # the claims direct three edges the fit leaves undirected
+        (CHAIN, claims, 0, 0),  # an edge directed as the true DAG directs it is no error
+        (reversed_, claims, 1, 2),
+        (np.zeros_like(CHAIN), claims, 3, 6),
+    ]
+    for fit, taken, errors, dag_errors in cases:
+        counts = kp.class_errors(fit, CHAIN, taken)
+        assert (counts["errors"], counts["dag_errors"]) == (errors, dag_errors)
+        assert (counts["empty_errors"], counts["empty_dag_errors"]) == (3, 6)
+    # Directing one edge the right way lowers both counts, and the wrong way raises both.
+    right, wrong = line.copy(), line.copy()
+    right[1, 0] = wrong[0, 1] = kp.ARROW
+    base = kp.class_errors(line, CHAIN, claims)
+    for fit, sign in ((right, -1), (wrong, 1)):
+        counts = kp.class_errors(fit, CHAIN, claims)
+        assert np.sign(counts["dag_errors"] - base["dag_errors"]) == sign
+        assert counts["errors"] - base["errors"] == min(sign, 0)
+
+
 def test_every_dag_on_three_nodes_is_listed():
     assert len(list(kp.all_dags(3))) == 25
 
@@ -98,3 +125,47 @@ def test_summarize_pairs_each_claimed_fit_with_its_bare_fit(tmp_path):
     (row,) = json.loads(out.read_text())["rows"]
     assert (row["paired"], row["knowledge_error"], row["verdict"]) == (6, 1, "better")
     assert row["mean_D"] == -2
+    assert "dag_verdict" not in row and row["in_setting"]
+
+
+def test_summarize_judges_the_distance_to_the_true_dag_and_flags_cells_outside_the_setting(
+    tmp_path,
+):
+    cell = "d10-n500-deg4"
+    rows, again = [], []
+    for method in ("pc", "ges"):
+        for seed in range(6):
+            base = {
+                "lane": "cpdag",
+                "method": method,
+                "cell": cell,
+                "dataset_id": f"x{seed}",
+                "status": "ok",
+                "definite_marks": 4,
+                "wrong_marks": 2,
+                "empty_errors": 9,
+                **{f"n_{p}": 1 for p in kp.PARTS},
+            }
+            bare = {**base, "arm": "bare", "fraction": None, "errors": 5, "dag_errors": 7}
+            true = {**base, "arm": "true", "fraction": 0.1, "errors": 5}
+            rows += [bare, {**true, "dag_errors": 9 + seed % 2}]
+            again += [bare, {**true, "dag_errors": 7 if method == "pc" else 9}]
+    for name, records in (("run", rows), ("rep", again)):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / kp.RECORDS).write_text("".join(json.dumps(r) + "\n" for r in records))
+    out = tmp_path / "summary.json"
+    kp.main(
+        [
+            "summarize",
+            *("--runs", str(tmp_path / "run")),
+            *("--replicate", str(tmp_path / "rep")),
+            *("--out", str(out)),
+        ]
+    )
+    by_method = {row["method"]: row for row in json.loads(out.read_text())["rows"]}
+    for method, row in by_method.items():
+        assert (row["verdict"], row["dag_verdict"], row["dag_mean_D"]) == ("tie", "worse", 2.5)
+        assert row["reversed_with"] == 1
+    # Worse again on the fresh seeds counts; ges at degree 4 is outside its setting.
+    assert not by_method["pc"]["counts"] and by_method["pc"]["in_setting"]
+    assert by_method["ges"]["counts"] and not by_method["ges"]["in_setting"]
