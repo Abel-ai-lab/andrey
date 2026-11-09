@@ -13,22 +13,27 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     data_matrix,
+    fit_missing,
     json_safe,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
+from andrey.core.ci_missing import EM
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
+    import numpy as np
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
     from andrey.search.continuous import ContinuousResult
 
 
-def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> StructureOutput:
-    """Wrap a fit as a weighted DAG with its bookkeeping."""
+def _output(
+    result: ContinuousResult, labels: tuple[str, ...] | None, em: dict[str, object]
+) -> StructureOutput:
+    """Wrap a fit as a weighted DAG with its bookkeeping and the record of its EM, if any."""
     return structure_output(
         result.dag,
         labels=labels,
@@ -37,6 +42,7 @@ def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> Structu
             "h_final": json_safe(result.h_final),
             "edges_removed": result.edges_removed,
             "path_steps": result.path_steps,
+            **em,
         },
     )
 
@@ -56,6 +62,7 @@ def notears(
     mcp_decay: float = 0.8,
     max_path: int = 50,
     standardize: bool = False,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with NOTEARS, a continuous-optimization structure learner.
@@ -248,11 +255,12 @@ def notears(
     """
     from andrey.search.continuous import notears as _notears
 
-    X = data_matrix(data, method="notears")
+    X = data_matrix(data, method="notears", missing=missing == EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
-    with copies_named(labels), one_blas_thread():
-        result = _notears(
+
+    def fit(cov: np.ndarray | None) -> tuple[ContinuousResult, GraphStructure]:
+        found = _notears(
             X,
             lambda1=lambda1,
             w_threshold=w_threshold,
@@ -267,8 +275,13 @@ def notears(
             standardize=standardize,
             labels=labels,
             constraints=constraints,
+            cov=cov,
         )
-    return _output(result, labels)
+        return found, found.dag
+
+    with copies_named(labels), one_blas_thread():
+        result, em = fit_missing(X, missing, fit)
+    return _output(result, labels, em)
 
 
 @method_spec("dagma")
@@ -287,6 +300,7 @@ def dagma(
     mcp_decay: float = 0.8,
     max_path: int = 50,
     standardize: bool = False,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with DAGMA, a continuous-optimization structure learner.
@@ -484,11 +498,12 @@ def dagma(
     """
     from andrey.search.continuous import dagma as _dagma
 
-    X = data_matrix(data, method="dagma")
+    X = data_matrix(data, method="dagma", missing=missing == EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
-    with copies_named(labels), one_blas_thread():
-        result = _dagma(
+
+    def fit(cov: np.ndarray | None) -> tuple[ContinuousResult, GraphStructure]:
+        found = _dagma(
             X,
             lambda1=lambda1,
             w_threshold=w_threshold,
@@ -504,5 +519,10 @@ def dagma(
             standardize=standardize,
             labels=labels,
             constraints=constraints,
+            cov=cov,
         )
-    return _output(result, labels)
+        return found, found.dag
+
+    with copies_named(labels), one_blas_thread():
+        result, em = fit_missing(X, missing, fit)
+    return _output(result, labels, em)

@@ -55,6 +55,7 @@ def boss(
     n_starts: int = 1,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with BOSS (Best Order Score Search).
@@ -354,6 +355,7 @@ def boss(
         score_func=score_func,
         categorical=categorical,
         knowledge=knowledge,
+        missing=missing,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -377,6 +379,7 @@ def grasp(
     n_starts: int = 1,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with GRaSP.
@@ -693,6 +696,7 @@ def grasp(
         score_func=score_func,
         categorical=categorical,
         knowledge=knowledge,
+        missing=missing,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,

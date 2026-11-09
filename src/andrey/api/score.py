@@ -21,7 +21,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
+    bic_cov,
     categorical_metadata,
+    check_em,
     column_labels,
     column_namer,
     copies_named,
@@ -29,6 +31,7 @@ from andrey.api._adapt import (
     data_matrix,
     declared_columns,
     fit_inputs,
+    fit_missing,
     json_safe,
     label_of,
     structure_output,
@@ -36,6 +39,7 @@ from andrey.api._adapt import (
 )
 from andrey.api._method import method_spec
 from andrey.core import backend
+from andrey.core.ci_missing import EM
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -43,7 +47,8 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
+    from andrey.search.calm import CalmResult
 
 
 @method_spec("ges")
@@ -57,6 +62,7 @@ def ges(
     equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with greedy equivalence search (GES).
@@ -387,6 +393,7 @@ def ges(
         score_func=score_func,
         categorical=categorical,
         knowledge=knowledge,
+        missing=missing,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -1051,6 +1058,7 @@ def xges(
     max_parents: int | None = None,
     extended_search: bool = True,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
@@ -1254,11 +1262,13 @@ def xges(
     from andrey.search.xges import xges as _xges
 
     assert score_func is not None  # method_spec picks it from the column types
+    check_em("xges", missing, score_func)
     X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="xges"
+        data, "score_func", score_func, categorical, knowledge, method="xges", missing=missing == EM
     )
-    with copies_named(labels):
-        cpdag, score = _xges(
+
+    def fit(cov: np.ndarray | None) -> tuple[tuple[GraphStructure, float], GraphStructure]:
+        found = _xges(
             X,
             score_func=score_func,
             penalty_discount=penalty_discount,
@@ -1268,8 +1278,13 @@ def xges(
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
+            cov=bic_cov(cov, X.shape[0]),
         )
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+        return found, found[0]
+
+    with copies_named(labels):
+        (cpdag, score), em = fit_missing(X, missing, fit)
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
@@ -1288,6 +1303,7 @@ def hc(
     n_perturbations: int | None = None,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
@@ -1582,6 +1598,7 @@ def hc(
         score_func=score_func,
         categorical=categorical,
         knowledge=knowledge,
+        missing=missing,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -1610,6 +1627,7 @@ def tabu(
     n_perturbations: int | None = None,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with tabu search.
@@ -1899,6 +1917,7 @@ def tabu(
         score_func=score_func,
         categorical=categorical,
         knowledge=knowledge,
+        missing=missing,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -1923,6 +1942,7 @@ def exact_search(
     equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
@@ -2126,11 +2146,19 @@ def exact_search(
     from andrey.search.exact import exact_search as _exact
 
     assert score_func is not None  # method_spec picks it from the column types
+    check_em("exact_search", missing, score_func)
     X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="exact_search"
+        data,
+        "score_func",
+        score_func,
+        categorical,
+        knowledge,
+        method="exact_search",
+        missing=missing == EM,
     )
-    with copies_named(labels):
-        dag = _exact(
+
+    def fit(cov: np.ndarray | None) -> tuple[GraphStructure, GraphStructure]:
+        found = _exact(
             X,
             search_method=search_method,
             score_func=score_func,
@@ -2140,7 +2168,12 @@ def exact_search(
             categorical=mask,
             constraints=constraints,
             max_parents=max_parents,
+            cov=bic_cov(cov, X.shape[0]),
         )
+        return found, found
+
+    with copies_named(labels):
+        dag, em = fit_missing(X, missing, fit)
     marks = dag.to_numpy()
     cpdag = dag2cpdag(marks)
     if constraints is not None:
@@ -2149,7 +2182,7 @@ def exact_search(
     return structure_output(
         to_structure(cpdag, kind="cpdag"),
         labels=labels,
-        metadata={"dag": edges, **categorical_metadata(mask, data)},
+        metadata={"dag": edges, **categorical_metadata(mask, data), **em},
     )
 
 
@@ -2172,6 +2205,7 @@ def calm(
     rho_max: float = 1e16,
     h_tol: float = 1e-8,
     seed: int | None = None,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with CALM, a continuous-optimization structure learner.
@@ -2377,11 +2411,12 @@ def calm(
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data, method="calm")
+    X = data_matrix(data, method="calm", missing=missing == EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="calm")
-    with copies_named(labels):
-        result = _calm(
+
+    def fit(cov: np.ndarray | None) -> tuple[CalmResult, GraphStructure]:
+        found = _calm(
             X,
             lambda1=lambda1,
             alpha=screen_alpha,
@@ -2399,7 +2434,12 @@ def calm(
             use_moral_graph=use_moral_graph,
             seed=seed,  # ty: ignore[invalid-argument-type]  # an int here
             constraints=constraints,
+            cov=cov,
         )
+        return found, found.dag
+
+    with copies_named(labels):
+        result, em = fit_missing(X, missing, fit)
     return structure_output(
         result.dag,
         labels=labels,
@@ -2407,5 +2447,6 @@ def calm(
         metadata={
             "h_final": json_safe(result.h_final),
             "objective": json_safe(result.objective),
+            **em,
         },
     )

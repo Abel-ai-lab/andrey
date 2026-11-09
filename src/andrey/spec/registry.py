@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
+from andrey.core.ci_missing import EM, EM_METHODS
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
@@ -2861,6 +2862,23 @@ for _name in CONCEPTS["missing"].conforming:
         update={"params": (*_params[:_cut], _MISSING, *_params[_cut:])}
     )
 
+#: Structural EM on the searches whose fit reads only a covariance and the row count, after their
+#: categorical columns where they have them.
+_MISSING_EM = concept_param(
+    "missing",
+    choices=(EM,),
+    doc="How missing values (NaN) are handled: em = experimental structural EM, which alternates "
+    "the search on the expected covariance of the data with a linear-Gaussian fit of the graph it "
+    "returns, 10 times; it assumes values missing completely at random or at random given "
+    "observed values. null refuses missing values.",
+)
+for _name in EM_METHODS:
+    _params = REGISTRY[_name].params
+    _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={"params": (*_params[:_cut], _MISSING_EM, *_params[_cut:])}
+    )
+
 for _name, _how in _KNOWLEDGE_HOW.items():
     _knowledge = concept_param(
         "knowledge",
@@ -2941,7 +2959,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
-# handled, and the triples a collider vote left ambiguous.
+# handled, the record of a structural EM, and the triples a collider vote left ambiguous.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2959,6 +2977,7 @@ for _name, _spec in REGISTRY.items():
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("missing",) if "missing" in _concepts else ()),
+        *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})

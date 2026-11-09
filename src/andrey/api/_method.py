@@ -362,11 +362,12 @@ def missing_used(
 ) -> dict[str, object]:
     """Return ``{"missing": value}`` when the fit ``out`` met missing values, else ``{}``.
 
-    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``. The
-    value is the call's ``missing`` or, for ``None``, the method's default handling,
-    ``"testwise"``.
+    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, or when
+    it ran structural EM, ``metadata["em"]``. The value is the call's ``missing`` or, for ``None``,
+    the method's default handling, ``"testwise"``.
     """
-    if "rows_tested" not in out.metadata or not any(p.concept == "missing" for p in spec.params):
+    met = "rows_tested" in out.metadata or "em" in out.metadata
+    if not met or not any(p.concept == "missing" for p in spec.params):
         return {}
     return {"missing": arguments.get("missing") or TESTWISE}
 
