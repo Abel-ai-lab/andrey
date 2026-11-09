@@ -106,7 +106,12 @@ def fit_pair(
 
 
 @method_spec("anm")
-def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
+def anm(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    missing: str | None = None,
+) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
 
     ANM [1]_ fits ``y = f(x) + e`` in each direction by Gaussian-process regression. An HSIC test
@@ -123,6 +128,11 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
         exactly one p-value exceeds it. See Notes.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -244,7 +254,12 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
 
 @method_spec("pnl")
-def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
+def pnl(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    missing: str | None = None,
+) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
     PNL [1]_ [2]_ fits ``y = f2(f1(x) + e)`` in each direction. An HSIC test checks whether the
@@ -260,6 +275,11 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
         exactly one p-value exceeds it. See Notes.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
 
     Returns
     -------

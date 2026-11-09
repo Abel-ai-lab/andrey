@@ -442,6 +442,7 @@ def pcmci(
     fdr_method: str = "fdr_bh",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -504,6 +505,11 @@ def pcmci(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -736,6 +742,7 @@ def pcmciplus(
     collider_rule: str = "majority",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
@@ -805,6 +812,11 @@ def pcmciplus(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1342,6 +1354,7 @@ def lpcmci(
     n_preliminary_iterations: int = 1,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
@@ -1394,6 +1407,11 @@ def lpcmci(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

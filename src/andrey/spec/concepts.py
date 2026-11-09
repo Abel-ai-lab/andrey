@@ -24,6 +24,7 @@ from pydantic import model_validator
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci_missing import MISSING_HANDLING
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -956,7 +957,21 @@ _CONCEPTS = (
     ),
     Concept(
         key="missing",
-        summary="NaN is a missing value, and each test reads the rows that observe its variables.",
+        summary="How a fit handles missing values: a NaN cell, pandas' NA, or an empty, NA, or N/A "
+        "field of a CSV file. testwise deletes rows per test, each test reading the rows that "
+        "observe its variables. None picks the method's default handling, which is testwise for "
+        "every method that takes the argument; each method lists the values it accepts.",
+        param=_template(
+            "missing",
+            "str",
+            None,
+            "How missing values (NaN) are handled: testwise = each test reads only the rows where "
+            "all of its variables are observed (test-wise deletion); null picks the method's "
+            "default, testwise.",
+            choices=MISSING_HANDLING,
+            nullable=True,
+        ),
+        fragment="missing values",
         suitable=(
             "pc",
             "fci",
