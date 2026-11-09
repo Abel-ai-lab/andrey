@@ -24,10 +24,10 @@ must return the true CPDAG, which the CPDAG step then restricts; `ges` and `boss
 step to their result. The score phase of `gfci` and `boss_fci` is replaced by its large-sample
 limit, the CPDAG of the minimal I-map in a causal order of the DAG.
 
-Where a PAG has at most 12 circles, `pag` also lists the MAGs of its class, keeps those that meet
-the claims, and compares each mark they share with the fit's. The PAG rule sets marks on adjacent
-pairs only, so a claim about a non-adjacent pair can leave a circle that every kept MAG fills the
-same way; the count of such fits is reported and not judged.
+Where a PAG has at most 12 circles (`--max-circles`), `pag` also lists the MAGs of its class,
+keeps those that meet the claims, and compares each mark they share with the fit's. The PAG rule
+sets marks on adjacent pairs only, so a claim about a non-adjacent pair can leave a circle that
+every kept MAG fills the same way; the count of such fits is reported and not judged.
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py oracle --lane cpdag --out outputs/kp-oracle-cpdag

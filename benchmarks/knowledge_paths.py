@@ -1006,7 +1006,7 @@ def cmd_summarize(args: argparse.Namespace) -> int:
             )
             row["counts"] = again is not None and again.get("verdict") == "worse"
     oracle = {
-        p.name: json.loads(p.read_text())
+        f"{Path(d).name}/{p.name}": json.loads(p.read_text())
         for d in (args.oracle or [])
         for p in Path(d).glob("oracle-*.json")
     }
