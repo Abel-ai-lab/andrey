@@ -198,13 +198,11 @@ class Knowledge:
         edges forming a cycle, ``required_paths`` and required edges forming a directed cycle, a
         pair in ``forbidden_paths`` whose cause ``required_paths`` and required edges make an
         ancestor of its effect, directly or through other variables, or a ``confounded`` pair the
-        knowledge makes non-adjacent. A method that honors ``required_paths`` and
-        ``forbidden_paths`` also raises it when they admit no DAG the graph it found stands for, or
-        when that graph stands for no DAG. A PAG method, ``lpcmci``, and the DirectLiNGAM methods
+        knowledge makes non-adjacent. A PAG method, ``lpcmci``, and the DirectLiNGAM methods
         raise it for ``required_paths`` and required edges that lead from a later tier into an
-        earlier one; a PAG method and ``lpcmci`` also for a claim their PAG contradicts, and for a
-        required path on an edge whose cause ``forbidden`` or ``tiers`` mark with an arrowhead;
-        ``lpcmci`` for a claim without its lag.
+        earlier one; ``lpcmci`` also for a claim without its lag, and for a same-step required
+        path whose edge ``forbidden`` marks with an arrowhead at its cause. These checks run
+        before the search; a claim the graph found does not meet is dropped instead (Notes).
         ``boss``, ``grasp``, and the LiNGAM methods that search a causal order also raise it when
         the required edges and the tiers admit no causal order, through a column in no tier.
         ``pc``, ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a
@@ -284,8 +282,24 @@ class Knowledge:
     show that no remaining variable is an ancestor of some of them, the next variable in the causal
     order is one of those; a variable with a claimed ancestor among the remaining ones is never
     next; and a non-ancestor of a variable is not among its parents. Such a DAG can still miss an
-    ancestor claim, so ``metadata["unmet_knowledge"]`` lists each claim the DAG does not meet, as
-    ``[part, a, b]``.
+    ancestor claim.
+
+    A ``required_paths``, ``forbidden_paths``, or ``confounded`` claim that the rest of the
+    knowledge allows can still be one the graph a fit finds does not meet: the tests remove an
+    edge on the only path an ancestor claim needs, or the class found has no DAG without a path a
+    non-ancestor claim denies. The fit then keeps the graph it found, drops each such claim, warns
+    once with :class:`~andrey.KnowledgeWarning` naming them, and lists them in
+    ``metadata["unmet_knowledge"]``, each ``[part, a, b]``, or ``[part, a, b, lag]`` for
+    ``lpcmci``; the list is empty when every claim is met. A CPDAG method takes the claims one at
+    a time, ``required_paths`` and then ``forbidden_paths``, each in column order, and keeps a
+    claim when some DAG of the class meets it together with those kept before it, so only claims
+    that each hold in some DAG but not together depend on that order; when the graph found stands
+    for no DAG, it drops every claim. A PAG method drops a required path that ``forbidden`` or the
+    tiers deny on a pair the tests keep adjacent, before the rules, in column order, and then
+    each claim the final PAG does not meet; a mark a claim set before the rules stays. A
+    ``confounded`` pair is never tested, so it is always met. Knowledge that no graph meets, such
+    as ``required_paths`` that form a cycle with the required edges, raises ``ValueError`` before
+    the search, as Raises describes.
 
     References
     ----------

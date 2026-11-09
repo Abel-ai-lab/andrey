@@ -15,7 +15,6 @@ import pytest
 
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ancestral import ChainGraph, clause_mpdag, restrict
-from andrey.core.knowledge import KnowledgeError
 from andrey.core.orient import dag2cpdag, meek
 
 # Fang, Zhao, Liu, and He (2025), Figure 7a: A, B, C, and X form a clique of undirected edges, D is
@@ -111,24 +110,36 @@ def _claims(rng: np.random.Generator, truth: np.ndarray, cpdag: np.ndarray, true
 
 def _check(start: np.ndarray, members: list[np.ndarray], required_paths, forbidden_paths) -> bool:
     """Check :func:`restrict` on the graph ``start`` against the enumeration; ``members`` is the
-    class of its CPDAG. Returns whether no DAG met the claims, so that it had to raise."""
+    class of its CPDAG. The claims it keeps are those the enumeration keeps when it takes them
+    in order, ``required_paths`` then ``forbidden_paths``, each kept when some DAG ``start``
+    stands for meets it with those kept before it. Returns whether a claim was dropped."""
+    d = len(start)
+    required_paths = np.zeros((d, d), bool) if required_paths is None else required_paths
+    forbidden_paths = np.zeros((d, d), bool) if forbidden_paths is None else forbidden_paths
     stands_for = [m for m in members if _directed(start) <= _directed(m)]
-    kept = [m for m in stands_for if _meets(m, required_paths, forbidden_paths)]
-    if not kept:
-        with pytest.raises(KnowledgeError):
-            restrict(start, required_paths, forbidden_paths)
-        return True
-    mpdag, clauses = restrict(start, required_paths, forbidden_paths)
+    kept_required, kept_forbidden = np.zeros((d, d), bool), np.zeros((d, d), bool)
+    dropped = []
+    for part, mask in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths)):
+        for i, j in np.argwhere(mask).tolist():
+            trial = (kept_required.copy(), kept_forbidden.copy())
+            trial[part == "forbidden_paths"][i, j] = True
+            if any(_meets(m, *trial) for m in stands_for):
+                kept_required, kept_forbidden = trial
+            else:
+                dropped.append((part, i, j))
+    mpdag, clauses, unmet = restrict(start, required_paths, forbidden_paths)
+    assert unmet == dropped, (start, required_paths, forbidden_paths)
+    kept = [m for m in stands_for if _meets(m, kept_required, kept_forbidden)]
     cpdag = dag2cpdag(members[0])
     assert np.array_equal(mpdag, _expected(cpdag, kept)), (start, required_paths, forbidden_paths)
     assert np.array_equal(meek(mpdag, rule4=True), mpdag)
     assert all(len(heads) >= 2 for _, heads in clauses), clauses
     within = [m for m in stands_for if _directed(mpdag) <= _directed(m)]
     assert [_holds(m, clauses) for m in within] == [
-        _meets(m, required_paths, forbidden_paths) for m in within
+        _meets(m, kept_required, kept_forbidden) for m in within
     ], (start, required_paths, forbidden_paths, clauses)
     _check_minimal(within, clauses)
-    return False
+    return bool(dropped)
 
 
 def _check_minimal(within: list[np.ndarray], clauses) -> None:
@@ -145,7 +156,7 @@ def _check_minimal(within: list[np.ndarray], clauses) -> None:
 
 def test_every_restricted_class_matches_the_enumeration():
     rng = np.random.default_rng(0)
-    checked = raised = 0
+    checked = dropped = 0
     while checked < 300:
         d = int(rng.integers(4, 9))
         truth = _random_dag(rng, d)
@@ -157,15 +168,17 @@ def test_every_restricted_class_matches_the_enumeration():
         start = cpdag
         if lines and checked % 2:
             i, j = lines[rng.integers(len(lines))]
-            if truth[j, i] == ARROW:
+            if truth[i, j] == ARROW:  # j -> i in the truth
                 i, j = j, i
             start = cpdag.copy()
             start[j, i] = ARROW
             start = meek(start, rule4=True)
         required_paths, forbidden_paths = _claims(rng, truth, cpdag, true=checked % 3 != 0)
-        raised += _check(start, _members(cpdag), required_paths, forbidden_paths)
+        found = _check(start, _members(cpdag), required_paths, forbidden_paths)
+        assert not (found and checked % 3), "a true claim is always met"
+        dropped += found
         checked += 1
-    assert raised > 10  # the false claims reach the conflict
+    assert dropped > 10  # the false claims reach the conflict
 
 
 def _sink_dag(rng: np.random.Generator, d: int) -> np.ndarray:
@@ -204,7 +217,7 @@ def test_a_forbidden_path_directs_its_critical_set_into_it():
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
     forbidden_paths = np.zeros((7, 7), dtype=bool)
     forbidden_paths[A, Y] = True
-    mpdag, clauses = restrict(cpdag, None, forbidden_paths)
+    mpdag, clauses, _ = restrict(cpdag, None, forbidden_paths)
     assert {(B, A), (C, A)} <= _directed(mpdag)
     assert clauses == []
 
@@ -215,7 +228,7 @@ def test_a_required_path_through_one_of_two_edges_stays_a_clause():
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
     required_paths = np.zeros((7, 7), dtype=bool)
     required_paths[D, Y] = True
-    mpdag, clauses = restrict(cpdag, required_paths, None)
+    mpdag, clauses, _ = restrict(cpdag, required_paths, None)
     assert _directed(mpdag) - _directed(cpdag) == {(A, B), (A, C), (X, B), (X, C)}
     assert clauses == [(D, frozenset({A, X}))]
 
@@ -231,36 +244,41 @@ def test_a_clause_drops_a_head_another_claim_rules_out():
     assert restrict(cpdag, required_paths, none)[1] == [(0, frozenset({2, 3}))]
 
 
-def test_claims_no_dag_meets_together_raise():
-    # Fang et al. (2025), Example 3: the two claims of Example 2 hold together in no DAG.
+def test_claims_no_dag_meets_together_keep_the_first():
+    # Fang et al. (2025), Example 3: the two claims of Example 2 hold together in no DAG; each holds
+    # in some, so the required path, taken first, is kept, and the forbidden path is dropped.
     cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
     required_paths = np.zeros((7, 7), dtype=bool)
     forbidden_paths = np.zeros((7, 7), dtype=bool)
     required_paths[D, Y] = forbidden_paths[A, Y] = True
-    with pytest.raises(KnowledgeError, match="together"):
-        restrict(cpdag, required_paths, forbidden_paths)
+    mpdag, clauses, unmet = restrict(cpdag, required_paths, forbidden_paths)
+    assert unmet == [("forbidden_paths", A, Y)]
+    alone = restrict(cpdag, required_paths, None)
+    assert np.array_equal(mpdag, alone[0]) and clauses == alone[1] and alone[2] == []
+    assert _check(cpdag, _members(cpdag), required_paths, forbidden_paths)
 
 
-@pytest.mark.parametrize(
-    ("part", "message"), [("required_paths", "no DAG"), ("forbidden_paths", "every DAG")]
-)
-def test_a_claim_the_class_cannot_meet_names_itself(part, message):
+@pytest.mark.parametrize("part", ["required_paths", "forbidden_paths"])
+def test_a_claim_the_class_cannot_meet_is_dropped(part):
     # a -> b <- d and b -> c, the class's one DAG: a is an ancestor of c, and c is not one of a.
     cpdag = dag2cpdag(_graph(4, arrows=[(0, 1), (3, 1), (1, 2)]))
     claim = np.zeros((4, 4), dtype=bool)
-    claim[(2, 0) if part == "required_paths" else (0, 2)] = True
+    pair = (2, 0) if part == "required_paths" else (0, 2)
+    claim[pair] = True
     claims = (claim, None) if part == "required_paths" else (None, claim)
-    with pytest.raises(KnowledgeError, match=message):
-        restrict(cpdag, *claims)
+    mpdag, clauses, unmet = restrict(cpdag, *claims)
+    assert unmet == [(part, *pair)] and clauses == []
+    assert np.array_equal(mpdag, cpdag)
 
 
-def test_a_graph_that_stands_for_no_dag_raises():
+def test_a_graph_that_stands_for_no_dag_drops_every_claim():
     # The undirected 4-cycle a - b - c - d - a has no extension without a new collider.
     pdag = _graph(4, [(0, 1), (1, 2), (2, 3), (3, 0)])
     claim = np.zeros((4, 4), dtype=bool)
     claim[0, 2] = True
-    with pytest.raises(KnowledgeError, match="stands for no DAG"):
-        restrict(pdag, claim, None)
+    mpdag, clauses, unmet = restrict(pdag, claim, claim.T)
+    assert np.array_equal(mpdag, pdag) and clauses == []
+    assert unmet == [("required_paths", 0, 2), ("forbidden_paths", 2, 0)]
 
 
 def test_the_orientation_components_give_the_mpdag_of_clauses():

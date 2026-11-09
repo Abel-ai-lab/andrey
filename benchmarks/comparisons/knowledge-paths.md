@@ -14,7 +14,7 @@ large-sample answer, and compares the claimed result with the answer that listin
 
 | lane | graphs | methods | what must hold |
 |---|---|---|---|
-| `cpdag` | every DAG on 4 and 5 nodes; random DAGs on 6 to 8 nodes whose CPDAG has at most 11 undirected edges | `pc`, `ges`, `boss`, through the step they share | the MPDAG directs an edge exactly when every DAG of the class that meets the claims directs it alike; the MPDAG with its clauses keeps exactly those DAGs; claims no DAG of the class meets raise |
+| `cpdag` | every DAG on 4 and 5 nodes; random DAGs on 6 to 8 nodes whose CPDAG has at most 11 undirected edges | `pc`, `ges`, `boss`, through the step they share | the MPDAG directs an edge exactly when every DAG of the class that meets the claims directs it alike; the MPDAG with its clauses keeps exactly those DAGs; when no DAG of the class meets every claim, some are dropped |
 | `pag` | every DAG on 4 observed nodes with one hidden parent of two or more; random DAGs on 5 to 8 observed and 1 to 3 hidden nodes | `fci`; `gfci` and `boss_fci` with the score phase at its large-sample limit | every tail and arrowhead is the true MAG's, the adjacencies are the MAG's, and every confounded pair is adjacent |
 
 The claims are drawn from the truth: in `cpdag`, 20 %, 50 %, and all of the ordered pairs, with
@@ -57,8 +57,9 @@ adjacent in both, that differs from the true DAG (`cpdag`, `lingam`), the true M
 variables (`pag`), or the true window MAG (`lpcmci`). An undirected edge or a circle states nothing
 and is never wrong, so a claim that orients an edge the right way lowers `errors`, and one that
 orients it the wrong way raises it. `empty_errors`, the empty graph's count, is the floor. A fit
-that raises `KnowledgeError` because the graph it found cannot meet the claims is recorded as
-`knowledge_error`, with its message, and never scored as a graph.
+drops the claims the graph it found cannot meet and records how many as `unmet`; a fit that raises
+`KnowledgeError`, for knowledge no graph meets, is recorded as `knowledge_error`, with its message,
+and never scored as a graph.
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --cell d20-n500-deg2 \

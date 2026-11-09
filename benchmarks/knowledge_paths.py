@@ -12,7 +12,9 @@ check them against exact answers and against the same fit without the claims.
   the true CPDAG, and the step that ``pc``, ``ges``, and ``boss`` share (``restrict_paths``)
   restricts it by claims drawn from the truth, true and false. The MPDAG must direct an edge
   exactly when every DAG of the class that meets the claims directs it alike, the MPDAG with its
-  clauses must keep exactly those DAGs, and claims no DAG meets must raise.
+  clauses must keep exactly those DAGs, and when no DAG meets every claim, some must be dropped.
+  A claim set some claim of which is dropped is counted, not checked further: ``tests/unit``
+  checks which claims are kept against the enumeration.
 - ``pag``: every DAG on 4 observed nodes with one hidden parent of two or more of them, and random
   DAGs on 5 to 8 observed and 1 to 3 hidden. ``fci``, and ``gfci`` and ``boss_fci`` with the score
   phase at its large-sample limit, take true claims; every tail and arrowhead they set must be the
@@ -28,8 +30,9 @@ the pairs adjacent in one graph and not the other plus every tail or arrowhead, 
 in both, that differs from the true DAG (``cpdag``, ``lingam``), the true MAG over the observed
 variables (``pag``), or the true window MAG (``lpcmci``); an undirected edge or a circle claims
 nothing and is never wrong, so a claim that orients an edge correctly lowers ``errors``.
-``empty_errors`` is the empty graph's count, the floor. A fit that raises ``KnowledgeError``
-because its result cannot meet the claims is recorded as ``knowledge_error``, never as a graph.
+``empty_errors`` is the empty graph's count, the floor. A fit drops the claims its result cannot
+meet and records how many as ``unmet``; a fit that raises ``KnowledgeError`` (knowledge no graph
+meets) is recorded as ``knowledge_error``, never as a graph.
 A seed whose graph has too few nodes with two children to hide the cell's hidden nodes is recorded
 once as ``no_dataset`` and left out.
 
@@ -650,7 +653,6 @@ def oracle_cpdag(seed: int, graphs: int, exhaustive: tuple[int, ...]) -> dict:
     """The CPDAG oracle lane: see the module docstring."""
     from andrey.constraint import pc as pc_engine
     from andrey.core.ancestral import restrict
-    from andrey.core.knowledge import KnowledgeError
     from andrey.core.orient import dag2cpdag, meek
 
     rng = np.random.default_rng(seed)
@@ -658,7 +660,7 @@ def oracle_cpdag(seed: int, graphs: int, exhaustive: tuple[int, ...]) -> dict:
         "graphs": 0,
         "claim_sets": 0,
         "exact": 0,
-        "raised_as_expected": 0,
+        "dropped_as_expected": 0,
         "pc_true_cpdag": 0,
         "with_clauses": 0,
     }
@@ -704,16 +706,15 @@ def oracle_cpdag(seed: int, graphs: int, exhaustive: tuple[int, ...]) -> dict:
         for label, req, forb in _cpdag_claim_sets(rng, dag):
             tally["claim_sets"] += 1
             kept = [m for m in members if meets(m, req, forb)]
-            try:
-                mpdag, clauses = restrict(found, req, forb)
-            except KnowledgeError:
+            mpdag, clauses, unmet = restrict(found, req, forb)
+            if unmet:
                 if kept:
-                    failures.append({"why": "raised", "dag": dag.tolist(), "claims": label})
+                    failures.append({"why": "dropped", "dag": dag.tolist(), "claims": label})
                 else:
-                    tally["raised_as_expected"] += 1
+                    tally["dropped_as_expected"] += 1
                 continue
             if not kept:
-                failures.append({"why": "did not raise", "dag": dag.tolist(), "claims": label})
+                failures.append({"why": "did not drop", "dag": dag.tolist(), "claims": label})
                 continue
             common = set.intersection(*(directed(m) for m in kept))
             expected = cpdag.copy()

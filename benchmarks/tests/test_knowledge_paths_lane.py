@@ -61,7 +61,7 @@ def test_every_dag_on_three_nodes_is_listed():
 def test_the_cpdag_oracle_finds_no_mismatch():
     result = kp.oracle_cpdag(0, graphs=5, exhaustive=(3,))
     assert result["failures"] == 0
-    assert result["exact"] + result["raised_as_expected"] == result["claim_sets"]
+    assert result["exact"] + result["dropped_as_expected"] == result["claim_sets"]
     assert result["pc_true_cpdag"] == result["graphs"]
 
 

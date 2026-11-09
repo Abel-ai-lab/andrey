@@ -9,7 +9,8 @@ when every vertex of that set is a direct cause of ``x``. :func:`critical_set` f
 (Fang, Liu, Geng, and He 2022, Algorithm 2 and Proposition 4), :func:`consistent` checks a set of
 clauses against the class (Fang et al. 2025, Algorithm 1), :func:`clause_mpdag` gives the MPDAG of
 the DAGs that meet them (Algorithm 3 and Corollary 38), and :func:`residual_clauses` the clauses the
-MPDAG cannot show (Algorithm 4). :func:`restrict` applies the claims to a learned graph.
+MPDAG cannot show (Algorithm 4). :func:`restrict` applies the claims to a learned graph and drops
+those no DAG it stands for meets.
 
 References
 ----------
@@ -23,12 +24,11 @@ under Markov equivalence. Artificial Intelligence, 305, 103669.
 from __future__ import annotations
 
 from collections import Counter, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
 
-from .knowledge import KnowledgeError
 from .structure import ARROW, TAIL
 
 __all__ = [
@@ -39,6 +39,7 @@ __all__ = [
     "consistent",
     "clause_mpdag",
     "residual_clauses",
+    "Claim",
     "restrict",
 ]
 
@@ -313,67 +314,62 @@ def residual_clauses(
     return left
 
 
+#: A path claim ``(part, x, y)``: ``x`` is (``"required_paths"``) or is not
+#: (``"forbidden_paths"``) an ancestor of ``y``.
+Claim = tuple[str, int, int]
+
+
 def restrict(
     pdag: np.ndarray,
     required_paths: np.ndarray | None,
     forbidden_paths: np.ndarray | None,
-    label: Callable[[int], str] = str,
-) -> tuple[np.ndarray, list[Clause]]:
-    """The DAGs ``pdag`` stands for in which each claim holds: their MPDAG and residual clauses.
+) -> tuple[np.ndarray, list[Clause], list[Claim]]:
+    """The DAGs ``pdag`` stands for in which the claims hold: their MPDAG, residual clauses, and
+    the claims dropped because no such DAG meets them.
 
     ``pdag`` is a learned graph, a CPDAG or an MPDAG, as a mark matrix; it stands for the DAGs of
     the class of its consistent extensions that direct its directed edges alike.
     ``required_paths[i, j]`` claims that ``i`` is an ancestor of ``j``, and
     ``forbidden_paths[i, j]`` that it is not. The claims and the directed edges of ``pdag`` become
     clauses over the CPDAG of the class (:func:`claim_clauses`), and the result is their
-    :func:`clause_mpdag` and :func:`residual_clauses`. ``label`` names a vertex in messages.
+    :func:`clause_mpdag` and :func:`residual_clauses`.
 
-    Raises :class:`~andrey.core.knowledge.KnowledgeError` when ``pdag`` has no consistent extension,
-    or when no DAG it stands for meets the claims; the message names a claim no such DAG meets, or
-    says that only the claims together fail.
+    When no DAG ``pdag`` stands for meets every claim (:func:`consistent`), the claims are taken
+    one at a time, ``required_paths`` and then ``forbidden_paths``, each in column order: a claim
+    is kept when some DAG meets it together with the directed edges and the claims kept before it,
+    and dropped otherwise. A claim that no DAG meets alone is dropped in any order; only claims
+    that each hold in some DAG but not together depend on it, and then the earlier ones are kept.
+    When ``pdag`` has no consistent extension, so that it stands for no DAG, every claim is dropped
+    and ``pdag`` is returned unchanged. The dropped claims come last, each ``(part, x, y)``.
     """
     from .orient import cpdag_of_pdag
 
+    claims: list[Claim] = [
+        (part, x, y)
+        for part, mask in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths))
+        if mask is not None
+        for x, y in np.argwhere(mask).tolist()
+    ]
     try:
         graph = ChainGraph.of(cpdag_of_pdag(pdag))
-    except ValueError as error:
-        raise KnowledgeError(
-            f"the graph found stands for no DAG ({error}), so required_paths and forbidden_paths "
-            "cannot restrict it"
-        ) from error
+    except ValueError:
+        return pdag.copy(), [], claims
     edges = _directed(pdag, graph)
-    pairs = {
-        part: [] if mask is None else [tuple(p) for p in np.argwhere(mask).tolist()]
-        for part, mask in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths))
+    each = {
+        (part, x, y): claim_clauses(
+            graph, *(([(x, y)], []) if part == "required_paths" else ([], [(x, y)]))
+        )
+        for part, x, y in claims
     }
-    clauses = [*edges, *claim_clauses(graph, pairs["required_paths"], pairs["forbidden_paths"])]
+    clauses = [*edges, *(c for found in each.values() for c in found)]
+    dropped: list[Claim] = []
     if not consistent(graph, clauses):
-        raise KnowledgeError(_conflict(graph, edges, pairs, label))
+        clauses = list(edges)
+        for claim in claims:
+            if consistent(graph, [*clauses, *each[claim]]):
+                clauses.extend(each[claim])
+            else:
+                dropped.append(claim)
     mpdag = clause_mpdag(graph, clauses)
-    return mpdag, sorted((t, frozenset(h)) for t, h in residual_clauses(graph, clauses, mpdag))
-
-
-def _conflict(
-    graph: ChainGraph,
-    edges: list[Clause],
-    pairs: dict[str, list[tuple[int, int]]],
-    label: Callable[[int], str],
-) -> str:
-    """The message for claims no DAG of the learned graph meets: the first claim that fails alone,
-    or else all of them together."""
-    for x, y in pairs["required_paths"]:
-        if not consistent(graph, [*edges, *claim_clauses(graph, [(x, y)], [])]):
-            return (
-                f"knowledge required_paths lists ({label(x)}, {label(y)}), but no DAG the graph "
-                f"found stands for has a directed path from {label(x)} to {label(y)}"
-            )
-    for x, y in pairs["forbidden_paths"]:
-        if not consistent(graph, [*edges, *claim_clauses(graph, [], [(x, y)])]):
-            return (
-                f"knowledge forbidden_paths lists ({label(x)}, {label(y)}), but every DAG the "
-                f"graph found stands for has a directed path from {label(x)} to {label(y)}"
-            )
-    return (
-        "knowledge required_paths and forbidden_paths hold together in no DAG the graph found "
-        "stands for, though each holds in some"
-    )
+    residual = sorted((t, frozenset(h)) for t, h in residual_clauses(graph, clauses, mpdag))
+    return mpdag, residual, dropped

@@ -444,9 +444,9 @@ MPDAG, so an edge is directed when all of those DAGs direct it alike. With an un
 which the claims cannot restrict, IAMB, Inter-IAMB, and MMPC raise `NotImplementedError`. Some
 claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly when it is a direct
 cause of `tar` or of `gene`, and the data leave both edges undirected,
-`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
-the result is the class the search found, restricted, not a new search for the best class that
-meets them. These two parts are experimental.
+`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. The result is
+the class the search found, restricted, not a new search for the best class that meets the claims.
+These two parts are experimental.
 
 When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
 that is not in the data; a common cause that is in the data does not make the pair adjacent. The
@@ -465,14 +465,25 @@ result = fci(data, knowledge=knowledge)  # diet <-> exercise
 ```
 
 On a pair the tests keep, a required path makes the edge `smoking -> cancer` and a forbidden path
-puts an arrowhead at its cause; no test removes a `confounded` pair. A claim the PAG contradicts,
-such as a required path with no path that could lead to its effect, raises a `ValueError`. These
-marks and checks assume no selection bias: the samples were not kept or dropped by the value of a
-variable the measured ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths`
-and `forbidden_paths` to narrow the causal order, as their paper describes, and list the claims
-their DAG does not meet in `metadata["unmet_knowledge"]`. Every other method raises
+puts an arrowhead at its cause; no test removes a `confounded` pair. These marks and checks assume
+no selection bias: the samples were not kept or dropped by the value of a variable the measured
+ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths`
+to narrow the causal order, as their paper describes. Every other method raises
 `NotImplementedError` for a part it does not honor, naming the methods that do. These parts are
 experimental for every method.
+
+Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
+before the search. A true claim can still be one the graph a fit finds does not meet: on finite
+data the tests can remove an edge on the only path from `smoking` to `cancer`. The fit then keeps
+its graph, drops the claim, warns with `KnowledgeWarning`, and lists it:
+
+```python
+result.metadata["unmet_knowledge"]  # [] when every claim is met
+# [["required_paths", "smoking", "cancer"]]
+```
+
+When only some claims hold together, a CPDAG method keeps them in order, `required_paths` and then
+`forbidden_paths`, each by column position.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`

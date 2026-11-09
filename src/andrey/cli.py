@@ -1061,7 +1061,7 @@ def fit_errors() -> Generator[None]:
         ) from exc
     except NotImplementedError as exc:  # a documented parameter limit -> fix the call
         raise CliError("unsupported_value", str(exc), EXIT_USAGE) from exc
-    except KnowledgeError as exc:  # knowledge the data's columns or the search cannot satisfy
+    except KnowledgeError as exc:  # knowledge the data's columns or any graph cannot satisfy
         raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
     except TypeError as exc:  # an argument of the wrong type
         raise CliError("unsupported_value", f"{exc}", EXIT_USAGE) from exc

@@ -689,12 +689,27 @@ def test_the_path_parts_are_experimental(data):
         andrey.pc(data, knowledge=Knowledge(required_paths=[("a", "f")]))
 
 
-def test_a_path_the_result_cannot_have_raises(data):
-    # a -> c -> d -> e is directed in every DAG of the class.
-    with pytest.raises(KnowledgeError, match=r"required_paths lists \('e', 'a'\)"):
-        _fit("pc", data, knowledge=Knowledge(required_paths=[("e", "a")]))
+@pytest.mark.parametrize("name", ["pc", "ges", "boss"])
+def test_a_path_the_result_cannot_have_is_dropped(data, name):
+    # a -> c -> d -> e is directed in every DAG of the class, so e is no ancestor of a.
+    met = Knowledge(required_paths=[("a", "f")])
+    knowledge = Knowledge(required_paths=[("e", "a"), ("a", "f")])
+    with pytest.warns(andrey.KnowledgeWarning, match=rf"andrey.{name}: .*\('e', 'a'\)") as caught:
+        out = getattr(andrey, name)(data, knowledge=knowledge)
+    assert len([w for w in caught if w.category is andrey.KnowledgeWarning]) == 1
+    assert out.metadata["unmet_knowledge"] == [["required_paths", "e", "a"]]
+    alone = _fit(name, data, knowledge=met)
+    assert out.structure == alone.structure and alone.metadata["unmet_knowledge"] == []
+    assert out.metadata["ancestor_clauses"] == alone.metadata["ancestor_clauses"]
+
+
+def test_knowledge_no_dag_meets_raises_before_the_search(data):
+    # Each check runs on the knowledge alone, when it is resolved against the data's columns.
     with pytest.raises(KnowledgeError, match="cycle"):
         _fit("ges", data, knowledge=Knowledge(required_paths=[("a", "e")], required=[("e", "a")]))
+    knowledge = Knowledge(required_paths=[("a", "c"), ("c", "e")], forbidden_paths=[("a", "e")])
+    with pytest.raises(KnowledgeError, match="make 'a' an ancestor of 'e'"):
+        _fit("pc", data, knowledge=knowledge)
 
 
 def _collider(seed: int = 0, n: int = 1000) -> pd.DataFrame:

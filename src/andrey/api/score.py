@@ -145,8 +145,9 @@ def ges(
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
         In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1168,7 +1169,8 @@ def xges(
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. In a CPDAG, ``required_paths`` and ``forbidden_paths``
         keep the DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1485,8 +1487,9 @@ def hc(
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
         In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1852,8 +1855,9 @@ def tabu(
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
         In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -2170,8 +2174,9 @@ def exact_search(
         the forbidden parents and include the required ones, so the DAG found is the best one that
         satisfies the knowledge, and the returned graph directs the edges the knowledge decides. In
         a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------

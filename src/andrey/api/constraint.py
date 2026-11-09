@@ -145,8 +145,8 @@ def pc(
         oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
         the search kept into a directed cycle raises ``ValueError``. In a CPDAG, ``required_paths``
         and ``forbidden_paths`` keep the DAGs the graph stands for in which each listed path holds
-        or does not, as :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise
-        ``ValueError``.
+        or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped
+        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -622,8 +622,9 @@ def fci(
         ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``. In the
         PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an
         arrowhead at the cause, and no test removes a ``confounded`` pair, as
-        :class:`~andrey.Knowledge` describes; these marks, and the check that raises ``ValueError``
-        for a claim the PAG contradicts, assume no selection bias.
+        :class:`~andrey.Knowledge` describes; these marks, and the check that drops a claim the PAG
+        does not meet with a :class:`~andrey.KnowledgeWarning` and lists it in
+        ``metadata["unmet_knowledge"]``, assume no selection bias.
 
     Returns
     -------
@@ -845,7 +846,6 @@ def fci(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
-            label=column_namer(labels),
             _ambiguous=ambiguous,
         )
     metadata = {
@@ -907,7 +907,6 @@ def fci_hybrid(
             constraints=augmented_constraints,
             in_column_order=resolve_in_column_order(),
             context=column,
-            label=namer,
             _ambiguous=ambiguous,
             **settings,
         )
@@ -1075,7 +1074,8 @@ def gfci(
         ``env``, the environment index is unconstrained. In the PAG, ``required_paths`` makes an
         adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead at the cause, and no test
         removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; these marks, and the
-        check that raises ``ValueError`` for a claim the PAG contradicts, assume no selection bias.
+        check that drops a claim the PAG does not meet with a :class:`~andrey.KnowledgeWarning` and
+        lists it in ``metadata["unmet_knowledge"]``, assume no selection bias.
 
     Returns
     -------
@@ -1432,8 +1432,9 @@ def cdnod(
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The environment index is unconstrained. In a CPDAG,
         ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
-        listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no such
-        DAG meets raise ``ValueError``.
+        listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
+        meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1811,8 +1812,9 @@ def fci_jci(
         raises ``ValueError``. The environment index is unconstrained. In the PAG,
         ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
         at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
-        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
-        contradicts, assume no selection bias.
+        describes; these marks, and the check that drops a claim the PAG does not meet with a
+        :class:`~andrey.KnowledgeWarning` and lists it in ``metadata["unmet_knowledge"]``, assume no
+        selection bias.
 
     Returns
     -------
@@ -2011,7 +2013,6 @@ def fci_jci(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
-            label=namer,
             _ambiguous=ambiguous,
         )
     variable = label_of(labels)

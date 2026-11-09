@@ -882,14 +882,28 @@ def test_a_path_claim_restricts_the_averaged_graph():
     assert out.structure.endpoints(1, 2) == (TAIL, ARROW)
 
 
-def test_a_vote_the_path_claims_deny_names_the_columns():
+def test_the_averaged_graph_drops_the_claims_it_does_not_meet():
+    # a - b - c: c is an ancestor of a only through b, so the claim that b is not one, taken
+    # after the required path, is dropped, and the averaged graph is c -> b -> a.
+    knowledge = andrey.Knowledge(required_paths=[("c", "a")], forbidden_paths=[("b", "a")])
+    with pytest.warns(andrey.KnowledgeWarning, match=r"andrey.bootstrap: .*\('b', 'a'\)"):
+        out = bootstrap("pc", lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
+    assert out.metadata["unmet_knowledge"] == [["forbidden_paths", "b", "a"]]
+    assert out.structure.endpoints(1, 0) == (TAIL, ARROW)
+    assert out.structure.endpoints(2, 1) == (TAIL, ARROW)
+
+
+def test_a_vote_the_path_claims_deny_drops_them():
     # The vote a -> c <- b, in whose DAGs c is never an ancestor of a.
     vote = np.zeros((3, 3), dtype=np.int8)
     vote[0, 2] = vote[1, 2] = TAIL
     vote[2, 0] = vote[2, 1] = ARROW
-    constraints = resolve(Knowledge(required_paths=[("c", "a")]), 3, list("abc"), method="pc")
-    with pytest.raises(ValueError, match=r"\('c', 'a'\)"):
-        resample._valid_graph(vote, "cpdag", ("a", "b", "c"), constraints, None)
+    knowledge = Knowledge(required_paths=[("c", "a"), ("b", "c")])
+    constraints = resolve(knowledge, 3, list("abc"), method="pc")
+    unmet: list = []
+    graph = resample._valid_graph(vote, "cpdag", ("a", "b", "c"), constraints, None, unmet)
+    assert unmet == [("required_paths", 2, 0)]
+    assert np.array_equal(graph.to_numpy(), vote)
 
 
 def linear_data(n, parents, seed=0):

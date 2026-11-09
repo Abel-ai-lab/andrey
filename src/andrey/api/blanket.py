@@ -166,7 +166,8 @@ def iamb(
         forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -412,7 +413,8 @@ def inter_iamb(
         forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -649,7 +651,8 @@ def mmpc(
         forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------

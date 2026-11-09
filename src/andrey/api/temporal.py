@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from andrey.api._method import method_spec
+from andrey.api._method import drop_unmet, method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
@@ -1443,7 +1443,9 @@ def lpcmci(
         also name each link with its lag: on a link the search keeps, a required path makes it
         ``-->`` from the cause and a forbidden path puts an arrowhead at the cause, while the tests
         can still remove it; no test removes a ``confounded`` link. A claim the PAG over the time
-        window contradicts raises ``ValueError``, as for :func:`~andrey.fci`.
+        window does not meet is dropped, as for :func:`~andrey.fci`: the fit warns with
+        :class:`~andrey.KnowledgeWarning`, and ``metadata["unmet_knowledge"]`` lists each dropped
+        claim as ``[part, a, b, lag]``.
 
     Returns
     -------
@@ -1615,8 +1617,8 @@ def lpcmci(
     >>> out.structure.lag(1).oriented_edges()
     [(0, 0, 'directed'), (1, 1, 'directed')]
     """
-    from andrey.temporal.lpcmci import check_claims
     from andrey.temporal.lpcmci import lpcmci as _native
+    from andrey.temporal.lpcmci import unmet_claims
     from andrey.temporal.pcmci import design_column_name
 
     assert indep_test is not None  # method_spec picks it from the column types
@@ -1646,9 +1648,11 @@ def lpcmci(
             categorical=mask,
             seed=seed,
         )
-    check_claims(result, constraints, (lambda i: repr(labels[i])) if labels is not None else str)
     metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
-    return with_labels(adapt_lpcmci(result, metadata), labels)
+    out = with_labels(adapt_lpcmci(result, metadata), labels)
+    if constraints is None or constraints.required_paths is None:
+        return out
+    return drop_unmet(out, unmet_claims(result, constraints), "lpcmci")
 
 
 @method_spec("granger")

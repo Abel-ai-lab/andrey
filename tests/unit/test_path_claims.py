@@ -17,7 +17,7 @@ import pytest
 import andrey
 from andrey import Knowledge
 from andrey.constraint import fci as fci_engine
-from andrey.constraint.fci import check_path_claims, knowledge_marks
+from andrey.constraint.fci import knowledge_marks, unmet_path_claims
 from andrey.core import ARROW, CIRCLE, LATENT, NULL, OBSERVED, TAIL, GraphStructure, ci
 from andrey.core.knowledge import KnowledgeError, resolve
 from andrey.data.latent import DSepOracle, marginal
@@ -111,7 +111,9 @@ def test_fci_with_true_claims_sets_only_true_marks(seed, monkeypatch):
         np.testing.assert_array_equal(found != NULL, mag != NULL)
         assert not _wrong_marks(found, mag).any()
         assert (found != NULL)[constraints.confounded].all()
-        check_path_claims(found, constraints.required_paths, constraints.forbidden_paths)
+        assert (
+            unmet_path_claims(found, constraints.required_paths, constraints.forbidden_paths) == []
+        )
 
 
 def _minimal_imap(dag: nx.DiGraph, d: int) -> GraphStructure:
@@ -153,7 +155,9 @@ def test_score_then_test_methods_with_true_claims_set_only_true_marks(name, monk
         found = found.to_numpy()
         assert not _wrong_marks(found, mag).any(), seed
         assert (found != NULL)[constraints.confounded].all()
-        check_path_claims(found, constraints.required_paths, constraints.forbidden_paths)
+        assert (
+            unmet_path_claims(found, constraints.required_paths, constraints.forbidden_paths) == []
+        )
         checked += 1
     assert checked >= 15
 
@@ -164,12 +168,24 @@ def independent() -> pd.DataFrame:
     return pd.DataFrame(rng.standard_normal((400, 4)), columns=list("abcd"))
 
 
+def _call(name, data, **kwargs):
+    if name == "fci_jci":
+        return andrey.fci_jci(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
+    return getattr(andrey, name)(data, **kwargs)
+
+
 def _fit(name, data, **kwargs):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if name == "fci_jci":
-            return andrey.fci_jci(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
-        return getattr(andrey, name)(data, **kwargs)
+        return _call(name, data, **kwargs)
+
+
+def _dropping(name, data, **kwargs):
+    """Fit, and return the result with the messages of its :class:`~andrey.KnowledgeWarning`."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = _call(name, data, **kwargs)
+    return out, [str(w.message) for w in caught if w.category is andrey.KnowledgeWarning]
 
 
 @pytest.mark.parametrize("name", ["fci", "fci_jci", "gfci", "boss_fci", "grasp_fci"])
@@ -195,21 +211,36 @@ def test_a_required_path_on_an_adjacent_pair_directs_it():
     knowledge_marks(marks, constraints)
     assert (marks[0, 1], marks[1, 0]) == (TAIL, ARROW)
     assert marks[2, 0] == ARROW and marks[0, 2] == CIRCLE
+    # The forbidden edge's arrowhead at 0 denies the claim, which is left unset.
     clash = resolve(Knowledge(required_paths=[(0, 1)], forbidden=[(0, 1)]), 3, None, method="fci")
-    with pytest.raises(KnowledgeError, match="arrowhead at 0"):
-        knowledge_marks(np.where(np.eye(3, dtype=bool), NULL, CIRCLE).astype(np.int8), clash)
+    marks = np.where(np.eye(3, dtype=bool), NULL, CIRCLE).astype(np.int8)
+    knowledge_marks(marks, clash)
+    assert (marks[0, 1], marks[1, 0]) == (ARROW, CIRCLE)
+    assert unmet_path_claims(marks, clash.required_paths, None) == [("required_paths", 0, 1)]
+    # 0 -> 1 -> 2 would make 0 an ancestor of 2, which the arrowhead at 0 on 0 - 2 denies.
+    cycle = resolve(
+        Knowledge(required_paths=[(0, 1), (1, 2)], forbidden=[(0, 2)]), 3, None, method="fci"
+    )
+    marks = np.where(np.eye(3, dtype=bool), NULL, CIRCLE).astype(np.int8)
+    knowledge_marks(marks, cycle)
+    assert (marks[0, 1], marks[1, 0]) == (TAIL, ARROW)
+    assert (marks[1, 2], marks[2, 1]) == (CIRCLE, CIRCLE)
 
 
 @pytest.mark.parametrize("name", ["fci", "fci_jci", "gfci"])
-def test_a_required_path_on_an_edge_forbidden_one_way_names_the_columns(name):
+def test_a_required_path_on_an_edge_forbidden_one_way_is_dropped(name):
     # a -> b -> c: the tests keep a - b, and forbidding a -> b puts an arrowhead at a.
     rng = np.random.default_rng(0)
     a = rng.standard_normal(1000)
     b = a + rng.standard_normal(1000)
     data = pd.DataFrame({"a": a, "b": b, "c": b + rng.standard_normal(1000)})
-    knowledge = Knowledge(required_paths=[("a", "b")], forbidden=[("a", "b")])
-    with pytest.raises(KnowledgeError, match=r"\('a', 'b'\) in required_paths, .* 'a' -> 'b'"):
-        _fit(name, data, knowledge=knowledge)
+    knowledge = Knowledge(required_paths=[("a", "b"), ("b", "c")], forbidden=[("a", "b")])
+    out, caught = _dropping(name, data, knowledge=knowledge)
+    assert out.metadata["unmet_knowledge"] == [["required_paths", "a", "b"]]
+    assert len(caught) == 1 and "required_paths ('a', 'b')" in caught[0]
+    marks = out.structure.to_numpy()
+    assert marks[0, 1] == ARROW
+    assert (marks[1, 2], marks[2, 1]) == (TAIL, ARROW)  # the claim the PAG meets is kept
 
 
 class _Pattern(Exception):
@@ -235,15 +266,38 @@ def test_the_score_phase_puts_a_required_path_in_its_order(name, monkeypatch):
         assert (pattern != NULL).sum() // 2 == pairs
 
 
-def test_a_claim_the_pag_contradicts_raises(independent):
-    with pytest.raises(ValueError, match="no possibly directed path from 'a' to 'b'"):
-        _fit("fci", independent, knowledge=Knowledge(required_paths=[("a", "b")]))
+@pytest.mark.parametrize("name", ["fci", "fci_jci", "gfci", "boss_fci", "grasp_fci"])
+def test_a_claim_the_pag_does_not_meet_is_dropped(name, independent):
+    knowledge = Knowledge(required_paths=[("a", "b")], forbidden_paths=[("c", "d")])
+    out, caught = _dropping(name, independent, knowledge=knowledge)
+    assert out.metadata["unmet_knowledge"] == [["required_paths", "a", "b"]]
+    assert len(caught) == 1 and caught[0].startswith(f"andrey.{name}: ")
+    assert "required_paths ('a', 'b')" in caught[0] and "'c'" not in caught[0]
+    assert np.array_equal(out.structure.to_numpy(), _fit(name, independent).structure.to_numpy())
+
+
+def test_the_unmet_claims_of_a_pag():
     chain = np.zeros((3, 3), dtype=np.int8)
     chain[0, 1] = chain[1, 2] = TAIL
     chain[1, 0] = chain[2, 1] = ARROW
-    with pytest.raises(KnowledgeError, match=r"\(0, 2\) in forbidden_paths, but the PAG has a"):
-        check_path_claims(chain, None, np.eye(3, k=2, dtype=bool))
-    check_path_claims(chain, np.eye(3, k=2, dtype=bool), np.eye(3, k=-2, dtype=bool))
+    pair = np.eye(3, k=2, dtype=bool)  # (0, 2)
+    assert unmet_path_claims(chain, None, pair) == [("forbidden_paths", 0, 2)]
+    assert unmet_path_claims(chain, pair, pair.T) == []
+    # On an adjacent pair, an ancestor needs the edge a -> b, not only a possibly directed path.
+    circles = np.where(np.eye(2, dtype=bool), NULL, CIRCLE).astype(np.int8)
+    one = np.eye(2, k=1, dtype=bool)
+    assert unmet_path_claims(circles, one, None) == [("required_paths", 0, 1)]
+    assert unmet_path_claims(circles, None, one) == [("forbidden_paths", 0, 1)]
+
+
+@pytest.mark.parametrize("name", ["pc", "ges", "boss", "fci", "gfci", "lpcmci", "direct_lingam"])
+def test_empty_path_parts_change_nothing(name, independent):
+    bare = _fit(name, independent)
+    empty = Knowledge(required_paths=[], forbidden_paths=[], confounded=[])
+    out, caught = _dropping(name, independent, knowledge=empty)
+    assert not caught
+    assert out.structure == bare.structure
+    assert "unmet_knowledge" not in out.metadata and "ancestor_clauses" not in out.metadata
 
 
 @pytest.mark.parametrize(
@@ -307,8 +361,10 @@ def test_order_claims_shape_the_dag(name, chain):
     assert out.metadata["unmet_knowledge"] == []
     met = fit(Knowledge(required_paths=[("x", "z")]))
     assert met.metadata["unmet_knowledge"] == []
-    unmet = fit(Knowledge(required_paths=[("w", "x")]))
+    unmet, caught = _dropping(name, data, knowledge=Knowledge(required_paths=[("w", "x")]))
+    unmet = unmet[0] if isinstance(unmet, list) else unmet
     assert unmet.metadata["unmet_knowledge"] == [["required_paths", "w", "x"]]
+    assert caught and all("required_paths ('w', 'x')" in message for message in caught)
 
 
 # ---- LPCMCI --------------------------------------------------------------------------------------
@@ -353,8 +409,10 @@ def test_lpcmci_claims_need_their_lag():
     ):
         with pytest.raises(ValueError, match=message):
             _fit("lpcmci", data, tau_max=2, knowledge=knowledge)
-    with pytest.raises(ValueError, match="no possibly directed path from 2 at t-2 to 0 at t"):
-        _fit("lpcmci", data, tau_max=2, knowledge=Knowledge(required_paths=[(2, 0, 2)]))
+    knowledge = Knowledge(required_paths=[(2, 0, 2), (0, 1, 1)])
+    out, caught = _dropping("lpcmci", data, tau_max=2, knowledge=knowledge)
+    assert out.metadata["unmet_knowledge"] == [["required_paths", 2, 0, 2]]
+    assert len(caught) == 1 and "required_paths (2, 0, 2)" in caught[0]
 
 
 @pytest.mark.parametrize(
