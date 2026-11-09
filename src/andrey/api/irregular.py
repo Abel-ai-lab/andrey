@@ -510,7 +510,7 @@ def loci(
     rows, or a column constant on them, raises ``ValueError``.
 
     **Limitations.** Not benchmarked yet. Its tests run it on simulated location-scale pairs of up
-    to 1,000 rows. It decides one pair: the paper defines no procedure for more variables. The
+    to 500 rows. It decides one pair: the paper defines no procedure for more variables. The
     model's noise is Gaussian, so under non-Gaussian noise the likelihood criterion is
     misspecified. A spline at either end of the cause's range covers few rows, where the fitted
     variance can shrink toward zero as the likelihood grows, which only the prior bounds. Each HSIC
