@@ -275,6 +275,15 @@ def test_a_pulse_is_a_time_context_beside_the_time_dummy():
     assert out.metadata["time_dummy"]
 
 
+def test_an_undeclared_pulse_raises_as_a_copy_of_a_time_dummy_level():
+    pulse = np.zeros(40)
+    pulse[20] = 1.0
+    data = [np.column_stack([block, pulse]) for block in _datasets(3, 40)]
+    with pytest.raises(SingularCorrelationError) as caught:
+        andrey.jpcmciplus(data)
+    assert "as a time context" in caught.value.__notes__[0]
+
+
 def test_normal_scores_reads_two_datasets():
     out = andrey.jpcmciplus(_datasets(2, 100), indep_test="normal_scores", time_dummy=False)
     assert out.metadata["indep_test"] == "normal_scores"
