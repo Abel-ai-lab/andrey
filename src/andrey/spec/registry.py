@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.ci_missing import EM, EM_METHODS
+from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -156,7 +157,10 @@ _add(
             graph_kind="cpdag",
             doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
-            "[x, z, y] triples the rule left ambiguous, by 0-based position",
+            "[x, z, y] triples the rule left ambiguous, by 0-based position; with missing=mvpc on "
+            "data with missing values, metadata['missingness_parents'] maps each column whose "
+            "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
+            "edges tested again (retested) and removed (removed), by name or 0-based position",
         ),
         accel="numpy",
         status="supported",
@@ -172,6 +176,16 @@ _add(
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
+            concept_param(
+                "missing",
+                choices=("testwise", "mvpc"),
+                doc="How missing values (NaN) are handled: testwise = each test reads only the "
+                "rows where all of its variables are observed (test-wise deletion); mvpc = "
+                "Missing-Value PC, experimental: after the test-wise skeleton, the parents of each "
+                "missingness indicator are found and the edges they could have kept are tested "
+                "again on virtual data that correct for them, with fisherz or student_t; null "
+                "picks the method's default, testwise.",
+            ),
             _TEST_SEED,
         ),
         references=(
@@ -180,6 +194,7 @@ _add(
             "Colombo & Maathuis 2014",
             "Meek 1995",
             "Ramsey, Zhang & Spirtes 2006",
+            "Tu et al. 2019",
         ),
     )
 )
@@ -2522,6 +2537,63 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="loci",
+        family="pairwise",
+        summary="Location-scale-noise-model pairwise direction test: decides whether column 0 "
+        "causes column 1, the reverse, or neither, from a two-column table.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+            missing=True,
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge under criterion independence. null: the "
+                "direction with the larger p-value, or with the smaller HSIC statistic when the "
+                "p-values are equal. A level such as 0.05: an edge only when exactly one "
+                "direction's p-value is above it. Must be null under criterion likelihood.",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="criterion",
+                type="str",
+                default="independence",
+                choices=("independence", "likelihood"),
+                doc="independence = an HSIC test of each direction's scaled residual against its "
+                "proposed cause decides (LOCI-H); likelihood = the direction whose model has the "
+                "larger likelihood (LOCI-M).",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata log_likelihoods maps "
+            "forward (x->y) and backward (y->x) to each model's mean log-likelihood, and under "
+            "criterion independence p_values and statistics map them to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Immer et al. 2023", "Gretton et al. 2008", "Mooij et al. 2016"),
+    )
+)
 
 # --- latent-variable family -----------------------------------------------------------------------
 
@@ -2742,7 +2814,8 @@ _MEMBER_RULE = (
 _BLANKET_ORIENT_RULE = (
     "Under structure=cpdag, every edge the knowledge decides is directed before the colliders, "
     "which never reverse it, and Meek's rules R1-R4 follow; the undirected structures do not read "
-    "tiers or edges forbidden one way."
+    "tiers or edges forbidden one way. With target or an undirected structure, required_paths and "
+    "forbidden_paths raise NotImplementedError."
 )
 _BLANKET_RULE = (
     _MEMBER_RULE
@@ -2849,17 +2922,120 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
+#: The methods whose result is a CPDAG (for iamb, inter_iamb, and mmpc, with structure="cpdag" and
+#: no target, else the path parts raise): they honor the path parts by restricting the class they
+#: found (Fang et al. 2025).
+_PATH_METHODS = (
+    "pc",
+    "cdnod",
+    "ges",
+    "xges",
+    "hc",
+    "tabu",
+    "mmhc",
+    "rsmax2",
+    "boss",
+    "grasp",
+    "exact_search",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
+)
+_PATH_RULE = (
+    " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
+    "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
+    "et al. 2025); claims that no such DAG meets raise."
+)
+_PAG_PATHS = (
+    " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
+    "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
+    "removes a confounded pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
+    "one the PAG contradicts raises: a required path with no possibly directed path, or a "
+    "forbidden path with a directed path. The marks and the checks assume no selection bias, as an "
+    "arrowhead at a says that a is an ancestor of neither b nor the selection variables "
+    "(Richardson and Spirtes 2002)."
+)
+_SCORE_PAG_PATHS = " The test phase also starts from every confounded pair." + _PAG_PATHS
+#: boss_fci and grasp_fci: their order search reads required_paths as it reads the tiers.
+_ORDER_PAG_PATHS = (
+    " The order search puts the cause of each required_paths pair before its effect in every order "
+    "it visits." + _SCORE_PAG_PATHS
+)
+_ORDER_PATHS = (
+    " With required_paths and forbidden_paths, the order search follows Shimizu et al. (2011, "
+    "Section 3.4): when the claims show that no remaining variable is an ancestor of some of "
+    "them, the next variable is one of those; otherwise it is none with a claimed ancestor among "
+    "the remaining. The regression drops each forbidden path as a parent, and metadata "
+    "unmet_knowledge lists the claims the DAG does not meet."
+)
+_LAGGED_PATHS = (
+    " required_paths [a, b, lag] puts a tail at a and an arrowhead at b on that link, and "
+    "forbidden_paths [a, b, lag] an arrowhead at a; the tests can still remove the link. "
+    "confounded [a, b, lag] keeps the link from every removal. Each claim names its lag. A claim "
+    "on a link the PAG lacks sets no mark, and one the PAG contradicts raises: a required path "
+    "with no possibly directed path, or a forbidden path with a directed path."
+)
+_PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "confounded")
+#: The methods that read the path parts and confounded in the search, with the sentence that says
+#: how.
+_ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
+    "fci": (_PAG_PARTS, _PAG_PATHS),
+    "fci_jci": (_PAG_PARTS, _PAG_PATHS),
+    "gfci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "boss_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
+    "grasp_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
+    "lpcmci": (_PAG_PARTS, _LAGGED_PATHS),
+    "direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+    "multi_group_direct_lingam": (PATH_PARTS, _ORDER_PATHS),
+}
+_ORDER_PATH_METHODS = ("direct_lingam", "multi_group_direct_lingam")
 _MAX_DEPTH = concept_param("max_depth")
 
+#: How missing values are handled, on every method the concept's template fits, after its
+#: categorical columns where it has them.
+_MISSING = concept_param("missing")
+for _name in CONCEPTS["missing"].conforming:
+    _params = REGISTRY[_name].params
+    _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={"params": (*_params[:_cut], _MISSING, *_params[_cut:])}
+    )
+
+#: Structural EM on the searches whose fit reads only a covariance and the row count, after their
+#: categorical columns where they have them.
+_MISSING_EM = concept_param(
+    "missing",
+    choices=(EM,),
+    doc="How missing values (NaN) are handled: em = experimental structural EM, which alternates "
+    "the search on the expected covariance of the data with a linear-Gaussian fit of the graph it "
+    "returns, 10 times; it assumes values missing completely at random or at random given "
+    "observed values. null refuses missing values.",
+)
+for _name in EM_METHODS:
+    _params = REGISTRY[_name].params
+    _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={"params": (*_params[:_cut], _MISSING_EM, *_params[_cut:])}
+    )
+
 for _name, _how in _KNOWLEDGE_HOW.items():
+    _extra, _rule = (
+        (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
+    )
+    _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(KNOWLEDGE_PARTS)}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}{_rule}",
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*REGISTRY[_name].params, *_depth, _knowledge)}
+        update={
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
+            "knowledge_extra": _extra,
+            "knowledge_experimental": _extra,
+            "restricts_paths": _name in _PATH_METHODS,
+        }
     )
 
 #: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
@@ -2884,7 +3060,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
-    "pc": ("conflicts",),
+    "pc": ("conflicts", "missingness_parents", "corrected_edges"),
     "cdnod": ("conflicts", "index_edges", "changing_variables"),
     "fci_jci": ("index_edges",),
     "icp": (
@@ -2923,6 +3099,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
+    "loci": ("log_likelihoods", "p_values", "statistics"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
@@ -2930,8 +3107,9 @@ _METADATA: dict[str, tuple[str, ...]] = {
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
-# column types a mixed-data setting read, the fewest rows a test used, and the triples a collider
-# vote left ambiguous.
+# column types a mixed-data setting read, the fewest rows a test used and how missing values were
+# handled, the record of a structural EM, the triples a collider vote left ambiguous, the clauses
+# the path parts of knowledge leave, and the claims a causal order search does not meet.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2948,7 +3126,11 @@ for _name, _spec in REGISTRY.items():
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
+        *(("missing",) if "missing" in _concepts else ()),
+        *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
+        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("unmet_knowledge",) if _spec.name in _ORDER_PATH_METHODS else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

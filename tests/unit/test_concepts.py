@@ -371,6 +371,7 @@ UNIT_CASES = {
     "bottom_up_parce_lingam": "confounded_fork_4v",
     "anm": "anm_pair_cubic",
     "pnl": "anm_pair_cubic",
+    "loci": "lsnm_pair",
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "camuv": "nonmonotone_4v",
@@ -607,7 +608,6 @@ def keeps_the_required_edge(method: str) -> bool:
 
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
-    "missing": (lambda m: REGISTRY[m].data.missing, True),
     "env": (lambda m: env_kind(m) or False, "context"),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
     "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
@@ -637,7 +637,7 @@ def test_every_behavior_has_an_observation():
         pytest.param(c, m, id=f"{c.key}-{m}")
         for c in BEHAVIORS
         for m in REGISTRY
-        if m in c.suitable or c.deviation(m) or c.key in ("missing", "env")
+        if m in c.suitable or c.deviation(m) or c.key == "env"
     ],
 )
 def test_behavior_cell(concept, method):
@@ -1270,9 +1270,7 @@ def test_documented_method_lists_match_the_table():
                 break
             paragraph.append(line)
         named = set(re.findall(r"`(\w+)`", " ".join(paragraph))) & set(REGISTRY)
-        if key == "missing":
-            takes = {m for m, spec in REGISTRY.items() if spec.data.missing}
-        elif key == "env":
+        if key == "env":
             takes = {m for m in REGISTRY if env_kind(m)}
         else:
             takes = {m for m in REGISTRY if tagged(CONCEPTS[key], m) is not None}

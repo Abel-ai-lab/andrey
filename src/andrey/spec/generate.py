@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
+from andrey.core.ci_missing import EM_METHODS
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -98,9 +99,12 @@ _JSON_TYPES: dict[str, dict] = {
 KNOWLEDGE_NOTE = (
     "knowledge= takes a JSON object, inline or as a .json file path: required and forbidden list "
     "directed edges [cause, effect], allowed lists the only pairs that may be adjacent, and tiers "
-    "lists groups of columns in time order (no edge from a later tier into an earlier one). For a "
-    "time-series method, [cause, effect, lag] is the link from cause at time t - lag to effect at "
-    "time t. Name columns by the data file's header or by 0-based position, for example, "
+    "lists groups of columns in time order (no edge from a later tier into an earlier one), "
+    "required_paths and forbidden_paths list pairs [cause, effect] with and without a directed "
+    "path from cause to effect, and confounded lists pairs with a hidden common cause. For a "
+    "time-series method, [cause, effect, lag] is the link from cause at time t - lag to effect "
+    "at time t. "
+    "Name columns by the data file's header or by 0-based position, for example, "
     'knowledge=\'{"forbidden": [["y", "x"]], "tiers": [["age"], ["x", "y"]]}\'.'
 )
 
@@ -565,15 +569,22 @@ def render_skill() -> str:
     a("")
     a(
         "A `NaN` cell, or an empty, `NA`, or `N/A` field of the data file, is a missing value. "
-        "The methods whose schema sets `data.missing` accept it and delete rows per test: each "
-        "test reads the rows observed in all of its variables, and `metadata.rows_tested` gives "
-        "the fewest (`min`) and the median rows a test read. They are "
+        "The methods whose schema sets `data.missing` accept it, and their `missing` parameter "
+        "names how: `testwise`, the default under `null`, deletes rows per test, each test "
+        "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
+        "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
+        "They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
-        + ". Every other method refuses a missing value with a data error that says what to do "
-        "instead. The deletion is sound when values are missing completely at random; when "
-        "whether a value is missing depends on the variables, `pc` can keep extra edges, and "
-        "`fci` stays sound "
-        "when no missingness mechanism causally affects another."
+        + ". The deletion is sound when values are missing completely at random; when whether a "
+        "value is missing depends on the variables, `pc` can keep extra edges, and `fci` stays "
+        "sound when no missingness mechanism causally affects another. The searches whose fit "
+        "reads only a covariance, "
+        + ", ".join(f"`{name}`" for name in EM_METHODS)
+        + ", refuse a missing value under `null` and take `em`, experimental: structural EM, "
+        "which runs the search on the expected covariance of the data 10 times and assumes values "
+        "missing completely at random or at random given observed values; `metadata.em` records "
+        "its rounds and the observed-data log-likelihood after each. Every other method refuses a "
+        "missing value with a data error that says what to do instead."
     )
     a("")
     a("## Background knowledge")

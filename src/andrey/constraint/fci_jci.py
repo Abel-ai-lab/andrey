@@ -35,6 +35,8 @@ from andrey.core.ci import make_indep_test
 from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from andrey.core.knowledge import Constraints
 
 
@@ -53,6 +55,7 @@ def fci_jci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> tuple[GraphStructure, list[tuple[int, str]]]:
     """Discover a PAG from multi-domain ``data`` with FCI and the environment index as a context.
@@ -60,12 +63,12 @@ def fci_jci(
     ``data`` is an ``(n_samples, n_features)`` array; ``env`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` environment index (one number per row). ``alpha``, ``indep_test``,
     ``collider_rule``, ``possible_dsep``, ``max_depth``, ``in_column_order``, ``workers``, ``seed``,
-    and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the data with the index
-    appended as a last column; ``categorical``, a boolean mask of the data's categorical columns,
-    reaches a mixed-data test, which also takes the index as categorical. ``constraints``, over the
-    data's columns, act as for FCI, with the index unconstrained. ``confounded_index=False`` assumes
-    no hidden variable causes both the index and a data variable. With a single domain the index is
-    left out and the search is FCI on ``data`` alone.
+    ``label``, and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the data with
+    the index appended as a last column; ``categorical``, a boolean mask of the data's categorical
+    columns, reaches a mixed-data test, which also takes the index as categorical. ``constraints``,
+    over the data's columns, act as for FCI, with the index unconstrained.
+    ``confounded_index=False`` assumes no hidden variable causes both the index and a data variable.
+    With a single domain the index is left out and the search is FCI on ``data`` alone.
 
     Returns the PAG over the ``n_features`` data variables as a ``GraphStructure`` of kind
     ``"pag"``, and the index's edges as ``(variable, kind)`` pairs in variable order: ``kind`` is
@@ -122,7 +125,7 @@ def fci_jci(
     )
 
     marks = circle_pag(skeleton)
-    knowledge_marks(marks, padded)
+    knowledge_marks(marks, padded, label)
     mark_index(marks, d, confounded_index)
     orient_colliders(marks, sepsets)
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
@@ -140,6 +143,7 @@ def fci_jci(
         max_depth=max_depth,
         constraints=padded,
         workers=workers,
+        label=label,
     )
     mark_index(marks, d, confounded_index)
     ambiguous = unseparated_triples(marks != NULL, sepsets, padded)

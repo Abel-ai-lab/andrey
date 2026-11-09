@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 from itertools import combinations
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 
@@ -718,4 +718,25 @@ def sortability(data: np.ndarray, truth: GraphStructure | TemporalStructure) -> 
     return {
         "varsortability": float(varsort(x, adj)),
         "r2_sortability": float(r2sort(x, adj)),
+    }
+
+
+def missingness_parent_scores(
+    detected: np.ndarray, parents: Mapping[str, Sequence[int]]
+) -> dict[str, float]:
+    """Precision and recall of detected missingness-indicator parents against the m-graph.
+
+    ``detected[j, i] = 1`` when column ``j`` is detected as a parent of column ``i``'s missingness
+    indicator; ``parents`` maps each column, as a string, to the true parents of its indicator, as
+    the registry records them (:func:`~andrey_bench.datasets.materialize`). Precision is ``NaN``
+    when nothing is detected, and recall when no indicator has a parent.
+    """
+    found = {(int(j), int(i)) for j, i in zip(*np.nonzero(np.asarray(detected)))}
+    true_ = {(int(j), int(i)) for i, pa in parents.items() for j in pa}
+    hits = len(found & true_)
+    return {
+        "mparent_precision": hits / len(found) if found else float("nan"),
+        "mparent_recall": hits / len(true_) if true_ else float("nan"),
+        "mparent_detected": float(len(found)),
+        "mparent_true": float(len(true_)),
     }

@@ -28,7 +28,9 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
+from andrey.core.ci_missing import EM_METHODS
 from andrey.spec import REGISTRY
+from andrey.spec.concepts import CONCEPTS
 
 ROOT = Path(__file__).resolve().parents[1]
 API = ROOT / "src" / "andrey" / "api"
@@ -113,6 +115,38 @@ SHARED = {
         "pairs allowed to be adjacent, and temporal tiers, all honored.",
         lambda m: takes(m, "knowledge") and REGISTRY[m].family != "temporal" and m != "gnies",
     ),
+    # The methods whose result can be a CPDAG honor the path parts of knowledge.
+    "knowledge_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for "
+        "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; "
+        "claims that no such DAG meets raise ``ValueError``.",
+        lambda m: REGISTRY[m].restricts_paths,
+    ),
+    # The PAG methods read the path parts and confounded as marks and kept pairs.
+    "knowledge_pag_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "In the PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts "
+        "an arrowhead at the cause, and no test removes a ``confounded`` pair, as "
+        ":class:`~andrey.Knowledge` describes; these marks, and the check that raises "
+        "``ValueError`` for a claim the PAG contradicts, assume no selection bias.",
+        lambda m: "confounded" in REGISTRY[m].knowledge and REGISTRY[m].family != "temporal",
+    ),
+    # The LiNGAM order searches read the path parts as Shimizu et al. (2011) define them.
+    "knowledge_order_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "``required_paths`` and ``forbidden_paths`` narrow the variables the causal order may place "
+        "next, and a forbidden path is no parent, as :class:`~andrey.Knowledge` describes; "
+        '``metadata["unmet_knowledge"]`` lists the claims the DAG does not meet.',
+        lambda m: "required_paths" in REGISTRY[m].knowledge
+        and REGISTRY[m].output.graph_kind == "dag",
+    ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
         "Parameters",
@@ -124,6 +158,28 @@ SHARED = {
             any(i.name == "env" for i in REGISTRY[m].data.inputs) and m not in ("cdnod", "fci_jci")
         ),
     ),
+    # A method whose missing takes more than the template's values words its own entry.
+    "missing": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
+        "reads only the rows where all of its variables are observed. ``None`` picks the method's "
+        'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
+        "handling used. See **Missing values.** in Notes.",
+        lambda m: m in CONCEPTS["missing"].conforming,
+    ),
+    "missing_em": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by '
+        "structural expectation-maximization (EM) over the expected covariance of the data, which "
+        "assumes values missing completely at random or at random given observed values. ``None`` "
+        'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
+        'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        lambda m: m in EM_METHODS,
+    ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
@@ -132,8 +188,17 @@ SHARED = {
         "Drop the incomplete rows first, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: (
-            refuses_missing(m, series=False) and m not in (*FCI_SEARCHES, "icp", "igsp", "ut_igsp")
+            refuses_missing(m, series=False)
+            and m not in (*FCI_SEARCHES, *EM_METHODS, "icp", "igsp", "ut_igsp")
         ),
+    ),
+    "drop_rows_em": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        'Without ``"em"``, drop the incomplete rows first, which suits values missing completely at '
+        "random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
+        lambda m: m in EM_METHODS,
     ),
     "drop_rows_fci": Shared(
         "Notes",

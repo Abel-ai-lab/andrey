@@ -191,17 +191,26 @@ continuous non-Gaussian noise.
 Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
 empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
-incomplete one would lose. The other methods refuse missing values with an error that says what to
-do instead. Test-wise deletion is sound when values are missing completely at random; when whether a
-value is missing depends on the variables, a test can be biased. The [release cards](benchmarks.md)
-measure it against dropping incomplete samples, and
-[Missing values](guides/getting-started.md#missing-values) explains it.
+incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
+`missing="mvpc"`, an experimental correction for values whose missingness depends on the variables.
+Test-wise deletion is sound when values are missing completely at random; when whether a value is
+missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
+it against dropping incomplete samples. The searches whose fit reads the data only through their
+covariance, {{ em_methods }}, take `missing="em"`, which is experimental: structural EM over the
+expected covariance of the data, sound when values are missing completely at random or at random
+given observed values. The other methods refuse missing values with an error that says what to do
+instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
 
 ### Can I tell it what I already know?
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except {{ no_knowledge_methods }}.
+takes it except {{ no_knowledge_methods }}. It can also say that one variable causes another,
+directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
+share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
+honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths, all
+experimentally; a method given a part it does not honor raises an error naming the methods that
+do. [Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
 

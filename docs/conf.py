@@ -491,6 +491,7 @@ PROSE_NAMES = {
     "dynotears": "DYNOTEARS",
     "anm": "ANM",
     "pnl": "PNL",
+    "loci": "LOCI",
     "gin": "GIN",
     "rcd": "RCD",
     "bottom_up_parce_lingam": "BottomUpParceLiNGAM",
@@ -511,6 +512,7 @@ METHOD_LISTS = {
         any(p.type == "targets" for p in s.params) and s.output.graph_kind == "cpdag"
     ),
     "missing": lambda s: s.data.missing,
+    "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
 }
 
 

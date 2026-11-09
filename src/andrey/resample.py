@@ -604,9 +604,10 @@ def _valid_graph(
     ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
-    MPDAG, and a ``pag`` is oriented as ``fci`` orients one under knowledge: the vote and the PAG
-    get the knowledge's endpoints (``knowledge_marks``) before the MAG step and before the
-    orientation rules, which then run to a fixed point.
+    MPDAG, restricted by the knowledge's ``required_paths`` and ``forbidden_paths``
+    (:func:`~andrey.core.ancestral.restrict`), and a ``pag`` is oriented as ``fci`` orients one
+    under knowledge: the vote and the PAG get the knowledge's endpoints (``knowledge_marks``)
+    before the MAG step and before the orientation rules, which then run to a fixed point.
     Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
@@ -614,7 +615,8 @@ def _valid_graph(
             from andrey.constraint.fci import knowledge_marks
 
             vote = vote.copy()
-            knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
+            name = (lambda i: repr(labels[i])) if labels is not None else str
+            knowledge_marks(vote, constraints, name)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
         return pag_of(mag, None, (), constraints)
     if ((vote == ARROW) & (vote.T == ARROW)).any():
@@ -627,6 +629,13 @@ def _valid_graph(
     cpdag = cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
+        if constraints.required_paths is not None:
+            from andrey.core.ancestral import restrict
+
+            label = (lambda i: repr(labels[i])) if labels is not None else str
+            cpdag, _ = restrict(
+                cpdag, constraints.required_paths, constraints.forbidden_paths, label=label
+            )
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 

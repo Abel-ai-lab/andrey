@@ -424,6 +424,56 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
+Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
+in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in
+which it does not:
+
+```python
+knowledge = Knowledge(
+    required_paths=[("smoking", "cancer")],  # smoking causes cancer, directly or not
+    forbidden_paths=[("tar", "age")],        # tar causes age by no path
+)
+result = pc(data, knowledge=knowledge)
+result.metadata["ancestor_clauses"]
+```
+
+The methods whose result is a CPDAG (PC, CD-NOD, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP,
+exact search, and IAMB, Inter-IAMB, and MMPC with `structure="cpdag"` and no `target`) honor them:
+of the DAGs the graph they found stands for, they keep those that meet every claim and return their
+MPDAG, so an edge is directed when all of those DAGs direct it alike. With an undirected result,
+which the claims cannot restrict, IAMB, Inter-IAMB, and MMPC raise `NotImplementedError`. Some
+claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly when it is a direct
+cause of `tar` or of `gene`, and the data leave both edges undirected,
+`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
+the result is the class the search found, restricted, not a new search for the best class that
+meets them. These two parts are experimental.
+
+When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
+that is not in the data; a common cause that is in the data does not make the pair adjacent. The
+PAG methods (FCI, FCI-JCI, GFCI, BOSS-FCI, GRaSP-FCI, and LPCMCI over lagged links) honor all three
+parts:
+
+```python
+from andrey import fci
+
+knowledge = Knowledge(
+    required_paths=[("smoking", "cancer")],
+    confounded=[("diet", "exercise")],  # a hidden common cause
+    forbidden_paths=[("diet", "exercise"), ("exercise", "diet")],  # neither causes the other
+)
+result = fci(data, knowledge=knowledge)  # diet <-> exercise
+```
+
+On a pair the tests keep, a required path makes the edge `smoking -> cancer` and a forbidden path
+puts an arrowhead at its cause; no test removes a `confounded` pair. A claim the PAG contradicts,
+such as a required path with no path that could lead to its effect, raises a `ValueError`. These
+marks and checks assume no selection bias: the samples were not kept or dropped by the value of a
+variable the measured ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths`
+and `forbidden_paths` to narrow the causal order, as their paper describes, and list the claims
+their DAG does not meet in `metadata["unmet_knowledge"]`. Every other method raises
+`NotImplementedError` for a part it does not honor, naming the methods that do. These parts are
+experimental for every method.
+
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
 is the same step, except in PCMCI and Granger, which learn no same-step links. A forbidden pair
@@ -537,8 +587,17 @@ out = andrey.pc(gappy)
 out.metadata["rows_tested"]
 ```
 
-`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
-complete data has no such entry. With `fisherz` and `student_t`, each test computes its
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read, and
+`metadata["missing"]` the handling the fit used; a fit on complete data has neither entry. The
+argument `missing` names the handling. `missing="testwise"` is test-wise deletion, and `None`, the
+default, picks the method's default handling, which is `"testwise"` for every method that takes the
+argument; a value a method does not list raises a `ValueError` that names the values it takes:
+
+```{code-cell} ipython3
+andrey.pc(gappy, missing="testwise").structure == out.structure
+```
+
+With `fisherz` and `student_t`, each test computes its
 correlations directly from its rows, for many tests at once; the other tests are built anew on each
 test's rows, which costs more. A time series keeps every step: each row of the lagged design that
 reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
@@ -551,12 +610,42 @@ find dependence where the population has none and keep extra edges ([Tu et al., 
 allows for selection and stays sound when no missingness mechanism causally affects another
 ([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
 
+`andrey.pc(data, missing="mvpc")`, experimental, corrects PC for those extra edges with
+Missing-Value PC ([Tu et al., 2019][tu]). It finds the variables each missingness indicator depends
+on, then tests again the edges such an indicator could have kept, on virtual data rebuilt from the
+rows where those variables are observed. It takes `fisherz` or `student_t`;
+`metadata["missingness_parents"]` names the parents it found and `metadata["corrected_edges"]` the
+edges it tested again and removed. The correction holds when no indicator causes a variable and no
+value causes its own missingness, which the data cannot check. It also needs the rows it rebuilds
+from to keep the independence of each pair it tests: when a variable it rebuilds from goes missing
+because of a common effect of that pair, as when two effects of the same causes each hide the
+other, the extra edge can stay. `andrey.data.missingness` simulates
+data whose missingness graph you know, to see where it helps.
+
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
 `ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
 with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A column with no
 observed value, or with one value throughout, raises before the fit, and so does infinity, which is
 not a missing value. CD-NOD needs a complete `env`.
+
+The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
+rows per test, and refuse missing values by default. They take `missing="em"` instead, which is
+experimental: structural EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates two steps.
+Under a linear-Gaussian model of the current graph, it replaces each row's missing values by their
+expected values given the row's observed ones and adds their uncertainty, which gives the expected
+covariance of the data; then the search runs on that covariance over every row, and the model is fit
+again to the graph it returns. It runs 10 rounds, and `metadata["em"]` records the observed-data
+log-likelihood after each:
+
+```{code-cell} ipython3
+em = andrey.ges(gappy, missing="em")
+em.metadata["em"]["log_likelihood"][-1]
+```
+
+EM is sound when values are missing completely at random or at random given observed values; when
+whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
+the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
@@ -621,6 +710,10 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
   Test-Wise Deletion][strobl]: FCI with test-wise deletion.
 - [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
   deletion.
+- Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
+  Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
+- [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous
+  Additive Noise Models][missdag]: structural EM with a continuous search.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -630,3 +723,4 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
 [mpdag]: https://arxiv.org/abs/1707.02171
 [strobl]: https://doi.org/10.1007/s41060-017-0094-6
 [tu]: https://proceedings.mlr.press/v89/tu19a.html
+[missdag]: https://arxiv.org/abs/2205.13869

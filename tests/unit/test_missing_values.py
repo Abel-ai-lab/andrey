@@ -24,7 +24,7 @@ from andrey.core.ci import (
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -413,6 +413,30 @@ def test_a_supported_method_runs_on_missing_values_and_repeats(name):
     assert "rows_tested" not in _fit(name, _continuous(400)).metadata
 
 
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_testwise_is_the_default_handling_and_the_fit_records_it(name):
+    x = _gaps(_continuous(400), 0.1)
+    default, testwise = _fit(name, x), _fit(name, x, missing="testwise")
+    assert default.structure == testwise.structure
+    assert default.metadata == testwise.metadata
+    assert default.metadata["missing"] == "testwise"
+    complete = _fit(name, _continuous(400), missing="testwise")
+    assert "missing" not in complete.metadata
+    assert complete.structure == _fit(name, _continuous(400)).structure
+
+
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_a_handling_the_method_does_not_list_raises_naming_the_argument(name):
+    with pytest.raises(ValueError, match=rf"^{name}: missing must be one of 'testwise'.*'em'"):
+        _fit(name, _gaps(_continuous(400), 0.1), missing="em")
+
+
+def test_the_methods_that_take_missing_accept_missing_values_or_fit_them_by_em():
+    takes = {m for m, spec in REGISTRY.items() if any(p.name == "missing" for p in spec.params)}
+    assert takes == set(SUPPORTED) | set(EM_METHODS)
+    assert not set(SUPPORTED) & set(EM_METHODS)
+
+
 @pytest.mark.parametrize("name", ["pc", "fci", "cdnod"])
 def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     # Every pass with a conditioning set goes to the pool where a pool runs.
@@ -472,9 +496,13 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert "fill in the missing steps first" in str(error.value)
         assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
+    elif name in EM_METHODS:
+        assert 'pass missing="em"' in str(error.value)
+        assert "drop the rows that hold one" in str(error.value)
     else:
         assert "drop the rows that hold one" in str(error.value)
         assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
+        assert 'missing="em"' not in str(error.value)
 
 
 def test_a_refused_text_category_names_the_method():
@@ -492,7 +520,7 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
 
 
-@pytest.mark.parametrize("name", ["anm", "pnl"])
+@pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
 def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
     x = np.random.default_rng(0).uniform(-1, 1, (300, 2))
     x[:, 1] = x[:, 0] ** 3 + 0.3 * x[:, 1]
@@ -504,10 +532,11 @@ def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
     assert out.metadata == {
         **alone.metadata,
         "rows_tested": {"min": rows.sum(), "median": rows.sum()},
+        "missing": "testwise",
     }
 
 
-@pytest.mark.parametrize("name", ["anm", "pnl"])
+@pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
 def test_a_pair_test_with_too_few_rows_raises(name):
     x = _continuous(40)[:, :2]
     x[2:, 0] = np.nan

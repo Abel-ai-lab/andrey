@@ -36,7 +36,7 @@ RATE = 0.2
 SERIES_RATE = 0.1
 IID = ["pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc"]
 SERIES = ["pcmci", "pcmciplus", "lpcmci"]
-PAIRS = ["anm", "pnl"]
+PAIRS = ["anm", "pnl", "loci"]
 
 
 @pytest.fixture(autouse=True)
@@ -177,7 +177,7 @@ def test_planted_links_survive_missing_steps(name):
     assert _lagged_links(gappy) == complete
 
 
-# The docstring pairs: x -> y with an additive and with a post-nonlinear mechanism.
+# The docstring pairs: x -> y with an additive, a post-nonlinear, and a location-scale mechanism.
 def _anm_pair(seed: int = 0, n: int = 300) -> np.ndarray:
     rng = np.random.default_rng(seed)
     x = rng.uniform(-1, 1, n)
@@ -190,7 +190,14 @@ def _pnl_pair(seed: int = 2, n: int = 300) -> np.ndarray:
     return np.column_stack([x, np.tanh(x**3 + 0.3 * rng.uniform(-1, 1, n))])
 
 
-FIXED_PAIRS = {"anm": _anm_pair, "pnl": _pnl_pair}
+def _loci_pair(seed: int = 0, n: int = 300) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal(n)
+    noise = (0.6 + 0.5 * np.tanh(x)) * rng.standard_normal(n)
+    return np.column_stack([x, np.sin(2 * x) + x + noise])
+
+
+FIXED_PAIRS = {"anm": _anm_pair, "pnl": _pnl_pair, "loci": _loci_pair}
 
 
 @pytest.mark.parametrize("name", PAIRS)
@@ -281,11 +288,15 @@ _MAPS = (lambda z: z**3, np.tanh, np.sin, lambda z: np.exp(z / 2))
 
 def _pair(name: str, seed: int, n: int = 300) -> np.ndarray:
     """Pair ``seed`` of a method's own kind, ``x -> y``: additive noise for ANM, post-nonlinear
-    for PNL."""
+    for PNL, and for LOCI a Gaussian cause and a noise scale that changes with it."""
     rng = np.random.default_rng(seed)
     if name == "anm":
         x = rng.uniform(-2, 2, n)
         return np.column_stack([x, _MAPS[seed % 4](x) + 0.3 * rng.standard_normal(n)])
+    if name == "loci":
+        x = rng.standard_normal(n)
+        noise = 0.3 * (1 + 0.8 * np.tanh(x)) * rng.standard_normal(n)
+        return np.column_stack([x, _MAPS[seed % 4](x) + noise])
     x = rng.uniform(-1, 1, n)
     return np.column_stack([x, np.tanh(_MAPS[seed % 4](2 * x) + 0.3 * rng.uniform(-1, 1, n))])
 

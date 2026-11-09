@@ -21,6 +21,12 @@ names its pull request.
 
 ### Added
 
+- `loci`, experimental, decides the direction of a variable pair under the location-scale noise
+  model of Immer et al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose
+  mean and variance are spline functions of the proposed cause in each direction, and decides by
+  an HSIC test of the scaled residual against the cause (`criterion="independence"`, the default)
+  or by the larger likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows
+  where both columns are observed and takes `missing`. ([#830])
 - `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
   by position, as `square` nodes, as `draw` does. ([#806])
 - The graph types guide has a section, "How to read a causal graph", with a legend of every mark
@@ -29,12 +35,54 @@ names its pull request.
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
   link preview, the wordmark and its release on navy. ([#809])
+- `andrey.Knowledge` takes `required_paths` and `forbidden_paths`, the pairs `(cause, effect)` with
+  and without a directed path from `cause` to `effect`, and `confounded`, the pairs with a hidden
+  common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+  `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` honor
+  `required_paths` and `forbidden_paths`, experimentally: the result is the MPDAG of the DAGs of
+  the class found that meet them (Fang, Zhao, Liu, and He 2025), and
+  `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. Knowledge that contradicts
+  itself raises `ValueError` before the search, and claims that no DAG of the class meets raise it
+  after. ([#829])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
+  `forbidden_paths`, and `confounded`, experimentally: on a pair the tests keep, a required path
+  makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
+  rules, no test removes a `confounded` pair, and a claim the PAG contradicts raises `ValueError`;
+  the marks and the checks assume no selection bias. `lpcmci` takes each claim with its lag.
+  ([#835])
+- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
+  experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
+  the variables the causal order may place next, a forbidden path is no parent, and
+  `metadata["unmet_knowledge"]` lists the claims the DAG does not meet. ([#835])
+- Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
+  another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
+  `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
+  undirected `structure`. ([#829])
 - `andrey.data.missingness` draws missing values whose missingness graph is known: `mcar`, `mar`,
   `mnar`, and `self_masking` masks, in a logistic form (Muzellec et al., 2020) or the quantile form
   of the MVPC simulations (Tu et al., 2019), with `parents=` to place each indicator. `missing=` on
   `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
   it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
   indicator; `missingness.draw` masks any complete data. ([#826])
+- One package-wide argument, `missing`, on the twelve methods that accept missing values: `pc`,
+  `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
+  and `pnl`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  method's default handling, `"testwise"`, so no result changes; a value a method does not list
+  raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
+  values. ([#828])
+- `pc(missing="mvpc")`, experimental, runs Missing-Value PC (Tu et al., 2019) with the
+  permutation-based correction: after the test-wise skeleton, it finds the parents of each
+  missingness indicator and tests again, on virtual data that correct for them, the edges such an
+  indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
+  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
+- `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
+  `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
+  by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a
+  linear-Gaussian model of the current graph, the E-step gives the expected covariance of the data,
+  the method's own search runs on it over every row, and the model is fit again to the graph it
+  returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
+  each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
+  values, with a message that names `missing="em"` where EM would run. ([#842])
 
 ### Changed
 
@@ -61,6 +109,10 @@ names its pull request.
 
 ### Fixed
 
+- `jpcmciplus` raises `SingularCorrelationError` when a system variable has a copy among a
+  test's conditions, such as a pulse every dataset shares that is not listed as a time
+  context, with the note to list it as one; it dropped that variable's links without an
+  error. ([#841])
 - The J-PCMCI+ comparison's same-graph counts for 0.15.0 are recounted after a fix to the
   benchmark harness, which recorded each conflict of Andrey's arm as `o-o` where tigramite marks it
   `x-x`. On the comparison page, 7 of the 21 counts in the claim go up, and no claim changes.
@@ -2090,3 +2142,10 @@ First alpha release.
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
+[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#829]: https://github.com/Abel-ai-lab/andrey/pull/829
+[#830]: https://github.com/Abel-ai-lab/andrey/pull/830
+[#832]: https://github.com/Abel-ai-lab/andrey/pull/832
+[#835]: https://github.com/Abel-ai-lab/andrey/pull/835
+[#841]: https://github.com/Abel-ai-lab/andrey/pull/841
+[#842]: https://github.com/Abel-ai-lab/andrey/pull/842

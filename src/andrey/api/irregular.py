@@ -1,7 +1,7 @@
-"""Facades for the pairwise direction tests (ANM and PNL) and the hidden-confounder methods.
+"""Facades for the pairwise direction tests (ANM, PNL, LOCI) and the hidden-confounder methods.
 
-ANM and PNL test both directions in a two-column table. RCD and BottomUpParceLiNGAM return a PAG
-over the observed variables. RCD lists the pairs a hidden variable links in
+ANM, PNL, and LOCI test both directions in a two-column table. RCD and BottomUpParceLiNGAM return
+a PAG over the observed variables. RCD lists the pairs a hidden variable links in
 ``metadata["confounded_pairs"]``; BottomUpParceLiNGAM leaves the variables whose order such a
 cause hides unordered.
 """
@@ -26,6 +26,7 @@ from ._adapt import (
 from ._irregular import (
     adapt_bottom_up_parce,
     adapt_rcd,
+    likelihood_output,
     pairwise_output,
 )
 
@@ -65,22 +66,15 @@ def _complete_pairs(
     return kept, rows_metadata({rows: 2})
 
 
-def fit_pair(
-    method: str,
-    data: npt.ArrayLike,
-    native: Callable[[np.ndarray, np.ndarray], tuple[float, float, float, float]],
-    alpha: float | None,
-    *,
-    standardize: bool = False,
-) -> StructureOutput:
-    """Run ``method``'s pairwise test ``native``, ANM's or PNL's, both ways on ``data``.
+def _pair_matrix(
+    method: str, data: npt.ArrayLike, *, standardize: bool
+) -> tuple[np.ndarray, tuple[str, ...] | None, dict[str, dict[str, float]]]:
+    """Return the pair's ``float64`` table, its column labels, and its ``rows_tested`` metadata.
 
-    ``data`` must be a table of two columns; the tests read the rows where both are observed
+    ``data`` must be a table of two columns; the table holds the rows where both are observed
     (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
     magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
-    mean and unit variance. ``native`` returns the natural logarithms of the forward and backward
-    p-values, then the two statistics, and the result holds the edge they choose with ``alpha``
-    (:func:`pairwise_output`).
+    mean and unit variance.
     """
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:
         raise ValueError(
@@ -92,6 +86,24 @@ def fit_pair(
     if standardize:
         X = X / np.abs(X).max(axis=0)
         X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
+    return X, labels, rows
+
+
+def fit_pair(
+    method: str,
+    data: npt.ArrayLike,
+    native: Callable[[np.ndarray, np.ndarray], tuple[float, float, float, float]],
+    alpha: float | None,
+    *,
+    standardize: bool = False,
+) -> StructureOutput:
+    """Run ``method``'s pairwise test ``native``, ANM's or PNL's, both ways on ``data``.
+
+    The tests read the table :func:`_pair_matrix` returns. ``native`` returns the natural
+    logarithms of the forward and backward p-values, then the two statistics, and the result holds
+    the edge they choose with ``alpha`` (:func:`pairwise_output`).
+    """
+    X, labels, rows = _pair_matrix(method, data, standardize=standardize)
     log_p_forward, log_p_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
     return pairwise_output(
         math.exp(log_p_forward),
@@ -106,7 +118,12 @@ def fit_pair(
 
 
 @method_spec("anm")
-def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
+def anm(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    missing: str | None = None,
+) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
 
     ANM [1]_ fits ``y = f(x) + e`` in each direction by Gaussian-process regression. An HSIC test
@@ -123,6 +140,11 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
         exactly one p-value exceeds it. See Notes.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -244,7 +266,12 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
 
 @method_spec("pnl")
-def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
+def pnl(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    missing: str | None = None,
+) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
     PNL [1]_ [2]_ fits ``y = f2(f1(x) + e)`` in each direction. An HSIC test checks whether the
@@ -260,6 +287,11 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
         exactly one p-value exceeds it. See Notes.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -394,6 +426,184 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     from andrey.irregular.pnl import pnl as _native
 
     return fit_pair("pnl", data, _native, alpha)
+
+
+@method_spec("loci")
+def loci(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    criterion: str = "independence",
+    missing: str | None = None,
+) -> StructureOutput:
+    """Test the direction of a variable pair with LOCI, the location-scale noise model.
+
+    LOCI [1]_ fits ``y = f(x) + g(x) n`` in each direction, a noise scale ``g`` that changes with
+    the cause, by a Gaussian likelihood over B-spline features of the cause. Either an HSIC test
+    [2]_ of the scaled residual against the proposed cause or the two likelihoods determine the
+    edge.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, 2)
+        The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
+        ``float64``. A DataFrame's column names become the structure's ``labels``.
+    alpha : float or None, default=None
+        Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
+        or with the smaller test statistic when the p-values are equal; a significance level such
+        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        ``criterion="likelihood"``. See Notes.
+    criterion : {"independence", "likelihood"}, default="independence"
+        ``"independence"`` tests whether each direction's scaled residual is independent of its
+        proposed cause; ``"likelihood"`` chooses the direction whose model has the larger
+        likelihood. See Notes.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
+        edge, or no edge. ``metadata["algorithm"]`` is ``"loci"``. ``metadata["log_likelihoods"]``
+        holds the mean log-likelihood of ``y`` given ``x`` under ``"forward"`` and of ``x`` given
+        ``y`` under ``"backward"``. Under ``criterion="independence"``, ``metadata["p_values"]``
+        holds the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``, and ``metadata["statistics"]`` the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns, or if ``alpha`` is not ``None`` under ``criterion="likelihood"``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** LOCI decides the direction between two continuous variables observed i.i.d.,
+    under the location-scale noise model ``y = f(x) + g(x) n`` with ``g > 0``, the noise ``n``
+    independent of the cause ``x``, and no hidden common cause of the two [1]_. The direction is
+    identifiable, outside pathological cases, for noise of any distribution with a
+    twice-differentiable log density and twice-differentiable ``f`` and ``g``; the cause must have
+    unbounded support, which excludes a uniform cause [1]_. It is designed for one pair whose
+    effect's spread changes with the cause, which the additive noise model of :func:`~andrey.anm`
+    does not allow, and it returns a two-node DAG whose edge depends on ``criterion``. For more
+    than two variables, use :func:`~andrey.cam`, whose Limitations give its errors under such
+    noise.
+
+    With ``criterion="independence"``, LOCI-H in [1]_, each direction's scaled residual
+    ``(y - mu(x)) / sigma(x)`` is tested against the proposed cause by HSIC with Gaussian kernels,
+    each bandwidth the median distance between the rows, and a gamma approximation of the null
+    distribution [2]_. The p-values then decide as for :func:`~andrey.anm`: with ``alpha=None``, the
+    larger p-value, compared through their logarithms, and on equal p-values the smaller
+    statistic, with no edge when those are equal too; with a significance level, an edge only when
+    exactly one direction's p-value exceeds it. Mooij et al. (2016) [3]_ compare p-values to avoid
+    choosing a level. The paper proposes this criterion for noise that is not Gaussian.
+
+    With ``criterion="likelihood"``, LOCI-M in [1]_, the edge points in the direction whose model
+    has the larger mean log-likelihood, and equal ones give no edge. The likelihood identifies the
+    direction consistently when the noise is Gaussian, as the fitted model assumes [1]_. In the
+    paper's benchmarks it is ahead of the independence criterion on location-scale data and behind
+    it on data outside that model.
+
+    Each column is standardized first, as in [1]_, so the result does not depend on the units of
+    either variable; the Gaussian marginals of the two standardized causes are then equal, so the
+    likelihoods compare the two conditional models. In each direction the effect given the cause
+    is Gaussian with natural parameters ``eta_1 = Phi w_1`` and ``eta_2 = -Phi w_2``, where
+    ``Phi`` is a B-spline basis of the cause with 25 knots, of degree 5, and ``w_2 >= 0``, so the
+    log-likelihood is jointly concave [1]_. A Gaussian prior of precision ``1e-6`` on the weights
+    makes it strictly concave [1]_. Projected Newton steps [4]_ maximize it until the mean
+    objective changes by less than ``1e-6`` in a full step, or for at most 100 steps; the paper
+    takes a closed-form step in ``w_1`` and L-BFGS steps in ``w_2`` in turn, which approach the
+    same maximum in many more steps. The fit draws no random numbers, so it is deterministic.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on simulated location-scale pairs of up
+    to 500 rows. It decides one pair: the paper defines no procedure for more variables. The
+    model's noise is Gaussian, so under non-Gaussian noise the likelihood criterion is
+    misspecified. A spline at either end of the cause's range covers few rows, where the fitted
+    variance can shrink toward zero as the likelihood grows, which only the prior bounds. Each HSIC
+    test builds matrices with one row and one column per sample, so under
+    ``criterion="independence"`` time and memory grow with the square of ``n_samples``; the
+    likelihood fit grows linearly with it. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Immer, A., Schultheiss, C., Vogt, J. E., Scholkopf, B., Buhlmann, P., and Marx, A.
+       (2023). On the identifiability and estimation of causal location-scale noise models. ICML,
+       PMLR 202.
+    .. [2] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J. (2008).
+       A kernel statistical test of independence. NeurIPS 20, 585-592.
+    .. [3] Mooij, J. M., Peters, J., Janzing, D., Zscheischler, J., and Scholkopf, B. (2016).
+       Distinguishing cause from effect using observational data: methods and benchmarks. JMLR
+       17(32), 1-102.
+    .. [4] Bertsekas, D. P. (1982). Projected Newton methods for optimization problems with simple
+       constraints. SIAM Journal on Control and Optimization 20(2), 221-246.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import loci
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = np.sin(2 * x) + x + (0.6 + 0.5 * np.tanh(x)) * rng.standard_normal(500)
+    >>> out = loci(np.column_stack([x, y]))
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    >>> out = loci(np.column_stack([x, y]), criterion="likelihood")
+    >>> out.metadata["log_likelihoods"]["forward"] > out.metadata["log_likelihoods"]["backward"]
+    True
+    """
+    if criterion == "likelihood" and alpha is not None:
+        raise ValueError(
+            f"loci: alpha must be None under criterion='likelihood', which compares two "
+            f"likelihoods and no p-values, got {alpha!r}"
+        )
+    from andrey.core.independence import hsic_median_statistic_log_p
+    from andrey.irregular.loci import fit_direction
+
+    X, labels, rows = _pair_matrix("loci", data, standardize=True)
+    x, y = X[:, 0], X[:, 1]
+    ll_forward, residual_forward = fit_direction(x, y)
+    ll_backward, residual_backward = fit_direction(y, x)
+    extra = {"log_likelihoods": {"forward": ll_forward, "backward": ll_backward}, **rows}
+    if criterion == "likelihood":
+        return likelihood_output(ll_forward, ll_backward, labels=labels, extra=extra)
+    # The paper leaves the HSIC test's bandwidth, null approximation, and variance open; the
+    # comment in hsic_median_statistic_log_p names the source of each choice.
+    stat_forward, log_p_forward = hsic_median_statistic_log_p(x, residual_forward)
+    stat_backward, log_p_backward = hsic_median_statistic_log_p(y, residual_backward)
+    return pairwise_output(
+        math.exp(log_p_forward),
+        math.exp(log_p_backward),
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        log_p=(log_p_forward, log_p_backward),
+        alpha=alpha,
+        labels=labels,
+        extra=extra,
+    )
 
 
 @method_spec("rcd")

@@ -92,6 +92,7 @@ def tabu(
     n_perturbations: int = 1,
     seed: int = 0,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over a linear-Gaussian, categorical, or mixed-data score.
 
@@ -146,6 +147,9 @@ def tabu(
     sources : tuple of int
         Columns no other column may cause, such as an environment index, as for
         :func:`~andrey.search.hc.hc`.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, as for
+        :func:`~andrey.search.hc.hc`.
 
     Returns
     -------
@@ -173,4 +177,5 @@ def tabu(
         n_perturbations=n_perturbations,
         seed=seed,
         sources=sources,
+        cov=cov,
     )
