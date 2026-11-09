@@ -157,7 +157,10 @@ _add(
             graph_kind="cpdag",
             doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
-            "[x, z, y] triples the rule left ambiguous, by 0-based position",
+            "[x, z, y] triples the rule left ambiguous, by 0-based position; with missing=mvpc on "
+            "data with missing values, metadata['missingness_parents'] maps each column whose "
+            "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
+            "edges tested again (retested) and removed (removed), by name or 0-based position",
         ),
         accel="numpy",
         status="supported",
@@ -173,6 +176,16 @@ _add(
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
+            concept_param(
+                "missing",
+                choices=("testwise", "mvpc"),
+                doc="How missing values (NaN) are handled: testwise = each test reads only the "
+                "rows where all of its variables are observed (test-wise deletion); mvpc = "
+                "Missing-Value PC, experimental: after the test-wise skeleton, the parents of each "
+                "missingness indicator are found and the edges they could have kept are tested "
+                "again on virtual data that correct for them, with fisherz or student_t; null "
+                "picks the method's default, testwise.",
+            ),
             _TEST_SEED,
         ),
         references=(
@@ -181,6 +194,7 @@ _add(
             "Colombo & Maathuis 2014",
             "Meek 1995",
             "Ramsey, Zhang & Spirtes 2006",
+            "Tu et al. 2019",
         ),
     )
 )
@@ -2912,7 +2926,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
-    "pc": ("conflicts",),
+    "pc": ("conflicts", "missingness_parents", "corrected_edges"),
     "cdnod": ("conflicts", "index_edges", "changing_variables"),
     "fci_jci": ("index_edges",),
     "icp": (

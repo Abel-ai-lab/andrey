@@ -27,10 +27,12 @@ from andrey.constraint._skeleton import (
     unseparated_triples,
     vote_triples,
 )
+from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, separating_set, to_structure
+from andrey.core.seeding import resolve_seed
 from andrey.core.structure import has_cycle
 from andrey.core.ties import KEY_DP
 from andrey.core.warning_policy import PerformanceWarning, warn_once
@@ -55,9 +57,11 @@ def pc(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    missing: str = "testwise",
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
     _conflicts: set[tuple[int, int]] | None = None,
+    _mvpc: dict | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
 
@@ -79,8 +83,11 @@ def pc(
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
     larger conditioning-size passes (:func:`adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
-    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns the
-    CPDAG, or the MPDAG with ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) and of MVPC's permutations; ``None`` uses
+    ``ANDREY_SEED``. ``missing="mvpc"`` corrects the skeleton of data with ``NaN`` before the
+    orientation (:func:`correct_skeleton`); every other value, and data without ``NaN``, keep the
+    test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with ``constraints``, as a
+    ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`adjacency_search`), each unshielded triple
@@ -90,14 +97,16 @@ def pc(
     The tests of a collider vote are not recorded. The private ``_ambiguous`` sink receives the
     triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``, and
     the private ``_conflicts`` sink the edges colliders ask to orient both ways
-    (:func:`collider_conflicts`).
+    (:func:`collider_conflicts`), and the private ``_mvpc`` sink what MVPC found
+    (:func:`correct_skeleton`).
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
     allowed, keep, apart = knowledge_masks(constraints)
+    deletion = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     skeleton, sepsets, pvalues = adjacency_search(
-        make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+        deletion,
         X.shape[1],
         alpha,
         support=allowed,
@@ -109,6 +118,22 @@ def pc(
         warn_expensive=True,
         trace=_trace,
     )
+    if missing == "mvpc" and np.isnan(X).any():
+        skeleton, sepsets, pvalues = correct_skeleton(
+            X,
+            skeleton,
+            sepsets,
+            pvalues,
+            deletion,
+            indep_test=indep_test,
+            alpha=alpha,
+            max_depth=max_depth,
+            keep=keep,
+            seed=resolve_seed(seed),
+            record_pvalues=collider_order == "p_value",
+            trace=_trace,
+            sink=_mvpc,
+        )
     rule4 = constraints is not None
     ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
@@ -135,6 +160,87 @@ def pc(
     )
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
+
+
+def correct_skeleton(
+    X: np.ndarray,
+    skeleton: np.ndarray,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    pvalues: dict[tuple[int, int], float],
+    deletion: CITest,
+    *,
+    indep_test: str,
+    alpha: float,
+    max_depth: int | None,
+    keep: np.ndarray | None,
+    seed: int,
+    record_pvalues: bool,
+    trace: list[dict] | None,
+    sink: dict | None,
+) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
+    """Correct the test-wise deletion ``skeleton`` of ``X`` with MVPC's Steps 2 to 4.
+
+    Tu et al. (2019), Algorithm 1. Step 2 finds the parents of each column's missingness indicator
+    (:func:`indicator_parents`). Step 3 marks as candidates the adjacent pairs that share an
+    adjacent variable or an indicator they both cause
+    (:func:`~andrey.constraint.mvpc.candidate_edges`). Step 4 runs the stable skeleton search again
+    over ``skeleton`` with every other edge, and every pair in ``keep``, kept, testing the
+    candidates with :class:`~andrey.constraint.mvpc.PermutationCorrection` over the test-wise
+    deletion test ``deletion``, at ``alpha`` and ``max_depth``; ``trace`` records its tests. A
+    removed candidate gets its separating set and, with ``record_pvalues``, its p-value; the pairs
+    the first search removed keep theirs. The ``sink`` receives ``parents``, the parents of each
+    indicator that has any, ``retested``, the candidates, and ``removed``, those Step 4 removed, as
+    ``(x, y)`` pairs with ``x < y`` in ascending order. Returns the skeleton, the separating sets,
+    and the p-values.
+    """
+    d = X.shape[1]
+    adjacent = skeleton != NULL
+    parents = indicator_parents(X, indep_test, alpha, max_depth, seed)
+    candidates = candidate_edges(adjacent, parents)
+    kept = adjacent & ~candidates if keep is None else (adjacent & ~candidates) | keep
+    corrected, more_sepsets, more_pvalues = adjacency_search(
+        PermutationCorrection(X, indep_test, parents, candidates, deletion, seed),
+        d,
+        alpha,
+        support=adjacent,
+        keep=kept,
+        max_depth=max_depth,
+        record_pvalues=record_pvalues,
+        trace=trace,
+    )
+    if sink is not None:
+        retested = candidates & ~kept
+        sink["parents"] = parents
+        sink["retested"] = adjacent_pairs(retested)
+        sink["removed"] = adjacent_pairs(retested & (corrected == NULL))
+    return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}
+
+
+def indicator_parents(
+    X: np.ndarray, indep_test: str, alpha: float, max_depth: int | None, seed: int
+) -> dict[int, list[int]]:
+    """MVPC's Step 2: the parents of the missingness indicator of each column of ``X`` with ``NaN``.
+
+    Tu et al. (2019), Algorithm 1 and Appendix A.3. The column is replaced by its 0/1 indicator,
+    and the stable skeleton search runs on the pairs of the indicator alone: each other column is
+    tested against it given subsets of the indicator's neighbors, with ``indep_test`` on test-wise
+    deletion, at ``alpha`` and ``max_depth``. The columns left adjacent are its parents, in
+    ascending order, and an indicator with none is left out. A query whose rows hold one value of
+    the indicator separates its pair (:class:`~andrey.constraint.mvpc.IndicatorTest`).
+    """
+    d = X.shape[1]
+    parents: dict[int, list[int]] = {}
+    for column in np.flatnonzero(np.isnan(X).any(axis=0)):
+        R = X.copy()
+        R[:, column] = np.isnan(X[:, column])
+        pairs = np.zeros((d, d), dtype=bool)
+        pairs[column, :] = pairs[:, column] = True
+        test = IndicatorTest(make_indep_test(indep_test, R, seed=seed), R, int(column))
+        found, _, _ = adjacency_search(test, d, alpha, support=pairs, max_depth=max_depth)
+        adjacent = np.flatnonzero(found[column] != NULL)
+        if adjacent.size:
+            parents[int(column)] = [int(c) for c in adjacent]
+    return parents
 
 
 def check_collider_order(collider_order: str) -> None:
