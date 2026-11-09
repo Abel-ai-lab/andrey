@@ -413,6 +413,29 @@ def test_a_supported_method_runs_on_missing_values_and_repeats(name):
     assert "rows_tested" not in _fit(name, _continuous(400)).metadata
 
 
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_testwise_is_the_default_handling_and_the_fit_records_it(name):
+    x = _gaps(_continuous(400), 0.1)
+    default, testwise = _fit(name, x), _fit(name, x, missing="testwise")
+    assert default.structure == testwise.structure
+    assert default.metadata == testwise.metadata
+    assert default.metadata["missing"] == "testwise"
+    complete = _fit(name, _continuous(400), missing="testwise")
+    assert "missing" not in complete.metadata
+    assert complete.structure == _fit(name, _continuous(400)).structure
+
+
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_a_handling_the_method_does_not_list_raises_naming_the_argument(name):
+    with pytest.raises(ValueError, match=rf"^{name}: missing must be one of 'testwise'.*'em'"):
+        _fit(name, _gaps(_continuous(400), 0.1), missing="em")
+
+
+def test_the_methods_that_take_missing_are_the_ones_that_accept_missing_values():
+    takes = {m for m, spec in REGISTRY.items() if any(p.name == "missing" for p in spec.params)}
+    assert takes == set(SUPPORTED)
+
+
 @pytest.mark.parametrize("name", ["pc", "fci", "cdnod"])
 def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     # Every pass with a conditioning set goes to the pool where a pool runs.
@@ -504,6 +527,7 @@ def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
     assert out.metadata == {
         **alone.metadata,
         "rows_tested": {"min": rows.sum(), "median": rows.sum()},
+        "missing": "testwise",
     }
 
 

@@ -21,6 +21,7 @@ from andrey.api._adapt import default_score, default_test
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
+from andrey.core.ci_missing import TESTWISE
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
@@ -64,8 +65,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     ``metadata["score_func"]`` are the test and the score the fit used, for a method that takes
     them, with the penalties that score used (:func:`used_penalties`);
     ``metadata["tie_break"]`` is :data:`andrey.config`'s ``tie_break`` for a method whose result it
-    can change (``MethodSpec.tie_break``); and, when the fit draws random numbers
-    (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used.
+    can change (``MethodSpec.tie_break``); when the fit draws random numbers
+    (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used; and, when its tests met
+    missing values, ``metadata["missing"]`` is how it handled them (:func:`missing_used`).
     """
 
     def decorate(facade: Facade) -> Facade:
@@ -102,8 +104,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             if spec.tie_break:
                 stamp["tie_break"] = config.tie_break
             if isinstance(out, list):
-                return [stamped(o, stamp) for o in out]
-            return stamped(out, stamp)
+                return [stamped(o, stamp | missing_used(spec, bound.arguments, o)) for o in out]
+            return stamped(out, stamp | missing_used(spec, bound.arguments, out))
 
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
 
@@ -353,6 +355,20 @@ def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
                     DeprecatedArgumentWarning,
                 )
     return kwargs
+
+
+def missing_used(
+    spec: MethodSpec, arguments: dict[str, Any], out: StructureOutput
+) -> dict[str, object]:
+    """Return ``{"missing": value}`` when the fit ``out`` met missing values, else ``{}``.
+
+    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``. The
+    value is the call's ``missing`` or, for ``None``, the method's default handling,
+    ``"testwise"``.
+    """
+    if "rows_tested" not in out.metadata or not any(p.concept == "missing" for p in spec.params):
+        return {}
+    return {"missing": arguments.get("missing") or TESTWISE}
 
 
 def stamped(out: StructureOutput, stamp: dict[str, object]) -> StructureOutput:

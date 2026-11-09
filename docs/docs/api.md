@@ -139,11 +139,15 @@ accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` f
 each conditional-independence test reads only the rows where all of its variables are observed
 (test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where
 both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
-test read. A column with no observed value, or a constant one over its observed values, raises a
-`ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
-`"student_t"` and 2 for the other tests, raises one during it. `cdnod` and `fci_jci` need a complete
-`env`. Every other method raises a `ValueError` that names it and says what to do instead, as
-[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
+test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
+records the one a fit used. A value a method does not list raises a `ValueError` that names the
+values it takes. A column with no observed value, or a constant one over its observed values, raises
+a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"`
+and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and `fci_jci` need a
+complete `env`. Every other method raises a `ValueError` that names it and says what to do instead,
+as [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say
+why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
