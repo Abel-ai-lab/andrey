@@ -172,6 +172,16 @@ _add(
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
+            concept_param(
+                "missing",
+                choices=("testwise", "mvpc"),
+                doc="How missing values (NaN) are handled: testwise = each test reads only the "
+                "rows where all of its variables are observed (test-wise deletion); mvpc = "
+                "Missing-Value PC, experimental: after the test-wise skeleton, the parents of each "
+                "missingness indicator are found and the edges they could have kept are tested "
+                "again on virtual data that correct for them, with fisherz or student_t; null "
+                "picks the method's default, testwise.",
+            ),
             _TEST_SEED,
         ),
         references=(
@@ -180,6 +190,7 @@ _add(
             "Colombo & Maathuis 2014",
             "Meek 1995",
             "Ramsey, Zhang & Spirtes 2006",
+            "Tu et al. 2019",
         ),
     )
 )
