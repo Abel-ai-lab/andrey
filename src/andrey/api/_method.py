@@ -16,7 +16,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -31,7 +31,13 @@ from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
 from andrey.core.structure import ARROW, TAIL, column_labels
-from andrey.core.warning_policy import DeprecatedArgumentWarning, ExperimentalWarning, warn_once
+from andrey.core.warning_policy import (
+    DeprecatedArgumentWarning,
+    ExperimentalWarning,
+    KnowledgeWarning,
+    warn_each,
+    warn_once,
+)
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -72,7 +78,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
     a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
     After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
-    ``forbidden_paths`` (:func:`restrict_paths`); each result's ``metadata["algorithm"]`` is
+    ``forbidden_paths`` (:func:`restrict_paths`), a PAG or a DAG is checked against them
+    (:func:`meet_paths`), and a claim the result does not meet is dropped with a warning
+    (:func:`drop_unmet`); each result's ``metadata["algorithm"]`` is
     ``name``, ``metadata["indep_test"]`` and ``metadata["score_func"]`` are the test and the score
     the fit used, for a method that takes them, with the penalties that score used
     (:func:`used_penalties`);
@@ -113,7 +121,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
             out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
-                out = restrict_paths(out, paths) if spec.restricts_paths else meet_paths(out, paths)
+                out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
             stamp.update(chosen)
             stamp.update(used_penalties(spec, bound.arguments, chosen.get("score_func")))
             if spec.tie_break:
@@ -235,14 +243,15 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
     )
 
 
-def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureOutput:
+def restrict_paths(out: StructureOutput, constraints: Constraints, method: str) -> StructureOutput:
     """Return ``out`` with its CPDAG restricted by the causal paths of ``constraints``.
 
     Of the DAGs the CPDAG stands for, the structure becomes the MPDAG of those that meet
     ``required_paths`` and ``forbidden_paths`` (:func:`~andrey.core.ancestral.restrict`), and
     ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each
-    ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. An
-    undirected structure, which the paths do not orient, is returned as it is.
+    ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. A claim no
+    such DAG meets is dropped (:func:`drop_unmet`). An undirected structure, which the paths do not
+    orient, is returned as it is.
     """
     from andrey.core.ancestral import restrict
     from andrey.core.orient import from_structure, to_structure
@@ -254,33 +263,33 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
     assert structure.n_nodes == constraints.d, (structure.n_nodes, constraints.d)
     labels = structure.labels
     name = label_of(labels)
-    mpdag, clauses = restrict(
+    mpdag, clauses, unmet = restrict(
         from_structure(structure),  # ty: ignore[invalid-argument-type]  # a cpdag is a graph
         constraints.required_paths,
         constraints.forbidden_paths,
-        label=lambda i: repr(name(i)) if labels is not None else str(i),
     )
     metadata = {
         **out.metadata,
         "ancestor_clauses": [[name(t), [name(h) for h in sorted(heads)]] for t, heads in clauses],
     }
-    return dataclasses.replace(
+    out = dataclasses.replace(
         out, _structure=to_structure(mpdag, kind="cpdag", labels=labels), _metadata=metadata
     )
+    return drop_unmet(out, unmet, method)
 
 
-def meet_paths(out: Any, constraints: Constraints) -> Any:
+def meet_paths(out: Any, constraints: Constraints, method: str) -> Any:
     """Check ``out``, a result or a list of them, against the causal paths of ``constraints``.
 
-    A PAG that contradicts a claim raises :class:`~andrey.core.knowledge.KnowledgeError`
-    (:func:`~andrey.constraint.fci.check_path_claims`); a PAG with an index column after the data's
-    columns reads the claims over its first columns. A DAG gets ``metadata["unmet_knowledge"]``,
-    the claims it does not meet, each ``[part, a, b]``.
+    A PAG or a DAG drops the claims it does not meet (:func:`drop_unmet`): for a PAG, those
+    :func:`~andrey.constraint.fci.unmet_path_claims` finds, and for a DAG, a required path it lacks
+    and a forbidden path it has. A PAG with an index column after the data's columns reads the
+    claims over its first columns.
     """
-    from andrey.constraint.fci import check_path_claims, reach
+    from andrey.constraint.fci import reach, unmet_path_claims
 
     if isinstance(out, list):
-        return [meet_paths(each, constraints) for each in out]
+        return [meet_paths(each, constraints, method) for each in out]
     structure = out.structure
     kind = getattr(structure, "kind", None)
     if kind not in ("pag", "dag"):
@@ -288,8 +297,6 @@ def meet_paths(out: Any, constraints: Constraints) -> Any:
     marks = structure.to_numpy()
     d = constraints.d
     assert len(marks) >= d, (len(marks), d)
-    labels = structure.labels
-    name = label_of(labels)
     claims = {}
     for part, pairs in (
         ("required_paths", constraints.required_paths),
@@ -300,17 +307,38 @@ def meet_paths(out: Any, constraints: Constraints) -> Any:
             full[:d, :d] = pairs
         claims[part] = full
     if kind == "pag":
-        label = (lambda i: repr(name(i))) if labels is not None else str
-        check_path_claims(marks, claims["required_paths"], claims["forbidden_paths"], label)
-        return out
-    directed = (marks == TAIL) & (marks.T == ARROW)
-    unmet = [
-        [part, name(a), name(b)]
-        for part, pairs in claims.items()
-        for a, b in np.argwhere(pairs).tolist()
-        if bool(reach(directed, a)[b]) != (part == "required_paths")
-    ]
-    return dataclasses.replace(out, _metadata={**out.metadata, "unmet_knowledge": unmet})
+        unmet = unmet_path_claims(marks, claims["required_paths"], claims["forbidden_paths"])
+    else:
+        directed = (marks == TAIL) & (marks.T == ARROW)
+        unmet = [
+            (part, a, b)
+            for part, pairs in claims.items()
+            for a, b in np.argwhere(pairs).tolist()
+            if bool(reach(directed, a)[b]) != (part == "required_paths")
+        ]
+    return drop_unmet(out, unmet, method)
+
+
+def drop_unmet(out: Any, unmet: Sequence[Sequence[Any]], method: str) -> Any:
+    """Return ``out`` with ``metadata["unmet_knowledge"]``, the claims its graph does not meet.
+
+    Each claim in ``unmet`` is ``(part, a, b)``, or ``(part, a, b, lag)`` for a lagged claim, with
+    ``a`` and ``b`` column positions, recorded as ``[part, a, b]`` or ``[part, a, b, lag]`` with
+    the columns' labels. When there is one, the fit warns once with
+    :class:`~andrey.KnowledgeWarning`, naming them all.
+    """
+    name = label_of(out.structure.labels)
+    listed = [[part, name(a), name(b), *lag] for part, a, b, *lag in unmet]
+    if listed:
+        claims = ", ".join(
+            f"{part} ({', '.join(repr(v) for v in claim)})" for part, *claim in listed
+        )
+        warn_each(
+            f"andrey.{method}: the graph found does not meet knowledge {claims}, so the fit drops "
+            "them and lists them in metadata['unmet_knowledge']",
+            KnowledgeWarning,
+        )
+    return dataclasses.replace(out, _metadata={**out.metadata, "unmet_knowledge": listed})
 
 
 def removed_name_error(

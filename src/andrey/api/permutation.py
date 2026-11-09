@@ -147,8 +147,9 @@ def boss(
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
         In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -516,8 +517,9 @@ def grasp(
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
         In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
-        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
-        that no such DAG meets raise ``ValueError``.
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim
+        no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1613,8 +1615,9 @@ def boss_fci(
         ``a -> b``. With ``env``, the environment index is unconstrained. In the PAG,
         ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
         at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
-        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
-        contradicts, assume no selection bias.
+        describes; these marks, and the check that drops a claim the PAG does not meet with a
+        :class:`~andrey.KnowledgeWarning` and lists it in ``metadata["unmet_knowledge"]``, assume no
+        selection bias.
 
     Returns
     -------
@@ -1945,8 +1948,9 @@ def grasp_fci(
         is ``a -> b``. With ``env``, the environment index is unconstrained. In the PAG,
         ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
         at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
-        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
-        contradicts, assume no selection bias.
+        describes; these marks, and the check that drops a claim the PAG does not meet with a
+        :class:`~andrey.KnowledgeWarning` and lists it in ``metadata["unmet_knowledge"]``, assume no
+        selection bias.
 
     Returns
     -------

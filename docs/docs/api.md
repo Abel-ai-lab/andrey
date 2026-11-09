@@ -190,14 +190,24 @@ the result is the MPDAG of the DAGs of the class found that meet them (Fang et a
 `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`,
 `boss_fci`, `grasp_fci`, and `lpcmci` honor all three, experimentally: on a pair the tests keep, a
 required path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before
-Zhang's rules (Richardson and Spirtes 2002; Zhang 2008); no test removes a `confounded` pair; and a
-claim the PAG contradicts raises. These marks and checks assume no selection bias. `lpcmci` takes
-each claim with its lag. `direct_lingam` and
-`multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`, experimentally, as the
-order search's prior knowledge (Shimizu et al. 2011, Section 3.4), and
-`metadata["unmet_knowledge"]` lists the claims the DAG does not meet. A method given a part it does
-not honor raises `NotImplementedError`, naming the methods that honor it, and so do `iamb`,
-`inter_iamb`, and `mmpc` given the paths with a `target` or an undirected `structure`.
+Zhang's rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair.
+These marks and checks assume no selection bias. `lpcmci` takes each claim with its lag.
+`direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
+experimentally, as the order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
+
+Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
+raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
+graph a fit finds does not meet: the tests remove an edge on the only path a required path needs,
+or the class found has no DAG without a path a forbidden path denies. The fit then keeps its graph,
+drops each such claim, warns once with `KnowledgeWarning`, naming the claims, and lists them in
+`metadata["unmet_knowledge"]`, each `[part, a, b]`, or `[part, a, b, lag]` for `lpcmci`; the list
+is empty when every claim is met. A CPDAG method takes the claims in order, `required_paths` and
+then `forbidden_paths`, each by column position, and keeps a claim when some DAG of the class meets
+it together with those kept before it. A PAG method drops a required path that `forbidden` or the
+tiers deny on an adjacent pair before the rules, and then each claim the final PAG does not meet.
+A method given a part it does not honor raises `NotImplementedError`, naming the methods that
+honor it, and so do `iamb`, `inter_iamb`, and `mmpc` given the paths with a `target` or an
+undirected `structure`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -830,7 +840,7 @@ environment variables and the order in which the settings apply, and
 Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`, and each
 situation has one category, the one the table names, in every method. A warning never changes a
 result. Each distinct message warns once per process, at the line in your code that
-made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
+made the call; a `BoundaryWarning` warns once per method, and a `KnowledgeWarning` once per fit. A warning from a dependency keeps its own
 category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
 `SearchLimitWarning`.
 
@@ -843,6 +853,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function or class, which also works for one more release. |
+| {py:class}`~andrey.KnowledgeWarning` | A fit dropped `required_paths`, `forbidden_paths`, or `confounded` claims the graph it found does not meet, and lists them in `metadata["unmet_knowledge"]`. |
 | {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
@@ -889,6 +900,7 @@ name.
    SearchLimitWarning
    SampleSizeWarning
    DataTypeWarning
+   KnowledgeWarning
    BoundaryWarning
    DeprecatedArgumentWarning
 ```

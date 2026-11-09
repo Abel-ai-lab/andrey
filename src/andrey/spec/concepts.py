@@ -1348,7 +1348,8 @@ _CONCEPTS = (
         key="warnings",
         summary="Every warning a fit raises is an AndreyWarning, one class per situation: "
         "ExperimentalWarning, BoundaryWarning, SearchLimitWarning, DataTypeWarning, "
-        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning.",
+        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning, "
+        "KnowledgeWarning.",
         suitable=ALL_METHODS,
     ),
     Concept(

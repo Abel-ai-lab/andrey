@@ -1430,20 +1430,20 @@ def run(
     return _result(search, kept)
 
 
-def check_claims(
-    result: LPCMCIResult, constraints: LaggedConstraints | None, label: Callable[[int], str] = str
-) -> None:
-    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when ``result`` contradicts a path
-    claim of ``constraints``.
+def unmet_claims(
+    result: LPCMCIResult, constraints: LaggedConstraints
+) -> list[tuple[str, int, int, int]]:
+    """The path claims of ``constraints`` that ``result`` does not meet, each
+    ``(part, cause, effect, lag)``.
 
     The claims are read over the time window, with the node ``(i, lag)``, variable ``i`` at time
     ``t - lag``, joined to every node by the links ``result`` repeats at each step
-    (:func:`~andrey.constraint.fci.check_path_claims`). ``label`` names a variable.
+    (:func:`~andrey.constraint.fci.unmet_path_claims`).
     """
-    if constraints is None or constraints.required_paths is None:
-        return
-    from andrey.constraint.fci import check_path_claims
+    from andrey.constraint.fci import unmet_path_claims
 
+    if constraints.required_paths is None:
+        return []
     lags, n, _ = result.start_marks.shape
     marks = np.zeros((lags * n, lags * n), dtype=np.int8)
     for lag, i, j in np.argwhere(result.start_marks != NULL).tolist():
@@ -1458,14 +1458,11 @@ def check_claims(
             out[lag * n + i, j] = True
         return out
 
-    def node(k: int) -> str:
-        lag, i = divmod(k, n)
-        return f"{label(i)} at t-{lag}" if lag else f"{label(i)} at t"
-
     assert constraints.forbidden_paths is not None
-    check_path_claims(
-        marks, window(constraints.required_paths), window(constraints.forbidden_paths), node
+    found = unmet_path_claims(
+        marks, window(constraints.required_paths), window(constraints.forbidden_paths)
     )
+    return [(part, cause % n, effect, cause // n) for part, cause, effect in found]
 
 
 def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:

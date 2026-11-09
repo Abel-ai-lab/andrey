@@ -257,15 +257,38 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
     directs close a cycle.
 
     The cycle follows edges ``paths[i, j]`` (``i -> j``) from a node ``y`` to a node ``x`` and
-    closes with ``closing[x, y]``; ``closing`` defaults to ``paths``, so any directed cycle of
-    ``paths`` counts. PC and CD-NOD pass the edges the knowledge directs. FCI passes its required
-    edges as ``paths`` and its arrowheads as ``closing``: a required path from ``y`` to ``x`` makes
-    ``y`` an ancestor of ``x``, which an arrowhead at ``y`` on the edge ``x - y`` denies, while a
-    cycle of arrowheads alone fits bidirected edges. The message names the cycle by column position.
+    closes with ``closing[x, y]`` (:func:`knowledge_cycle`); ``closing`` defaults to ``paths``, so
+    any directed cycle of ``paths`` counts. PC and CD-NOD pass the edges the knowledge directs. FCI
+    passes its required edges as ``paths`` and its arrowheads as ``closing``: a required path from
+    ``y`` to ``x`` makes ``y`` an ancestor of ``x``, which an arrowhead at ``y`` on the edge
+    ``x - y`` denies, while a cycle of arrowheads alone fits bidirected edges. The message names
+    the cycle by column position.
     """
+    if (cycle := knowledge_cycle(paths, closing)) is None:
+        return
+    x, y = cycle[0], cycle[-1]
+    if closing is None:
+        path = " -> ".join(str(v) for v in [*cycle[::-1], y])
+        conflict = f"orients the edges {path} into a directed cycle"
+    else:
+        path = " -> ".join(str(v) for v in cycle[::-1])
+        conflict = (
+            f"requires the directed path {path}, which makes {y} an ancestor of {x}, "
+            f"and puts an arrowhead at {y} on the edge {x} - {y}, which denies it"
+        )
+    raise KnowledgeError(
+        f"the background knowledge {conflict}, over the adjacencies the search kept; "
+        "change the required edges, forbidden edges, or tiers that set them"
+    )
+
+
+def knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) -> list[int] | None:
+    """A cycle that follows edges ``paths[i, j]`` from a node ``y`` to a node ``x`` and closes
+    with ``closing[x, y]``, as its nodes from ``x`` back to ``y``, or ``None`` when there is none;
+    ``closing`` defaults to ``paths``."""
     closing = paths if closing is None else closing
     if not has_cycle(paths | closing):
-        return
+        return None
     successors = [np.flatnonzero(row).tolist() for row in paths]
     for y in np.flatnonzero(closing.any(axis=0)).tolist():
         previous = {y: y}
@@ -276,23 +299,12 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
                 cycle = [x]
                 while cycle[-1] != y:
                     cycle.append(previous[cycle[-1]])
-                if closing is paths:
-                    path = " -> ".join(str(v) for v in [*cycle[::-1], y])
-                    conflict = f"orients the edges {path} into a directed cycle"
-                else:
-                    path = " -> ".join(str(v) for v in cycle[::-1])
-                    conflict = (
-                        f"requires the directed path {path}, which makes {y} an ancestor of {x}, "
-                        f"and puts an arrowhead at {y} on the edge {x} - {y}, which denies it"
-                    )
-                raise KnowledgeError(
-                    f"the background knowledge {conflict}, over the adjacencies the search kept; "
-                    "change the required edges, forbidden edges, or tiers that set them"
-                )
+                return cycle
             for z in successors[x]:
                 if z not in previous:
                     previous[z] = x
                     queue.append(z)
+    return None
 
 
 def orient_colliders(

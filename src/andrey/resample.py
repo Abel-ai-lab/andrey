@@ -253,10 +253,21 @@ class BootstrapOutput:
         nearest = None
         if lags is None and slices[0].kind in _MADE_VALID:
             nearest = _nearest(slices[0], coded[0], fits)
+        unmet: list[tuple[str, int, int]] = []
         structure, source = _average(
-            slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints, ranks
+            slices,
+            len(fits),
+            threshold,
+            lags,
+            n,
+            labels,
+            nearest,
+            strict,
+            constraints,
+            ranks,
+            unmet,
         )
-        return cls(
+        out = cls(
             _structure=structure,
             _n_resamples=len(fits),
             _threshold=threshold,
@@ -269,6 +280,11 @@ class BootstrapOutput:
             _constraints=constraints,
             _ranks=ranks,
         )
+        if constraints is None or constraints.required_paths is None:
+            return out
+        from andrey.api._method import drop_unmet
+
+        return drop_unmet(out, unmet, "bootstrap")
 
     # ---- surface --------------------------------------------------------------------------
 
@@ -507,11 +523,13 @@ def _average(
     strict: bool,
     constraints: Constraints | None,
     ranks: np.ndarray | None,
+    unmet: list[tuple[str, int, int]] | None = None,
 ) -> tuple[Structure, str]:
     """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``.
 
     Returns the graph and its ``metadata["averaged_graph"]``: ``"vote"``, ``"nearest_resample"``,
-    or ``"nearest_resample_invalid"`` when no fit is a valid graph of the kind.
+    or ``"nearest_resample_invalid"`` when no fit is a valid graph of the kind. The path claims a
+    valid vote does not meet are added to ``unmet`` (:func:`_valid_graph`).
     """
     if lags is not None:
         graphs = [_vote_graph(s, n_resamples, threshold, n, labels) for s in slices]
@@ -521,7 +539,7 @@ def _average(
         return _vote_graph(s, n_resamples, threshold, n, labels), "vote"
     try:
         return _valid_graph(
-            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks
+            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks, unmet
         ), "vote"
     except ValueError as exc:
         reason = f"the vote of the fits has no valid {s.kind}: {exc}"
@@ -595,6 +613,7 @@ def _valid_graph(
     labels: tuple[str, ...] | None,
     constraints: Constraints | None,
     ranks: np.ndarray | None,
+    unmet: list[tuple[str, int, int]] | None = None,
 ) -> GraphStructure:
     """Return the valid graph of ``kind`` that the published steps make of ``vote``.
 
@@ -607,18 +626,29 @@ def _valid_graph(
     MPDAG, restricted by the knowledge's ``required_paths`` and ``forbidden_paths``
     (:func:`~andrey.core.ancestral.restrict`), and a ``pag`` is oriented as ``fci`` orients one
     under knowledge: the vote and the PAG get the knowledge's endpoints (``knowledge_marks``)
-    before the MAG step and before the orientation rules, which then run to a fixed point.
-    Raises ``ValueError``, saying why, when no extension or no MAG exists.
+    before the MAG step and before the orientation rules, which then run to a fixed point. The
+    claims of ``required_paths`` and ``forbidden_paths`` the graph does not meet, which the
+    ``cpdag`` step drops and the ``pag`` step finds as ``fci`` does
+    (:func:`~andrey.constraint.fci.unmet_path_claims`), are added to ``unmet``, each
+    ``(part, a, b)``. Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
         if constraints is not None:
             from andrey.constraint.fci import knowledge_marks
 
             vote = vote.copy()
-            name = (lambda i: repr(labels[i])) if labels is not None else str
-            knowledge_marks(vote, constraints, name)  # a tie edge o-o can drop a knowledge endpoint
+            knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
-        return pag_of(mag, None, (), constraints)
+        pag = pag_of(mag, None, (), constraints)
+        if unmet is not None and constraints is not None and constraints.required_paths is not None:
+            from andrey.constraint.fci import unmet_path_claims
+
+            unmet.extend(
+                unmet_path_claims(
+                    pag.to_numpy(), constraints.required_paths, constraints.forbidden_paths
+                )
+            )
+        return pag
     if ((vote == ARROW) & (vote.T == ARROW)).any():
         raise ValueError("it has a bidirected edge, which no DAG has")
     if constraints is not None:
@@ -632,10 +662,11 @@ def _valid_graph(
         if constraints.required_paths is not None:
             from andrey.core.ancestral import restrict
 
-            label = (lambda i: repr(labels[i])) if labels is not None else str
-            cpdag, _ = restrict(
-                cpdag, constraints.required_paths, constraints.forbidden_paths, label=label
+            cpdag, _, dropped = restrict(
+                cpdag, constraints.required_paths, constraints.forbidden_paths
             )
+            if unmet is not None:
+                unmet.extend(dropped)
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 
@@ -1080,7 +1111,10 @@ def bootstrap(
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
     is oriented as ``fci`` orients one under knowledge: the endpoints the knowledge sets come
     first, and Zhang's orientation rules then run from them until no endpoint changes, as they do
-    in a fit [9]_, [10]_. A time-series result's lag graphs
+    in a fit [9]_, [10]_. Its ``required_paths`` and ``forbidden_paths`` act on the averaged graph
+    as in a fit: a claim the graph does not meet is dropped, with a
+    :class:`~andrey.KnowledgeWarning`, and ``metadata["unmet_knowledge"]`` lists it, as each fit's
+    own metadata lists its claims. A time-series result's lag graphs
     keep the vote, as in [6]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 

@@ -53,18 +53,22 @@ names its pull request.
   `required_paths` and `forbidden_paths`, experimentally: the result is the MPDAG of the DAGs of
   the class found that meet them (Fang, Zhao, Liu, and He 2025), and
   `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. Knowledge that contradicts
-  itself raises `ValueError` before the search, and claims that no DAG of the class meets raise it
-  after. ([#829])
+  itself raises `ValueError` before the search. A claim that no DAG of the class meets is dropped:
+  the fit warns with the new `KnowledgeWarning`, naming the claims, and lists them in
+  `metadata["unmet_knowledge"]`; when only some claims hold together, they are kept in order,
+  `required_paths` and then `forbidden_paths`. `bootstrap` drops them from the averaged graph alike.
+  ([#829], [#850])
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
   `forbidden_paths`, and `confounded`, experimentally: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
-  rules, no test removes a `confounded` pair, and a claim the PAG contradicts raises `ValueError`;
-  the marks and the checks assume no selection bias. `lpcmci` takes each claim with its lag.
-  ([#835])
+  rules, no test removes a `confounded` pair, and a claim the PAG does not meet is dropped with a
+  `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`; the marks and the checks assume
+  no selection bias. `lpcmci` takes each claim with its lag. ([#835], [#850])
 - `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
   experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
-  the variables the causal order may place next, a forbidden path is no parent, and
-  `metadata["unmet_knowledge"]` lists the claims the DAG does not meet. ([#835])
+  the variables the causal order may place next, a forbidden path is no parent, and a claim the DAG
+  does not meet is dropped with a `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`.
+  ([#835], [#850])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
   another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
   `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
@@ -2160,3 +2164,4 @@ First alpha release.
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
+[#850]: https://github.com/Abel-ai-lab/andrey/pull/850

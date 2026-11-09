@@ -26,11 +26,15 @@ from andrey.constraint._skeleton import (
     unseparated_triples,
     vote_triples,
 )
-from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
+from andrey.constraint.pc import (
+    adjacency_search,
+    check_knowledge_cycle,
+    knowledge_cycle,
+    knowledge_masks,
+)
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.knowledge import KnowledgeError
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -56,7 +60,6 @@ def fci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
-    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
@@ -78,9 +81,9 @@ def fci(
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
-    endpoints before the orientation rules, which change circles only; ``label`` names a node in
-    its error. A triple over a non-adjacent pair with no separating set is neither a collider nor a
-    non-collider to any rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
+    endpoints before the orientation rules, which change circles only. A triple over a
+    non-adjacent pair with no separating set is neither a collider nor a non-collider to any rule
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
     arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
     share the adjacency search's larger conditioning-size passes
@@ -110,7 +113,7 @@ def fci(
     )
 
     marks = circle_pag(skeleton)
-    knowledge_marks(marks, constraints, label)
+    knowledge_marks(marks, constraints)
     orient_colliders(marks, sepsets)
     marks = possible_dsep_step(
         marks,
@@ -125,7 +128,6 @@ def fci(
         max_depth=max_depth,
         constraints=constraints,
         workers=workers,
-        label=label,
     )
     ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
@@ -153,9 +155,7 @@ def circle_pag(support: np.ndarray) -> np.ndarray:
     return marks
 
 
-def knowledge_marks(
-    marks: np.ndarray, constraints: Constraints | None, label: Callable[[int], str] = str
-) -> None:
+def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
     """Set the endpoints ``constraints`` decide on the adjacent pairs, in place.
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
@@ -163,9 +163,14 @@ def knowledge_marks(
     forbidden, an arrowhead at ``j``. A pair ``(i, j)`` of ``forbidden_paths`` puts an arrowhead at
     ``i``, and a pair of ``required_paths`` makes the edge ``i -> j``: in a maximal ancestral graph
     an edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
-    (Richardson and Spirtes 2002). A ``required_paths`` pair on an edge the forbidden edges or the
-    tiers put an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`,
-    whose message names a node by ``label``. ``None`` leaves ``marks`` as they are.
+    (Richardson and Spirtes 2002). The ``required_paths`` pairs come last, one at a time in column
+    order, and a pair is left unset when the marks set so far deny it: an arrowhead at ``i`` or a
+    tail at ``j`` on its edge, which ``forbidden`` and the tiers set on a pair the tests kept
+    adjacent, or an edge ``i -> j`` that would close a directed path of the edges set so far with
+    an arrowhead that denies it (:func:`~andrey.constraint.pc.knowledge_cycle`). Such a claim is one
+    the PAG does not meet (:func:`unmet_path_claims`). When the other parts alone close such a
+    path, no pair is set, and :func:`~andrey.constraint.pc.check_knowledge_cycle` raises for them.
+    ``None`` leaves ``marks`` as they are.
     """
     if constraints is None:
         return
@@ -174,54 +179,50 @@ def knowledge_marks(
     if constraints.forbidden_paths is not None:
         marks[adjacent & constraints.forbidden_paths] = ARROW
     marks[adjacent & constraints.required] = TAIL
-    if constraints.required_paths is not None:
-        claimed = adjacent & constraints.required_paths
-        if (clash := claimed & (marks == ARROW)).any():
-            i, j = (label(v) for v in np.argwhere(clash)[0].tolist())
-            raise KnowledgeError(
-                f"knowledge lists ({i}, {j}) in required_paths, but forbids the edge {i} -> {j} "
-                f"one way or by the tiers, which puts an arrowhead at {i} on the edge it keeps "
-                "between them"
-            )
-        marks[claimed] = TAIL
-        marks[claimed.T] = ARROW
-
-
-def check_path_claims(
-    marks: np.ndarray,
-    required_paths: np.ndarray | None,
-    forbidden_paths: np.ndarray | None,
-    label: Callable[[int], str] = str,
-) -> None:
-    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when the PAG ``marks`` contradict a
-    path claim.
-
-    ``required_paths[a, b]`` claims that ``a`` is an ancestor of ``b``, which needs a possibly
-    directed path from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not
-    out of ``v`` (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral
-    graph the PAG stands for. ``forbidden_paths[a, b]`` claims the opposite, which a directed path
-    ``a -> ... -> b`` denies in every such graph. ``label`` names a node in the message.
-    """
-    for claims, steps, holds, what in (
-        (
-            required_paths,
-            (marks != NULL) & (marks != ARROW) & (marks.T != TAIL),
-            False,
-            "no possibly",
-        ),
-        (forbidden_paths, (marks == TAIL) & (marks.T == ARROW), True, "a"),
-    ):
-        if claims is None or not claims.any():
+    if constraints.required_paths is None or _closes_cycle(marks):
+        return
+    for i, j in np.argwhere(adjacent & constraints.required_paths).tolist():
+        if marks[i, j] == ARROW or marks[j, i] == TAIL:
             continue
-        for a in np.flatnonzero(claims.any(axis=1)).tolist():
-            reached = reach(steps, a)
-            if (found := claims[a] & (reached == holds)).any():
-                b = int(np.flatnonzero(found)[0])
-                part = "required_paths" if claims is required_paths else "forbidden_paths"
-                raise KnowledgeError(
-                    f"knowledge lists ({label(a)}, {label(b)}) in {part}, but the PAG has {what} "
-                    f"directed path from {label(a)} to {label(b)}"
-                )
+        before = marks[i, j], marks[j, i]
+        marks[i, j], marks[j, i] = TAIL, ARROW
+        if _closes_cycle(marks):
+            marks[i, j], marks[j, i] = before
+
+
+def _closes_cycle(marks: np.ndarray) -> bool:
+    """Whether a directed path of ``marks`` and an arrowhead that denies it close a cycle."""
+    return knowledge_cycle((marks == TAIL) & (marks.T == ARROW), (marks == ARROW).T) is not None
+
+
+def unmet_path_claims(
+    marks: np.ndarray, required_paths: np.ndarray | None, forbidden_paths: np.ndarray | None
+) -> list[tuple[str, int, int]]:
+    """The path claims the PAG ``marks`` does not meet, each ``(part, a, b)``, in column order.
+
+    ``required_paths[a, b]`` claims that ``a`` is an ancestor of ``b``. On an adjacent pair it
+    needs the edge ``a -> b``, the edge of a maximal ancestral graph whose end ``a`` is an ancestor
+    of the other (Richardson and Spirtes 2002); on a non-adjacent pair, a possibly directed path
+    from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not out of ``v``
+    (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral graph the PAG
+    stands for. ``forbidden_paths[a, b]`` claims the opposite: on an adjacent pair it needs an
+    arrowhead at ``a``, and a directed path ``a -> ... -> b`` denies it in every such graph.
+    """
+    adjacent = marks != NULL
+    directed = (marks == TAIL) & (marks.T == ARROW)
+    possible = adjacent & (marks != ARROW) & (marks.T != TAIL)
+    unmet = []
+    for part, claims in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths)):
+        if claims is None:
+            continue
+        for a, b in np.argwhere(claims).tolist():
+            if part == "required_paths":
+                met = bool(directed[a, b] if adjacent[a, b] else reach(possible, a)[b])
+            else:
+                met = not (adjacent[a, b] and marks[a, b] != ARROW) and not reach(directed, a)[b]
+            if not met:
+                unmet.append((part, a, b))
+    return unmet
 
 
 def reach(steps: np.ndarray, source: int) -> np.ndarray:
@@ -604,7 +605,6 @@ def possible_dsep_step(
     constraints: Constraints | None,
     keep: np.ndarray | None = None,
     workers: int = 1,
-    label: Callable[[int], str] = str,
 ) -> np.ndarray:
     """Remove the pairs a possible-d-sep subset separates; return the PAG re-circled for the
     orientation rules.
@@ -616,8 +616,7 @@ def possible_dsep_step(
     The pairs the required edges of ``constraints`` join, and those marked in the boolean ``keep``
     (both ways), are never tested. ``workers`` worker processes share the larger searches. Every
     kept edge then becomes ``o-o``, and
-    :func:`knowledge_marks` sets the endpoints ``constraints`` decide, naming a node by ``label`` in
-    its error. An arrowhead the knowledge
+    :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An arrowhead the knowledge
     puts at ``x`` on a kept edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
     :class:`~andrey.core.knowledge.KnowledgeError`
     (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
@@ -642,7 +641,7 @@ def possible_dsep_step(
             workers=workers,
         )
     marks = circle_pag(marks != NULL)
-    knowledge_marks(marks, constraints, label)
+    knowledge_marks(marks, constraints)
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     return marks

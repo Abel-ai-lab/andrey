@@ -2944,14 +2944,19 @@ _PATH_METHODS = (
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
     "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
-    "et al. 2025); claims that no such DAG meets raise."
+    "et al. 2025). A claim no such DAG meets is dropped: taken in order, required_paths then "
+    "forbidden_paths, each claim is kept when some DAG meets it with those kept before it. "
+    "metadata unmet_knowledge lists the dropped claims, and the fit warns with KnowledgeWarning."
 )
 _PAG_PATHS = (
     " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
     "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
-    "removes a confounded pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
-    "one the PAG contradicts raises: a required path with no possibly directed path, or a "
-    "forbidden path with a directed path. The marks and the checks assume no selection bias, as an "
+    "removes a confounded pair. A required path the forbidden edges or the tiers deny on an "
+    "adjacent pair sets no mark. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
+    "one the PAG does not meet is dropped: a required path without the edge a -> b or, on a "
+    "non-adjacent pair, a possibly directed path, or a forbidden path with a directed path. "
+    "metadata unmet_knowledge lists the dropped claims, and the fit warns with KnowledgeWarning. "
+    "The marks and the checks assume no selection bias, as an "
     "arrowhead at a says that a is an ancestor of neither b nor the selection variables "
     "(Richardson and Spirtes 2002)."
 )
@@ -2965,15 +2970,17 @@ _ORDER_PATHS = (
     " With required_paths and forbidden_paths, the order search follows Shimizu et al. (2011, "
     "Section 3.4): when the claims show that no remaining variable is an ancestor of some of "
     "them, the next variable is one of those; otherwise it is none with a claimed ancestor among "
-    "the remaining. The regression drops each forbidden path as a parent, and metadata "
-    "unmet_knowledge lists the claims the DAG does not meet."
+    "the remaining. The regression drops each forbidden path as a parent. A claim the DAG does not "
+    "meet is dropped: metadata unmet_knowledge lists it, and the fit warns with KnowledgeWarning."
 )
 _LAGGED_PATHS = (
     " required_paths [a, b, lag] puts a tail at a and an arrowhead at b on that link, and "
     "forbidden_paths [a, b, lag] an arrowhead at a; the tests can still remove the link. "
     "confounded [a, b, lag] keeps the link from every removal. Each claim names its lag. A claim "
-    "on a link the PAG lacks sets no mark, and one the PAG contradicts raises: a required path "
-    "with no possibly directed path, or a forbidden path with a directed path."
+    "on a link the PAG lacks sets no mark, and one the PAG does not meet is dropped: a required "
+    "path with no possibly directed path, or a forbidden path with a directed path. metadata "
+    "unmet_knowledge lists the dropped claims as [part, a, b, lag], and the fit warns with "
+    "KnowledgeWarning."
 )
 _PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "confounded")
 #: The methods that read the path parts and confounded in the search, with the sentence that says
@@ -2988,7 +2995,6 @@ _ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
     "direct_lingam": (PATH_PARTS, _ORDER_PATHS),
     "multi_group_direct_lingam": (PATH_PARTS, _ORDER_PATHS),
 }
-_ORDER_PATH_METHODS = ("direct_lingam", "multi_group_direct_lingam")
 _MAX_DEPTH = concept_param("max_depth")
 
 #: How missing values are handled, on every method the concept's template fits, after its
@@ -3130,7 +3136,7 @@ for _name, _spec in REGISTRY.items():
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
         *(("ancestor_clauses",) if _spec.restricts_paths else ()),
-        *(("unmet_knowledge",) if _spec.name in _ORDER_PATH_METHODS else ()),
+        *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})
