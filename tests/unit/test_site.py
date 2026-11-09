@@ -1636,9 +1636,9 @@ def test_the_newest_release_post_is_the_latest_version(conf):
     # A later version breaks a tie in date, and the later file name a tie in both.
     assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
     assert newest(posts[:2]) == ("blog/20261008-why-andrey-is-fast", "0.1.0")
-    moved = [("blog/20261015-andrey-0-4-0", "2026-11-09", "0.16.0"), *posts]
-    moved.append(("blog/20261103-andrey-0-13-0", "2026-11-09", "0.16.0"))
-    assert newest(moved)[0] == "blog/20261103-andrey-0-13-0"
+    moved = [("blog/20261029-andrey-0-11-0", "2026-11-09", "0.16.0"), *posts]
+    moved.append(("blog/20261015-andrey-0-4-0", "2026-11-09", "0.16.0"))
+    assert newest(moved)[0] == "blog/20261029-andrey-0-11-0"
 
 
 def test_the_blog_lists_the_newest_post_first(conf):

@@ -43,7 +43,6 @@ experimental. Drawings mark intervened variables, and HSIC p-values stay precise
 :::{div} release-actions
 [Read the release card](benchmarks/0.16.0.md)
 [Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
-[Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
 [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::

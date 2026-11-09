@@ -30,7 +30,6 @@ below 1e-16.
 
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
 **[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
-**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
 **[Pairwise direction](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)**
 
 ---
