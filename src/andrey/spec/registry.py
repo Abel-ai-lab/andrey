@@ -2742,7 +2742,8 @@ _MEMBER_RULE = (
 _BLANKET_ORIENT_RULE = (
     "Under structure=cpdag, every edge the knowledge decides is directed before the colliders, "
     "which never reverse it, and Meek's rules R1-R4 follow; the undirected structures do not read "
-    "tiers or edges forbidden one way."
+    "tiers or edges forbidden one way. With target or an undirected structure, required_paths and "
+    "forbidden_paths raise NotImplementedError."
 )
 _BLANKET_RULE = (
     _MEMBER_RULE
@@ -2849,8 +2850,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The methods whose result is a CPDAG (for iamb, inter_iamb, and mmpc, with structure="cpdag"):
-#: they honor the path parts by restricting the class they found (Fang et al. 2025).
+#: The methods whose result is a CPDAG (for iamb, inter_iamb, and mmpc, with structure="cpdag" and
+#: no target, else the path parts raise): they honor the path parts by restricting the class they
+#: found (Fang et al. 2025).
 _PATH_METHODS = (
     "pc",
     "cdnod",

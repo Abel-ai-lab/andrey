@@ -157,9 +157,10 @@ def iamb(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
-        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
-        describes; claims that no such DAG meets raise ``ValueError``.
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -191,6 +192,10 @@ def iamb(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----
@@ -392,9 +397,10 @@ def inter_iamb(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
-        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
-        describes; claims that no such DAG meets raise ``ValueError``.
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -426,6 +432,10 @@ def inter_iamb(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----
@@ -618,9 +628,10 @@ def mmpc(
         direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
-        forbidden one way. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
-        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
-        describes; claims that no such DAG meets raise ``ValueError``.
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -651,6 +662,10 @@ def mmpc(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----

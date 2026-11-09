@@ -39,7 +39,9 @@ names its pull request.
   itself raises `ValueError` before the search, and claims that no DAG of the class meets raise it
   after; no method honors `confounded`. ([#829])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
-  another part raises `NotImplementedError`, naming the methods that honor it. ([#829])
+  another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
+  `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
+  undirected `structure`. ([#829])
 
 ### Changed
 

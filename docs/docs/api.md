@@ -173,11 +173,12 @@ time `t`. Three more parts state causal paths and hidden common causes: `require
 `forbidden_paths` list the pairs `(cause, effect)` with and without a directed path from `cause` to
 `effect`, and `confounded` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`,
 `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
-`structure="cpdag"` honor `required_paths` and `forbidden_paths`, experimentally: the result is the
-MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
+`structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`, experimentally:
+the result is the MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
 `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. No method honors `confounded`. A
 method given a part it does not honor raises `NotImplementedError`, naming the methods that honor
-it.
+it, and so do `iamb`, `inter_iamb`, and `mmpc` given the paths with a `target` or an undirected
+`structure`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
