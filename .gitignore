@@ -17,6 +17,10 @@ benchmarks/uv.lock
 benchmarks/.r-lib-bench/
 # The authors' RESIT code that benchmarks/start_resit_r.sh fetches, read from disk and never committed.
 benchmarks/.resit-r/
+# The MVPC authors' R code that benchmarks/start_mvpc_r.sh fetches, read from disk and never committed.
+benchmarks/.mvpc-r/
+# MissDAG's code that benchmarks/start_missdag.sh fetches, read from disk and never committed.
+benchmarks/.missdag/
 # The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
 benchmarks/.loci/
 env/
