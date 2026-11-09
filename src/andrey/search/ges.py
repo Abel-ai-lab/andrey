@@ -80,6 +80,7 @@ def ges(
     constraints: Constraints | None = None,
     workers: int | None = None,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
     _parent_rule: str = "cap",
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -137,6 +138,11 @@ def ges(
         into one, and after every move the edges at them are directed out of them, with Meek's
         rules orienting what follows (:func:`~andrey.search._parallel_ges.out_of`), so the search
         moves over partially directed graphs. Empty, the default, leaves every variable free.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
@@ -159,6 +165,7 @@ def ges(
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
+        cov=cov,
     )
 
     adj = np.zeros((n, n), dtype=np.int8)

@@ -75,6 +75,14 @@ names its pull request.
   missingness indicator and tests again, on virtual data that correct for them, the edges such an
   indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
   `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
+- `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
+  `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
+  by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a
+  linear-Gaussian model of the current graph, the E-step gives the expected covariance of the data,
+  the method's own search runs on it over every row, and the model is fit again to the graph it
+  returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
+  each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
+  values, with a message that names `missing="em"` where EM would run. ([#842])
 
 ### Changed
 
@@ -2140,3 +2148,4 @@ First alpha release.
 [#832]: https://github.com/Abel-ai-lab/andrey/pull/832
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
+[#842]: https://github.com/Abel-ai-lab/andrey/pull/842

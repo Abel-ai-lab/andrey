@@ -24,7 +24,7 @@ from andrey.core.ci import (
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -431,9 +431,10 @@ def test_a_handling_the_method_does_not_list_raises_naming_the_argument(name):
         _fit(name, _gaps(_continuous(400), 0.1), missing="em")
 
 
-def test_the_methods_that_take_missing_are_the_ones_that_accept_missing_values():
+def test_the_methods_that_take_missing_accept_missing_values_or_fit_them_by_em():
     takes = {m for m, spec in REGISTRY.items() if any(p.name == "missing" for p in spec.params)}
-    assert takes == set(SUPPORTED)
+    assert takes == set(SUPPORTED) | set(EM_METHODS)
+    assert not set(SUPPORTED) & set(EM_METHODS)
 
 
 @pytest.mark.parametrize("name", ["pc", "fci", "cdnod"])
@@ -495,9 +496,13 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert "fill in the missing steps first" in str(error.value)
         assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
+    elif name in EM_METHODS:
+        assert 'pass missing="em"' in str(error.value)
+        assert "drop the rows that hold one" in str(error.value)
     else:
         assert "drop the rows that hold one" in str(error.value)
         assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
+        assert 'missing="em"' not in str(error.value)
 
 
 def test_a_refused_text_category_names_the_method():

@@ -38,6 +38,7 @@ def ranked_score(
     categorical: npt.ArrayLike | None,
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
+    cov: np.ndarray | None = None,
 ) -> tuple[LocalScore, np.ndarray]:
     """The local score over the columns of ``x`` sorted by :func:`~andrey.core.ties.tie_ranks`.
 
@@ -48,7 +49,9 @@ def ranked_score(
     for bit, and reordering the columns of ``x`` reorders the learned graph's nodes and changes
     nothing else, unless two columns are identical. Under BDeu or the multinomial BIC every column
     ranks by which rows share a category, and under a mixed-data score the categorical columns do,
-    with the mask sorted with them; the linear-Gaussian BIC ranks every column as continuous.
+    with the mask sorted with them; the linear-Gaussian BIC ranks every column as continuous. A
+    ``cov`` replaces the data's covariance in the linear-Gaussian BIC, sorted with the columns
+    (:func:`~andrey.core.score.make_score`).
 
     Returns the score and ``ranks``: column ``i`` of ``x`` is variable ``ranks[i]`` of the score,
     so a matrix ``m`` over the score's variables maps back to the columns of ``x`` as
@@ -67,6 +70,7 @@ def ranked_score(
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
             categorical=mask[by_rank] if mixed else None,
+            cov=None if cov is None else np.ascontiguousarray(cov[np.ix_(by_rank, by_rank)]),
         )
     except ValueError:
         # The error names positions in the sorted data; the same check on ``x`` names its columns.
@@ -77,6 +81,7 @@ def ranked_score(
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
             categorical=categorical,
+            cov=cov,
         )
         raise
     return score, ranks
@@ -796,13 +801,15 @@ def _search_state(
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     max_parents: int | None,
+    cov: np.ndarray | None = None,
 ) -> tuple[LocalScore, np.ndarray, list[GrowShrinkTree], np.ndarray | None]:
     """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
 
     The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
+    A ``cov`` replaces the data's covariance in the linear-Gaussian BIC (:func:`ranked_score`).
     """
     score, ranks = ranked_score(
-        X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
+        X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size, cov
     )
     delta = make_delta(score)
     p = X.shape[1]
@@ -843,6 +850,7 @@ def permutation_search(
     n_starts: int,
     seed: int,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Run ``n_starts`` permutation searches; return the best one's CPDAG and total score.
 
@@ -878,6 +886,7 @@ def permutation_search(
             categorical,
             constraints,
             max_parents,
+            cov,
         )
         before = sources_ahead(sorted(int(ranks[column]) for column in sources), p, before)
         parents = run_start(start, start_rng(seed, start), gsts, before)
@@ -945,6 +954,7 @@ def boss(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by best-order score search and return it with its total score.
 
@@ -994,6 +1004,11 @@ def boss(
         of them, with Meek's rules orienting what follows
         (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every variable
         free.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
 
     Returns
     -------
@@ -1034,4 +1049,5 @@ def boss(
         n_starts=n_starts,
         seed=seed,
         sources=sources,
+        cov=cov,
     )

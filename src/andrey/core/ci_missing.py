@@ -71,6 +71,23 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
+#: Structural EM over the expected covariance (:mod:`andrey.search.em`), which the searches whose
+#: fit reads only a covariance and the row count take.
+EM = "em"
+#: The methods that take ``missing="em"``: the searches over the linear-Gaussian BIC and the
+#: continuous searches whose loss and screen read only a covariance and the row count.
+EM_METHODS = (
+    "ges",
+    "xges",
+    "hc",
+    "tabu",
+    "exact_search",
+    "boss",
+    "grasp",
+    "notears",
+    "dagma",
+    "calm",
+)
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"

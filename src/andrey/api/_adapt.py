@@ -5,15 +5,23 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.ci_missing import EM, EM_METHODS
 from andrey.core.knowledge import as_node, column_position, resolve
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    LINEAR_SCORES,
+    MIXED_SCORES,
+    CopiedColumnsError,
+    copies_error,
+    copies_message,
+)
 from andrey.core.structure import EDGE_TYPES, column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
@@ -28,6 +36,7 @@ if TYPE_CHECKING:
 #: every other method.
 TESTWISE_METHODS = ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc")
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
+R = TypeVar("R")
 
 
 def _listed(names: Sequence[str]) -> str:
@@ -41,6 +50,12 @@ DROP_ROWS = (
     "drop the rows that hold one (for a DataFrame, {name}.dropna()), or use a method that deletes "
     f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
     f"{_listed(TESTWISE_SERIES_METHODS)}"
+)
+#: The way on of a call that ``missing="em"`` would run: a method that takes it, on continuous data
+#: under the linear-Gaussian BIC and without ``env``.
+FIT_BY_EM = (
+    'pass missing="em" (experimental), which fits the method by expectation-maximization over '
+    "the expected covariance, or drop the rows that hold one (for a DataFrame, {name}.dropna())"
 )
 FILL_STEPS = (
     "fill in the missing steps first, as dropping one would join the steps around it, or use "
@@ -68,7 +83,10 @@ def data_matrix(
 
     ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
     delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
-    constant on its observed values, or with none, raises. Without it, a missing value raises,
+    constant on its observed values, or with none, raises. For a method that fits by structural EM
+    (``missing="em"``), a row that observes no value is dropped: it holds no information on the
+    model, and in the E-step it would count as a row and add the model's whole covariance to the
+    expected covariance. Without ``missing``, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
     :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
 
@@ -96,6 +114,8 @@ def data_matrix(
     finite = np.isfinite(X)
     if not finite.all():
         X = _missing_values(data, X, finite, name=name, method=method, missing=missing, fix=fix)
+        if method in EM_METHODS:
+            X = X[~np.isnan(X).all(axis=1)]
         spread = np.nanmax(X, axis=0) - np.nanmin(X, axis=0)
     else:
         spread = np.ptp(X, axis=0)
@@ -357,6 +377,7 @@ def checked_data(
     index_categorical: bool = False,
     method: str | None = None,
     missing: bool = False,
+    takes_em: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Return ``data`` checked for the setting ``option=value``, and its categorical-column mask.
 
@@ -368,7 +389,10 @@ def checked_data(
     gets :func:`data_matrix`'s checks and a one-time :class:`~andrey.DataTypeWarning` naming the
     columns that look like category codes (:func:`warn_category_codes`). The mask is ``None``
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
-    and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
+    and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value. With
+    ``takes_em``, the call would run with ``missing="em"`` on continuous data, so there a refused
+    missing value names it (:data:`FIT_BY_EM`); categorical and mixed data, which EM does not take,
+    get :data:`DROP_ROWS`.
 
     Raises ``ValueError`` when two columns share a name
     (:func:`~andrey.core.structure.column_labels`), when ``categorical`` lists a column ``data``
@@ -407,7 +431,13 @@ def checked_data(
         )
         check_categories(X, data, setting)
         return X, None
-    X = data_matrix(data, method=method, missing=missing, reads_categories=True)
+    X = data_matrix(
+        data,
+        method=method,
+        missing=missing,
+        fix=FIT_BY_EM if takes_em else DROP_ROWS,
+        reads_categories=True,
+    )
     what = "test" if option == "indep_test" else "score"
     warn_category_codes(
         X,
@@ -429,12 +459,14 @@ def fit_inputs(
     method: str,
     missing: bool = False,
     index_categorical: bool = False,
+    takes_em: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None, tuple[str, ...] | None, Constraints | None]:
     """Return a fit's data matrix, its categorical-column mask, its column labels, and knowledge.
 
     The data are checked for the setting ``option=value`` (:func:`checked_data`, with
-    ``index_categorical``, ``method``, and ``missing``), and ``knowledge`` is resolved against
-    their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those raise, in that order.
+    ``index_categorical``, ``method``, ``missing``, and ``takes_em``), and ``knowledge`` is
+    resolved against their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those
+    raise, in that order.
     """
     X, mask = checked_data(
         data,
@@ -444,6 +476,7 @@ def fit_inputs(
         index_categorical=index_categorical,
         method=method,
         missing=missing,
+        takes_em=takes_em,
     )
     labels = column_labels(data)
     return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
@@ -523,6 +556,62 @@ def split_index(
     return GraphStructure.from_numpy(marks[:column, :column].copy(), kind=structure.kind), edges
 
 
+def check_em(name: str, missing: str | None, score_func: str | None, env: object = None) -> None:
+    """Check the settings ``missing="em"`` runs with, raising ``ValueError`` on any other.
+
+    The expected covariance holds the statistics of one linear-Gaussian dataset, so ``score_func``
+    must be the linear-Gaussian BIC and ``env`` must be ``None``.
+    """
+    if missing != EM:
+        return
+    if score_func is not None and score_func not in LINEAR_SCORES:
+        raise ValueError(
+            f'{name}: missing="em" fits a linear-Gaussian model by its expected covariance, so '
+            f'score_func must be "bic", got {score_func!r}'
+        )
+    if env is not None:
+        raise ValueError(
+            f'{name}: missing="em" takes no env; EM over the expected covariance is defined for '
+            "data from one environment"
+        )
+
+
+def fit_missing(
+    X: np.ndarray,
+    missing: str | None,
+    fit: Callable[[np.ndarray | None], tuple[R, GraphStructure]],
+    *,
+    bic: bool = False,
+) -> tuple[R, dict[str, object]]:
+    """Run a fit on ``X``, by structural EM when ``missing="em"`` and ``X`` holds ``NaN``.
+
+    ``fit(cov)`` runs the method's search over the covariance ``cov``, divided by the number of
+    rows, in place of the data's, or over the data's own with ``None``, and returns its result and
+    the graph it learned. Without a missing value, or without ``"em"``, ``fit(None)`` runs once and
+    the metadata are empty. Otherwise :func:`~andrey.search.em.structural_em` runs it on each
+    expected covariance, and the metadata hold its record under ``"em"``. With ``bic``, the fit
+    scores by the linear-Gaussian BIC, so copies among the observed values raise
+    :class:`~andrey.core.score.CopiedColumnsError` first
+    (:func:`~andrey.search.em.observed_copies`), as on complete data.
+    """
+    if missing != EM or not np.isnan(X).any():
+        return fit(None)[0], {}
+    from andrey.search.em import observed_copies, structural_em
+
+    if bic and (groups := observed_copies(X)):
+        raise copies_error(groups)
+    result, record = structural_em(X, fit)
+    return result, {"em": record}
+
+
+def bic_cov(cov: np.ndarray | None, n: int) -> np.ndarray | None:
+    """Rescale ``cov``, divided by the ``n`` rows, to the ``n - 1`` of the BIC's sample covariance.
+
+    ``None`` stays ``None``.
+    """
+    return None if cov is None else cov * (n / (n - 1))
+
+
 def cpdag_search(
     name: str,
     engine: Callable[..., tuple[GraphStructure, float]],
@@ -532,6 +621,7 @@ def cpdag_search(
     score_func: str | None,
     categorical: Sequence[str | int] | None,
     knowledge: Knowledge | None,
+    missing: str | None = None,
     **settings: object,
 ) -> StructureOutput:
     """Run the score search ``name``, whose ``engine`` returns a CPDAG and its score, on ``data``.
@@ -540,9 +630,11 @@ def cpdag_search(
     causes (the engine's ``sources``), and leaves the result again: its edges, and the variables
     they reach, go in ``metadata``. ``settings`` reach ``engine``. An ``n_perturbations`` of
     ``None``, the default of ``hc`` and ``tabu``, becomes one change per data variable, which
-    ``metadata`` records when ``n_starts`` is above 1.
+    ``metadata`` records when ``n_starts`` is above 1. ``missing="em"`` keeps a missing value as
+    ``NaN`` and fits by structural EM (:func:`fit_missing`).
     """
     assert score_func is not None  # method_spec picks it from the column types
+    check_em(name, missing, score_func, env)
     data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
         data,
@@ -551,25 +643,33 @@ def cpdag_search(
         categorical,
         knowledge,
         method=name,
+        missing=missing == EM,
         # One environment adds no index column (index_column), so it is not a categorical one.
         index_categorical=index is not None and np.ptp(index) > 0,
+        takes_em=env is None,
     )
     if "n_perturbations" in settings and settings["n_perturbations"] is None:
         settings["n_perturbations"] = X.shape[1]  # one change per data variable
     augmented, augmented_mask, augmented_constraints, column = index_column(
         X, mask, constraints, index, "score_func", score_func
     )
-    with copies_named(labels, index_namer(labels, column)):
-        cpdag, score = engine(
+
+    def fit(cov: np.ndarray | None) -> tuple[tuple[GraphStructure, float], GraphStructure]:
+        found = engine(
             augmented,
             score_func=score_func,
             categorical=augmented_mask,
             constraints=augmented_constraints,
             sources=() if column is None else (column,),
+            cov=bic_cov(cov, X.shape[0]),
             **settings,
         )
+        return found, found[0]
+
+    with copies_named(labels, index_namer(labels, column)):
+        (cpdag, score), em = fit_missing(augmented, missing, fit, bic=True)
     cpdag, index_edges = split_index(cpdag, column)
-    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     if "n_perturbations" in settings and settings["n_starts"] != 1:
         metadata["n_perturbations"] = settings["n_perturbations"]
     if env is not None:
