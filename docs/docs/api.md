@@ -956,7 +956,7 @@ each context drives exactly one variable, so no hidden context is a common cause
    missingness.self_masking
    missingness.draw
    missingness.Mechanism
-   Missingness
+   missingness.Missingness
 ```
 
 #### Scale
