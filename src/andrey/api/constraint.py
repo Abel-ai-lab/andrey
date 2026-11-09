@@ -51,6 +51,7 @@ def pc(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -114,6 +115,11 @@ def pc(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -431,6 +437,7 @@ def fci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -487,6 +494,11 @@ def fci(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -1214,6 +1226,7 @@ def cdnod(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     dependence_threshold: float | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1286,6 +1299,11 @@ def cdnod(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -1584,6 +1602,7 @@ def fci_jci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     possible_dsep: str | None = None,
     confounded_index: bool = True,
     seed: int | None = None,
@@ -1650,6 +1669,11 @@ def fci_jci(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column

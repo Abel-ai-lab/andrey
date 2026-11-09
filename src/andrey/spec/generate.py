@@ -565,9 +565,11 @@ def render_skill() -> str:
     a("")
     a(
         "A `NaN` cell, or an empty, `NA`, or `N/A` field of the data file, is a missing value. "
-        "The methods whose schema sets `data.missing` accept it and delete rows per test: each "
-        "test reads the rows observed in all of its variables, and `metadata.rows_tested` gives "
-        "the fewest (`min`) and the median rows a test read. They are "
+        "The methods whose schema sets `data.missing` accept it, and their `missing` parameter "
+        "names how: `testwise`, the default under `null`, deletes rows per test, each test "
+        "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
+        "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
+        "They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
         + ". Every other method refuses a missing value with a data error that says what to do "
         "instead. The deletion is sound when values are missing completely at random; when "

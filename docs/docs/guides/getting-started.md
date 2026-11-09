@@ -537,8 +537,17 @@ out = andrey.pc(gappy)
 out.metadata["rows_tested"]
 ```
 
-`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
-complete data has no such entry. With `fisherz` and `student_t`, each test computes its
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read, and
+`metadata["missing"]` the handling the fit used; a fit on complete data has neither entry. The
+argument `missing` names the handling. `missing="testwise"` is test-wise deletion, and `None`, the
+default, picks the method's default handling, which is `"testwise"` for every method that takes the
+argument; a value a method does not list raises a `ValueError` that names the values it takes:
+
+```{code-cell} ipython3
+andrey.pc(gappy, missing="testwise").structure == out.structure
+```
+
+With `fisherz` and `student_t`, each test computes its
 correlations directly from its rows, for many tests at once; the other tests are built anew on each
 test's rows, which costs more. A time series keeps every step: each row of the lagged design that
 reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
