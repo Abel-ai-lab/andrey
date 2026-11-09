@@ -208,12 +208,12 @@ def _skip_without_package(adapter: SolutionAdapter) -> None:
     [a for a in ALL_ADAPTERS if a.package == "andrey" or a.name in DEFERRED_MODULES],
     ids=lambda a: a.name,
 )
-def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
+def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter, unimport) -> None:
     import sys
 
     _skip_without_package(adapter)
     module = DEFERRED_MODULES[adapter.name]
-    sys.modules.pop(module, None)
+    unimport(module)
     adapter.setup()
     assert module in sys.modules, (
         f"{adapter.name}: setup() left {module} for the first fit to import"
