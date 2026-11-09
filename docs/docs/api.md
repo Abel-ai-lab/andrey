@@ -1080,8 +1080,10 @@ matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of 
 temporal result, draw one lag's graph or its `summary_graph()`. Graphviz places
 the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout otherwise. Latent
 variables are hollow, dashed circles. `draw(structure, targets=["x"])` marks the variables an
-experiment set: each is a square, and a bar crosses each edge into it. A hard intervention cuts
-those edges, and a soft one keeps them; the marks are the same.
+experiment set: each is a square, and a cross marks the middle of each edge into it. A hard
+intervention cuts those edges, and a soft one keeps them; the marks are the same.
+`to_graphviz(structure, targets=["x"])` draws the squares. [How to read a causal
+graph](guides/graph-types.md#how-to-read-a-causal-graph) lists every mark.
 
 ```{eval-rst}
 .. currentmodule:: andrey.viz

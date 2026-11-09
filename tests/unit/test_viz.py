@@ -457,6 +457,11 @@ def test_to_graphviz_draws_a_self_loop_as_one_directed_edge() -> None:
     looped = GraphStructure.from_numpy(m, kind="digraph", allow_self_loops=True)
     loop = viz.to_graphviz(looped).get_edge("0", "0")
     assert loop.attr.get("dir") in (None, "")
+    # As in draw, a target's loop takes no bar.
+    marked = viz.to_graphviz(looped, targets=[0])
+    assert marked.get_edge("0", "0").attr.get("arrowhead") in (None, "")
+    assert sorted(marked.nodes()) == ["0", "1"]
+    assert "intervention" not in viz.draw(looped, targets=[0], engine="builtin")
 
 
 def test_without_pygraphviz_the_default_is_the_builtin_layout(monkeypatch) -> None:
@@ -525,19 +530,19 @@ def test_a_temporal_structure_is_drawn_one_graph_at_a_time(render):
         render(temporal)
 
 
-def _intervention_bars(svg: str) -> list[tuple[float, float]]:
-    """The midpoints of the bars across edges into intervened nodes."""
+def _intervention_cuts(svg: str) -> list[tuple[float, float]]:
+    """The centers of the crosses on edges into intervened nodes."""
     return [
         ((float(a) + float(c)) / 2, (float(b) + float(d)) / 2)
         for a, b, c, d in re.findall(
-            r'<line class="intervention" x1="([\d.-]+)" y1="([\d.-]+)" '
+            r'<g class="intervention"><line x1="([\d.-]+)" y1="([\d.-]+)" '
             r'x2="([\d.-]+)" y2="([\d.-]+)"',
             svg,
         )
     ]
 
 
-def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -> None:
+def test_an_intervened_node_is_a_square_with_a_cross_on_each_edge_into_it() -> None:
     # x -> y <- w, y -> z: intervening on y cuts both edges into it, not the edge out of it.
     g = _from(
         {(0, 1): (TAIL, ARROW), (3, 1): (TAIL, ARROW), (1, 2): (TAIL, ARROW)},
@@ -549,22 +554,27 @@ def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -
     svg = viz.draw(g, targets=["y"], positions=positions, engine="builtin")
     minidom.parseString(svg)
     assert svg.count('class="intervened"') == 1
-    bars = _intervention_bars(svg)
-    assert len(bars) == 2
+    cuts = _intervention_cuts(svg)
+    assert len(cuts) == 2
     square = re.search(r'<rect class="intervened" x="([\d.]+)" y="([\d.]+)"', svg)
     cx, cy = float(square[1]) + 11.5, float(square[2]) + 11.5
-    # Each bar sits just outside the square, on the side of the parent it cuts off.
-    for bx, by in bars:
-        assert 15 < np.hypot(bx - cx, by - cy) < 35 and bx < cx
+    parents = [
+        (float(x), float(y))
+        for x, y in re.findall(r'<circle cx="([\d.]+)" cy="([\d.]+)" r="13', svg)
+    ]
+    # Each cross marks the middle of an edge from a parent, x or w, not the edge out to z.
+    middles = [((px + cx) / 2, (py + cy) / 2) for px, py in parents if px < cx]
+    assert len(middles) == 2
+    for mx, my in middles:
+        assert min(np.hypot(bx - mx, by - my) for bx, by in cuts) < 4
 
 
-def test_a_target_no_arrowhead_points_into_gets_a_barred_stub() -> None:
+def test_a_target_no_arrowhead_points_into_is_a_square_alone() -> None:
     g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
     svg = viz.draw(g, targets=[0], engine="builtin")
     minidom.parseString(svg)
-    assert svg.count('<g class="intervention">') == 1 and len(_intervention_bars(svg)) == 1
-    # A target with an edge into it gets no stub.
-    assert '<g class="intervention">' not in viz.draw(g, targets=[1], engine="builtin")
+    assert svg.count('class="intervened"') == 1 and "intervention" not in svg
+    assert sorted(viz.to_graphviz(g, targets=["x"]).nodes()) == ["0", "1"]
 
 
 def test_without_targets_the_drawing_is_unchanged() -> None:
@@ -583,8 +593,55 @@ def test_a_latent_target_keeps_its_dashed_ring() -> None:
     assert re.search(r'<rect class="intervened"[^>]*stroke-dasharray', viz.draw(g, targets=[1]))
 
 
+@pytest.mark.parametrize("render", [viz.draw, viz.to_graphviz])
 @pytest.mark.parametrize("target", ["q", 2, -1, True])
-def test_targets_must_name_a_variable(target) -> None:
+def test_targets_must_name_a_variable(render, target) -> None:
+    if render is viz.to_graphviz:
+        pytest.importorskip("pygraphviz")
     g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
     with pytest.raises(ValueError, match="targets names"):
-        viz.draw(g, targets=[target])
+        render(g, targets=[target])
+
+
+_MARK_PAIRS = {
+    "dag": [(TAIL, ARROW)],
+    "cpdag": [(TAIL, ARROW), (ARROW, TAIL), (TAIL, TAIL)],
+    "pag": [(a, b) for a in (TAIL, ARROW, CIRCLE) for b in (TAIL, ARROW, CIRCLE)],
+    "digraph": [(TAIL, ARROW), (ARROW, TAIL), (ARROW, ARROW)],
+}
+
+
+@pytest.mark.parametrize("kind", list(_MARK_PAIRS))
+@pytest.mark.parametrize("seed", range(4))
+def test_to_graphviz_and_draw_mark_the_same_targets(kind, seed) -> None:
+    pytest.importorskip("pygraphviz")
+    rng = np.random.default_rng(seed)
+    choices = _MARK_PAIRS[kind]
+    pairs = {}
+    for a in range(8):
+        for b in range(a + 1, 8):
+            if rng.random() < 0.3:
+                pairs[(a, b)] = choices[rng.integers(len(choices))]
+    g = _from(pairs, 8, kind, labels=[f"v{k}" for k in range(8)])
+    targets = sorted(rng.choice(8, size=3, replace=False).tolist())
+    graph = viz.to_graphviz(g, targets=[f"v{k}" for k in targets])
+    svg = viz.draw(g, targets=targets, engine="builtin")
+    squares = sorted(int(v) for v in graph.nodes() if v.attr["shape"] == "square")
+    assert squares == targets and svg.count('class="intervened"') == len(targets)
+    # Graphviz marks only an edge's ends, so the DOT edges are those of the unmarked graph.
+    plain = viz.to_graphviz(g)
+    assert [(a, b, dict(graph.get_edge(a, b).attr)) for a, b in graph.edges()] == [
+        (a, b, dict(plain.get_edge(a, b).attr)) for a, b in plain.edges()
+    ]
+    assert viz.to_graphviz(g, targets=()).to_string() == plain.to_string()
+    assert "square" not in plain.to_string()
+    # draw crosses each edge, other than a self-loop, with an arrowhead into a target.
+    into = 0
+    for a, b in plain.edges():
+        attr = plain.get_edge(a, b).attr
+        head = attr.get("arrowhead") or ("none" if attr.get("dir") == "none" else "normal")
+        tail = attr.get("arrowtail") or ""
+        into += a != b and (
+            (int(b) in targets and head == "normal") or (int(a) in targets and tail == "normal")
+        )
+    assert len(_intervention_cuts(svg)) == into

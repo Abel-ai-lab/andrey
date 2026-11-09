@@ -305,10 +305,10 @@ def draw(
     targets : iterable of int or str, default=()
         The intervened variables, named by label or by 0-based position: the variables an
         experiment set from outside, such as the targets of ``do(x)`` or of a soft intervention.
-        Each is drawn as a square, and a bar crosses each arrowhead into it: a hard intervention
-        cuts that edge, and a soft one keeps it, under the same marks. A target no arrowhead points
-        into gets a short barred arrow from outside. A latent target keeps its dashed ring on the
-        square. The default marks none.
+        Each is drawn as a square, and a cross marks the middle of each edge with an arrowhead
+        into it: a hard intervention cuts that edge, and a soft one keeps it, under the same marks.
+        A target no arrowhead points into is marked by its square alone. A latent target keeps its
+        dashed ring on the square. The default marks none.
 
     Returns
     -------
@@ -370,7 +370,7 @@ def draw(
             f"highlight names no endpoint of an edge between two nodes: {sorted(rings - ends)}."
         )
 
-    marked = frozenset(_target(t, labels) for t in targets)
+    marked = _graphviz.intervened(targets, labels)
 
     inside = all(len(label) <= 2 for label in labels)
     widths = [_svg.footprint(label, inside)[0] for label in labels]
@@ -416,14 +416,3 @@ def draw(
             targets=marked,
         )
     )
-
-
-def _target(name: int | str, labels: list[str]) -> int:
-    """Return the position of a target named by label or by 0-based position."""
-    if isinstance(name, str):
-        if name in labels:
-            return labels.index(name)
-    elif isinstance(name, (int, np.integer)) and not isinstance(name, bool):
-        if 0 <= int(name) < len(labels):
-            return int(name)
-    raise ValueError(f"targets names {name!r}, which is not a variable's label or position.")

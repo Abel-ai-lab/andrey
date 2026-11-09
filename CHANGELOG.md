@@ -12,6 +12,10 @@ names its pull request.
 
 ### Added
 
+- `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
+  by position, as `square` nodes, as `draw` does. ([#806])
+- The graph types guide has a section, "How to read a causal graph", with a legend of every mark
+  `draw` uses. ([#806])
 - A release without its own art has a default release-card cover: the navy ground, the "Release
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
@@ -19,6 +23,9 @@ names its pull request.
 
 ### Changed
 
+- `andrey.viz.draw` marks each edge with an arrowhead into an intervened variable by a cross in
+  its middle, where it put a bar by the arrowhead, and marks a target that no arrowhead points
+  into by its square alone, where it drew a short barred arrow from outside into it. ([#806])
 - `fci`'s **Limitations** paragraph says that test errors can give results that no MAG fits,
   and the `pag` it returns is then not the PAG of any MAG: of 200 simulated datasets with 10
   variables, mean degree 3, and 2,000 rows, 36 fits with `"fisherz"` and 36 with `"normal_scores"`
@@ -2055,6 +2062,7 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#806]: https://github.com/Abel-ai-lab/andrey/pull/806
 [#807]: https://github.com/Abel-ai-lab/andrey/pull/807
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809

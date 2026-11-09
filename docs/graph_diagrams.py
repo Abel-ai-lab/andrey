@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from andrey import GraphStructure, TemporalStructure
-from andrey.core import ARROW, CIRCLE, TAIL
+from andrey.core import ARROW, CIRCLE, LATENT, OBSERVED, TAIL
 from andrey.viz import LIGHT, Palette, draw
 
 STATIC = Path(__file__).parent / "_static"
@@ -39,9 +39,14 @@ def graph(matrix: list[list[int]], kind: str, labels: tuple[str, ...]) -> GraphS
     return result
 
 
-def svg(g: GraphStructure, description: str, *, width: int = 340, height: int = 180) -> str:
-    """Render a fluid SVG with an accessible description and theme-aware colors."""
-    markup = str(draw(g, palette=PALETTE, width=width, height=height, background=False))
+def svg(
+    g: GraphStructure, description: str, *, width: int = 340, height: int = 180, **options
+) -> str:
+    """Render a fluid SVG with an accessible description and theme-aware colors.
+
+    ``options`` go to ``draw``, such as ``targets`` or ``highlight``.
+    """
+    markup = str(draw(g, palette=PALETTE, width=width, height=height, background=False, **options))
     ET.register_namespace("", "http://www.w3.org/2000/svg")
     root = ET.fromstring(markup)
     root.set("role", "img")
@@ -178,6 +183,74 @@ def comparison() -> str:
     return "".join(panels)
 
 
+def legend() -> str:
+    """One small drawing per mark ``draw`` uses, each with what it says about the variables."""
+    xy = ("X", "Y")
+    latent = GraphStructure.from_numpy(
+        np.array([[0, 1], [2, 0]], dtype=np.int8),
+        kind="dag",
+        labels=("L", "X"),
+        node_types=np.array([LATENT, OBSERVED], dtype=np.int8),
+    )
+    items = [
+        (
+            graph([[0, 1], [2, 0]], "dag", xy),
+            {},
+            "X -> Y",
+            "In a DAG, X is a direct cause of Y; in a PAG, an ancestor of Y.",
+        ),
+        (
+            graph([[0, 1], [1, 0]], "cpdag", xy),
+            {},
+            "X - Y",
+            "In a CPDAG, X and Y are adjacent, and the equivalence class holds DAGs with either "
+            "direction.",
+        ),
+        (
+            graph([[0, 3], [2, 0]], "pag", xy),
+            {},
+            "X o-> Y",
+            "Y is not an ancestor of X; the circle is a tail in some graphs of the class and an "
+            "arrowhead in others.",
+        ),
+        (
+            graph([[0, 2], [2, 0]], "pag", xy),
+            {},
+            "X <-> Y",
+            "In a PAG, neither is an ancestor of the other, and a latent common cause links them.",
+        ),
+        (
+            graph([[0, 2], [2, 0]], "digraph", xy),
+            {},
+            "X -> Y, Y -> X",
+            "Feedback: each causes the other.",
+        ),
+        (latent, {}, "Dashed ring", "L is a latent (unmeasured) variable."),
+        (
+            graph([[0, 1], [2, 0]], "dag", xy),
+            {"targets": ["Y"]},
+            "Square and cross",
+            "Y is an intervention target; a cross marks each edge into it.",
+        ),
+        (
+            graph([[0, 1], [2, 0]], "dag", xy),
+            {"highlight": [(1, 0)]},
+            "Accent",
+            "The accent lights an endpoint mark and its half of the edge, for a demo or a page to "
+            "point to.",
+        ),
+    ]
+    cells = ['<div class="graph-legend">']
+    for g, options, name, meaning in items:
+        cells.append(
+            '<figure class="graph-legend-item">'
+            f"{svg(g, f'{name}: {meaning}', width=200, height=64, **options)}"
+            f"<figcaption><strong>{escape(name)}</strong> {escape(meaning)}</figcaption></figure>"
+        )
+    cells.append("</div>\n")
+    return "".join(cells)
+
+
 def write_diagrams() -> None:
     """Write only changed fragments so live documentation builds settle."""
     dag = graph([[0, 1, 0], [2, 0, 1], [0, 2, 0]], "dag", ("X", "Y", "Z"))
@@ -189,6 +262,7 @@ def write_diagrams() -> None:
     temporal = TemporalStructure.from_lag_graphs([lag1, lag2], lags=[1, 2], labels=("X", "Y"))
     fragments = {
         "graph-comparison.html": comparison(),
+        "graph-types-legend.html": legend(),
         "graph-types-dag.html": figure(dag, "DAG", "A directed chain: X causes Y, which causes Z."),
         "graph-types-cpdag.html": figure(cpdag, "CPDAG", "The chain's directions are unresolved."),
         "graph-types-pag.html": figure(

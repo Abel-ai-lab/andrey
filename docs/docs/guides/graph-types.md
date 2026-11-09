@@ -1,6 +1,6 @@
 ---
 name: graph-types
-description: DAG, CPDAG, PAG, and temporal graphs - diagrams, interpretation, and Andrey structures.
+description: DAG, CPDAG, PAG, and temporal graphs - diagrams, meaning, and the drawing legend.
 meta:
   type: guide
 ---
@@ -209,6 +209,8 @@ nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). ANM and PNL are direct
 variables: each returns a two-node `dag` with the direction its tests decide, or no edge, and
 both p-values and test statistics in `metadata`.
 
+## How to read a causal graph
+
 Draw any `GraphStructure`, including a temporal lag or summary, with `andrey.viz.draw`:
 
 ```python
@@ -217,6 +219,20 @@ from andrey.viz import draw
 
 Path("graph.svg").write_text(draw(pag), encoding="utf-8")
 ```
+
+We use the same marks for every graph kind. Each mark is a shape, so you can read drawings in
+print and without color. Edge colors only repeat what the marks say.
+
+```{raw} html
+:file: ../../_static/graph-types-legend.html
+```
+
+`draw(structure, targets=["Y"])` draws each intervention target as a square and puts a cross in
+the middle of each edge with an arrowhead into it. A hard intervention cuts the edges into its
+targets, and a soft one keeps them; both get the same marks, so a cross does not mean the edge was
+removed. If any label is longer than two characters, every label sits below its node.
+`andrey.viz.to_graphviz` writes the same nodes and edge marks in DOT, for Graphviz and other tools,
+with squares for the targets. It leaves out the cross because Graphviz marks only an edge's ends.
 
 ## References
 

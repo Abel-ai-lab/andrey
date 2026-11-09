@@ -66,3 +66,21 @@
   .graph-explorer [data-example][hidden] { display: block !important; }
   .graph-example, .graph-figure { break-inside: avoid; }
 }
+/* The legend of draw's marks: one small drawing per mark, in a grid of captioned cells. */
+.graph-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: .75rem;
+  margin: 1.75rem 0;
+}
+.graph-legend-item {
+  margin: 0;
+  padding: .75rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+  background: var(--andrey-paper);
+  color: var(--andrey-ink);
+}
+.graph-legend-item svg { display: block; width: 100%; max-width: 200px; height: auto; margin: 0 auto; }
+.graph-legend-item figcaption { margin-top: .4rem; font-size: .85rem; }
+.graph-legend-item figcaption strong { display: block; font-family: var(--andrey-font-mono); font-weight: 500; }
