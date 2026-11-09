@@ -91,6 +91,7 @@ def iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -133,6 +134,11 @@ def iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -325,6 +331,7 @@ def inter_iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -366,6 +373,11 @@ def inter_iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -551,6 +563,7 @@ def mmpc(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -592,6 +605,11 @@ def mmpc(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
