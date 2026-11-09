@@ -1532,10 +1532,15 @@ def boss_fci(
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The BOSS phase honors it as
-        :func:`~andrey.boss` does, and the test phase starts from the adjacencies BOSS found and
-        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
-        an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained.
+        :func:`~andrey.boss` does and also puts the cause of each ``required_paths`` pair before its
+        effect in every causal order it visits, and the test phase starts from the adjacencies BOSS
+        found and never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent
+        pair puts an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is
+        ``a -> b``. With ``env``, the environment index is unconstrained. In the PAG,
+        ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
+        at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
+        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
+        contradicts, assume no selection bias.
 
     Returns
     -------
@@ -1859,10 +1864,15 @@ def grasp_fci(
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GRaSP phase honors it as
-        :func:`~andrey.grasp` does, and the test phase starts from the adjacencies GRaSP found and
-        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
-        an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained.
+        :func:`~andrey.grasp` does and also puts the cause of each ``required_paths`` pair before
+        its effect in every causal order it visits, and the test phase starts from the adjacencies
+        GRaSP found and never removes a required pair. In the PAG, a forbidden ``a -> b`` on an
+        adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``, and a required one
+        is ``a -> b``. With ``env``, the environment index is unconstrained. In the PAG,
+        ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
+        at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
+        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
+        contradicts, assume no selection bias.
 
     Returns
     -------

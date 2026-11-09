@@ -19,6 +19,7 @@ import numpy as np
 
 from andrey.core.ties import tie_ranks
 from andrey.lingam import adjacency, pwling
+from andrey.lingam.direct import forbidden_parents
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -34,8 +35,9 @@ def multi_group_direct_lingam(
     ``len(X_list) >= 2`` arrays with matching ``n_features``. ``measure`` is one of
     :data:`~andrey.lingam.pwling.MEASURES`, as in :func:`~andrey.lingam.direct.direct_lingam`; each
     group is standardized, and for ``"skew"`` sign-corrected, on its own. With background knowledge
-    ``constraints``, the order keeps :meth:`~andrey.core.knowledge.Constraints.precedence`, and each
-    group's regression drops forbidden parents and keeps required ones unpenalized, as
+    ``constraints``, the order keeps :meth:`~andrey.core.knowledge.Constraints.precedence` and
+    reads ``forbidden_paths``, and each group's regression drops forbidden parents and forbidden
+    paths and keeps required ones unpenalized, as
     :func:`~andrey.lingam.direct.direct_lingam` does.
     """
     groups = [np.asarray(X, dtype=np.float64) for X in X_list]
@@ -45,10 +47,15 @@ def multi_group_direct_lingam(
         order = _find_shared_causal_order(groups, n_features, measure=measure)
         return order, [adjacency.estimate(X, order) for X in groups]
     order = _find_shared_causal_order(
-        groups, n_features, precedence=constraints.precedence(), measure=measure
+        groups,
+        n_features,
+        precedence=constraints.precedence(),
+        forbidden_paths=constraints.forbidden_paths,
+        measure=measure,
     )
+    forbidden = forbidden_parents(constraints)
     adjacency_matrices = [
-        adjacency.estimate(X, order, forbidden=constraints.forbidden, required=constraints.required)
+        adjacency.estimate(X, order, forbidden=forbidden, required=constraints.required)
         for X in groups
     ]
     return order, adjacency_matrices
@@ -59,6 +66,7 @@ def _find_shared_causal_order(
     n_features: int,
     *,
     precedence: np.ndarray | None = None,
+    forbidden_paths: np.ndarray | None = None,
     measure: str = "pwling",
 ) -> list[int]:
     """Peel exogenous variables by size-weighted sum of per-group ``measure`` scores.
@@ -68,8 +76,8 @@ def _find_shared_causal_order(
     Ties are broken by :func:`~andrey.core.ties.tie_ranks` of the stacked input groups. Columns
     that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
     representative and followed directly by the other copies. With ``precedence``, as for
-    :func:`pwling.find_causal_order`, no copy group is formed, and the pick is the best candidate
-    that no remaining variable must precede.
+    :func:`pwling.find_causal_order`, no copy group is formed, and the pick is the best of
+    :func:`pwling.eligible`, which also reads ``forbidden_paths``.
     """
     score = pwling.scorer(measure)
     total_n = sum(len(X) for X in groups)
@@ -94,7 +102,7 @@ def _find_shared_causal_order(
             if precedence is None:
                 m = pwling.pick(neg_mg, candidates, ranks)
             else:
-                eligible = ~precedence[np.ix_(candidates, candidates)].any(axis=0)
+                eligible = pwling.eligible(precedence, forbidden_paths, candidates)
                 chosen = [c for c, ok in zip(candidates, eligible, strict=True) if ok]
                 m = pwling.pick(neg_mg[eligible], chosen, ranks)
         placed = [m, *copies[m]]

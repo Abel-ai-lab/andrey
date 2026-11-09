@@ -122,7 +122,29 @@ SHARED = {
         "In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for "
         "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; "
         "claims that no such DAG meets raise ``ValueError``.",
-        lambda m: "required_paths" in REGISTRY[m].knowledge,
+        lambda m: REGISTRY[m].restricts_paths,
+    ),
+    # The PAG methods read the path parts and confounded as marks and kept pairs.
+    "knowledge_pag_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "In the PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts "
+        "an arrowhead at the cause, and no test removes a ``confounded`` pair, as "
+        ":class:`~andrey.Knowledge` describes; these marks, and the check that raises "
+        "``ValueError`` for a claim the PAG contradicts, assume no selection bias.",
+        lambda m: "confounded" in REGISTRY[m].knowledge and REGISTRY[m].family != "temporal",
+    ),
+    # The LiNGAM order searches read the path parts as Shimizu et al. (2011) define them.
+    "knowledge_order_paths": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "``required_paths`` and ``forbidden_paths`` narrow the variables the causal order may place "
+        "next, and a forbidden path is no parent, as :class:`~andrey.Knowledge` describes; "
+        '``metadata["unmet_knowledge"]`` lists the claims the DAG does not meet.',
+        lambda m: "required_paths" in REGISTRY[m].knowledge
+        and REGISTRY[m].output.graph_kind == "dag",
     ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
