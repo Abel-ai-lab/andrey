@@ -21,24 +21,13 @@ that runtime in its output.
 :gutter: 3
 :class-container: example-gallery
 
-:::{grid-item-card} Speed on your machine
-:link: speed_on_your_machine
+:::{grid-item-card} Quick start
+:link: quick_start
 :link-type: doc
-:img-top: /_generated/thumbs/speed_on_your_machine.svg
-:img-alt: The true graph of the notebook's smallest dataset
-
-Time PC in Andrey and causal-learn on your own hardware.
-
-{bdg-secondary-line}`Notebook · Colab`
-:::
-
-:::{grid-item-card} GES quickstart
-:link: ges_quickstart
-:link-type: doc
-:img-top: /_generated/thumbs/ges_quickstart.svg
+:img-top: /_generated/thumbs/quick_start.svg
 :img-alt: The graph GES recovers in this notebook
 
-Recover a three-variable chain with GES.
+Simulate a small dataset, fit GES, read the graph it learns, and draw it.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -83,7 +72,7 @@ from interventions, and GnIES from environments whose changes it is not told.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Continuous optimization: CALM
+:::{grid-item-card} Continuous optimization
 :link: calm
 :link-type: doc
 :img-top: /_generated/thumbs/calm.svg
@@ -106,7 +95,7 @@ fits several datasets, and GIN finds latent variables.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Nonlinear additive-noise models: CAM, RESIT, and CAM-UV
+:::{grid-item-card} Nonlinear additive-noise models
 :link: functional
 :link-type: doc
 :img-top: /_generated/thumbs/functional.svg
@@ -118,7 +107,7 @@ its parents plus independent noise; CAM-UV allows hidden causes and marks the pa
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Hidden common causes: RCD
+:::{grid-item-card} Pairs that share a hidden cause
 :link: rcd
 :link-type: doc
 :img-top: /_generated/thumbs/rcd.svg
@@ -129,7 +118,7 @@ RCD finds the direct causes and marks the pairs that share a hidden cause.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Hidden common causes: BottomUpParceLiNGAM
+:::{grid-item-card} Causal order with hidden causes
 :link: bottom_up_parce_lingam
 :link-type: doc
 :img-top: /_generated/thumbs/bottom_up_parce_lingam.svg
@@ -198,7 +187,18 @@ rejected, and the sparsest passing graph is not always the most accurate.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Drawing a recovered structure
+:::{grid-item-card} Speed on your machine
+:link: speed_on_your_machine
+:link-type: doc
+:img-top: /_generated/thumbs/speed_on_your_machine.svg
+:img-alt: The true graph of the notebook's smallest dataset
+
+Time PC in Andrey and causal-learn on your own hardware.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
+:::{grid-item-card} Visualize a causal graph
 :link: viz
 :link-type: doc
 :img-top: /_generated/thumbs/viz.svg
@@ -214,8 +214,7 @@ Draw a recovered graph as a self-contained SVG.
 :hidden:
 :caption: Notebooks
 
-speed_on_your_machine
-ges_quickstart
+quick_start
 constraint_based
 permutation_based
 score_search
@@ -229,5 +228,6 @@ time_series
 knowledge
 bootstrap
 markov_check
+speed_on_your_machine
 viz
 ```

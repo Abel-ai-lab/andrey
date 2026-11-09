@@ -332,9 +332,12 @@ html_additional_pages = {
 
 def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
     """Redirects the API reference's old addresses, ``docs/code/index`` and its generated pages
-    under ``docs/code/generated/``, to their corresponding pages under ``docs/api``."""
+    under ``docs/code/generated/``, to their corresponding pages under ``docs/api``, and the quick
+    start notebook's old address to the notebook."""
     reference = {"title": "API reference", "target": "../api.html"}
     yield "docs/code/index", reference, "moved-redirect.html"
+    quick_start = {"title": "Quick start", "target": "quick_start.html"}
+    yield "docs/examples/ges_quickstart", quick_start, "moved-redirect.html"
     for doc in sorted(app.env.found_docs):
         if doc.startswith("docs/api/"):
             name = doc.removeprefix("docs/api/")

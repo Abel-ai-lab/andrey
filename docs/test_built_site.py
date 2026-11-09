@@ -579,6 +579,7 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",
         "blog/why-andrey-is-fast.html",
+        "docs/examples/ges_quickstart.html",
     )
     for address in (*left_out, *moved):
         assert f"https://andrey.abel.ai/{address}" not in urls, address

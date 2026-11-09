@@ -911,7 +911,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("docs/index") == (["Docs"], ["Docs"])
     assert marks("docs/guides/getting-started") == (["Docs"], [])
     assert marks("docs/examples/index") == (["Examples"], ["Examples"])
-    assert marks("docs/examples/ges_quickstart") == (["Examples"], [])
+    assert marks("docs/examples/quick_start") == (["Examples"], [])
     assert marks("docs/demos/index") == (["Demos"], ["Demos"])
     assert marks("docs/demos/pc-replay") == (["Demos"], [])
     assert marks("blog/index") == (["Blog"], ["Blog"])
