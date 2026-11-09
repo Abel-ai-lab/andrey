@@ -22,7 +22,7 @@ names its pull request.
   DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three
   parts, and `direct_lingam` narrows its causal order. The parts are supported in `fci`, `gfci`,
   `boss_fci`, `lpcmci`, and `direct_lingam`, where true claims measured no worse than the same fit
-  without them, and experimental in the other methods. ([#829], [#835], [#852])
+  without them, and experimental in the other methods. ([#829], [#835], [#854])
 - `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
   et al. (2023), whose noise scale changes with the cause. ([#830])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
@@ -60,7 +60,7 @@ names its pull request.
   `metadata["unmet_knowledge"]`; when only some claims hold together, they are kept in order,
   `required_paths` and then `forbidden_paths`. `bootstrap` drops them from the averaged graph alike.
   With true claims, `pc` and `boss` made more errors than without on some graphs, so the
-  parts stay experimental in every CPDAG method. ([#829], [#850], [#852])
+  parts stay experimental in every CPDAG method. ([#829], [#850], [#854])
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
   `forbidden_paths`, and `confounded`: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
@@ -68,13 +68,13 @@ names its pull request.
   `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`; the marks and the checks assume
   no selection bias. `lpcmci` takes each claim with its lag. The three parts are supported in
   `fci`, `gfci`, `boss_fci`, and `lpcmci`, and experimental in `fci_jci` and `grasp_fci`, which
-  the benchmark does not run. ([#835], [#850], [#852])
+  the benchmark does not run. ([#835], [#850], [#854])
 - `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`
   as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
   the variables the causal order may place next, a forbidden path is no parent, and a claim the DAG
   does not meet is dropped with a `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`.
   The parts are supported in `direct_lingam` and experimental in `multi_group_direct_lingam`,
-  which the benchmark does not run. ([#835], [#850], [#852])
+  which the benchmark does not run. ([#835], [#850], [#854])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
   another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
   `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
@@ -2176,4 +2176,4 @@ First alpha release.
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
-[#852]: https://github.com/Abel-ai-lab/andrey/pull/852
+[#854]: https://github.com/Abel-ai-lab/andrey/pull/854
