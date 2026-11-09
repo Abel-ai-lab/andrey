@@ -49,6 +49,8 @@ from andrey.search.ges import ges
 from andrey.search.grasp import grasp
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from andrey.core.knowledge import Constraints
 
 #: The pattern edges the test phase may remove: every one, or those in a triangle of the pattern.
@@ -89,6 +91,7 @@ def gfci(
     seed: int | None = None,
     context: int | None = None,
     confounded_index: bool = True,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
@@ -107,6 +110,8 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
+    ``label`` names a node in the error of a knowledge mark
+    (:func:`~andrey.constraint.fci.knowledge_marks`).
     ``workers`` worker processes share the GES passes, the adjacency search's larger
     conditioning-size passes, and the larger possible-d-sep searches, each above its own work
     threshold; ``None`` reads ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or
@@ -153,6 +158,7 @@ def gfci(
         seed=seed,
         context=context,
         confounded_index=confounded_index,
+        label=label,
         _ambiguous=_ambiguous,
     )
 
@@ -178,6 +184,7 @@ def boss_fci(
     seed: int | None = None,
     context: int | None = None,
     confounded_index: bool = True,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with BOSS adjacency and FCI orientation.
@@ -221,6 +228,7 @@ def boss_fci(
         seed=seed,
         context=context,
         confounded_index=confounded_index,
+        label=label,
         _ambiguous=_ambiguous,
     )
 
@@ -247,6 +255,7 @@ def grasp_fci(
     seed: int | None = None,
     context: int | None = None,
     confounded_index: bool = True,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GRaSP adjacency and FCI orientation.
@@ -288,6 +297,7 @@ def grasp_fci(
         seed=seed,
         context=context,
         confounded_index=confounded_index,
+        label=label,
         _ambiguous=_ambiguous,
     )
 
@@ -309,6 +319,7 @@ def fci_from_pattern(
     seed: int | None = None,
     context: int | None = None,
     confounded_index: bool = True,
+    label: Callable[[int], str] = str,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Prune and orient the score search's ``cpdag`` with FCI's tests and rules: a PAG.
@@ -319,7 +330,7 @@ def fci_from_pattern(
     :func:`gfci`) runs the possible-d-separation step between the two, after a first collider pass
     that sets the arrowheads its sets read; ``None`` leaves the step out, as Algorithm 5 of Ramsey,
     Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
-    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
+    ``seed``, ``label``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
 
     ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
     pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
@@ -332,6 +343,10 @@ def fci_from_pattern(
     of the index gets the marks of Joint Causal Inference
     (:func:`~andrey.constraint.fci_jci.mark_index`, with ``confounded_index``), and the rules leave
     out R5-R7, since JCI assumes no selection bias. The PAG still holds the index.
+
+    A ``confounded`` pair of ``constraints`` joins the adjacencies the test phase starts from,
+    whether the pattern joins it or not, and no test removes it; a triple over it that the pattern
+    lacks is decided by the separating sets (:func:`~andrey.constraint.fci.orient_colliders`).
     """
     check_edge_removal(edge_removal)
     pattern = from_structure(cpdag)
@@ -342,21 +357,28 @@ def fci_from_pattern(
         keep = untested if keep is None else keep | untested
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    support = pattern != NULL
+    confounded = None if constraints is None else constraints.confounded
+    if confounded is not None:
+        support = support | confounded
     skeleton, sepsets, _ = adjacency_search(
         test,
         X.shape[1],
         alpha,
-        support=pattern != NULL,
+        support=support,
         keep=keep,
         max_depth=max_depth,
         workers=workers,
     )
-    sepsets.update(
-        _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
+    derived = _derive_sepsets(
+        pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order
     )
+    if confounded is not None:  # a confounded pair stays adjacent, so it has no separating set
+        derived = {pair: found for pair, found in derived.items() if not confounded[pair]}
+    sepsets.update(derived)
 
     marks = circle_pag(skeleton)
-    knowledge_marks(marks, constraints)
+    knowledge_marks(marks, constraints, label)
     if possible_dsep is None:
         if constraints is not None:
             check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
@@ -378,6 +400,7 @@ def fci_from_pattern(
             constraints=constraints,
             keep=untested,
             workers=workers,
+            label=label,
         )
     if context is not None:
         mark_index(marks, context, confounded_index)
