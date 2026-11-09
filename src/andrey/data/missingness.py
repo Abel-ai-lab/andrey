@@ -5,7 +5,7 @@ rule by which values go missing. ``missing=`` on :meth:`~andrey.data.SCM.sample`
 :func:`~andrey.data.sample_scm` draws its mask over the sampled values, and :func:`draw` draws it
 over any complete data. The missingness indicator ``R_i`` of column ``i`` is 1 where its value is
 missing, and the m-graph adds each indicator to the causal graph with an edge from each of its
-parents [1]_; the returned :class:`~andrey.data.Missingness` records them:
+parents [1]_; the returned :class:`Missingness` records them:
 
 >>> import numpy as np
 >>> import andrey.data as data
@@ -58,7 +58,7 @@ from scipy.special import expit
 from .dataset import Missingness
 from .scm import MISSING, component_rng
 
-__all__ = ["Mechanism", "draw", "mar", "mcar", "mnar", "self_masking"]
+__all__ = ["Mechanism", "Missingness", "draw", "mar", "mcar", "mnar", "self_masking"]
 
 MECHANISMS = ("mcar", "mar", "mnar", "self_masking")
 FORMS = ("logistic", "quantile")
