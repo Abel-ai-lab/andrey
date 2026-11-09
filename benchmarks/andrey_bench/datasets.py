@@ -36,6 +36,10 @@ The data of CD-NOD, MultiGroupDirectLiNGAM, and GIN are drawn by :mod:`andrey_be
 instead (functional ``domain_shift``, ``multi_group``, or ``measurement``); that module gives each
 layout, truth, and column order.
 
+The simulation of the SCORE and NoGAM papers, links drawn from a Gaussian process, is drawn by
+:mod:`andrey_bench.gp_models` (functional ``score2022``; the key's density is the graph's mean
+degree, and its ``standardize`` one of that module's scales).
+
 The synthetic pair sets of Tagasovska et al. (2020) that the LOCI paper uses are drawn by
 :mod:`andrey_bench.pair_models` (functional ``an2020``, ``ans2020``, ``ls2020``, ``lss2020``, or
 ``mnu2020``; topology ``pair``, ``d = 2``, density 1.0).
@@ -69,7 +73,14 @@ import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
 from andrey.data import missingness
-from andrey_bench import lingam_models, pair_models, regime_models, svar_models, temporal_models
+from andrey_bench import (
+    gp_models,
+    lingam_models,
+    pair_models,
+    regime_models,
+    svar_models,
+    temporal_models,
+)
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -144,6 +155,20 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # The simulation of the SCORE paper, Rolland et al. (2022), Sect. 4.1, which the NoGAM paper
+    # repeats: links drawn from a Gaussian process, noise variances uniform on [0.4, 0.8]
+    # (andrey_bench.gp_models; the key's density is the graph's mean degree, 2 for the papers' ER1
+    # and 8 for ER4). Gaussian, Laplace, and Gumbel noise; at the papers' raw scale, z-scored, and
+    # rescaled in causal order.
+    "score_paper": ("er", "score2022", "gaussian", "raw"),
+    "score_paper_standardized": ("er", "score2022", "gaussian", "standardized"),
+    "score_paper_rescaled": ("er", "score2022", "gaussian", "ancestral"),
+    "score_paper_laplace": ("er", "score2022", "laplace", "raw"),
+    "score_paper_laplace_standardized": ("er", "score2022", "laplace", "standardized"),
+    "score_paper_laplace_rescaled": ("er", "score2022", "laplace", "ancestral"),
+    "score_paper_gumbel": ("er", "score2022", "gumbel", "raw"),
+    "score_paper_gumbel_standardized": ("er", "score2022", "gumbel", "standardized"),
+    "score_paper_gumbel_rescaled": ("er", "score2022", "gumbel", "ancestral"),
     # Cause-effect pairs from the location-scale generator, ``y = f(x) + s(x) e`` with the noise
     # scale ``s`` between the bounds of the LOCI paper's location-scale benchmark (Immer et al.
     # 2023): Gaussian, Gumbel, and Laplace noise, z-scored, and rescaled so the cause has unit
@@ -170,6 +195,9 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # z-scored (the default) and at raw scale. ``anm_er`` and ``linear_gauss_er`` are the z-scored
     # Gaussian pair.
     "anm_gumbel_er": ("er", "anm", "gumbel", "standardized"),
+    # Additive noise with Laplace noise: with ``anm_er`` and ``anm_gumbel_er``, the data of the
+    # Stein-score screen's oracle, whose Hessian has a closed form.
+    "anm_laplace_er": ("er", "anm", "laplace", "standardized"),
     "lsnm_er": ("er", "lsnm", "gaussian", "standardized"),
     "anm_er_raw": ("er", "anm", "gaussian", "raw"),
     "anm_gumbel_er_raw": ("er", "anm", "gumbel", "raw"),
@@ -580,6 +608,21 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             **DISCRETE_SETTINGS,
             **shuffle,
         }
+    if key.functional in gp_models.MODELS:
+        if key.latents or key.times:
+            raise ValueError(f"{key.label}: {key.functional} has no hidden nodes and no panel")
+        return {
+            "generator": "andrey_bench.gp_models.sample",
+            "model": key.functional,
+            "setup": gp_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "density": key.density,
+            "noise": key.noise,
+            "standardize": key.standardize,
+            **shuffle,
+        }
     if key.functional in pair_models.MODELS:
         spec = pair_models.MODELS[key.functional]
         if (
@@ -754,6 +797,13 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "density": key.density,
             "params": regime_models.model_params(key.functional),
         }
+    if key.functional in gp_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": gp_models.model_params(key.functional),
+        }
     if key.functional in pair_models.MODELS:
         return {
             "model": key.functional,
@@ -830,6 +880,19 @@ def _generate(
         return _mvpc_paper(key)
     kwargs = generation_kwargs(key)
     no_mask = None
+    if key.functional in gp_models.MODELS:
+        data_arr, marks, columns = gp_models.sample(
+            key.functional,
+            d=key.d,
+            n=key.n,
+            seed=key.seed,
+            density=key.density,
+            noise=key.noise,
+            standardize=key.standardize,
+            shuffle=key.shuffle,  # an unshuffled key's call leaves it out
+        )
+        data_arr = np.ascontiguousarray(data_arr, dtype=CANONICAL_DTYPE)
+        return data_arr, marks, "dag", columns.tolist(), no_mask
     if key.functional in pair_models.MODELS:
         data_arr, marks, columns = pair_models.sample(
             key.functional,

@@ -37,6 +37,7 @@ whose Reproduce table lists the driver.
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
+| Stein-score screen | `stein_cpu.py` | CAM as context; no Andrey SCORE or NoGAM | the authors' SCORE, NoGAM (dodiscover), CausalDisco (R2-SortnRegress) | |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
@@ -55,8 +56,8 @@ whose Reproduce table lists the driver.
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
-`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, and `start_loci.sh` build the
-separate environments some comparisons need ([setup](README.md#setup)).
+`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, and `start_stein.sh`
+build the separate environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
