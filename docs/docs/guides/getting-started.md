@@ -629,6 +629,24 @@ with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). 
 observed value, or with one value throughout, raises before the fit, and so does infinity, which is
 not a missing value. CD-NOD needs a complete `env`.
 
+The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
+rows per test, and refuse missing values by default. They take `missing="em"` instead, which is
+experimental: structural EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates two steps.
+Under a linear-Gaussian model of the current graph, it replaces each row's missing values by their
+expected values given the row's observed ones and adds their uncertainty, which gives the expected
+covariance of the data; then the search runs on that covariance over every row, and the model is fit
+again to the graph it returns. It runs 10 rounds, and `metadata["em"]` records the observed-data
+log-likelihood after each:
+
+```{code-cell} ipython3
+em = andrey.ges(gappy, missing="em")
+em.metadata["em"]["log_likelihood"][-1]
+```
+
+EM is sound when values are missing completely at random or at random given observed values; when
+whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
+the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
+
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
@@ -692,6 +710,10 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
   Test-Wise Deletion][strobl]: FCI with test-wise deletion.
 - [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
   deletion.
+- Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
+  Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
+- [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous
+  Additive Noise Models][missdag]: structural EM with a continuous search.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -701,3 +723,4 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
 [mpdag]: https://arxiv.org/abs/1707.02171
 [strobl]: https://doi.org/10.1007/s41060-017-0094-6
 [tu]: https://proceedings.mlr.press/v89/tu19a.html
+[missdag]: https://arxiv.org/abs/2205.13869
