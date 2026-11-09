@@ -457,15 +457,21 @@ def scored(lane: str, result: dict, truth: np.ndarray) -> dict:
 
 def run_unit(task: tuple) -> list[dict]:
     """Every fit of one dataset: each method without claims, with true claims at each fraction,
-    and with false claims."""
-    lane, cell_name, seed = task
+    and with false claims; with a ``part``, with true claims of that part alone instead."""
+    lane, cell_name, seed, part = task
     cell = LANES[lane]["cells"][cell_name]
     prob = problem(lane, cell, seed)
     truth = prob["truth"]
     rows = []
     arms = [("bare", None, None)]
-    arms += [("true", f, prob["claims"][f]) for f in LANES[lane]["fractions"]]
-    arms.append(("false", FALSE_FRACTION, prob["false_claims"]))
+    if part is None:
+        arms += [("true", f, prob["claims"][f]) for f in LANES[lane]["fractions"]]
+        arms.append(("false", FALSE_FRACTION, prob["false_claims"]))
+    else:
+        arms += [
+            ("true", f, {p: c if p == part else [] for p, c in prob["claims"][f].items()})
+            for f in LANES[lane]["fractions"]
+        ]
     for method in LANES[lane]["methods"]:
         for arm, fraction, claims in arms:
             if method.startswith("lingam.") and claims is not None and claims.get("confounded"):
@@ -476,6 +482,7 @@ def run_unit(task: tuple) -> list[dict]:
                     "lane": lane,
                     "cell": cell_name,
                     "seed": seed,
+                    "part": part or "all",
                     "dataset_id": prob["dataset_id"],
                     "method": method,
                     "arm": arm,
@@ -520,7 +527,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2))
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
     done = {(r["cell"], r["seed"]) for r in _read(out / RECORDS)}
-    tasks = [(lane, c, s) for c in cells for s in seeds if (c, s) not in done]
+    tasks = [(lane, c, s, args.part) for c in cells for s in seeds if (c, s) not in done]
     _log(f"=== {lane}: {len(tasks)} datasets -> {out} (git {prov['git_sha']})")
     start = time.monotonic()
     with multiprocessing.get_context("forkserver").Pool(args.workers, maxtasksperchild=1) as pool:
@@ -926,10 +933,11 @@ def compare(records: list[dict]) -> list[dict]:
     for r in records:
         if r["arm"] != "bare":
             groups.setdefault(
-                (r["lane"], r["method"], r["cell"], r["arm"], r["fraction"]), []
+                (r["lane"], r["method"], r["cell"], r.get("part", "all"), r["arm"], r["fraction"]),
+                [],
             ).append(r)
     rows = []
-    for (lane, method, cell, arm, fraction), rs in sorted(groups.items(), key=str):
+    for (lane, method, cell, part, arm, fraction), rs in sorted(groups.items(), key=str):
         pairs = [(r, bare.get((method, r["dataset_id"]))) for r in rs]
         pairs = [(r, b) for r, b in pairs if b is not None and b["status"] == "ok"]
         ok = [(r, b) for r, b in pairs if r["status"] == "ok"]
@@ -937,6 +945,7 @@ def compare(records: list[dict]) -> list[dict]:
             "lane": lane,
             "method": method,
             "cell": cell,
+            "part": part,
             "arm": arm,
             "fraction": fraction,
             "datasets": len(rs),
@@ -973,13 +982,13 @@ def cmd_summarize(args: argparse.Namespace) -> int:
 
     main_rows = compare(pool(args.runs))
     replicate = {
-        (r["lane"], r["method"], r["cell"], r["arm"], r["fraction"]): r
+        (r["lane"], r["method"], r["cell"], r["part"], r["arm"], r["fraction"]): r
         for r in compare(pool(args.replicate or []))
     }
     for row in main_rows:
         if row.get("verdict") == "worse" and row["arm"] == "true":
             again = replicate.get(
-                (row["lane"], row["method"], row["cell"], row["arm"], row["fraction"])
+                (row["lane"], row["method"], row["cell"], row["part"], row["arm"], row["fraction"])
             )
             row["replicate"] = (
                 None
@@ -1015,6 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--cell", action="append", help="a cell of the lane; all when absent")
     r.add_argument("--seeds", type=int, nargs=2, default=(0, 20), metavar=("FIRST", "STOP"))
     r.add_argument("--workers", type=int, default=max(1, len(os.sched_getaffinity(0))))
+    r.add_argument("--part", choices=PARTS, help="true claims of this part alone")
     r.add_argument("--out", required=True)
     s = sub.add_parser("summarize", help="paired verdicts from finished runs")
     s.add_argument("--runs", nargs="+", required=True)
