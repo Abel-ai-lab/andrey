@@ -631,7 +631,10 @@ def _valid_graph(
         if constraints.required_paths is not None:
             from andrey.core.ancestral import restrict
 
-            cpdag, _ = restrict(cpdag, constraints.required_paths, constraints.forbidden_paths)
+            label = (lambda i: repr(labels[i])) if labels is not None else str
+            cpdag, _ = restrict(
+                cpdag, constraints.required_paths, constraints.forbidden_paths, label=label
+            )
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 

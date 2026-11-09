@@ -13,6 +13,7 @@ from andrey import BootstrapOutput, bootstrap, resample
 from andrey.constraint.fci import fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
+from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
 from andrey.data.latent import DSepOracle, _AncestorSepsets, observed_ancestors
 from andrey.resample import EDGES, Job, _default_block_length, _draw
@@ -879,6 +880,16 @@ def test_a_path_claim_restricts_the_averaged_graph():
     assert out.metadata["averaged_graph"] == "vote"
     assert out.structure.endpoints(0, 1) == (TAIL, ARROW)
     assert out.structure.endpoints(1, 2) == (TAIL, ARROW)
+
+
+def test_a_vote_the_path_claims_deny_names_the_columns():
+    # The vote a -> c <- b, in whose DAGs c is never an ancestor of a.
+    vote = np.zeros((3, 3), dtype=np.int8)
+    vote[0, 2] = vote[1, 2] = TAIL
+    vote[2, 0] = vote[2, 1] = ARROW
+    constraints = resolve(Knowledge(required_paths=[("c", "a")]), 3, list("abc"), method="pc")
+    with pytest.raises(ValueError, match=r"\('c', 'a'\)"):
+        resample._valid_graph(vote, "cpdag", ("a", "b", "c"), constraints, None)
 
 
 def linear_data(n, parents, seed=0):
