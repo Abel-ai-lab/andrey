@@ -81,13 +81,26 @@ DESCRIPTION_LENGTH = 160
 HEADER = {
     "Docs": "docs/index.html",
     "Examples": "docs/examples/index.html",
-    "Demos": "docs/demos/index.html",
     "Blog": "blog/index.html",
     "FAQ": "docs/faq.html",
 }
 # The header's sections in the order they read; Release cards, which carries the newest release's
 # dot, is checked on its own.
-NAV = ["Docs", "Examples", "Demos", "Blog", "Release cards", "FAQ"]
+NAV = ["Docs", "Examples", "Blog", "Release cards", "FAQ"]
+# The Examples gallery's section of demos, where the demos' old gallery sends the reader.
+DEMOS = "docs/examples/index.html#interactive-demos"
+# Each moved page's old address and the address it sends the reader to.
+MOVED = {
+    "demo/index.html": DEMOS,
+    "docs/demos/index.html": DEMOS,
+    "docs/demos/compare.html": "docs/examples/compare.html",
+    "docs/demos/pc-replay.html": "docs/examples/pc-replay.html",
+    "docs/demos/meek.html": "docs/examples/meek.html",
+    "docs/demos/d-separation.html": "docs/examples/d-separation.html",
+    "docs/demos/benchmark-explorer.html": "docs/benchmarks.html",
+    "docs/code/index.html": "docs/api.html",
+    "docs/examples/ges_quickstart.html": "docs/examples/quick_start.html",
+}
 
 
 @pytest.fixture(scope="module")
@@ -572,16 +585,13 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         "404.html",
         "genindex.html",
         "blog/drafts.html",
-        "demo/index.html",
-        "docs/demos/benchmark-explorer.html",
     )
     moved = (
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",
         "blog/why-andrey-is-fast.html",
-        "docs/examples/ges_quickstart.html",
     )
-    for address in (*left_out, *moved):
+    for address in (*left_out, *moved, *MOVED):
         assert f"https://andrey.abel.ai/{address}" not in urls, address
 
 
@@ -668,11 +678,61 @@ def test_every_page_with_an_embedded_example_loads_the_files_that_host_it(html):
     assert embedding
 
 
-def test_the_demos_page_shows_the_live_demo_only_once_its_space_is_public(html):
+def _redirect(html: pathlib.Path, address: str) -> str | None:
+    """The address the page at ``address`` sends the reader to at once, from the site's root."""
+    page = html / address
+    refresh = re.findall(r'<meta http-equiv="refresh" content="0; url=([^"]+)">', page.read_text())
+    if len(refresh) != 1:
+        return None
+    target, _, section = refresh[0].partition("#")
+    to = _resolve(html, page, target).relative_to(html).as_posix()
+    return f"{to}#{section}" if section else to
+
+
+@pytest.mark.parametrize("old", MOVED)
+def test_a_moved_pages_old_address_sends_the_reader_to_its_new_one(html, old):
+    assert _redirect(html, old) == MOVED[old]
+    page, _, section = MOVED[old].partition("#")
+    text = (html / page).read_text(encoding="utf-8")
+    assert 'http-equiv="refresh"' not in text  # the reader arrives in one step
+    assert not section or f'id="{section}"' in text
+
+
+def test_a_released_posts_link_to_a_moved_page_still_arrives(html):
+    # The launch post links the demos' old gallery, and a released post is not edited.
+    post = html / "blog" / "20261008-introducing-andrey.html"
+    links = _Links()
+    links.feed(post.read_text(encoding="utf-8"))
+    (old,) = {href for _, href in links.found if href.endswith("docs/demos/index.html")}
+    assert _redirect(html, _resolve(html, post, old).relative_to(html).as_posix()) == DEMOS
+
+
+def test_the_examples_gallery_lists_the_same_pages_as_its_sidebar_section_by_section(html):
+    page = html / "docs" / "examples" / "index.html"
+    text = page.read_text(encoding="utf-8")
+    cards = {}
+    for section in re.split(r'<section id="', text[text.index("<h1>") :])[1:]:
+        title = re.search(r"<h2>([^<]+)<", section)[1]
+        links = re.findall(r'<a class="[^"]*sd-stretched-link[^"]*" href="([^"#]+)"', section)
+        cards[title] = [_resolve(html, page, href) for href in links]
+    assert list(cards) == ["Quick start", "Methods", "Advanced", "Interactive demos", "Misc"]
+    assert all(target.is_file() for targets in cards.values() for target in targets)
+    nav = text[text.index('<nav class="bd-docs-nav docs-nav"') :]
+    nav = nav[: nav.index("</nav>")]
+    for title, targets in cards.items():
+        if len(targets) == 1:  # a section of one page is that page's row
+            assert f'href="{targets[0].name}"' in nav, title
+            continue
+        fold = nav[nav.index(f"<summary>{title}<") :]
+        rows = re.findall(r'<a href="([^"]+)"', fold[: fold.index("</details>")])
+        assert [_resolve(html, page, href) for href in rows] == targets, title
+
+
+def test_the_examples_page_shows_the_live_demo_only_once_its_space_is_public(html):
     spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
     site = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(site)
-    page = (html / "docs" / "demos" / "index.html").read_text(encoding="utf-8")
+    page = (html / "docs" / "examples" / "index.html").read_text(encoding="utf-8")
     if site.DEMO_URL:
         assert page.count(f'href="{site.DEMO_URL}"') == 1
     else:

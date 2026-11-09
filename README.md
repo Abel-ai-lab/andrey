@@ -166,9 +166,8 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 ## Learn more
 
 - [Documentation](https://andrey.abel.ai/docs/): guides and the API reference.
-- [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
-- [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
-  browser.
+- [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each, and demos
+  that run in your browser.
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
   release.
 - [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)

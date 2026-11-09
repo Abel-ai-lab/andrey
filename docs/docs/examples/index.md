@@ -1,6 +1,7 @@
 ---
 name: examples-index
-description: Example notebooks - each runs one method or task on your machine or in Colab.
+description: Example notebooks, each running one method or task on your machine or in Colab, and
+  interactive demos that run in your browser.
 meta:
   type: index
 html_theme.sidebar_secondary.remove: true
@@ -9,13 +10,15 @@ html_theme.sidebar_secondary.remove: true
 # Examples
 
 Each notebook runs one method or task, on your own machine or in Colab; each has **Open in Colab**
-and **Download this notebook** links. The [demos](../demos/index) run in your browser instead. From
-a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A notebook that needs
-another package installs it in a cell with `uv pip install`.
+and **Download this notebook** links. The [interactive demos](#interactive-demos) run in your
+browser instead. From a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A
+notebook that needs another package installs it in a cell with `uv pip install`.
 
 To run one in Colab, choose **Open in Colab**, select a CPU runtime, and run the setup cell before
 the example. The setup cell installs Andrey in the Colab runtime only; the speed notebook labels
 that runtime in its output.
+
+## Quick start
 
 ::::{grid} 1 2 2 3
 :gutter: 3
@@ -25,12 +28,26 @@ that runtime in its output.
 :link: quick_start
 :link-type: doc
 :img-top: /_generated/thumbs/quick_start.svg
-:img-alt: The graph GES recovers in this notebook
+:img-alt: The graph this notebook learns
 
-Simulate a small dataset, fit GES, read the graph it learns, and draw it.
+Simulate a small dataset, fit one method, read the graph it learns, and draw it.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
+::::
+
+```{toctree}
+:hidden:
+:caption: Quick start
+
+quick_start
+```
+
+## Methods
+
+::::{grid} 1 2 2 3
+:gutter: 3
+:class-container: example-gallery
 
 :::{grid-item-card} Constraint-based discovery
 :link: constraint_based
@@ -41,20 +58,6 @@ Simulate a small dataset, fit GES, read the graph it learns, and draw it.
 PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
 MMPC, which join each variable's local structure into a graph; CD-NOD and FCI-JCI on data from
 several domains; and ICP's parents of one variable from several environments.
-
-{bdg-secondary-line}`Notebook · Colab`
-:::
-
-:::{grid-item-card} Permutation-based search
-:link: permutation_based
-:link-type: doc
-:img-top: /_generated/thumbs/permutation_based.svg
-:img-alt: The graph BOSS or GRaSP recovers in this notebook
-
-BOSS and GRaSP search over orderings of the variables for the best-scoring graph, and BOSS-FCI
-and GRaSP-FCI start from that graph and allow hidden common causes; IGSP searches orderings too,
-on interventional settings, one per environment, whose changed variables it is told, and UT-IGSP
-on settings whose changed variables it is told in part or not at all.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -83,6 +86,20 @@ CALM learns a weighted DAG by gradient descent on a penalized likelihood; it run
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Permutation-based search
+:link: permutation_based
+:link-type: doc
+:img-top: /_generated/thumbs/permutation_based.svg
+:img-alt: The graph BOSS or GRaSP recovers in this notebook
+
+BOSS and GRaSP search over orderings of the variables for the best-scoring graph, and BOSS-FCI
+and GRaSP-FCI start from that graph and allow hidden common causes; IGSP searches orderings too,
+on interventional settings, one per environment, whose changed variables it is told, and UT-IGSP
+on settings whose changed variables it is told in part or not at all.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Linear non-Gaussian models
 :link: lingam
 :link-type: doc
@@ -103,6 +120,18 @@ fits several datasets, and GIN finds latent variables.
 
 CAM and RESIT learn a DAG, with every edge oriented, when each variable is a nonlinear function of
 its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they join.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
+:::{grid-item-card} Time series
+:link: time_series
+:link-type: doc
+:img-top: /_generated/thumbs/time_series.svg
+:img-alt: The true graph of this notebook's series, its lags merged
+
+PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, Longitudinal LiNGAM, and J-PCMCI+ on data
+over time.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -139,29 +168,29 @@ ANM and PNL test which of two variables causes the other.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
+::::
 
-:::{grid-item-card} Time series
-:link: time_series
-:link-type: doc
-:img-top: /_generated/thumbs/time_series.svg
-:img-alt: The true graph of this notebook's series, its lags merged
+```{toctree}
+:hidden:
+:caption: Methods
 
-PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, Longitudinal LiNGAM, and J-PCMCI+ on data
-over time.
+constraint_based
+score_search
+calm
+permutation_based
+lingam
+functional
+time_series
+rcd
+bottom_up_parce_lingam
+pairwise
+```
 
-{bdg-secondary-line}`Notebook · Colab`
-:::
+## Advanced
 
-:::{grid-item-card} Background knowledge
-:link: knowledge
-:link-type: doc
-:img-top: /_generated/thumbs/knowledge.svg
-:img-alt: The graph PC recovers with tiers in this notebook
-
-Pass what you already know to a search: tiers in time, and required or forbidden edges.
-
-{bdg-secondary-line}`Notebook · Colab`
-:::
+::::{grid} 1 2 2 3
+:gutter: 3
+:class-container: example-gallery
 
 :::{grid-item-card} Bootstrap: how stable is each edge?
 :link: bootstrap
@@ -187,16 +216,99 @@ rejected, and the sparsest passing graph is not always the most accurate.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Speed on your machine
-:link: speed_on_your_machine
+:::{grid-item-card} Background knowledge
+:link: knowledge
 :link-type: doc
-:img-top: /_generated/thumbs/speed_on_your_machine.svg
-:img-alt: The true graph of the notebook's smallest dataset
+:img-top: /_generated/thumbs/knowledge.svg
+:img-alt: The graph PC recovers with tiers in this notebook
 
-Time PC in Andrey and causal-learn on your own hardware.
+Pass what you already know to a search: tiers in time, and required or forbidden edges.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
+::::
+
+```{toctree}
+:hidden:
+:caption: Advanced
+
+bootstrap
+markov_check
+knowledge
+```
+
+## Interactive demos
+
+The demos run in your browser, with nothing to install. Step through PC and Meek's rules,
+explore d-separation, or compare methods on one dataset.
+
+::::{grid} 1 2 2 3
+:gutter: 3
+:class-container: example-gallery
+
+:::{grid-item-card} Compare on one dataset
+:link: compare
+:link-type: doc
+:img-top: /_generated/thumbs/compare.svg
+:img-alt: Andrey's graph with each edge colored against the true graph
+
+The true graph, Andrey's, and causal-learn's, side by side and scored.
+
+{bdg-secondary-line}`In your browser`
+:::
+
+:::{grid-item-card} PC, step by step
+:link: pc-replay
+:link-type: doc
+:img-top: /_generated/thumbs/pc-replay.svg
+:img-alt: The graph PC recovers from the rain and sprinkler example
+
+Every independence test, collider, and Meek rule PC recorded, beside its pseudocode.
+
+{bdg-secondary-line}`In your browser`
+:::
+
+:::{grid-item-card} Meek's rules
+:link: meek
+:link-type: doc
+:img-top: /_generated/thumbs/meek.svg
+:img-alt: A partially directed graph after one of Meek's rules
+
+Each orientation rule, one step at a time, from the orientation engine.
+
+{bdg-secondary-line}`In your browser`
+:::
+
+:::{grid-item-card} d-separation explorer
+:link: d-separation
+:link-type: doc
+:img-top: /_generated/thumbs/d-separation.svg
+:img-alt: A graph with a fork, a collider, and a descendant of the collider
+
+Choose two variables and a conditioning set; see which paths stay open.
+
+{bdg-secondary-line}`In your browser`
+:::
+::::
+
+```{include} ../../_generated/examples/live-demo.md
+```
+
+```{toctree}
+:hidden:
+:caption: Interactive demos
+
+compare
+pc-replay
+meek
+d-separation
+```
+
+## Misc
+
+::::{grid} 1 2 2 3
+:gutter: 3
+:class-container: example-gallery
 
 :::{grid-item-card} Visualize a causal graph
 :link: viz
@@ -208,26 +320,23 @@ Draw a recovered graph as a self-contained SVG.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
+
+:::{grid-item-card} Speed on your machine
+:link: speed_on_your_machine
+:link-type: doc
+:img-top: /_generated/thumbs/speed_on_your_machine.svg
+:img-alt: The true graph of the notebook's smallest dataset
+
+Time PC in Andrey and causal-learn on your own hardware.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
 ::::
 
 ```{toctree}
 :hidden:
-:caption: Notebooks
+:caption: Misc
 
-quick_start
-constraint_based
-permutation_based
-score_search
-calm
-lingam
-functional
-rcd
-bottom_up_parce_lingam
-pairwise
-time_series
-knowledge
-bootstrap
-markov_check
-speed_on_your_machine
 viz
+speed_on_your_machine
 ```

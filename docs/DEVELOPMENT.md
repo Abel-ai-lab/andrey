@@ -11,7 +11,7 @@ meta:
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
 configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
 pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
-Demos, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
+Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
 the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
 the brand are in [`DESIGN.md`](../DESIGN.md).
 
@@ -230,6 +230,9 @@ The left sidebar ([`_templates/docs-nav.html`](_templates/docs-nav.html)) groups
 toctree: each section in `NAV_SECTIONS` heads a group under its icon
 ([`_templates/nav-icons.html`](_templates/nav-icons.html)), folding pages past `NAV_SHOWN`, and the
 other entries make the Reference group; `_docs_sidebar` in `conf.py` builds it from the toctrees.
+A page whose toctrees each carry a caption, as the Examples gallery's do, lists its pages under
+those captions: each caption is a row that folds its pages, and a caption with one page is that
+page's row.
 The right sidebar holds the page's outline ([`_templates/page-toc.html`](_templates/page-toc.html),
 marked by [`_static/page-outline.js`](_static/page-outline.js)), then links to edit the page and
 report a problem ([`_templates/page-links.html`](_templates/page-links.html)); Edit this page opens
@@ -238,15 +241,18 @@ page's section sits over its title ([`_templates/page-kicker.html`](_templates/p
 On a phone the outline moves into the menu
 ([`_templates/page-outline.html`](_templates/page-outline.html)).
 
-## The Examples and Demos galleries
+## The Examples gallery
 
-[`docs/examples/index.md`](docs/examples/index.md) is a gallery of notebook cards, and
-[`docs/demos/index.md`](docs/demos/index.md) of demos that run in the browser, plus a live demo
-whose card appears once `DEMO_URL` in `site/build.py` names a public Space. Each demo is a page with
-a title, a paragraph, and the demo in a frame, generated into `_static/examples/` at build time: the
-comparison on one dataset from [`apps/compare.py`](../apps/compare.py), and the PC replay, Meek's
-rules, and the d-separation explorer from [`apps/build_assets.py`](../apps/build_assets.py). The
-comparison reads causal-learn's graphs from `apps/compare-causal-learn.json`, recorded once (see
+[`docs/examples/index.md`](docs/examples/index.md) is a gallery in sections, each a heading over its
+own grid of cards with a toctree of the same pages in the same order, captioned with the heading:
+Quick start, Methods (the README's method table gives the families' order), Advanced, Interactive
+demos, and Misc. A notebook's card says "Notebook · Colab" and a demo's "In your browser". The
+Interactive demos section also holds a live demo, whose card appears once `DEMO_URL` in
+`site/build.py` names a public Space. Each demo is a page beside the gallery with a title, a
+paragraph, and the demo in a frame, generated into `_static/examples/` at build time: the comparison
+on one dataset from [`apps/compare.py`](../apps/compare.py), and the PC replay, Meek's rules, and
+the d-separation explorer from [`apps/build_assets.py`](../apps/build_assets.py). The comparison
+reads causal-learn's graphs from `apps/compare-causal-learn.json`, recorded once (see
 [`apps/README.md`](../apps/README.md)); the build refuses a recording made on different data.
 
 Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose chosen
@@ -351,11 +357,10 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/api.md` |
 | Guides | `docs/docs/guides/` |
-| Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
+| Examples gallery, and the demos' pages | `docs/docs/examples/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
 | Notebook outputs | `scripts/execute_notebooks.py` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
-| The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
-| The API reference's old addresses under `docs/code/`, redirected | `docs/_templates/moved-redirect.html` |
+| A moved page's old address, redirected to the page (`MOVED` and `_moved_pages` in `conf.py`): the demos' under `demo/` and `docs/demos/`, the API reference's under `docs/code/`. A released post that links a moved page keeps its link, to the old address (`_moved_links`) | `docs/_templates/moved-redirect.html` |
 | The retired benchmark explorer's address, redirected to the release cards | `docs/_templates/benchmark-explorer-redirect.html` |

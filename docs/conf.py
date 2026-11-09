@@ -249,7 +249,6 @@ LLMS_SECTIONS = (
             "docs/guides/graph-types",
             "docs/guides/graph-representation",
             "docs/examples/index",
-            "docs/demos/index",
             "docs/changelog",
         ),
     ),
@@ -306,7 +305,6 @@ html_sidebars = {
 NAV_SECTIONS = {
     "docs/guides/index": "book",
     "docs/examples/index": "notebook",
-    "docs/demos/index": "play",
 }
 NAV_REFERENCE = ("Reference", "code")
 # The reference pages' icons in the documentation tree (_templates/nav-icons.html).
@@ -325,24 +323,56 @@ NAV_SHOWN = 5
 NAV_NEWEST = {"docs/benchmarks": 5}
 html_additional_pages = {
     "index": "homepage.html",
-    "demo/index": "demo-redirect.html",
     "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
+}
+# The pages that moved, each old address with the page, and the section where it names one, that
+# holds its content now. The old address redirects there (_moved_pages), and a released post that
+# links the old page keeps its link (_moved_links).
+EXAMPLES_DEMOS = "docs/examples/index#interactive-demos"
+MOVED = {
+    "demo/index": EXAMPLES_DEMOS,
+    "docs/demos/index": EXAMPLES_DEMOS,
+    "docs/demos/compare": "docs/examples/compare",
+    "docs/demos/pc-replay": "docs/examples/pc-replay",
+    "docs/demos/meek": "docs/examples/meek",
+    "docs/demos/d-separation": "docs/examples/d-separation",
+    "docs/code/index": "docs/api",
+    "docs/examples/ges_quickstart": "docs/examples/quick_start",
 }
 
 
 def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
-    """Redirects the API reference's old addresses, ``docs/code/index`` and its generated pages
-    under ``docs/code/generated/``, to their corresponding pages under ``docs/api``, and the quick
-    start notebook's old address to the notebook."""
-    reference = {"title": "API reference", "target": "../api.html"}
-    yield "docs/code/index", reference, "moved-redirect.html"
-    quick_start = {"title": "Quick start", "target": "quick_start.html"}
-    yield "docs/examples/ges_quickstart", quick_start, "moved-redirect.html"
+    """Redirects each old address in ``MOVED`` to its page, and the API reference's old generated
+    pages under ``docs/code/generated/`` to their corresponding pages under ``docs/api``."""
+    for old, new in MOVED.items():
+        doc, _, section = new.partition("#")
+        target = posixpath.relpath(doc, posixpath.dirname(old)) + ".html"
+        target += f"#{section}" if section else ""
+        context = {"title": app.env.titles[doc].astext(), "target": target}
+        yield old, context, "moved-redirect.html"
     for doc in sorted(app.env.found_docs):
         if doc.startswith("docs/api/"):
             name = doc.removeprefix("docs/api/")
             context = {"title": name, "target": f"../../api/{name}.html"}
             yield f"docs/code/generated/{name}", context, "moved-redirect.html"
+
+
+def _moved_links(app, doctree) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Point a post's link to a page in ``MOVED`` at the page's old address, which redirects.
+
+    A released post is not edited, so its link names a source file that is gone; left alone, the
+    link would not resolve and the build would stop.
+    """
+    docname = app.env.docname
+    if not docname.startswith("blog/"):
+        return
+    here = posixpath.dirname(docname)
+    for node in list(doctree.findall(addnodes.pending_xref)):
+        path, _, section = node["reftarget"].partition("#")
+        old = posixpath.normpath(posixpath.join(here, path)).removesuffix(".md")
+        if node.get("reftype") == "myst" and old in MOVED:
+            address = posixpath.relpath(old, here) + ".html" + (f"#{section}" if section else "")
+            node.replace_self(nodes.reference("", "", *node.children, refuri=address))
 
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
@@ -1012,7 +1042,7 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         css, js = ["figures.css", "blog.css"], ["figures.js"]
     elif pagename in INTERACTIVE:
         css, js = ["examples.css"], ["example-frame.js"]
-    elif pagename in ("docs/examples/index", "docs/demos/index"):
+    elif pagename == "docs/examples/index":
         css = ["examples.css"]
     elif pagename == "docs/benchmarks":
         # Nine earlier releases to a page.
@@ -1062,7 +1092,10 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
 
     ``docs_nav`` is the documentation tree's groups (_templates/docs-nav.html): a group per entry
     of ``NAV_SECTIONS`` holding its pages, then the docs index's other entries. A row carries its
-    ``pages``, itself and every page under it, so the fold that holds the current page opens.
+    ``pages``, itself and every page under it, so the fold that holds the current page opens. A
+    page whose toctrees each carry a caption lists its pages under those captions, as its own
+    headings group them: a row without a ``doc`` per caption, or the page itself where a caption
+    holds one page.
     ``page_kicker`` names the page's section over its title: the page that lists it, or the last
     group for a page the docs index lists itself. ``edit_url`` opens the file that holds the page's
     text on GitHub: a Markdown file or notebook it includes (the changelog, a staged notebook's
@@ -1074,12 +1107,20 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     # A toctree entry's own title, where it names one ("0.1.0: the alpha release"), labels the
     # page in the sidebar in place of the page's heading.
     if not hasattr(app, "andrey_nav_titles"):
+        toctrees = {
+            doc: list(app.env.get_doctree(doc).findall(addnodes.toctree)) for doc in includes
+        }
         app.andrey_nav_titles = {
             ref: label
-            for doc in includes
-            for toctree in app.env.get_doctree(doc).findall(addnodes.toctree)
+            for trees in toctrees.values()
+            for toctree in trees
             for label, ref in toctree["entries"]
             if label
+        }
+        app.andrey_nav_captions = {
+            doc: [(toctree["caption"], toctree["includefiles"]) for toctree in trees]
+            for doc, trees in toctrees.items()
+            if len(trees) > 1 and all(toctree.get("caption") for toctree in trees)
         }
 
     def title(doc: str) -> str:
@@ -1091,6 +1132,19 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     def row(doc: str) -> dict:
         kids = list(dict.fromkeys(includes.get(doc, ())))
         listed = [row(k) for k in kids]
+        if doc in app.andrey_nav_captions:
+            rows = {k["doc"]: k for k in listed}
+            listed = [
+                rows[files[0]]
+                if len(files) == 1
+                else {
+                    "doc": None,
+                    "title": caption,
+                    "pages": set().union(*(rows[f]["pages"] for f in files)),
+                    "kids": [rows[f] for f in files],
+                }
+                for caption, files in app.andrey_nav_captions[doc]
+            ]
         if doc in NAV_NEWEST:
             # The newest pages, the one being read if it is older, then a link to the whole list.
             shown = NAV_NEWEST[doc]
@@ -1463,26 +1517,26 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
         place.parent.replace(place, nodes.raw("", latest + earlier, format="html"))
 
 
-# ---- the examples and demos galleries ------------------------------------------------------------
-# Each demo's page (docs/demos/), the generated file that page shows at full width, and the gallery
+# ---- the examples gallery ------------------------------------------------------------------------
+# Each interactive demo's page, the generated file that page shows at full width, and the gallery
 # card's thumbnail.
 INTERACTIVE = {
-    "docs/demos/compare": (
+    "docs/examples/compare": (
         "compare.html",
         lambda summary: compare.compare_page(heading=False),
         lambda summary: compare.compare_thumbnail(),
     ),
-    "docs/demos/pc-replay": (
+    "docs/examples/pc-replay": (
         "pc.html",
         lambda summary: build_assets.pc_page(heading=False),
         lambda summary: build_assets.pc_thumbnail(),
     ),
-    "docs/demos/meek": (
+    "docs/examples/meek": (
         "meek.html",
         lambda summary: build_assets.meek_replay(heading=False),
         lambda summary: build_assets.meek_thumbnail(),
     ),
-    "docs/demos/d-separation": (
+    "docs/examples/d-separation": (
         "d-separation.html",
         lambda summary: build_assets.dsep_document(heading=False),
         lambda summary: build_assets.dsep_thumbnail(),
@@ -1509,7 +1563,7 @@ def _write_examples(app) -> None:  # noqa: ANN001 -- Sphinx passes its applicati
     card = ""
     if site.DEMO_URL:
         card = (
-            "## Live demo\n\n::::{grid} 1 2 2 3\n:gutter: 3\n\n"
+            "### Live demo\n\n::::{grid} 1 2 2 3\n:gutter: 3\n\n"
             f":::{{grid-item-card}} Andrey on Hugging Face\n:link: {site.DEMO_URL}\n"
             ":img-top: /_generated/thumbs/compare.svg\n\n"
             "Run the methods on your own CSV.\n\n{bdg-secondary-line}`In your browser`\n:::\n::::\n"
@@ -1594,6 +1648,8 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("builder-inited", _write_examples)
     app.connect("env-before-read-docs", _gallery_last)
     app.connect("doctree-read", _notebook_thumbnail)
+    # Before ABlog keeps its copy of a post for the feed (the default priority, 500).
+    app.connect("doctree-read", _moved_links, priority=400)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)

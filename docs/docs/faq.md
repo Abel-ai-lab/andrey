@@ -58,9 +58,9 @@ prints; [Configuration](configuration.md#parallel-search) lists the variables.
 
 ### What is the quickest way to try it?
 
-Run the [quickstart](guides/getting-started.md#learn-a-graph), try a [demo](demos/index) in your
-browser, or open one of the [example notebooks](examples/index) in Colab. Each notebook installs
-Andrey in its first cell.
+Run the [quickstart](guides/getting-started.md#learn-a-graph), try a
+[demo](examples/index.md#interactive-demos) in your browser, or open one of the
+[example notebooks](examples/index) in Colab. Each notebook installs Andrey in its first cell.
 
 ## Methods
 
