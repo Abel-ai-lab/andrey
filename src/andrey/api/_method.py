@@ -336,7 +336,8 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
     ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
     random changes before a later start, with ``n_starts`` above 1; every other seeded method
-    always does.
+    always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values, which
+    this check does not read: ``pc`` records its seed itself when the correction ran.
     """
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
