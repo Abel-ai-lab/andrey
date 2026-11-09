@@ -115,16 +115,20 @@ def pc(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    missing : {"testwise"} or None, default=None
+    missing : {"testwise", "mvpc"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
-        reads only the rows where all of its variables are observed. ``None`` picks the method's
-        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        reads only the rows where all of its variables are observed. ``"mvpc"``, experimental, is
+        Missing-Value PC [13]_: after the test-wise skeleton, it finds the parents of each
+        variable's missingness indicator and tests again, on virtual data that correct for them,
+        the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
+        ``None`` picks the method's default, ``"testwise"``. On data with missing values,
+        ``metadata["missing"]`` records the handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make, and of the permutations of
+        ``missing="mvpc"``; the other tests ignore it. With those tests, or with ``"mvpc"`` on data
+        with missing values, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -153,8 +157,14 @@ def pc(
         column positions, the middle node second and ``x < y``, in ascending order.
         ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
         ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
-        which orientation each keeps. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        which orientation each keeps. With ``missing="mvpc"`` on data with missing values,
+        ``metadata["missingness_parents"]`` maps each column whose missingness indicator has
+        parents to them, and ``metadata["corrected_edges"]`` lists the edges tested again
+        (``"retested"``) and those removed (``"removed"``), as ``[x, y]`` pairs in ascending order;
+        both name a DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is
+        the seed of the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
 
     Raises
@@ -174,7 +184,9 @@ def pc(
         categorical, by ``categorical`` or by its type. With ``"fisherz"`` or ``"student_t"``, also
         if a column repeats another up to scale and shift, before any test runs; one message names
         every group of copies and says to keep one column per group. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
+        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``, or a
+        corrected test reads fewer rows than it needs.
 
     Warns
     -----
@@ -197,7 +209,9 @@ def pc(
     sparse graphs, where every variable has few neighbors, and then stays feasible with many
     variables [5]_; it returns a CPDAG. When unmeasured common causes are plausible, use
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`.
+    :func:`~andrey.direct_lingam`. When whether a value is missing depends on the variables,
+    through variables other than itself, ``missing="mvpc"`` removes the extra edges that
+    test-wise deletion can keep [13]_.
 
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
@@ -294,6 +308,32 @@ def pc(
     other tests, or when a continuous column is constant on its rows. With missing values, the
     skeleton search runs in one process.
 
+    **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
+    skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
+    missingness indicator of a variable in the test to be a common effect of ``x`` and ``y``, or a
+    descendant of one (their Proposition 2). Step 2 finds the parents of each indicator: the
+    variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
+    against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
+    ``alpha``, and ``max_depth``; a test whose rows hold one value of the indicator separates the
+    pair. Step 3 marks as candidates the adjacent pairs that share an adjacent variable or an
+    indicator they both cause. Step 4 runs the skeleton search again over the candidates, every
+    other edge kept, with the permutation-based correction (PermC, their Algorithm 2): a test of
+    ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``, ``y``, and
+    ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
+    observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
+    drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
+    virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
+    ``W`` is observed (their Eq. (4)), and the test runs on them. A test
+    with an empty ``W`` is the test-wise one. The colliders follow the corrected separating sets;
+    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
+    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
+    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
+    p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
+    where the queried columns' values are missing, so a result depends on neither the column order,
+    nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
+    the result of ``"testwise"``.
+
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
     stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
@@ -319,9 +359,23 @@ def pc(
     ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
     them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    20 variables with up to a fifth of the values missing completely at random. ``missing="mvpc"``
+    is experimental and not benchmarked yet; its tests run it on up to 10 variables with indicators
+    placed at colliders. Its correction holds when no missingness indicator causes a variable, every
+    independence in the observed rows also holds in the missing ones, no indicator is a
+    deterministic function of others, and no value causes its own missingness (self-masking) [13]_;
+    the data cannot check these, and a violation voids the correction. PermC also needs
+    linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
+    ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
+    on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
+    d-separated given ``S`` exactly when they are given ``S`` and those indicators. Condition (ii)
+    fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
+    descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
+    ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
+    The density-ratio correction the paper gives for these cases is not implemented. Step 2 runs
+    one skeleton search per variable with missing values. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -384,15 +438,23 @@ def pc(
     >>> pc(data, indep_test="degen_gauss").structure.oriented_edges()
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
+    from andrey.constraint.mvpc import PERMC_TESTS
     from andrey.constraint.pc import pc as _pc
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     assert indep_test is not None  # method_spec picks it from the column types
+    assert seed is not None  # method_spec resolves it
+    if missing == "mvpc" and indep_test not in PERMC_TESTS:
+        raise ValueError(
+            'pc: missing="mvpc" corrects the partial-correlation tests, so indep_test must be '
+            f'"fisherz" or "student_t", got {indep_test!r}'
+        )
     X, mask, labels, constraints = fit_inputs(
         data, "indep_test", indep_test, categorical, knowledge, method="pc", missing=True
     )
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    found: dict = {}
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
@@ -405,16 +467,43 @@ def pc(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
+            missing=missing or "testwise",
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _mvpc=found,
         )
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
+        **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
+    """Return MVPC's indicator parents, corrected edges, and ``seed`` as metadata, or ``{}``.
+
+    ``found`` is empty when the correction did not run, on data without missing values, and the
+    fit then drew no random numbers. A column is its label when ``labels`` is given, else its
+    0-based position.
+    """
+    if not found:
+        return {}
+
+    def name(j: int) -> object:
+        return j if labels is None else labels[j]
+
+    return {
+        "missingness_parents": {
+            name(c): [name(p) for p in pa] for c, pa in sorted(found["parents"].items())
+        },
+        "corrected_edges": {
+            key: [[name(x), name(y)] for x, y in found[key]] for key in ("retested", "removed")
+        },
+        "seed": seed,
+    }
 
 
 def _ambiguous_metadata(

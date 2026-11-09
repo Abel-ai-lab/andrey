@@ -24,7 +24,7 @@ from pydantic import model_validator
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING
+from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -1013,17 +1013,27 @@ _CONCEPTS = (
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
-        deviations=tuple(
+        deviations=(
             Deviation(
-                method=m,
+                method="pc",
                 name="missing",
                 default=None,
-                choices=(EM,),
-                reason="em, structural EM over the expected covariance (Friedman 1997; Gao et al. "
-                "2022), suits a fit that reads only a covariance and the row count; None refuses "
-                "missing values.",
-            )
-            for m in EM_METHODS
+                choices=(*MISSING_HANDLING, MVPC),
+                reason="mvpc, Missing-Value PC, corrects the test-wise deletion skeleton of PC "
+                "under causal sufficiency (Tu et al. 2019); its theory covers PC only.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="missing",
+                    default=None,
+                    choices=(EM,),
+                    reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
+                    "et al. 2022), suits a fit that reads only a covariance and the row count; "
+                    "None refuses missing values.",
+                )
+                for m in EM_METHODS
+            ),
         ),
     ),
     Concept(
