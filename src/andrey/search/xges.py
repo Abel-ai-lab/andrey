@@ -1081,6 +1081,7 @@ def xges(
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Extremely Greedy Equivalence Search over a decomposable score.
 
@@ -1117,6 +1118,11 @@ def xges(
         one, a move whose class holds no DAG that satisfies the knowledge is undone, and the
         search starts from the class of the required edges. The result is that class narrowed by
         the knowledge (:func:`~andrey.core.knowledge.mpdag`).
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
 
     Returns
     -------
@@ -1139,6 +1145,7 @@ def xges(
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
+        cov=cov,
     )
     ranks = tie_ranks(X, tie_mask(score_func, categorical, d)).tolist()
     # One BLAS thread for reproducible scores and move ties.

@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
+from andrey.core.ci_missing import EM_METHODS
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -574,11 +575,16 @@ def render_skill() -> str:
         "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
         "They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
-        + ". Every other method refuses a missing value with a data error that says what to do "
-        "instead. The deletion is sound when values are missing completely at random; when "
-        "whether a value is missing depends on the variables, `pc` can keep extra edges, and "
-        "`fci` stays sound "
-        "when no missingness mechanism causally affects another."
+        + ". The deletion is sound when values are missing completely at random; when whether a "
+        "value is missing depends on the variables, `pc` can keep extra edges, and `fci` stays "
+        "sound when no missingness mechanism causally affects another. The searches whose fit "
+        "reads only a covariance, "
+        + ", ".join(f"`{name}`" for name in EM_METHODS)
+        + ", refuse a missing value under `null` and take `em`, experimental: structural EM, "
+        "which runs the search on the expected covariance of the data 10 times and assumes values "
+        "missing completely at random or at random given observed values; `metadata.em` records "
+        "its rounds and the observed-data log-likelihood after each. Every other method refuses a "
+        "missing value with a data error that says what to do instead."
     )
     a("")
     a("## Background knowledge")

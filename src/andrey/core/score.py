@@ -973,6 +973,7 @@ def make_score(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     categorical: npt.ArrayLike | None = None,
+    cov: np.ndarray | None = None,
 ) -> LocalScore:
     """Build the local score ``score_func`` names over ``data``.
 
@@ -981,9 +982,19 @@ def make_score(
     ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
     ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
     it out but still check its range, as BDeu does ``penalty_discount``'s.
-    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. Raises
-    :class:`NotImplementedError` for a name outside :data:`SCORES`.
+    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A ``cov``
+    replaces the covariance of ``data`` in the linear-Gaussian BIC, over as many rows as ``data``
+    holds, such as the expected covariance of data with missing values
+    (:mod:`andrey.search.em`); its columns are checked as :class:`BICScore` checks the data's.
+    Raises :class:`NotImplementedError` for a name outside :data:`SCORES`, and ``ValueError`` for
+    a ``cov`` with another score.
     """
+    if cov is not None:
+        if score_func not in LINEAR_SCORES:
+            raise ValueError(f"only the linear-Gaussian BIC reads a covariance, not {score_func!r}")
+        n = np.shape(data)[0]
+        check_columns(cov, n)
+        return BICScore.from_cov(cov, n, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
     if score_func in LINEAR_SCORES:
         return BICScore(
             np.asarray(data, dtype=np.float64),
