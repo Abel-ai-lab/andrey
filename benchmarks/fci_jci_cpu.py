@@ -226,7 +226,9 @@ def possible_dsep_sizes():
     """Record the size of every possible-d-separation set Andrey's FCI step forms.
 
     Yields a dict with ``max`` and ``calls``. The engine reads ``_possible_dsep`` from
-    :mod:`andrey.constraint.fci` at each call, so wrapping it there reaches ``fci`` and ``fci_jci``.
+    :mod:`andrey.constraint.fci` at each call, so wrapping it there reaches ``fci`` and ``fci_jci``
+    while ``sys.modules`` holds the copy of that module the engine imported; :func:`refit` checks
+    that it does.
     """
     module = importlib.import_module("andrey.constraint.fci")
     real = module._possible_dsep
@@ -651,11 +653,23 @@ def _seeds(text: str) -> list[int]:
 
 
 def refit(arm: str, x: np.ndarray, params: dict) -> tuple[np.ndarray, dict]:
-    """Repeat an Andrey FCI fit in this process, untimed, recording its possible-d-sep sets."""
+    """Repeat an Andrey FCI fit in this process, untimed, recording its possible-d-sep sets.
+
+    The step searches the sets of both endpoints of every pair it keeps, so fewer calls than twice
+    the adjacencies of the fit mean :func:`possible_dsep_sizes` missed some; that raises
+    ``RuntimeError`` rather than record sizes it did not see.
+    """
     solution = adapter(arm)
     solution.setup()
     with possible_dsep_sizes() as seen:
         marks = np.ascontiguousarray(solution.fit(x, params))
+    kept = len(edge_list(marks))
+    if seen["calls"] < 2 * kept:
+        raise RuntimeError(
+            f"{arm}: {seen['calls']} possible-d-separation searches recorded for a fit that keeps "
+            f"{kept} adjacencies; the wrapper on andrey.constraint.fci._possible_dsep missed the "
+            "engine's calls"
+        )
     return marks, dict(seen)
 
 
