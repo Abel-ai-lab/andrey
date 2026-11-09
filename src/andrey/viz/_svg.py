@@ -4,8 +4,8 @@ Every mark is drawn by shape -- an arrowhead (``ARROW``), a hollow circle (``CIR
 tail (nothing) -- so the grammar is colorblind-safe and the emitted string is self-contained. A
 2-cycle is drawn as two parallel curved edges (feedback), distinct from a single double-headed
 bidirected edge (a latent confounder). An edge that would cross another node bends around it. An
-intervened node is a square, and a bar crosses each arrowhead into it, whether the intervention
-cuts that edge (hard) or keeps it (soft).
+intervened node is a square, and a cross marks the middle of each edge with an arrowhead into it,
+whether the intervention cuts that edge (hard) or keeps it (soft).
 """
 
 from __future__ import annotations
@@ -27,8 +27,7 @@ PAD = 32.0  # canvas padding
 GLOW_W = 4.0 * SW  # the soft accent stroke under a highlighted endpoint's half of the edge
 CLEAR = NODE_R + 4.0  # minimum distance from an edge to a node it does not join
 HALF = 11.5  # half the side of an intervened node's square, about a node circle's area
-BAR = AW + 2.0  # half the length of the bar across an edge into an intervened node
-BAR_GAP = 4.0  # from an arrowhead's base to the bar
+CUT = AW + 1.0  # half the length of each stroke of the cross on an edge into an intervened node
 _BEND_STEP = NODE_R
 _BEND_STEPS = 8
 _SAMPLES = 16  # line segments approximating an arc for the clearance check
@@ -119,15 +118,19 @@ def _reach(ux: float, uy: float, square: bool) -> float:
     return HALF / max(abs(ux), abs(uy), 1e-9)
 
 
-def _bar(px: float, py: float, ux: float, uy: float, color: str) -> str:
-    """Draw the bar across an edge into an intervened node, ``(px, py)`` on its boundary."""
-    cx, cy = px + ux * (ALEN + BAR_GAP), py + uy * (ALEN + BAR_GAP)
-    nx, ny = -uy * BAR, ux * BAR
-    return (
-        f'<line class="intervention" x1="{_f(cx + nx)}" y1="{_f(cy + ny)}" '
-        f'x2="{_f(cx - nx)}" y2="{_f(cy - ny)}" stroke="{color}" stroke-width="{SW}" '
-        'stroke-linecap="round"/>'
-    )
+def _cut(cx: float, cy: float, ux: float, uy: float, color: str) -> str:
+    """Draw the cross on an edge into an intervened node, centered on ``(cx, cy)``.
+
+    ``(ux, uy)`` is the edge's direction there; each stroke lies 45 degrees off it.
+    """
+    strokes = []
+    for sx, sy in ((ux - uy, uy + ux), (ux + uy, uy - ux)):
+        sx, sy = sx * CUT / math.sqrt(2), sy * CUT / math.sqrt(2)
+        strokes.append(
+            f'<line x1="{_f(cx - sx)}" y1="{_f(cy - sy)}" x2="{_f(cx + sx)}" y2="{_f(cy + sy)}" '
+            f'stroke="{color}" stroke-width="{SW}" stroke-linecap="round"/>'
+        )
+    return '<g class="intervention">' + "".join(strokes) + "</g>"
 
 
 def _glyph(mark: int) -> str:
@@ -183,7 +186,8 @@ def _edge(
     A highlighted end lights its half of the edge: a soft, wide accent stroke under the edge, the
     half itself in the accent color and a little heavier, and the mark in the accent color. Every
     width scales with the drawing, so the highlight keeps its proportions at any size. An end at
-    an intervened node (``square``) meets its square, and an arrowhead there gets the bar.
+    an intervened node (``square``) meets its square, and an arrowhead there puts a cross on the
+    edge's middle.
     """
     mx, my = _control(ax, ay, bx, by, bend)
     ends = []
@@ -214,8 +218,13 @@ def _edge(
     for (px, py, ux, uy, mark, lit), sq in zip(ends, square):
         fill = palette.accent if lit else color
         parts.append(_head(px, py, ux, uy, _glyph(mark), fill, palette.surface))
-        if sq and mark == ARROW:
-            parts.append(_bar(px, py, ux, uy, color))
+    if any(sq and end[4] == ARROW for end, sq in zip(ends, square)):
+        (pax, pay, *_), (pbx, pby, *_) = ends
+        length = math.hypot(pbx - pax, pby - pay) or 1.0
+        # The middle of the arc, where a highlighted half ends; the tangent there is parallel to
+        # the chord between the ends.
+        cx, cy = (pax + 2 * mx + pbx) / 4, (pay + 2 * my + pby) / 4
+        parts.append(_cut(cx, cy, (pbx - pax) / length, (pby - pay) / length, color))
     return "".join(parts)
 
 
@@ -341,7 +350,8 @@ def render(
     """Emit the full SVG string. Optional background, then edges, then nodes on top.
 
     ``highlight`` holds ``(node, neighbor)`` pairs: the mark at ``node`` on that edge is lit.
-    ``targets`` holds the intervened nodes: squares, with a bar across each arrowhead into them.
+    ``targets`` holds the intervened nodes: squares, with a cross on the middle of each edge with an
+    arrowhead into them.
     """
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '

@@ -69,10 +69,9 @@ def to_graphviz(
         Graphviz graph attributes, such as ``{"rankdir": "TB", "nodesep": 0.5}``. Causes run left
         to right (``rankdir="LR"``) unless ``options`` says otherwise.
     targets : iterable of int or str, default=()
-        The intervened variables, named by label or by 0-based position, marked as
-        :func:`~andrey.viz.draw` marks them. Each is a ``square`` node, and each arrowhead into it
-        is ``normaltee``, an arrowhead with a bar behind it. A target no arrowhead points into is
-        marked by its square alone. The default marks none.
+        The intervened variables, named by label or by 0-based position, drawn as ``square``
+        nodes, as :func:`~andrey.viz.draw` draws them. Graphviz marks only the ends of an edge,
+        so the cross ``draw`` puts on each edge into a target is left out. The default marks none.
 
     Returns
     -------
@@ -103,12 +102,6 @@ def to_graphviz(
     for k in range(n):
         graph.add_node(str(k), label=labels[k], **({"shape": "square"} if k in marked else {}))
     for i, j, attrs in structure._dot_edges():
-        # j holds an arrowhead unless the edge is undirected; i holds one only with dir="both".
-        head = attrs.get("arrowhead", "none" if attrs.get("dir") == "none" else "normal")
-        if i != j and j in marked and head == "normal":
-            attrs["arrowhead"] = "normaltee"
-        if i != j and i in marked and attrs.get("arrowtail") == "normal":
-            attrs["arrowtail"] = "normaltee"
         graph.add_edge(str(i), str(j), **attrs)
     return graph
 

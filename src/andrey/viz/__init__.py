@@ -305,10 +305,10 @@ def draw(
     targets : iterable of int or str, default=()
         The intervened variables, named by label or by 0-based position: the variables an
         experiment set from outside, such as the targets of ``do(x)`` or of a soft intervention.
-        Each is drawn as a square, and a bar crosses each arrowhead into it: a hard intervention
-        cuts that edge, and a soft one keeps it, under the same marks. A target no arrowhead points
-        into is marked by its square alone. A latent target keeps its dashed ring on the square.
-        The default marks none.
+        Each is drawn as a square, and a cross marks the middle of each edge with an arrowhead
+        into it: a hard intervention cuts that edge, and a soft one keeps it, under the same marks.
+        A target no arrowhead points into is marked by its square alone. A latent target keeps its
+        dashed ring on the square. The default marks none.
 
     Returns
     -------

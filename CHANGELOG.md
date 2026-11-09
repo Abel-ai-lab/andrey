@@ -12,14 +12,16 @@ names its pull request.
 
 ### Added
 
-- `andrey.viz.to_graphviz(structure, targets=)` marks the intervened variables as `draw` does,
-  named by label or by position: each is a `square` node, and each arrowhead into it is
-  `normaltee`, an arrowhead with a bar behind it. ([#806])
+- `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
+  by position, as `square` nodes, as `draw` does. ([#806])
+- The graph types guide has a section, "Reading a drawing", with a legend of every mark `draw`
+  uses. ([#806])
 
 ### Changed
 
-- `andrey.viz.draw` marks a target that no arrowhead points into by its square alone; it drew a
-  short barred arrow from outside into it. ([#806])
+- `andrey.viz.draw` marks each edge with an arrowhead into an intervened variable by a cross in
+  its middle, where it put a bar by the arrowhead, and marks a target that no arrowhead points
+  into by its square alone, where it drew a short barred arrow from outside into it. ([#806])
 
 ## [0.15.0] - 2026-11-08
 

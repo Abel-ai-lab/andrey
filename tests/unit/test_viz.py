@@ -530,19 +530,19 @@ def test_a_temporal_structure_is_drawn_one_graph_at_a_time(render):
         render(temporal)
 
 
-def _intervention_bars(svg: str) -> list[tuple[float, float]]:
-    """The midpoints of the bars across edges into intervened nodes."""
+def _intervention_cuts(svg: str) -> list[tuple[float, float]]:
+    """The centers of the crosses on edges into intervened nodes."""
     return [
         ((float(a) + float(c)) / 2, (float(b) + float(d)) / 2)
         for a, b, c, d in re.findall(
-            r'<line class="intervention" x1="([\d.-]+)" y1="([\d.-]+)" '
+            r'<g class="intervention"><line x1="([\d.-]+)" y1="([\d.-]+)" '
             r'x2="([\d.-]+)" y2="([\d.-]+)"',
             svg,
         )
     ]
 
 
-def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -> None:
+def test_an_intervened_node_is_a_square_with_a_cross_on_each_edge_into_it() -> None:
     # x -> y <- w, y -> z: intervening on y cuts both edges into it, not the edge out of it.
     g = _from(
         {(0, 1): (TAIL, ARROW), (3, 1): (TAIL, ARROW), (1, 2): (TAIL, ARROW)},
@@ -554,13 +554,19 @@ def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -
     svg = viz.draw(g, targets=["y"], positions=positions, engine="builtin")
     minidom.parseString(svg)
     assert svg.count('class="intervened"') == 1
-    bars = _intervention_bars(svg)
-    assert len(bars) == 2
+    cuts = _intervention_cuts(svg)
+    assert len(cuts) == 2
     square = re.search(r'<rect class="intervened" x="([\d.]+)" y="([\d.]+)"', svg)
     cx, cy = float(square[1]) + 11.5, float(square[2]) + 11.5
-    # Each bar sits just outside the square, on the side of the parent it cuts off.
-    for bx, by in bars:
-        assert 15 < np.hypot(bx - cx, by - cy) < 35 and bx < cx
+    parents = [
+        (float(x), float(y))
+        for x, y in re.findall(r'<circle cx="([\d.]+)" cy="([\d.]+)" r="13', svg)
+    ]
+    # Each cross marks the middle of an edge from a parent, x or w, not the edge out to z.
+    middles = [((px + cx) / 2, (py + cy) / 2) for px, py in parents if px < cx]
+    assert len(middles) == 2
+    for mx, my in middles:
+        assert min(np.hypot(bx - mx, by - my) for bx, by in cuts) < 4
 
 
 def test_a_target_no_arrowhead_points_into_is_a_square_alone() -> None:
@@ -597,21 +603,6 @@ def test_targets_must_name_a_variable(render, target) -> None:
         render(g, targets=[target])
 
 
-def test_to_graphviz_bars_an_arrowtail_into_a_target_and_never_a_circle() -> None:
-    pytest.importorskip("pygraphviz")
-    # x <-> y and y o-o w: x's end is an arrowhead, w's only end is a circle.
-    pag = _from({(0, 1): (ARROW, ARROW), (1, 3): (CIRCLE, CIRCLE)}, 4, "pag")
-    graph = viz.to_graphviz(pag, targets=[0, 3])
-    edges = {(a, b): dict(graph.get_edge(a, b).attr) for a, b in graph.edges()}
-    assert (edges[("0", "1")]["arrowtail"], edges[("0", "1")]["arrowhead"]) == (
-        "normaltee",
-        "normal",
-    )
-    assert (edges[("1", "3")]["arrowtail"], edges[("1", "3")]["arrowhead"]) == ("odot", "odot")
-    assert graph.get_node("3").attr["shape"] == "square"
-    assert len(edges) == 2
-
-
 _MARK_PAIRS = {
     "dag": [(TAIL, ARROW)],
     "cpdag": [(TAIL, ARROW), (ARROW, TAIL), (TAIL, TAIL)],
@@ -622,7 +613,7 @@ _MARK_PAIRS = {
 
 @pytest.mark.parametrize("kind", list(_MARK_PAIRS))
 @pytest.mark.parametrize("seed", range(4))
-def test_to_graphviz_marks_the_targets_draw_marks(kind, seed) -> None:
+def test_to_graphviz_and_draw_mark_the_same_targets(kind, seed) -> None:
     pytest.importorskip("pygraphviz")
     rng = np.random.default_rng(seed)
     choices = _MARK_PAIRS[kind]
@@ -635,19 +626,22 @@ def test_to_graphviz_marks_the_targets_draw_marks(kind, seed) -> None:
     targets = sorted(rng.choice(8, size=3, replace=False).tolist())
     graph = viz.to_graphviz(g, targets=[f"v{k}" for k in targets])
     svg = viz.draw(g, targets=targets, engine="builtin")
-    nodes = {str(k) for k in range(8)}
-    squares = [int(v) for v in graph.nodes() if v in nodes and v.attr["shape"] == "square"]
-    assert sorted(squares) == targets
-    # A bar at an arrowhead sits at the edge's head, one at an arrowtail at its tail.
-    bars = [
-        end
-        for a, b in graph.edges()
-        for end, key in ((b, "arrowhead"), (a, "arrowtail"))
-        if "tee" in (graph.get_edge(a, b).attr.get(key) or "")
+    squares = sorted(int(v) for v in graph.nodes() if v.attr["shape"] == "square")
+    assert squares == targets and svg.count('class="intervened"') == len(targets)
+    # Graphviz marks only an edge's ends, so the DOT edges are those of the unmarked graph.
+    plain = viz.to_graphviz(g)
+    assert [(a, b, dict(graph.get_edge(a, b).attr)) for a, b in graph.edges()] == [
+        (a, b, dict(plain.get_edge(a, b).attr)) for a, b in plain.edges()
     ]
-    assert all(int(end) in targets for end in bars)
-    assert len(bars) == len(_intervention_bars(svg))
-    assert set(graph.nodes()) == nodes
-    plain = viz.to_graphviz(g).to_string()
-    assert viz.to_graphviz(g, targets=()).to_string() == plain
-    assert "square" not in plain and "tee" not in plain
+    assert viz.to_graphviz(g, targets=()).to_string() == plain.to_string()
+    assert "square" not in plain.to_string()
+    # draw crosses each edge, other than a self-loop, with an arrowhead into a target.
+    into = 0
+    for a, b in plain.edges():
+        attr = plain.get_edge(a, b).attr
+        head = attr.get("arrowhead") or ("none" if attr.get("dir") == "none" else "normal")
+        tail = attr.get("arrowtail") or ""
+        into += a != b and (
+            (int(b) in targets and head == "normal") or (int(a) in targets and tail == "normal")
+        )
+    assert len(_intervention_cuts(svg)) == into
