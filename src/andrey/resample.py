@@ -1075,14 +1075,16 @@ def bootstrap(
     keep the vote, as in [6]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 
-    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle
-    or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``, the
-    averaged graph is then the resample graph nearest the others, a graph the method returned: the
-    fit whose state of each pair the most fits share, summed over the pairs, which is the fit with
-    the least mean structural Hamming distance to the others. Only a resample that is a valid graph
-    of the method's kind can be that fit: a ``cpdag`` with a consistent DAG extension, or a PAG that
-    passes the steps above, because a method can return a graph labeled ``cpdag`` that no DAG
-    extends (``pc`` leaves conflicting orientations undirected). A warning says so, and
+    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle,
+    its undirected edges a chordless cycle of four or more nodes, or a bidirected edge joins a node
+    to one of its descendants. With ``strict=False``, the averaged graph is then the resample graph
+    nearest the others, a graph the method returned: the fit whose state of each pair the most fits
+    share, summed over the pairs, which is the fit with the least mean structural Hamming distance
+    to the others. Only a resample that is a valid graph of the method's kind can be that fit: a
+    ``cpdag`` with a consistent DAG extension, or a PAG that passes the steps above, because a
+    method can return a graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting
+    orientations undirected), or one labeled ``pag`` from which Zhang's construction builds no MAG
+    (``fci`` when test errors give results that no MAG fits). A warning says so, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is ``"vote"`` otherwise. When no
     resample is valid, a warning says so, the averaged graph is the resample nearest the others, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample_invalid"``. ``strict=True`` raises in both
