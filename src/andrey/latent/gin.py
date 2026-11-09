@@ -6,7 +6,8 @@ For a candidate group ``X`` of observed variables and the rest ``Z``, ``omega`` 
 singular vector of the smallest singular value of ``cov(Z, X)``, and ``e = X @ omega`` stands in
 for the group's noise. ``e`` is independent of every variable in ``Z`` when ``X`` is a pure
 cluster, one whose members share a single latent parent; the per-variable gamma-HSIC p-values are
-pooled by Fisher's method. Clusters grow by size and merge when they overlap. The latents are then
+pooled by Fisher's method, each through its logarithm, which stays finite where the p-value
+underflows to ``0``. Clusters grow by size and merge when they overlap. The latents are then
 ordered one root at a time (Xie et al. 2020, Proposition 4 and Algorithm 2): a cluster is a root
 when its ``e``, built with each other remaining cluster in turn and given the clusters already
 ordered, passes the pooled test at ``alpha`` for every one of them. Each of those tests runs once
@@ -30,13 +31,14 @@ Each column's HSIC kernel matrix is built once per fit and reused by every test,
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from itertools import combinations, count, islice
 
 import numpy as np
 from scipy.special import gammaincc
 
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_log_p
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -60,16 +62,18 @@ class GINResult:
     unordered: list[list[int]]
 
 
-def _fisher_combine(pvals: list[float]) -> float:
-    """Pool p-values by Fisher's method, returning the combined right-tail p-value.
+#: Smallest positive normal float64, to which a pooled p-value is raised before its logarithm.
+_TINY = float(np.finfo(np.float64).tiny)
+
+
+def _fisher_combine(log_pvals: list[float]) -> float:
+    """Pool p-values, given as their natural logarithms, by Fisher's method; return the combined
+    right-tail p-value.
 
     The statistic ``-2 sum(log p)`` over ``c`` p-values is chi-square with ``2c`` degrees of
-    freedom under independence. A p-value below the smallest positive normal float64 is raised to
-    it, so its logarithm stays finite.
+    freedom under independence.
     """
-    clipped = np.clip(np.asarray(pvals, dtype=np.float64), np.finfo(np.float64).tiny, None)
-    statistic = -2.0 * float(np.sum(np.log(clipped)))
-    return float(gammaincc(len(clipped), 0.5 * statistic))
+    return float(gammaincc(len(log_pvals), -float(np.sum(log_pvals))))
 
 
 def _surrogate(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) -> np.ndarray:
@@ -95,8 +99,7 @@ def _independence_pvalue(
     surrogate's is built here.
     """
     e_gram = gamma_gram(_surrogate(data, cov, x, z))
-    pvals = [hsic_gamma_from_grams(grams[j], e_gram, data.shape[0])[1] for j in z]
-    return _fisher_combine(pvals)
+    return _fisher_combine([hsic_gamma_log_p(grams[j], e_gram, data.shape[0]) for j in z])
 
 
 def _merge_overlapping(groups: list[tuple[int, ...]]) -> list[list[int]]:
@@ -159,17 +162,18 @@ def _root_pvalue(
     The test runs once per member, as many times as the largest of these clusters has members.
     Run ``k`` builds the surrogate from member ``k`` of the candidate, of ``other``, and of every
     ordered cluster, counting modulo each cluster's size, against the candidate's other members and
-    member ``k + 1`` of every ordered cluster. Each run's pooled p-value enters Fisher's method.
+    member ``k + 1`` of every ordered cluster. Each run's pooled p-value enters Fisher's method, a
+    p-value below the smallest positive normal float64 raised to it, so its logarithm stays finite.
     """
     runs = max(len(cluster) for cluster in [candidate, other, *ordered])
-    pvals = []
+    log_pvals = []
     for k in range(runs):
         member = candidate[k % len(candidate)]
         x = [member, other[k % len(other)]] + [prefix[k % len(prefix)] for prefix in ordered]
         z = [m for m in candidate if m != member]
         z += [prefix[(k + 1) % len(prefix)] for prefix in ordered]
-        pvals.append(_independence_pvalue(data, cov, grams, x, z))
-    return _fisher_combine(pvals)
+        log_pvals.append(math.log(max(_independence_pvalue(data, cov, grams, x, z), _TINY)))
+    return _fisher_combine(log_pvals)
 
 
 def _find_root(

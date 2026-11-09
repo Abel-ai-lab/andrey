@@ -18,13 +18,21 @@ def test_pnl_matches_the_recorded_output():
     assert_recorded_output(out, "PNL", case="anm_pair_cubic")
 
 
-def test_a_zero_pvalue_tie_is_broken_by_the_statistic():
-    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
-    # and both p-values round to zero; the smaller HSIC statistic over its null mean decides.
-    from andrey.api.irregular import anm as anm_facade
+@pytest.mark.parametrize("method", ["anm", "pnl"])
+def test_equal_p_values_are_broken_by_the_statistic(method, monkeypatch):
+    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits.
+    # Both tests' p-values are set to one value below the smallest double here, so they read zero
+    # and tie, and the smaller HSIC statistic over its null mean decides.
+    import importlib
 
+    from andrey.api import irregular
+
+    module = importlib.import_module(f"andrey.irregular.{method}")
+    name = "hsic_statistic_log_p" if method == "anm" else "_gamma_test"
+    test = getattr(module, name)
+    monkeypatch.setattr(module, name, lambda *args: (test(*args)[0], -1000.0))
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
-    out = anm_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
+    out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
     p, stat = out.metadata["p_values"], out.metadata["statistics"]
     assert p["forward"] == p["backward"] == 0.0
     assert stat["forward"] != stat["backward"]
@@ -32,16 +40,18 @@ def test_a_zero_pvalue_tie_is_broken_by_the_statistic():
     assert out.structure.oriented_edges() == [(*edge, "directed")]
 
 
-def test_pnl_orients_a_circle_whose_p_values_both_round_to_zero_by_its_statistic():
-    # Both directions' p-values, near 1e-48 and 1e-50, round to zero as ``1 - P``, so the smaller
-    # statistic orients this circle 1 -> 0; p-values that kept those digits would orient it 0 -> 1.
+def test_the_larger_p_value_decides_far_below_1e_16():
+    # Neither direction fits a noiseless circle, and both p-values lie far below 1e-16, where they
+    # keep their digits: the larger one orients the edge, against the order of the statistics.
     from andrey.api.irregular import pnl as pnl_facade
 
     angle = np.pi * np.random.default_rng(7).uniform(-1, 1, 200)
     out = pnl_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
-    p = out.metadata["p_values"]
-    assert p["forward"] == p["backward"] == 0.0
-    assert out.structure.oriented_edges() == [(1, 0, "directed")]
+    p, stat = out.metadata["p_values"], out.metadata["statistics"]
+    assert 0.0 < min(p.values()) < max(p.values()) < 1e-16
+    forward = p["forward"] > p["backward"]
+    assert forward == (stat["forward"] > stat["backward"])
+    assert out.structure.oriented_edges() == [((0, 1) if forward else (1, 0)) + ("directed",)]
 
 
 def test_pnl_draws_no_edge_when_the_statistics_tie_too():
@@ -138,7 +148,7 @@ def test_anm_matches_scikit_learns_own_search():
             warnings.simplefilter("ignore", ConvergenceWarning)
             gp = GaussianProcessRegressor(kernel=_kernel()).fit(cause, effect)
         expected.append(hsic_test(cause, effect - gp.predict(cause).reshape(-1, 1)))
-    assert np.allclose(anm(x[:, 0], x[:, 1])[:2], expected, rtol=0, atol=1e-8)
+    assert np.allclose(np.exp(anm(x[:, 0], x[:, 1])[:2]), expected, rtol=0, atol=1e-8)
 
 
 def test_anm_names_the_planted_direction_in_any_units_and_column_order():

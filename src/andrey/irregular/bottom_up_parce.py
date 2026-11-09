@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.special import gammainc
 
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.core.units import unit_factors
 from andrey.lingam import adjacency
@@ -57,8 +57,9 @@ def _fisher_hsic_test(
     :mod:`andrey.core.independence`. The predictor grams are cached (they are fixed data columns);
     only the residual's gram is built here, once, and reused across predictors. Returns
     ``(fisher_p, fisher_stat)``. One predictor short-circuits to its HSIC ``(p, stat)``. Otherwise
-    ``fisher_stat = sum_k -2 log(p_k)`` and ``fisher_p`` is its upper chi-squared tail on
-    ``2 * n_predictors`` degrees of freedom (a zero HSIC p-value sends ``fisher_stat`` to infinity).
+    ``fisher_stat = sum_k -2 log(p_k)``, each ``log(p_k)`` from :func:`hsic_gamma_log_p`, finite
+    where ``p_k`` underflows to ``0``, and ``fisher_p`` is its upper chi-squared tail on
+    ``2 * n_predictors`` degrees of freedom.
 
     ``bound`` is the smallest Fisher statistic seen so far in the current sink search, rounded to
     ``KEY_DP`` decimals. Because the running sum only grows (each ``-2 log(p_k) >= 0``), once it
@@ -74,8 +75,7 @@ def _fisher_hsic_test(
 
     fisher_stat = 0.0
     for gram in predictor_grams:
-        _, p_value = hsic_gamma_from_grams(gram, residual_gram, n)
-        fisher_stat += np.inf if p_value == 0 else -2 * np.log(p_value)
+        fisher_stat -= 2 * hsic_gamma_log_p(gram, residual_gram, n)
         if round(fisher_stat, KEY_DP) > bound:
             break
     fisher_p = 1 - gammainc(len(predictor_grams), 0.5 * fisher_stat)

@@ -74,6 +74,26 @@ def test_pairwise_breaks_a_pvalue_tie_by_the_statistic(
     assert out.structure.oriented_edges() == expected
 
 
+# (log_p_forward, log_p_backward, alpha) -> the edge, with both p-values 0 and the statistics
+# favoring the forward direction; None for no edge.
+LOG_P = [
+    (-900.0, -800.0, None, (1, 0)),  # the logarithms order p-values that read 0
+    (-800.0, -900.0, None, (0, 1)),
+    (-900.0, -900.0, None, (0, 1)),  # equal logarithms: the statistics decide
+    (-900.0, -800.0, 0.05, None),  # with a level, only the p-values decide
+]
+
+
+@pytest.mark.parametrize(("log_f", "log_b", "alpha", "edge"), LOG_P)
+def test_pairwise_compares_the_logarithms_of_p_values(log_f, log_b, alpha, edge):
+    out = pairwise_output(
+        0.0, 0.0, stat_forward=16.3, stat_backward=17.0, log_p=(log_f, log_b), alpha=alpha
+    )
+    expected = [] if edge is None else [(*edge, "directed")]
+    assert out.structure.oriented_edges() == expected
+    assert out.metadata["p_values"] == {"forward": 0.0, "backward": 0.0}
+
+
 def test_pairwise_keeps_the_statistics_as_floats(tmp_path):
     out = pairwise_output(
         np.array([0.0]), 0.0, stat_forward=np.float64(17.0), stat_backward=np.array([16.3])

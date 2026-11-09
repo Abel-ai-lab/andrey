@@ -7,6 +7,7 @@ Selected through ``indep_test="kci"`` and ``indep_test="rcot"``. Each test follo
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from functools import lru_cache
 
@@ -20,7 +21,7 @@ from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
 from .ci import _canonical_ranked, per_query
-from .independence import hsic_statistic_test
+from .independence import hsic_statistic_log_p
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
 
@@ -213,7 +214,7 @@ class KCI:
 
         ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
         conditioning sets. A statistic is relative to its mean under independence, as
-        :func:`~andrey.core.independence.hsic_statistic_test` reports it: near 1 for independent
+        :func:`~andrey.core.independence.hsic_statistic_log_p` reports it: near 1 for independent
         variables and larger the more dependent they are; ``0`` for a constant variable.
         """
         return per_query(self._statistic_pvalue, x, y, conditions)
@@ -227,7 +228,8 @@ class KCI:
         if not (np.ptp(data[:, x_int]) > 0.0 and np.ptp(data[:, y_int]) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
         if not cond:
-            return hsic_statistic_test(data[:, x_int], data[:, y_int])
+            statistic, log_p = hsic_statistic_log_p(data[:, x_int], data[:, y_int])
+            return statistic, math.exp(log_p)
 
         width = self._width(len(cond))
         z = data[:, cond]
