@@ -17,6 +17,7 @@ import pytest
 
 import andrey
 from andrey import data
+from andrey.core import GraphStructure
 from andrey.core.ci_missing import EM_METHODS
 from andrey.core.score import CopiedColumnsError
 from andrey.data import missingness
@@ -136,8 +137,29 @@ def test_with_a_fixed_graph_each_iteration_raises_the_observed_data_log_likeliho
 
     _, record = structural_em(np.asarray(sample.data), lambda cov: (None, truth))
     loglik = record["log_likelihood"]
-    assert record["iterations"] == ITERATIONS == len(loglik)
+    assert ITERATIONS == 10
+    assert record["iterations"] == 10 == len(loglik)
     assert all(b >= a - 1e-9 for a, b in zip(loglik, loglik[1:], strict=False))
+    assert loglik[-1] > loglik[0] + 100.0  # 423 on these data
+
+
+def test_with_only_the_child_missing_em_reaches_the_complete_case_regression():
+    # With x always observed and y missing completely at random, the maximum-likelihood
+    # regression of y on x is the least-squares fit on the rows that observe y (Little and Rubin
+    # 2019, Section 7.2), the fixed point the refit of each round converges to.
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(200)
+    X = np.column_stack([x, 0.8 * x + 0.6 * rng.standard_normal(200)])
+    X[rng.random(200) < 0.3, 1] = nan
+    graph = GraphStructure.from_numpy(np.array([[0, 1], [2, 0]]), kind="dag")  # x -> y
+    covs = []
+    structural_em(X, lambda cov: (covs.append(cov), graph))
+    rows = ~np.isnan(X[:, 1])
+    slope, intercept = np.polyfit(X[rows, 0], X[rows, 1], 1)
+    residual = X[rows, 1] - slope * X[rows, 0] - intercept
+    B, omega = fit_dag(np.array([[False, True], [False, False]]), covs[-1])
+    assert B[0, 1] == pytest.approx(slope, rel=1e-4)  # 0.80; 0.58 on the first round's covariance
+    assert omega[1] == pytest.approx(residual.var(), rel=1e-4)
 
 
 @pytest.mark.parametrize("name", EM_METHODS)
@@ -157,7 +179,7 @@ def test_a_fit_on_missing_values_records_its_handling_and_repeats(name):
     assert first == again
     assert first.metadata["missing"] == "em"
     record = first.metadata["em"]
-    assert record["iterations"] == ITERATIONS == len(record["log_likelihood"])
+    assert record["iterations"] == 10 == len(record["log_likelihood"])
 
 
 @pytest.mark.parametrize("name", EM_METHODS)
@@ -172,6 +194,29 @@ def test_a_handling_the_method_does_not_list_raises_naming_the_argument(name):
     fit = _method(name)
     with pytest.raises(ValueError, match=rf"^{name}: missing must be one of 'em'"):
         fit(_gaps(_chain(), 0.1), missing="testwise")
+
+
+@pytest.mark.parametrize("name", CORE)
+def test_a_row_that_observes_no_value_changes_no_fit(name):
+    fit = _method(name)
+    x = _gaps(_chain(), 0.1)
+    padded = np.insert(x, [0, 150, 150], nan, axis=0)
+    assert fit(padded, missing="em") == fit(x, missing="em")
+
+
+def test_the_refusal_names_em_only_where_em_would_run():
+    x = _gaps(_chain(), 0.1)
+    codes = np.round(np.abs(x))
+    frame = pd.DataFrame(codes, columns=list("abcde")).astype("category")
+    for call in (
+        lambda: andrey.ges(codes, score_func="bdeu"),
+        lambda: andrey.hc(frame),
+        lambda: andrey.ges(x, env=np.repeat([0, 1], 200)),
+        lambda: andrey.direct_lingam(x),
+    ):
+        with pytest.raises(ValueError, match=r"does not accept missing values") as error:
+            call()
+        assert 'missing="em"' not in str(error.value)
 
 
 @pytest.mark.parametrize("name", ["ges", "xges", "hc", "tabu", "exact_search", "boss", "grasp"])

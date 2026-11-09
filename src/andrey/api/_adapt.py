@@ -47,11 +47,12 @@ def _listed(names: Sequence[str]) -> str:
 #: The ways on that a refusal of missing values names, for a table of independent rows, ``{name}``
 #: the data's argument; for one time series, whose steps cannot be dropped; and for a panel.
 DROP_ROWS = (
-    "drop the rows that hold one (for a DataFrame, {name}.dropna()), use a method that deletes "
+    "drop the rows that hold one (for a DataFrame, {name}.dropna()), or use a method that deletes "
     f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
-    f'{_listed(TESTWISE_SERIES_METHODS)}; or pass missing="em" to {_listed(EM_METHODS)}'
+    f"{_listed(TESTWISE_SERIES_METHODS)}"
 )
-#: The way on of a method that takes ``missing="em"`` and was called without it.
+#: The way on of a call that ``missing="em"`` would run: a method that takes it, on continuous data
+#: under the linear-Gaussian BIC and without ``env``.
 FIT_BY_EM = (
     'pass missing="em" (experimental), which fits the method by expectation-maximization over '
     "the expected covariance, or drop the rows that hold one (for a DataFrame, {name}.dropna())"
@@ -82,7 +83,10 @@ def data_matrix(
 
     ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
     delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
-    constant on its observed values, or with none, raises. Without it, a missing value raises,
+    constant on its observed values, or with none, raises. For a method that fits by structural EM
+    (``missing="em"``), a row that observes no value is dropped: it holds no information on the
+    model, and in the E-step it would count as a row and add the model's whole covariance to the
+    expected covariance. Without ``missing``, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
     :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
 
@@ -110,6 +114,8 @@ def data_matrix(
     finite = np.isfinite(X)
     if not finite.all():
         X = _missing_values(data, X, finite, name=name, method=method, missing=missing, fix=fix)
+        if method in EM_METHODS:
+            X = X[~np.isnan(X).all(axis=1)]
         spread = np.nanmax(X, axis=0) - np.nanmin(X, axis=0)
     else:
         spread = np.ptp(X, axis=0)
@@ -208,8 +214,6 @@ def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) ->
     """
     who = "this method" if method is None else method
     base = name.split("[")[0]
-    if method in EM_METHODS and fix == DROP_ROWS:
-        fix = FIT_BY_EM
     return (
         f"{who} does not accept missing values, and {name} {where}; {fix.format(name=base)} (see "
         "Missing values in the getting-started guide)"
@@ -373,6 +377,7 @@ def checked_data(
     index_categorical: bool = False,
     method: str | None = None,
     missing: bool = False,
+    takes_em: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Return ``data`` checked for the setting ``option=value``, and its categorical-column mask.
 
@@ -384,7 +389,10 @@ def checked_data(
     gets :func:`data_matrix`'s checks and a one-time :class:`~andrey.DataTypeWarning` naming the
     columns that look like category codes (:func:`warn_category_codes`). The mask is ``None``
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
-    and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
+    and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value. With
+    ``takes_em``, the call would run with ``missing="em"`` on continuous data, so there a refused
+    missing value names it (:data:`FIT_BY_EM`); categorical and mixed data, which EM does not take,
+    get :data:`DROP_ROWS`.
 
     Raises ``ValueError`` when two columns share a name
     (:func:`~andrey.core.structure.column_labels`), when ``categorical`` lists a column ``data``
@@ -423,7 +431,13 @@ def checked_data(
         )
         check_categories(X, data, setting)
         return X, None
-    X = data_matrix(data, method=method, missing=missing, reads_categories=True)
+    X = data_matrix(
+        data,
+        method=method,
+        missing=missing,
+        fix=FIT_BY_EM if takes_em else DROP_ROWS,
+        reads_categories=True,
+    )
     what = "test" if option == "indep_test" else "score"
     warn_category_codes(
         X,
@@ -445,12 +459,14 @@ def fit_inputs(
     method: str,
     missing: bool = False,
     index_categorical: bool = False,
+    takes_em: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None, tuple[str, ...] | None, Constraints | None]:
     """Return a fit's data matrix, its categorical-column mask, its column labels, and knowledge.
 
     The data are checked for the setting ``option=value`` (:func:`checked_data`, with
-    ``index_categorical``, ``method``, and ``missing``), and ``knowledge`` is resolved against
-    their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those raise, in that order.
+    ``index_categorical``, ``method``, ``missing``, and ``takes_em``), and ``knowledge`` is
+    resolved against their columns (:func:`~andrey.core.knowledge.resolve`). Raises what those
+    raise, in that order.
     """
     X, mask = checked_data(
         data,
@@ -460,6 +476,7 @@ def fit_inputs(
         index_categorical=index_categorical,
         method=method,
         missing=missing,
+        takes_em=takes_em,
     )
     labels = column_labels(data)
     return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
@@ -629,6 +646,7 @@ def cpdag_search(
         missing=missing == EM,
         # One environment adds no index column (index_column), so it is not a categorical one.
         index_categorical=index is not None and np.ptp(index) > 0,
+        takes_em=env is None,
     )
     if "n_perturbations" in settings and settings["n_perturbations"] is None:
         settings["n_perturbations"] = X.shape[1]  # one change per data variable

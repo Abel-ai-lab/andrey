@@ -502,7 +502,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     else:
         assert "drop the rows that hold one" in str(error.value)
         assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
-        assert 'or pass missing="em" to ges, xges' in str(error.value)
+        assert 'missing="em"' not in str(error.value)
 
 
 def test_a_refused_text_category_names_the_method():

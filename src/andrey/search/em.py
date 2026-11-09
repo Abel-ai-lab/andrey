@@ -173,7 +173,9 @@ def structural_em(
     ``X``, divided by the number of rows) and returns its result and the graph it learned, a DAG,
     CPDAG, or a CPDAG narrowed by knowledge. Returns the last M-step's result and the record
     ``{"iterations": iterations, "log_likelihood": [...]}``: the observed-data log-likelihood of
-    the model after each M-step, which can fall in a round that changes the graph.
+    the model after each M-step, which can fall in a round that changes the graph. A row that
+    observes no value counts in the number of rows and adds the model's covariance to the expected
+    covariance, so the facades drop such rows first (:func:`~andrey.api._adapt.data_matrix`).
     """
     if iterations < 1:
         raise ValueError(f"iterations must be at least 1, got {iterations}")
