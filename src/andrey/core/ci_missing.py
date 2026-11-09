@@ -71,6 +71,9 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
+#: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
+#: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
+MVPC = "mvpc"
 
 # The most bytes of row blocks the tests one TestwiseDeletion keeps for reuse hold together.
 _CACHE_BYTES = 1 << 27

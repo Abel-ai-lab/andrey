@@ -52,6 +52,11 @@ names its pull request.
   method's default handling, `"testwise"`, so no result changes; a value a method does not list
   raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
   values. ([#828])
+- `pc(missing="mvpc")`, experimental, runs Missing-Value PC (Tu et al., 2019) with the
+  permutation-based correction: after the test-wise skeleton, it finds the parents of each
+  missingness indicator and tests again, on virtual data that correct for them, the edges such an
+  indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
+  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
 
 ### Changed
 
@@ -2112,4 +2117,5 @@ First alpha release.
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#832]: https://github.com/Abel-ai-lab/andrey/pull/832
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
