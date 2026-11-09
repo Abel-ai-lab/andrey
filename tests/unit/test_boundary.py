@@ -17,7 +17,7 @@ from andrey.core import backend
 from andrey.spec import REGISTRY
 
 ROOT = Path(__file__).resolve().parents[2]
-PAIRS = ("anm", "pnl")
+PAIRS = ("anm", "pnl", "loci")
 
 
 def _capped() -> list[str]:

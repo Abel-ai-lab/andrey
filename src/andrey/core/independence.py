@@ -18,6 +18,9 @@ underflows to ``0``.
   the p-value, the second the p-value's logarithm. RESIT and CAM-UV run the same test through
   :func:`hsic_log_p` on each side's joint distances with two settings of their own: the
   bandwidth's median over every row (:func:`hsic_gram`) and the variance's product form.
+  :func:`hsic_median_statistic_log_p`, used by LOCI, reads the median over every row with the
+  bias-corrected variance, and returns the statistic, divided by its null mean, with the p-value's
+  logarithm.
 
 References
 ----------
@@ -384,6 +387,34 @@ def hsic_log_p(gram_x: Gram, gram_y: Gram, method: str) -> float:
             "from these data"
         )
     return log_p
+
+
+def hsic_median_statistic_log_p(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Return ``(T / mean, log_p)`` of the gamma HSIC between ``x`` and ``y``, its bandwidths the
+    median distance over every row.
+
+    Each variable is centered and passed to :func:`gamma_gram` with ``median_rows=None``; the test
+    is :func:`hsic_gamma_log_p`'s with the bias-corrected variance. ``T / mean`` is the statistic
+    ``T = sum(Kxc * Kyc) / n`` divided by its mean under independence, the gamma law's
+    ``shape * scale = 1 + mu_x mu_y - mu_x - mu_y``: near 1 for independent variables and larger
+    the more dependent they are.
+
+    Raises
+    ------
+    FloatingPointError
+        If the test's value is not finite, so that no choice rests on it.
+    """
+    sides = (_as_columns(x), _as_columns(y))
+    grams = [gamma_gram(side - side.mean(axis=0), median_rows=None) for side in sides]
+    n = grams[0][0].shape[0]
+    statistic, log_p = _statistic_log_p(grams[0], grams[1], n, "bias_corrected")
+    if not math.isfinite(log_p):
+        raise FloatingPointError(
+            "an HSIC test gave a non-finite p-value; the kernels could not be computed from these "
+            "data"
+        )
+    (_, mu_x), (_, mu_y) = grams
+    return statistic / (1 + mu_x * mu_y - mu_x - mu_y), log_p
 
 
 def _sum_of_squares(gram: Gram) -> float:

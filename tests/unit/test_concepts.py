@@ -371,6 +371,7 @@ UNIT_CASES = {
     "bottom_up_parce_lingam": "confounded_fork_4v",
     "anm": "anm_pair_cubic",
     "pnl": "anm_pair_cubic",
+    "loci": "lsnm_pair",
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "camuv": "nonmonotone_4v",

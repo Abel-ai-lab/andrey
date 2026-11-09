@@ -171,7 +171,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl`, `icp` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl`, `loci`, `icp` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |

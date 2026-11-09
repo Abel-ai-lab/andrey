@@ -1,0 +1,36 @@
+{
+  "algorithm": "LOCI",
+  "case": "lsnm_pair",
+  "input": {
+    "case": "lsnm_pair",
+    "column_order": [
+      0,
+      1
+    ],
+    "seed": 20261108,
+    "sha256": "b5672fabbda6e8003f9509eca7e99931b31ac74164c71415018f7b8d1f68be44",
+    "shape": [
+      500,
+      2
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "ll_backward": -0.9250871571754953,
+    "ll_forward": -0.7194760774709305,
+    "pval_backward": 8.306047497359341e-08,
+    "pval_forward": 0.9071898238235119,
+    "stat_backward": 5.0283063860061645,
+    "stat_forward": 0.49998342765121123
+  },
+  "schema_version": 3
+}

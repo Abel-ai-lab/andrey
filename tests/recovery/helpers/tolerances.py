@@ -173,6 +173,19 @@ SPEC: dict[str, dict] = {
             "stat_backward": {"atol": 1e-6, "rtol": 1e-5},
         },
     },
+    # LOCI: the decided graph, both p-values and statistics, and both models' log-likelihoods. The
+    # Newton fit stops on a change of 1e-6 in its mean objective, so the fit's numbers get ANM's
+    # tolerance.
+    "LOCI": {
+        "structural": ["graph"],
+        "numeric": {
+            field: {"atol": 1e-4, "rtol": 1e-4}
+            for field in (
+                *("pval_forward", "pval_backward", "stat_forward", "stat_backward"),
+                *("ll_forward", "ll_backward"),
+            )
+        },
+    },
     "RCD": {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
