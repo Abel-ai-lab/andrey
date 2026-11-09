@@ -3,8 +3,8 @@
 
 ``Knowledge`` takes three claims beyond edges and tiers: ``required_paths`` (``a`` is an ancestor
 of ``b``), ``forbidden_paths`` (``a`` is not), and ``confounded`` (a hidden common cause of ``a``
-and ``b``). No other package implements these rules for the CPDAG and PAG searches, so the lanes
-check them against exact answers and against the same fit without the claims.
+and ``b``). The lanes check them against exact answers, against the same fit without the claims,
+and against reference packages given the same knowledge.
 
 ``oracle`` runs the exactness lanes, with d-separation in place of the tests:
 
@@ -54,6 +54,26 @@ once as ``no_dataset`` and left out.
   ``prior_knowledge`` (context); linear with uniform noise, standardized; ``d`` 10, 20, 50; ``n``
   500, 2000; claims on 10 and 30 % of ordered pairs.
 
+``run --methods`` also fits the reference packages (:data:`REFERENCES`), each unmodified in its own
+environment, without knowledge and with the same true knowledge. tigramite's LPCMCI takes the
+claims as ``link_assumptions`` and lingam's DirectLiNGAM as ``prior_knowledge``. pcalg and Tetrad
+take edges and tiers, and no path claim between variables that are not adjacent, so each set of
+true claims is translated to the edges it implies (:func:`edge_claims`): a forbidden path
+``a -> b`` forbids the edge ``a -> b``, a required path on a pair adjacent in the true graph is a
+required edge, and a required path on any other pair, or a confounded pair, has no edge form and is
+counted. Tetrad's PC, FGES, BOSS, FCI, GFCI, and BOSS-FCI take the edges as ``Knowledge``; pcalg's
+``pc`` keeps the required pairs adjacent with ``fixedEdges`` and directs its CPDAG with
+``addBgKnowledge``; pcalg's ``ges`` has no knowledge argument and is not run. Each method of the
+``cpdag`` and ``pag`` lanes takes the same edges as ``required`` and ``forbidden`` in its ``edges``
+arm, the like-for-like comparison. The references need ``ANDREY_BENCH_JAVA``,
+``ANDREY_BENCH_TETRAD_GIN_JAR`` (tetrad-lib 7.6.10), ``ANDREY_BENCH_TETRAD_JAR`` (causal-cmd, for
+GFCI), ``Rscript`` with pcalg on ``PATH``, and ``ANDREY_BENCH_TIGRAMITE_PYTHON``.
+
+``summarize`` also judges each method against each of its references on the same datasets
+(``reference_rows``, :func:`against_references`): the method's fit minus the reference's under the
+same knowledge, in ``dag_errors`` in ``cpdag`` and in ``errors`` elsewhere, with the same interval
+and the same rule for a worse cell; a reference's own change with knowledge is a row of ``rows``.
+
 ``summarize`` pairs each ``true`` fit with the ``bare`` fit of its dataset: the mean difference in
 ``errors``, and in ``cpdag`` in ``dag_errors`` too, with its 95 % interval over :data:`RESAMPLES`
 bootstrap resamples. A cell is ``worse`` when the interval lies above 0; a worse cell counts only
@@ -88,6 +108,8 @@ import json
 import multiprocessing
 import os
 import signal
+import subprocess
+import tempfile
 import time
 import warnings
 from datetime import datetime, timezone
@@ -140,6 +162,32 @@ LANES = {
         },
     },
 }
+#: The reference packages each method is judged against under the same knowledge, each run
+#: unmodified in its own environment. pcalg's ``ges`` has no knowledge argument, so GES has one
+#: reference.
+REFERENCES = {
+    "pc": ("pcalg.pc", "tetrad.pc"),
+    "ges": ("tetrad.ges",),
+    "boss": ("tetrad.boss",),
+    "fci": ("tetrad.fci",),
+    "gfci": ("tetrad.gfci",),
+    "boss_fci": ("tetrad.boss_fci",),
+    "lpcmci": ("tigramite.lpcmci",),
+    "direct_lingam": ("lingam.direct_lingam",),
+}
+#: The references that take a path claim as it is; the others take the edges it implies
+#: (:func:`edge_claims`).
+TAKES_PATHS = ("tigramite.lpcmci", "lingam.direct_lingam")
+#: The references a lane runs with ``--methods``, beside the methods it runs by default.
+LANE_REFERENCES = {
+    "cpdag": ("pcalg.pc", "tetrad.pc", "tetrad.ges", "tetrad.boss"),
+    "pag": ("tetrad.fci", "tetrad.gfci", "tetrad.boss_fci"),
+    "lpcmci": ("tigramite.lpcmci",),
+    "lingam": (),
+}
+ARMS = ("bare", "true", "edges", "false")
+#: The interpreter of tigramite's environment (``benchmarks/start_tigramite.sh``).
+TIGRAMITE_PYTHON = "ANDREY_BENCH_TIGRAMITE_PYTHON"
 #: The share of ordered pairs the false-claims arm states wrongly.
 FALSE_FRACTION = 0.1
 #: The cells outside a method's stated setting, by lane and method. GES suits sparse graphs: its
@@ -220,6 +268,51 @@ def knowledge_of(claims: dict[str, list]):
     from andrey import Knowledge
 
     return Knowledge(**{part: [tuple(c) for c in pairs] for part, pairs in claims.items() if pairs})
+
+
+def edge_claims(claims: dict[str, list], truth: np.ndarray) -> dict:
+    """The edge knowledge the true ``claims`` imply on the true graph ``truth``.
+
+    A forbidden path ``a -> b`` forbids the edge ``a -> b``. A required path on a pair adjacent in
+    ``truth`` is the required edge ``a -> b``; on any other pair it has no edge form, and neither
+    has a confounded pair. ``no_edge_form`` and ``confounded_no_edge_form`` count those.
+    """
+    adjacent = truth != NULL
+    required = [list(p) for p in claims.get("required_paths", []) if adjacent[p[0], p[1]]]
+    return {
+        "required": required,
+        "forbidden": [list(p) for p in claims.get("forbidden_paths", [])],
+        "no_edge_form": len(claims.get("required_paths", [])) - len(required),
+        "confounded_no_edge_form": len(claims.get("confounded", [])),
+    }
+
+
+def link_assumptions(claims: dict[str, list], d: int, tau_max: int) -> list[list]:
+    """tigramite's ``link_assumptions`` for lagged ``claims``, as ``[j, i, lag, link]`` rows.
+
+    Every link of the window is listed, since LPCMCI reads a missing one as absent: ``o?>`` at a
+    lag and ``o?o`` at lag 0 claim nothing. A required path ``[a, b, lag]`` puts a tail at ``a``
+    and an arrowhead at ``b``, a forbidden path an arrowhead at ``a``, and a confounded link drops
+    the ``?``, which states that the link is there.
+    """
+    left = {(a, b, k): "o" for a in range(d) for b in range(d) for k in range(tau_max + 1)}
+    sure = set()
+    for a, b, k in claims.get("required_paths", []):
+        left[a, b, k] = "-"
+        if k == 0:
+            left[b, a, 0] = "<"
+    for a, b, k in claims.get("forbidden_paths", []):
+        left[a, b, k] = "<"
+    for a, b, k in claims.get("confounded", []):
+        sure |= {(a, b, k), (b, a, k)} if k == 0 else {(a, b, k)}
+    flip = {"<": ">", "-": "-", "o": "o"}
+    rows = []
+    for (a, b, k), mark in left.items():
+        if a == b and k == 0:
+            continue
+        right = flip[left[b, a, 0]] if k == 0 else ">"
+        rows.append([b, a, -k, mark + ("-" if (a, b, k) in sure else "?") + right])
+    return rows
 
 
 def static_errors(est: np.ndarray, truth: np.ndarray, *, undirected_open: bool) -> dict[str, int]:
@@ -430,8 +523,19 @@ def _alarm(signum, frame):
     raise _Timeout
 
 
-def fit(method: str, data: np.ndarray, claims: dict | None, cell: dict, seed: int) -> dict:
-    """One fit: its status, its marks, and the clauses or unmet claims its metadata lists."""
+def fit(
+    method: str,
+    data: np.ndarray,
+    claims: dict | None,
+    cell: dict,
+    seed: int,
+    edges: dict | None = None,
+) -> dict:
+    """One fit: its status, its marks, and the clauses or unmet claims its metadata lists.
+
+    With ``edges`` (:func:`edge_claims`), the fit takes those required and forbidden edges and not
+    the path ``claims``.
+    """
     import andrey
     from andrey.core.knowledge import KnowledgeError
 
@@ -444,9 +548,23 @@ def fit(method: str, data: np.ndarray, claims: dict | None, cell: dict, seed: in
             if method == "lingam.direct_lingam":
                 marks = _lingam_reference(data, claims)
                 meta = {}
+            elif method == "tigramite.lpcmci":
+                marks = _tigramite_reference(data, claims, cell["tau_max"])
+                meta = {}
+            elif method == "pcalg.pc":
+                marks, unmet = _pcalg_reference(data, edges)
+                meta = {"unmet_knowledge": [None] * unmet}
+            elif method.startswith("tetrad."):
+                marks = _tetrad_reference(method, data, edges)
+                meta = {}
             else:
                 fn = getattr(andrey, method)
                 kwargs = {"knowledge": knowledge_of(claims)} if claims else {}
+                if edges is not None:
+                    kwargs["knowledge"] = andrey.Knowledge(
+                        required=[tuple(e) for e in edges["required"]],
+                        forbidden=[tuple(e) for e in edges["forbidden"]],
+                    )
                 if method == "lpcmci":
                     kwargs["tau_max"] = cell["tau_max"]
                 if "seed" in inspect.signature(fn).parameters:
@@ -496,6 +614,97 @@ def _lingam_reference(data: np.ndarray, claims: dict | None) -> np.ndarray:
     return marks
 
 
+def _cpdag_marks(adjacency: np.ndarray) -> np.ndarray:
+    from andrey_bench.contracts import structure_from_adjacency
+
+    graph = structure_from_adjacency(np.asarray(adjacency, dtype=np.int8), kind="cpdag")
+    return np.asarray(graph.to_numpy(), dtype=np.int8)
+
+
+def _tetrad_reference(method: str, data: np.ndarray, edges: dict | None) -> np.ndarray:
+    """Tetrad's search with the edges as its ``Knowledge``. Its FCI steps orient by knowledge only
+    without the rules for selection bias, so FCI and BOSS-FCI leave them out in every arm."""
+    from andrey_bench.adapters import tetrad_gfci, tetrad_search
+
+    adapter = {
+        "tetrad.pc": tetrad_search.TetradPC,
+        "tetrad.ges": tetrad_search.TetradFGES,
+        "tetrad.boss": tetrad_search.TetradBOSS,
+        "tetrad.fci": tetrad_search.TetradFCI,
+        "tetrad.boss_fci": tetrad_search.TetradBossFCI,
+        "tetrad.gfci": tetrad_gfci.TetradGFCI,
+    }[method]()
+    params = dict(adapter.params())
+    if method in ("tetrad.fci", "tetrad.boss_fci"):
+        params["excludeSelectionBias"] = True
+    if edges:
+        params.update(required=edges["required"], forbidden=edges["forbidden"])
+    native = adapter.fit(data, params)
+    return native if adapter.output_type == "pag" else _cpdag_marks(native)
+
+
+def _pcalg_reference(data: np.ndarray, edges: dict | None) -> tuple[np.ndarray, int]:
+    """pcalg's ``pc`` and ``addBgKnowledge`` (``andrey_bench/knowledge_pcalg.R``) in a fresh R
+    process: the CPDAG's marks and the number of edges pcalg could not apply."""
+    script = Path(__file__).parent / "andrey_bench" / "knowledge_pcalg.R"
+    with tempfile.TemporaryDirectory(prefix="andrey_bench_pcalg_") as tmp:
+        work = Path(tmp)
+        header = ",".join(f"x{j}" for j in range(data.shape[1]))
+        np.savetxt(work / "data.csv", data, delimiter=",", fmt="%.17g", header=header, comments="")
+        for part in ("required", "forbidden"):
+            rows = (edges or {}).get(part, [])
+            (work / f"{part}.csv").write_text("".join(f"{a},{b}\n" for a, b in rows))
+        files = [str(work / f) for f in ("data.csv", "required.csv", "forbidden.csv", "out.csv")]
+        done = subprocess.run(
+            ["Rscript", "--vanilla", str(script), *files, "0.05"], capture_output=True, text=True
+        )
+        if done.returncode != 0:
+            raise RuntimeError(f"knowledge_pcalg.R exited {done.returncode}: {done.stderr[-300:]}")
+        adjacency = np.loadtxt(work / "out.csv", delimiter=",")
+    return _cpdag_marks(adjacency != 0), int(done.stdout.split()[-1])
+
+
+_TIGRAMITE_FIT = """
+import json, sys
+import numpy as np
+from tigramite import data_processing
+from tigramite.independence_tests.parcorr import ParCorr
+from tigramite.lpcmci import LPCMCI
+
+data, tau_max = np.load(sys.argv[1]), int(sys.argv[2])
+links = json.load(open(sys.argv[3]))
+assumptions = None
+if links is not None:
+    assumptions = {j: {} for j in range(data.shape[1])}
+    for j, i, lag, link in links:
+        assumptions[j][(i, lag)] = link
+search = LPCMCI(dataframe=data_processing.DataFrame(data),
+                cond_ind_test=ParCorr(significance="analytic"), verbosity=0)
+out = search.run_lpcmci(link_assumptions=assumptions, tau_min=0, tau_max=tau_max, pc_alpha=0.05,
+                        n_preliminary_iterations=1)
+print(json.dumps(out["graph"].tolist()))
+"""
+
+
+def _tigramite_reference(data: np.ndarray, claims: dict | None, tau_max: int) -> np.ndarray:
+    """tigramite's LPCMCI, at the settings of the harness's adapter, with the claims as its
+    ``link_assumptions`` (:func:`link_assumptions`), in tigramite's own environment."""
+    from andrey_bench.window import marks_from_link_strings
+
+    links = link_assumptions(claims, data.shape[1], tau_max) if claims else None
+    with tempfile.TemporaryDirectory(prefix="andrey_bench_tigramite_") as tmp:
+        np.save(Path(tmp) / "data.npy", np.asarray(data, dtype=np.float64))
+        links_file = Path(tmp) / "links.json"
+        links_file.write_text(json.dumps(links))
+        command = [os.environ[TIGRAMITE_PYTHON], "-c", _TIGRAMITE_FIT, f"{tmp}/data.npy"]
+        done = subprocess.run(
+            [*command, str(tau_max), str(links_file)], capture_output=True, text=True
+        )
+    if done.returncode != 0:
+        raise RuntimeError(f"tigramite exited {done.returncode}: {done.stderr[-300:]}")
+    return marks_from_link_strings(np.array(json.loads(done.stdout.splitlines()[-1])))
+
+
 def scored(lane: str, result: dict, truth: np.ndarray, claims: dict | None = None) -> dict:
     """``result`` with its marks replaced by its error counts against ``truth``; ``claims`` are the
     true claims the fit took, which set the class a ``cpdag`` fit is scored against."""
@@ -512,9 +721,16 @@ def scored(lane: str, result: dict, truth: np.ndarray, claims: dict | None = Non
 
 
 def run_unit(task: tuple) -> list[dict]:
-    """Every fit of one dataset: each method without claims, with true claims at each fraction,
-    and with false claims; with a ``part``, with true claims of that part alone instead."""
-    lane, cell_name, seed, part = task
+    """Every fit of one dataset, for the methods and arms asked for.
+
+    A method of the lane is fitted without claims (``bare``), with true claims at each fraction
+    (``true``), with the edges those claims imply (``edges``, in ``cpdag`` and ``pag``), and with
+    false claims (``false``). A reference is fitted without knowledge and with the same true
+    knowledge: the claims themselves when it takes them (:data:`TAKES_PATHS`, arm ``true``), the
+    edges they imply otherwise (arm ``edges``). With a ``part``, the true claims are that part's
+    alone and there is no ``false`` arm.
+    """
+    lane, cell_name, seed, part, methods, wanted = task
     cell = LANES[lane]["cells"][cell_name]
     try:
         prob = problem(lane, cell, seed)
@@ -522,26 +738,39 @@ def run_unit(task: tuple) -> list[dict]:
         skipped = {"lane": lane, "cell": cell_name, "seed": seed, "part": part or "all"}
         return [{**skipped, "arm": "none", "status": "no_dataset", "message": str(exc)[:300]}]
     truth = prob["truth"]
+    true_claims = {
+        f: claims if part is None else {p: c if p == part else [] for p, c in claims.items()}
+        for f, claims in prob["claims"].items()
+    }
     rows = []
-    arms = [("bare", None, None)]
-    if part is None:
-        arms += [("true", f, prob["claims"][f]) for f in LANES[lane]["fractions"]]
-        arms.append(("false", FALSE_FRACTION, prob["false_claims"]))
-    else:
-        arms += [
-            ("true", f, {p: c if p == part else [] for p, c in prob["claims"][f].items()})
-            for f in LANES[lane]["fractions"]
-        ]
-    for method in LANES[lane]["methods"]:
+    for method in methods:
+        reference = method not in LANES[lane]["methods"]
+        arms = [("bare", None, None)]
+        if not reference or method in TAKES_PATHS:
+            arms += [("true", f, claims) for f, claims in true_claims.items()]
+        if lane in ("cpdag", "pag") and method not in TAKES_PATHS:
+            arms += [("edges", f, claims) for f, claims in true_claims.items()]
+        if part is None and not reference:
+            arms.append(("false", FALSE_FRACTION, prob["false_claims"]))
         for arm, fraction, claims in arms:
+            if arm not in wanted:
+                continue
             if method.startswith("lingam.") and claims is not None and claims.get("confounded"):
                 claims = {**claims, "confounded": []}
+            edges = edge_claims(claims, truth) if arm == "edges" else None
+            # An edge arm's class: the true CPDAG with the implied edges, which on a pair adjacent
+            # in the truth say what the path claims they come from say.
+            target = claims if arm == "true" else None
+            if edges is not None:
+                adjacent = [e for e in edges["forbidden"] if truth[e[0], e[1]] != NULL]
+                target = {"required_paths": edges["required"], "forbidden_paths": adjacent}
             result = scored(
-                lane,
-                fit(method, prob["data"], claims, cell, seed),
-                truth,
-                claims if arm == "true" else None,
+                lane, fit(method, prob["data"], claims, cell, seed, edges), truth, target
             )
+            counts = {f"n_{p}": len((claims or {}).get(p, [])) for p in PARTS}
+            if edges is not None:
+                counts.update({f"n_{key}": len(edges[key]) for key in ("required", "forbidden")})
+                counts.update({f"n_{key}": edges[key] for key in edges if key.endswith("form")})
             rows.append(
                 {
                     "lane": lane,
@@ -552,7 +781,7 @@ def run_unit(task: tuple) -> list[dict]:
                     "method": method,
                     "arm": arm,
                     "fraction": fraction,
-                    **{f"n_{part}": len((claims or {}).get(part, [])) for part in PARTS},
+                    **counts,
                     **result,
                 }
             )
@@ -578,12 +807,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     seeds = range(*args.seeds)
     import andrey
 
+    methods = tuple(args.methods or LANES[lane]["methods"])
+    unknown = set(methods) - {*LANES[lane]["methods"], *LANE_REFERENCES[lane]}
+    if unknown:
+        raise SystemExit(f"{lane} runs no {sorted(unknown)}")
+    arms = tuple(args.arms or ARMS)
     meta = {
         "andrey": andrey.__version__,
         "lane": lane,
         "cells": cells,
         "seeds": list(args.seeds),
-        "methods": LANES[lane]["methods"],
+        "methods": methods,
+        "arms": arms,
         "fractions": LANES[lane]["fractions"],
         "false_fraction": FALSE_FRACTION,
         "fit_cap_s": FIT_CAP_S,
@@ -592,7 +827,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2))
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
     done = {(r["cell"], r["seed"]) for r in _read(out / RECORDS)}
-    tasks = [(lane, c, s, args.part) for c in cells for s in seeds if (c, s) not in done]
+    tasks = [
+        (lane, c, s, args.part, methods, arms) for c in cells for s in seeds if (c, s) not in done
+    ]
     _log(f"=== {lane}: {len(tasks)} datasets -> {out} (git {prov['git_sha']})")
     start = time.monotonic()
     with multiprocessing.get_context("forkserver").Pool(args.workers, maxtasksperchild=1) as pool:
@@ -1064,20 +1301,90 @@ def compare(records: list[dict]) -> list[dict]:
     return rows
 
 
+def against_references(records: list[dict]) -> list[dict]:
+    """Each method against each of its references (:data:`REFERENCES`) on the same datasets.
+
+    A row pairs the method's fits of one arm with the reference's fits under the same knowledge:
+    the method's ``edges`` arm and its ``true`` arm against the reference's knowledge arm (the
+    like-for-like comparison and the path claims against the edges they imply; one row where the
+    reference takes the claims), and ``bare`` against ``bare``. The measure is ``dag_errors`` in
+    ``cpdag``, the same for every arm, and ``errors`` elsewhere; ``mean_D`` is the method's minus
+    the reference's, and ``floor`` the interval of the method's count minus the empty graph's.
+    """
+    fits: dict[tuple, dict] = {}
+    for r in records:
+        if r.get("status") == "ok":
+            part = "all" if r["arm"] == "bare" else r.get("part", "all")
+            fits[r["method"], r["dataset_id"], part, r["arm"], r["fraction"]] = r
+    groups: dict[tuple, list] = {}
+    for (method, dataset, part, arm, fraction), r in fits.items():
+        for reference in REFERENCES.get(method, ()):
+            takes = "true" if reference in TAKES_PATHS else "edges"
+            other = fits.get(
+                (reference, dataset, part, "bare" if arm == "bare" else takes, fraction)
+            )
+            if other is not None and arm in ("bare", "true", "edges"):
+                key = (r["lane"], method, reference, r["cell"], part, arm, fraction)
+                groups.setdefault(key, []).append((r, other))
+    rows = []
+    for (lane, method, reference, cell, part, arm, fraction), pairs in sorted(
+        groups.items(), key=str
+    ):
+        measure = "dag_errors" if lane == "cpdag" else "errors"
+        own = np.array([r[measure] for r, _ in pairs], dtype=float)
+        ref = np.array([o[measure] for _, o in pairs], dtype=float)
+        empty = np.array([r["empty_" + measure] for r, _ in pairs], dtype=float)
+        interval = bootstrap_95(own - ref)
+        rows.append(
+            {
+                "lane": lane,
+                "method": method,
+                "reference": reference,
+                "cell": cell,
+                "part": part,
+                "arm": arm,
+                "fraction": fraction,
+                "in_setting": not _outside(lane, method, cell),
+                "paired": len(pairs),
+                "measure": measure,
+                "errors_method": float(own.mean()),
+                "errors_reference": float(ref.mean()),
+                "mean_D": float((own - ref).mean()),
+                "bootstrap_95": interval,
+                "verdict": _verdict(interval),
+                "floor": bootstrap_95(own - empty),
+                "no_edge_form": float(np.mean([o.get("n_no_edge_form", 0) for _, o in pairs])),
+                "reference_unmet": float(np.mean([o.get("unmet", 0) for _, o in pairs])),
+            }
+        )
+    return rows
+
+
 def cmd_summarize(args: argparse.Namespace) -> int:
     def pool(dirs):
         return [r for d in dirs for r in _read(Path(d) / RECORDS)]
 
-    main_rows = compare(pool(args.runs))
+    records, again_records = pool(args.runs), pool(args.replicate or [])
+    reference_rows = against_references(records)
+    names = ("lane", "method", "reference", "cell", "part", "arm", "fraction")
+    again = {tuple(r[k] for k in names): r for r in against_references(again_records)}
+    for row in reference_rows:
+        if row["verdict"] == "worse":
+            repeat = again.get(tuple(row[k] for k in names))
+            row["replicate"] = repeat and {
+                k: repeat[k] for k in ("paired", "mean_D", "bootstrap_95", "verdict")
+            }
+            row["counts"] = repeat is not None and repeat["verdict"] == "worse"
+    main_rows = compare(records)
     replicate = {
         (r["lane"], r["method"], r["cell"], r["part"], r["arm"], r["fraction"]): r
-        for r in compare(pool(args.replicate or []))
+        for r in compare(again_records)
     }
     kept = ("paired", "mean_D", "bootstrap_95", "verdict")
     kept += ("dag_mean_D", "dag_bootstrap_95", "dag_verdict")
     for row in main_rows:
         worse = [v for v in ("verdict", "dag_verdict") if row.get(v) == "worse"]
-        if worse and row["arm"] == "true":
+        if worse and row["arm"] in ("true", "edges"):
             again = replicate.get(
                 (row["lane"], row["method"], row["cell"], row["part"], row["arm"], row["fraction"])
             )
@@ -1089,9 +1396,13 @@ def cmd_summarize(args: argparse.Namespace) -> int:
         for p in Path(d).glob("oracle-*.json")
     }
     Path(args.out).write_text(
-        json.dumps({"rows": main_rows, "oracle": oracle}, indent=2, default=int)
+        json.dumps(
+            {"rows": main_rows, "reference_rows": reference_rows, "oracle": oracle},
+            indent=2,
+            default=int,
+        )
     )
-    _log(f"{len(main_rows)} rows -> {args.out}")
+    _log(f"{len(main_rows)} rows, {len(reference_rows)} against references -> {args.out}")
     return 0
 
 
@@ -1113,6 +1424,10 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--seeds", type=int, nargs=2, default=(0, 20), metavar=("FIRST", "STOP"))
     r.add_argument("--workers", type=int, default=max(1, len(os.sched_getaffinity(0))))
     r.add_argument("--part", choices=PARTS, help="true claims of this part alone")
+    r.add_argument(
+        "--methods", nargs="+", help="the lane's methods or references; default: methods"
+    )
+    r.add_argument("--arms", nargs="+", choices=ARMS, help="the arms to fit; default: all")
     r.add_argument("--out", required=True)
     s = sub.add_parser("summarize", help="paired verdicts from finished runs")
     s.add_argument("--runs", nargs="+", required=True)

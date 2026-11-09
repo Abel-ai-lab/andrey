@@ -169,3 +169,67 @@ def test_summarize_judges_the_distance_to_the_true_dag_and_flags_cells_outside_t
     # Worse again on the fresh seeds counts; ges at degree 4 is outside its setting.
     assert not by_method["pc"]["counts"] and by_method["pc"]["in_setting"]
     assert by_method["ges"]["counts"] and not by_method["ges"]["in_setting"]
+
+
+def test_path_claims_translate_to_the_edges_they_imply():
+    claims = {"required_paths": [[0, 1], [0, 3]], "forbidden_paths": [[3, 0]], "confounded": []}
+    edges = kp.edge_claims(claims, CHAIN)
+    # 0 and 3 are not adjacent in the chain: that required path has no edge form.
+    assert (edges["required"], edges["forbidden"]) == ([[0, 1]], [[3, 0]])
+    assert (edges["no_edge_form"], edges["confounded_no_edge_form"]) == (1, 0)
+
+
+def test_lagged_claims_become_link_assumptions_over_the_whole_window():
+    claims = {
+        "required_paths": [[0, 1, 0]],
+        "forbidden_paths": [[1, 0, 1]],
+        "confounded": [[0, 1, 1]],
+    }
+    links = {(j, i, lag): link for j, i, lag, link in kp.link_assumptions(claims, 2, 1)}
+    assert links == {
+        (1, 0, 0): "-?>",  # 0 is an ancestor of 1 at lag 0, read from both ends
+        (0, 1, 0): "<?-",
+        (0, 1, -1): "<?>",  # 1 one step back is not an ancestor of 0
+        (1, 0, -1): "o->",  # a confounded link is there
+        (0, 0, -1): "o?>",  # no claim
+        (1, 1, -1): "o?>",
+    }
+
+
+def test_summarize_judges_a_method_against_its_reference_under_the_same_knowledge(tmp_path):
+    rows = []
+    for seed in range(6):
+        base = {
+            "lane": "cpdag",
+            "cell": "d10-n500-deg2",
+            "dataset_id": f"x{seed}",
+            "status": "ok",
+            "definite_marks": 4,
+            "wrong_marks": 0,
+            "errors": 3,
+            "empty_errors": 9,
+            "empty_dag_errors": 18,
+            **{f"n_{p}": 1 for p in kp.PARTS},
+        }
+        for method, bare, edges in (("ges", 8, 5), ("tetrad.ges", 8, 7)):
+            rows.append({**base, "method": method, "arm": "bare", "fraction": None})
+            rows[-1]["dag_errors"] = bare
+            for arm in ("true", "edges") if method == "ges" else ("edges",):
+                row = {**base, "method": method, "arm": arm, "fraction": 0.1, "dag_errors": edges}
+                rows.append({**row, "n_no_edge_form": 2})
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / kp.RECORDS).write_text("".join(json.dumps(r) + "\n" for r in rows))
+    out = tmp_path / "summary.json"
+    kp.main(["summarize", "--runs", str(run), "--out", str(out)])
+    summary = json.loads(out.read_text())
+    by_arm = {row["arm"]: row for row in summary["reference_rows"]}
+    assert {row["reference"] for row in by_arm.values()} == {"tetrad.ges"}
+    assert by_arm["bare"]["verdict"] == "tie" and by_arm["bare"]["mean_D"] == 0
+    for arm in ("true", "edges"):
+        assert (by_arm[arm]["verdict"], by_arm[arm]["mean_D"]) == ("better", -2)
+        assert by_arm[arm]["measure"] == "dag_errors" and by_arm[arm]["floor"][1] < 0
+        assert by_arm[arm]["no_edge_form"] == 2
+    # The reference's own change with knowledge is a row of its own.
+    own = [r for r in summary["rows"] if r["method"] == "tetrad.ges"]
+    assert [(r["arm"], r["dag_mean_D"]) for r in own] == [("edges", -1)]
