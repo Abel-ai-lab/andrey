@@ -41,6 +41,7 @@ whose Reproduce table lists the driver.
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | Missing values | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; listwise deletion and mean imputation | the MVPC authors' R code, MissDAG | |
+| [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; lingam's DirectLiNGAM with `prior_knowledge` as context | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
 | [PCMCI on lagged series](comparisons/pcmci.md) | `pcmci_cpu.py` | PCMCI | tigramite | 0.5.0, 0.9.0 |
