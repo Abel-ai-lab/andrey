@@ -200,6 +200,8 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
     structure = out.structure
     if getattr(structure, "kind", None) != "cpdag":
         return out
+    # The claims name the data's columns by position, and the graph is over the same columns.
+    assert structure.n_nodes == constraints.d, (structure.n_nodes, constraints.d)
     labels = structure.labels
     name = label_of(labels)
     mpdag, clauses = restrict(
