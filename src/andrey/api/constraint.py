@@ -322,7 +322,8 @@ def pc(
     ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
     observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
     drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
-    virtual data whose distribution is that of the complete data, and the test runs on them. A test
+    virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
+    ``W`` is observed (their Eq. (4)), and the test runs on them. A test
     with an empty ``W`` is the test-wise one. The colliders follow the corrected separating sets;
     ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
     to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
@@ -363,12 +364,18 @@ def pc(
     placed at colliders. Its correction holds when no missingness indicator causes a variable, every
     independence in the observed rows also holds in the missing ones, no indicator is a
     deterministic function of others, and no value causes its own missingness (self-masking) [13]_;
-    the data cannot check these, and a violation voids the correction. PermC's virtual data follow
-    the complete data's distribution only for linear-Gaussian variables whose indicators' parents
-    ``W`` make them independent of the indicators (the paper's conditions (i) and (ii)); the
-    density-ratio correction for the other cases is not implemented. Step 2 runs one skeleton search
-    per variable with missing values. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    the data cannot check these, and a violation voids the correction. PermC also needs
+    linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
+    ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
+    on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
+    d-separated given ``S`` exactly when they are given ``S`` and those indicators. Condition (ii)
+    fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
+    descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
+    ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
+    The density-ratio correction the paper gives for these cases is not implemented. Step 2 runs
+    one skeleton search per variable with missing values. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

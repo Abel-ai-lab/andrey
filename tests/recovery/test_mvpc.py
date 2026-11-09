@@ -7,9 +7,10 @@ finds ``w`` as the parent of ``y``'s indicator and removes it. On seeded ground 
 indicator's parent is a collider and the indicator belongs to one of the collider's parents, as in
 the paper's simulations: MVPC finds every placed parent, keeps no more extra edges than test-wise
 deletion on any dataset, and makes fewer errors over all of them. Two fixed cases check the steps
-those graphs leave untested: an indicator whose parent can itself go missing (MNAR), whose
-corrected test reads the parents of that parent's indicator too, and a pair that only the
-indicators they both cause make a candidate for the corrected test.
+those graphs leave untested. In the first, an indicator's parent can itself go missing (MNAR); the
+parents of that parent's indicator are common effects of the tested pair, which breaks condition
+(ii) of Tu et al. (2019), so the case checks the detection and the true edges, not the removal. In
+the second, only the indicators a pair both causes make it a candidate for the corrected test.
 """
 
 from __future__ import annotations
@@ -93,19 +94,20 @@ def two_collider_fits():
     return [(andrey.pc(X), andrey.pc(X, missing="mvpc")) for X in map(two_colliders, range(8))]
 
 
-def test_mvpc_reads_the_parents_of_an_indicator_parent_that_can_go_missing(two_collider_fits):
-    # The query x, y reads W = {w}, the parent of y's indicator, and, as w can go missing, the
-    # parent v of w's indicator; without v, the rows the regressions read are selected on v, a
-    # common effect of x and y, and the corrected test finds x and y dependent on 7 of the 8
-    # seeds. With v, it removes the edge on 5: W's values are drawn from rows selected on W's own
-    # indicators, so the correction is partial here.
-    removed = 0
+def test_mvpc_finds_indicator_parents_that_can_go_missing_and_keeps_every_true_edge(
+    two_collider_fits,
+):
+    # The query x, y reads W = {w, v}: w, the parent of y's indicator, and v, the parent of w's.
+    # The indicators of w and v are caused by v and w, common effects of x and y, so x and y are
+    # dependent on the rows where W is observed, whose distribution PermC's virtual data follow.
+    # The case breaks condition (ii) of Tu et al. (2019): the corrected test keeps x - y on some
+    # seeds, and on more of them with more rows, so its removal is not asserted.
+    true_edges = [(0, 2), (1, 2), (0, 3), (1, 3)]
     for deletion, corrected in two_collider_fits:
         assert deletion.structure.to_numpy()[0, 1] != 0
         found = corrected.metadata["missingness_parents"]
         assert all(set(pa) <= set(found[c]) for c, pa in TWO_COLLIDERS.items())
-        removed += [0, 1] in corrected.metadata["corrected_edges"]["removed"]
-    assert removed >= 3
+        assert all(corrected.structure.to_numpy()[e] != 0 for e in true_edges)
 
 
 def chain(seed: int, n: int = 5000) -> np.ndarray:
