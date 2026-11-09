@@ -792,7 +792,9 @@ def mag_class(pag: np.ndarray) -> list[np.ndarray]:
     return found
 
 
-def oracle_pag(seed: int, graphs: int, exhaustive: tuple[int, ...]) -> dict:
+def oracle_pag(
+    seed: int, graphs: int, exhaustive: tuple[int, ...], max_circles: int = MAX_CIRCLES
+) -> dict:
     """The PAG oracle lane: see the module docstring."""
     from andrey.constraint import fci as fci_engine
     from andrey.core import LATENT, OBSERVED, GraphStructure
@@ -836,7 +838,7 @@ def oracle_pag(seed: int, graphs: int, exhaustive: tuple[int, ...]) -> dict:
             setattr(engines, name, lambda *a, p=pattern, **k: (p, 0.0))
         pag = fci_engine.fci(x, indep_test="dsep_oracle").to_numpy()
         listed = None
-        if (pag == CIRCLE).sum() <= MAX_CIRCLES:
+        if (pag == CIRCLE).sum() <= max_circles:
             listed = mag_class(pag)
         for fraction in (0.3, 1.0):
             claims = draw_claims(
@@ -908,9 +910,10 @@ def cmd_oracle(args: argparse.Namespace) -> int:
     start = time.monotonic()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result = (oracle_cpdag if args.lane == "cpdag" else oracle_pag)(
-            args.seed, args.graphs, tuple(args.exhaustive)
-        )
+        if args.lane == "cpdag":
+            result = oracle_cpdag(args.seed, args.graphs, tuple(args.exhaustive))
+        else:
+            result = oracle_pag(args.seed, args.graphs, tuple(args.exhaustive), args.max_circles)
     result["wall_s"] = time.monotonic() - start
     (out / f"oracle-{args.lane}.json").write_text(json.dumps(result, indent=2, default=int))
     (out / DONE).write_text(json.dumps({"lane": args.lane, "failures": result["failures"]}))
@@ -1024,6 +1027,7 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument(
         "--graphs", type=int, default=600, help="random graphs after the exhaustive ones"
     )
+    o.add_argument("--max-circles", type=int, default=MAX_CIRCLES, help="largest PAG listed")
     o.add_argument("--exhaustive", type=int, nargs="*", default=[4, 5], help="sizes listed in full")
     r = sub.add_parser("run", help="the no-worse lanes, on simulated data")
     r.add_argument("--lane", choices=sorted(LANES), required=True)
