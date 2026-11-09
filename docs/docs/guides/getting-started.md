@@ -424,14 +424,14 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
-Knowledge can also state causal paths rather than edges. `ancestors` lists the pairs `(a, b)` in
-which `a` causes `b`, directly or through other variables, and `non_ancestors` the pairs in which
-it does not:
+Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
+in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in
+which it does not:
 
 ```python
 knowledge = Knowledge(
-    ancestors=[("smoking", "cancer")],  # smoking causes cancer, directly or not
-    non_ancestors=[("tar", "age")],     # tar causes age by no path
+    required_paths=[("smoking", "cancer")],  # smoking causes cancer, directly or not
+    forbidden_paths=[("tar", "age")],        # tar causes age by no path
 )
 result = pc(data, knowledge=knowledge)
 result.metadata["ancestor_clauses"]
@@ -447,25 +447,27 @@ as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a
 the result is the class the search found, restricted, not a new search for the best class that
 meets them. These two parts are experimental.
 
-When hidden common causes are possible, `latent` lists the pairs that share one. The PAG methods
-(FCI, FCI-JCI, GFCI, BOSS-FCI, GRaSP-FCI, and LPCMCI over lagged links) honor all three parts:
+When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
+that is not in the data; a common cause that is in the data does not make the pair adjacent. The
+PAG methods (FCI, FCI-JCI, GFCI, BOSS-FCI, GRaSP-FCI, and LPCMCI over lagged links) honor all three
+parts:
 
 ```python
 from andrey import fci
 
 knowledge = Knowledge(
-    ancestors=[("smoking", "cancer")],
-    latent=[("diet", "exercise")],  # a hidden common cause
-    non_ancestors=[("diet", "exercise"), ("exercise", "diet")],  # neither causes the other
+    required_paths=[("smoking", "cancer")],
+    confounded=[("diet", "exercise")],  # a hidden common cause
+    forbidden_paths=[("diet", "exercise"), ("exercise", "diet")],  # neither causes the other
 )
 result = fci(data, knowledge=knowledge)  # diet <-> exercise
 ```
 
-On a pair the tests keep, an ancestor claim makes the edge `smoking -> cancer` and a non-ancestor
-claim puts an arrowhead at its cause; no test removes a `latent` pair. A claim the PAG
-contradicts, such as an ancestor with no path that could lead to its effect, raises a
-`ValueError`. DirectLiNGAM and multi-group DirectLiNGAM read `ancestors` and `non_ancestors` to
-narrow the causal order, as their paper describes, and list the claims their DAG does not meet in
+On a pair the tests keep, a required path makes the edge `smoking -> cancer` and a forbidden path
+puts an arrowhead at its cause; no test removes a `confounded` pair. A claim the PAG contradicts,
+such as a required path with no path that could lead to its effect, raises a `ValueError`.
+DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths` to narrow
+the causal order, as their paper describes, and list the claims their DAG does not meet in
 `metadata["unmet_knowledge"]`. Every other method raises `NotImplementedError` for a part it does
 not honor, naming the methods that do. These parts are experimental for every method.
 

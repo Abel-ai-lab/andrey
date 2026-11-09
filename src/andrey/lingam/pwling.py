@@ -201,22 +201,22 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
 
 
 def eligible(
-    precedence: np.ndarray, non_ancestor: np.ndarray | None, candidates: list[int]
+    precedence: np.ndarray, forbidden_paths: np.ndarray | None, candidates: list[int]
 ) -> np.ndarray:
     """The ``candidates`` an order search may place next, as a mask aligned with them.
 
     A candidate is eligible when no other candidate must precede it (``precedence[a, b]``: ``a``
     before ``b``). Step 2a-1 of DirectLiNGAM with prior knowledge (Shimizu et al. 2011, Section
-    3.4) also reads ``non_ancestor[a, b]``, the claim that ``a`` is no ancestor of ``b``: when the
-    claims show that no other candidate is an ancestor of some eligible candidates (their Lemma 3),
-    only those are exogenous among the candidates, and the pick is among them. A candidate with a
-    claimed ancestor among the others is never exogenous (their Lemma 4); ``precedence`` holds
+    3.4) also reads ``forbidden_paths[a, b]``, the claim that ``a`` is no ancestor of ``b``: when
+    the claims show that no other candidate is an ancestor of some eligible candidates (their Lemma
+    3), only those are exogenous among the candidates, and the pick is among them. A candidate with
+    a claimed ancestor among the others is never exogenous (their Lemma 4); ``precedence`` holds
     those claims.
     """
     block = np.ix_(candidates, candidates)
     allowed = ~precedence[block].any(axis=0).astype(bool)
-    if non_ancestor is not None:
-        exogenous = (non_ancestor[block] | np.eye(len(candidates), dtype=bool)).all(axis=0)
+    if forbidden_paths is not None:
+        exogenous = (forbidden_paths[block] | np.eye(len(candidates), dtype=bool)).all(axis=0)
         if (allowed & exogenous).any():
             return allowed & exogenous
     return allowed
@@ -226,7 +226,7 @@ def find_causal_order(
     X: np.ndarray,
     *,
     precedence: np.ndarray | None = None,
-    non_ancestor: np.ndarray | None = None,
+    forbidden_paths: np.ndarray | None = None,
     measure: str = "pwling",
 ) -> list[int]:
     """Peel exogenous variables (:func:`pick` of the ``measure`` scores) one at a time.
@@ -262,7 +262,7 @@ def find_causal_order(
         elif precedence is None:
             m = pick(score(residualized, candidates), candidates, ranks)
         else:
-            allowed = eligible(precedence, non_ancestor, candidates)
+            allowed = eligible(precedence, forbidden_paths, candidates)
             values = score(residualized, candidates)[allowed]
             m = pick(values, [c for c, ok in zip(candidates, allowed) if ok], ranks)
         placed = [m, *copies[m]]

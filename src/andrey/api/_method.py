@@ -64,14 +64,14 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; an experimental method warns :class:`~andrey.ExperimentalWarning`
     (:func:`warn_experimental`); a ``knowledge`` part the method does not honor raises
-    ``NotImplementedError``, one it honors experimentally warns, and ``ancestors`` and
-    ``non_ancestors`` are resolved and set apart from the knowledge the facade gets
+    ``NotImplementedError``, one it honors experimentally warns, and ``required_paths`` and
+    ``forbidden_paths`` are resolved and set apart from the knowledge the facade gets
     (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
     declared column types, and the facade gets the pick and the columns it reads
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
     a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
-    After it: a CPDAG result keeps the DAGs it stands for that meet ``ancestors`` and
-    ``non_ancestors`` (:func:`restrict_paths`); each result's ``metadata["algorithm"]`` is
+    After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
+    ``forbidden_paths`` (:func:`restrict_paths`); each result's ``metadata["algorithm"]`` is
     ``name``, ``metadata["indep_test"]`` and ``metadata["score_func"]`` are the test and the score
     the fit used, for a method that takes them, with the penalties that score used
     (:func:`used_penalties`);
@@ -155,7 +155,7 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
 
     A part the method does not honor raises ``NotImplementedError`` (:func:`unhonored_part`), and
     a part it honors experimentally warns :class:`~andrey.ExperimentalWarning` once. Knowledge with
-    ``ancestors`` or ``non_ancestors`` is resolved against the data's columns before the fit
+    ``required_paths`` or ``forbidden_paths`` is resolved against the data's columns before the fit
     (:func:`~andrey.core.knowledge.resolve`, which raises
     :class:`~andrey.core.knowledge.KnowledgeError` for knowledge that contradicts itself). For a
     method that ``restricts_paths``, the facade gets the knowledge without them and the return
@@ -202,7 +202,7 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
     """Return ``out`` with its CPDAG restricted by the causal paths of ``constraints``.
 
     Of the DAGs the CPDAG stands for, the structure becomes the MPDAG of those that meet
-    ``ancestors`` and ``non_ancestors`` (:func:`~andrey.core.ancestral.restrict`), and
+    ``required_paths`` and ``forbidden_paths`` (:func:`~andrey.core.ancestral.restrict`), and
     ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each
     ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. An
     undirected structure, which the paths do not orient, is returned as it is.
@@ -219,8 +219,8 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
     name = label_of(labels)
     mpdag, clauses = restrict(
         from_structure(structure),  # ty: ignore[invalid-argument-type]  # a cpdag is a graph
-        constraints.ancestor,
-        constraints.non_ancestor,
+        constraints.required_paths,
+        constraints.forbidden_paths,
         label=lambda i: repr(name(i)) if labels is not None else str(i),
     )
     metadata = {
@@ -255,8 +255,8 @@ def meet_paths(out: Any, constraints: Constraints) -> Any:
     name = label_of(labels)
     claims = {}
     for part, pairs in (
-        ("ancestors", constraints.ancestor),
-        ("non_ancestors", constraints.non_ancestor),
+        ("required_paths", constraints.required_paths),
+        ("forbidden_paths", constraints.forbidden_paths),
     ):
         full = np.zeros(marks.shape, dtype=bool)
         if pairs is not None:
@@ -264,14 +264,14 @@ def meet_paths(out: Any, constraints: Constraints) -> Any:
         claims[part] = full
     if kind == "pag":
         label = (lambda i: repr(name(i))) if labels is not None else str
-        check_path_claims(marks, claims["ancestors"], claims["non_ancestors"], label)
+        check_path_claims(marks, claims["required_paths"], claims["forbidden_paths"], label)
         return out
     directed = (marks == TAIL) & (marks.T == ARROW)
     unmet = [
         [part, name(a), name(b)]
         for part, pairs in claims.items()
         for a, b in np.argwhere(pairs).tolist()
-        if bool(reach(directed, a)[b]) != (part == "ancestors")
+        if bool(reach(directed, a)[b]) != (part == "required_paths")
     ]
     return dataclasses.replace(out, _metadata={**out.metadata, "unmet_knowledge": unmet})
 

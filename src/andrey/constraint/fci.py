@@ -156,27 +156,28 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
     ``i -> j``), and a required ``i -> j`` is ``i -> j``: a tail at ``i`` and, as its reverse is
-    forbidden, an arrowhead at ``j``. A non-ancestor claim ``(i, j)`` puts an arrowhead at ``i``,
-    and an ancestor claim ``(i, j)`` makes the edge ``i -> j``: in a maximal ancestral graph an
-    edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
-    (Richardson and Spirtes 2002). An ancestor claim on an edge the forbidden edges or the tiers put
-    an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`. ``None``
-    leaves ``marks`` as they are.
+    forbidden, an arrowhead at ``j``. A pair ``(i, j)`` of ``forbidden_paths`` puts an arrowhead at
+    ``i``, and a pair of ``required_paths`` makes the edge ``i -> j``: in a maximal ancestral graph
+    an edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
+    (Richardson and Spirtes 2002). A ``required_paths`` pair on an edge the forbidden edges or the
+    tiers put an arrowhead at its cause raises :class:`~andrey.core.knowledge.KnowledgeError`.
+    ``None`` leaves ``marks`` as they are.
     """
     if constraints is None:
         return
     adjacent = marks != NULL
     marks[adjacent & constraints.forbidden & ~constraints.forbidden.T] = ARROW
-    if constraints.non_ancestor is not None:
-        marks[adjacent & constraints.non_ancestor] = ARROW
+    if constraints.forbidden_paths is not None:
+        marks[adjacent & constraints.forbidden_paths] = ARROW
     marks[adjacent & constraints.required] = TAIL
-    if constraints.ancestor is not None:
-        claimed = adjacent & constraints.ancestor
+    if constraints.required_paths is not None:
+        claimed = adjacent & constraints.required_paths
         if (clash := claimed & (marks == ARROW)).any():
             i, j = np.argwhere(clash)[0].tolist()
             raise KnowledgeError(
-                f"knowledge lists ({i}, {j}) in ancestors, but forbids the edge {i} -> {j} one way "
-                f"or by the tiers, which puts an arrowhead at {i} on the edge it keeps between them"
+                f"knowledge lists ({i}, {j}) in required_paths, but forbids the edge {i} -> {j} "
+                f"one way or by the tiers, which puts an arrowhead at {i} on the edge it keeps "
+                "between them"
             )
         marks[claimed] = TAIL
         marks[claimed.T] = ARROW
@@ -184,22 +185,27 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
 
 def check_path_claims(
     marks: np.ndarray,
-    ancestor: np.ndarray | None,
-    non_ancestor: np.ndarray | None,
+    required_paths: np.ndarray | None,
+    forbidden_paths: np.ndarray | None,
     label: Callable[[int], str] = str,
 ) -> None:
     """Raise :class:`~andrey.core.knowledge.KnowledgeError` when the PAG ``marks`` contradict a
     path claim.
 
-    ``ancestor[a, b]`` claims that ``a`` is an ancestor of ``b``, which needs a possibly directed
-    path from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not out of
-    ``v`` (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral graph the
-    PAG stands for. ``non_ancestor[a, b]`` claims the opposite, which a directed path
+    ``required_paths[a, b]`` claims that ``a`` is an ancestor of ``b``, which needs a possibly
+    directed path from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not
+    out of ``v`` (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral
+    graph the PAG stands for. ``forbidden_paths[a, b]`` claims the opposite, which a directed path
     ``a -> ... -> b`` denies in every such graph. ``label`` names a node in the message.
     """
     for claims, steps, holds, what in (
-        (ancestor, (marks != NULL) & (marks != ARROW) & (marks.T != TAIL), False, "no possibly"),
-        (non_ancestor, (marks == TAIL) & (marks.T == ARROW), True, "a"),
+        (
+            required_paths,
+            (marks != NULL) & (marks != ARROW) & (marks.T != TAIL),
+            False,
+            "no possibly",
+        ),
+        (forbidden_paths, (marks == TAIL) & (marks.T == ARROW), True, "a"),
     ):
         if claims is None or not claims.any():
             continue
@@ -207,7 +213,7 @@ def check_path_claims(
             reached = reach(steps, a)
             if (found := claims[a] & (reached == holds)).any():
                 b = int(np.flatnonzero(found)[0])
-                part = "ancestors" if claims is ancestor else "non_ancestors"
+                part = "required_paths" if claims is required_paths else "forbidden_paths"
                 raise KnowledgeError(
                     f"knowledge lists ({label(a)}, {label(b)}) in {part}, but the PAG has {what} "
                     f"directed path from {label(a)} to {label(b)}"
@@ -302,9 +308,9 @@ def orient_colliders(
     does not contain ``b``, and the triple is not ``ambiguous``. With ``pattern``, the CPDAG of a
     score search, a pair the pattern leaves non-adjacent is decided by the pattern instead: ``b``
     is a collider iff the pattern has ``a -> b <- c``, when the pattern also joins ``b`` to both:
-    a triple over an edge the pattern lacks, such as a latent pair the knowledge adds, is decided
-    by the separating sets. The endpoint at ``b`` on both edges is then set to an arrowhead; an
-    already-directed tail at ``b`` blocks the orientation.
+    a triple over an edge the pattern lacks, such as a ``confounded`` pair the knowledge adds, is
+    decided by the separating sets. The endpoint at ``b`` on both edges is then set to an
+    arrowhead; an already-directed tail at ``b`` blocks the orientation.
     """
     for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):

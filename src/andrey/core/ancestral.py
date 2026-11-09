@@ -136,22 +136,23 @@ def critical_set(graph: ChainGraph, x: int, y: int) -> set[int]:
 
 def claim_clauses(
     graph: ChainGraph,
-    ancestors: Iterable[tuple[int, int]],
-    non_ancestors: Iterable[tuple[int, int]],
+    required_paths: Iterable[tuple[int, int]],
+    forbidden_paths: Iterable[tuple[int, int]],
 ) -> list[Clause]:
     """The clauses of the claims ``x`` is an ancestor of ``y`` and ``x`` is not one (Fang et al.
     2025, Theorem 17), over the class of ``graph``.
 
-    An ancestor claim is one clause, ``x`` over its critical set, and none when ``x`` has a directed
-    path to ``y`` in every DAG of the class; a non-ancestor claim is a clause ``c`` over ``{x}`` for
-    each vertex ``c`` of the critical set, and the clause ``x`` over no vertex, which no DAG meets,
-    when ``x`` has a directed path to ``y`` in every DAG.
+    A pair of ``required_paths`` is an ancestor claim: one clause, ``x`` over its critical set, and
+    none when ``x`` has a directed path to ``y`` in every DAG of the class. A pair of
+    ``forbidden_paths`` is a non-ancestor claim: a clause ``c`` over ``{x}`` for each vertex ``c``
+    of the critical set, and the clause ``x`` over no vertex, which no DAG meets, when ``x`` has a
+    directed path to ``y`` in every DAG.
     """
     clauses: list[Clause] = []
-    for x, y in ancestors:
+    for x, y in required_paths:
         if x not in graph.explicit_ancestors(y):
             clauses.append((x, frozenset(critical_set(graph, x, y))))
-    for x, y in non_ancestors:
+    for x, y in forbidden_paths:
         if x in graph.explicit_ancestors(y):
             clauses.append((x, frozenset()))
         else:
@@ -314,18 +315,18 @@ def residual_clauses(
 
 def restrict(
     pdag: np.ndarray,
-    ancestor: np.ndarray | None,
-    non_ancestor: np.ndarray | None,
+    required_paths: np.ndarray | None,
+    forbidden_paths: np.ndarray | None,
     label: Callable[[int], str] = str,
 ) -> tuple[np.ndarray, list[Clause]]:
     """The DAGs ``pdag`` stands for in which each claim holds: their MPDAG and residual clauses.
 
     ``pdag`` is a learned graph, a CPDAG or an MPDAG, as a mark matrix; it stands for the DAGs of
-    the class of its consistent extensions that direct its directed edges alike. ``ancestor[i, j]``
-    claims that ``i`` is an ancestor of ``j``, and ``non_ancestor[i, j]`` that it is not. The claims
-    and the directed edges of ``pdag`` become clauses over the CPDAG of the class
-    (:func:`claim_clauses`), and the result is their :func:`clause_mpdag` and
-    :func:`residual_clauses`. ``label`` names a vertex in messages.
+    the class of its consistent extensions that direct its directed edges alike.
+    ``required_paths[i, j]`` claims that ``i`` is an ancestor of ``j``, and
+    ``forbidden_paths[i, j]`` that it is not. The claims and the directed edges of ``pdag`` become
+    clauses over the CPDAG of the class (:func:`claim_clauses`), and the result is their
+    :func:`clause_mpdag` and :func:`residual_clauses`. ``label`` names a vertex in messages.
 
     Raises :class:`~andrey.core.knowledge.KnowledgeError` when ``pdag`` has no consistent extension,
     or when no DAG it stands for meets the claims; the message names a claim no such DAG meets, or
@@ -337,15 +338,15 @@ def restrict(
         graph = ChainGraph.of(cpdag_of_pdag(pdag))
     except ValueError as error:
         raise KnowledgeError(
-            f"the graph found stands for no DAG ({error}), so ancestors and non_ancestors cannot "
-            "restrict it"
+            f"the graph found stands for no DAG ({error}), so required_paths and forbidden_paths "
+            "cannot restrict it"
         ) from error
     edges = _directed(pdag, graph)
     pairs = {
         part: [] if mask is None else [tuple(p) for p in np.argwhere(mask).tolist()]
-        for part, mask in (("ancestors", ancestor), ("non_ancestors", non_ancestor))
+        for part, mask in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths))
     }
-    clauses = [*edges, *claim_clauses(graph, pairs["ancestors"], pairs["non_ancestors"])]
+    clauses = [*edges, *claim_clauses(graph, pairs["required_paths"], pairs["forbidden_paths"])]
     if not consistent(graph, clauses):
         raise KnowledgeError(_conflict(graph, edges, pairs, label))
     mpdag = clause_mpdag(graph, clauses)
@@ -360,19 +361,19 @@ def _conflict(
 ) -> str:
     """The message for claims no DAG of the learned graph meets: the first claim that fails alone,
     or else all of them together."""
-    for x, y in pairs["ancestors"]:
+    for x, y in pairs["required_paths"]:
         if not consistent(graph, [*edges, *claim_clauses(graph, [(x, y)], [])]):
             return (
-                f"knowledge ancestors lists ({label(x)}, {label(y)}), but no DAG the graph found "
-                f"stands for has a directed path from {label(x)} to {label(y)}"
-            )
-    for x, y in pairs["non_ancestors"]:
-        if not consistent(graph, [*edges, *claim_clauses(graph, [], [(x, y)])]):
-            return (
-                f"knowledge non_ancestors lists ({label(x)}, {label(y)}), but every DAG the graph "
+                f"knowledge required_paths lists ({label(x)}, {label(y)}), but no DAG the graph "
                 f"found stands for has a directed path from {label(x)} to {label(y)}"
             )
+    for x, y in pairs["forbidden_paths"]:
+        if not consistent(graph, [*edges, *claim_clauses(graph, [], [(x, y)])]):
+            return (
+                f"knowledge forbidden_paths lists ({label(x)}, {label(y)}), but every DAG the "
+                f"graph found stands for has a directed path from {label(x)} to {label(y)}"
+            )
     return (
-        "knowledge ancestors and non_ancestors hold together in no DAG the graph found stands for, "
-        "though each holds in some"
+        "knowledge required_paths and forbidden_paths hold together in no DAG the graph found "
+        "stands for, though each holds in some"
     )

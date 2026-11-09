@@ -131,9 +131,9 @@ def ges(
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
-        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -1116,8 +1116,8 @@ def xges(
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
-        :class:`~andrey.Knowledge` describes. In a CPDAG, ``ancestors`` and ``non_ancestors`` keep
-        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes. In a CPDAG, ``required_paths`` and ``forbidden_paths``
+        keep the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; claims that no such DAG meets raise ``ValueError``.
 
     Returns
@@ -1383,9 +1383,9 @@ def hc(
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
-        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -1714,9 +1714,9 @@ def tabu(
         removes a required one, and the search starts from the required edges. The result directs
         every edge the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
-        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -1994,9 +1994,9 @@ def exact_search(
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
         the forbidden parents and include the required ones, so the DAG found is the best one that
         satisfies the knowledge, and the returned graph directs the edges the knowledge decides. In
-        a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------

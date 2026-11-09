@@ -139,9 +139,9 @@ def boss(
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
-        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -471,9 +471,9 @@ def grasp(
         the cause of each required edge, and each earlier tier, first. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes. With ``env``, the environment index is unconstrained.
-        In a CPDAG, ``ancestors`` and ``non_ancestors`` keep the DAGs the graph stands for in which
-        each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims that no
-        such DAG meets raise ``ValueError``.
+        In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in
+        which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; claims
+        that no such DAG meets raise ``ValueError``.
 
     Returns
     -------
@@ -1535,9 +1535,9 @@ def boss_fci(
         :func:`~andrey.boss` does, and the test phase starts from the adjacencies BOSS found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained. In the PAG, ``ancestors`` makes an
-        adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no test
-        removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
+        With ``env``, the environment index is unconstrained. In the PAG, ``required_paths`` makes
+        an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead at the cause, and no test
+        removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
         contradicts raises ``ValueError``.
 
     Returns
@@ -1865,9 +1865,9 @@ def grasp_fci(
         :func:`~andrey.grasp` does, and the test phase starts from the adjacencies GRaSP found and
         never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
         an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-        With ``env``, the environment index is unconstrained. In the PAG, ``ancestors`` makes an
-        adjacent pair ``a -> b``, ``non_ancestors`` puts an arrowhead at the cause, and no test
-        removes a ``latent`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
+        With ``env``, the environment index is unconstrained. In the PAG, ``required_paths`` makes
+        an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead at the cause, and no test
+        removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
         contradicts raises ``ValueError``.
 
     Returns

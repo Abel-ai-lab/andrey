@@ -27,8 +27,8 @@ def direct_lingam(
     ``measure`` is one of :data:`~andrey.lingam.pwling.MEASURES` and raises ``ValueError``
     otherwise; every measure is deterministic. With background knowledge ``constraints``, the order
     keeps
-    :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges, ancestor claims, and
-    tiers) and reads the non-ancestor claims (:func:`~andrey.lingam.pwling.eligible`), and the
+    :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges, ``required_paths``, and
+    tiers) and reads ``forbidden_paths`` (:func:`~andrey.lingam.pwling.eligible`), and the
     regression drops forbidden parents and keeps required ones unpenalized
     (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` has no forbidden edge. A non-ancestor
     ``a`` of ``b`` is no parent of ``b``: the claim forbids the edge ``a -> b`` (Lemma 5 of Shimizu
@@ -42,7 +42,7 @@ def direct_lingam(
     order = pwling.find_causal_order(
         X,
         precedence=constraints.precedence(),
-        non_ancestor=constraints.non_ancestor,
+        forbidden_paths=constraints.forbidden_paths,
         measure=measure,
     )
     B = adjacency.estimate(
@@ -52,7 +52,7 @@ def direct_lingam(
 
 
 def forbidden_parents(constraints: Constraints) -> np.ndarray:
-    """``[a, b]``: ``a`` is no parent of ``b``, by a forbidden edge or a non-ancestor claim."""
-    if constraints.non_ancestor is None:
+    """``[a, b]``: ``a`` is no parent of ``b``, by a forbidden edge or a forbidden path."""
+    if constraints.forbidden_paths is None:
         return constraints.forbidden
-    return constraints.forbidden | constraints.non_ancestor
+    return constraints.forbidden | constraints.forbidden_paths

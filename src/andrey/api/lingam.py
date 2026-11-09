@@ -125,8 +125,8 @@ def direct_lingam(
         forbidden parents and does not penalize the required ones. A variable with a required parent
         takes least-squares weights on the parents it keeps; the others keep the adaptive Lasso's.
         Every required edge is in the DAG, even where its least-squares weight is ``0``.
-        ``ancestors`` and ``non_ancestors`` narrow the variables the causal order may place next,
-        and a non-ancestor is no parent, as :class:`~andrey.Knowledge` describes;
+        ``required_paths`` and ``forbidden_paths`` narrow the variables the causal order may place
+        next, and a forbidden path is no parent, as :class:`~andrey.Knowledge` describes;
         ``metadata["unmet_knowledge"]`` lists the claims the DAG does not meet.
 
     Returns
@@ -456,8 +456,8 @@ def multi_group_direct_lingam(
         regression on that order drops the forbidden parents and does not penalize the required
         ones. A variable with a required parent takes least-squares weights on the parents it keeps;
         the others keep the adaptive Lasso's. Every required edge is in every group's DAG, even
-        where its least-squares weight is ``0``. ``ancestors`` and ``non_ancestors`` narrow the
-        variables the causal order may place next, and a non-ancestor is no parent, as
+        where its least-squares weight is ``0``. ``required_paths`` and ``forbidden_paths`` narrow
+        the variables the causal order may place next, and a forbidden path is no parent, as
         :class:`~andrey.Knowledge` describes; ``metadata["unmet_knowledge"]`` lists the claims the
         DAG does not meet.
 

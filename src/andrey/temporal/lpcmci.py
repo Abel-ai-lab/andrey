@@ -271,17 +271,18 @@ class LPCMCISearch:
     def _claims(
         self, constraints: LaggedConstraints | None
     ) -> tuple[set[tuple[Key, bool]], set[Key]]:
-        """Read the path and latent claims of ``constraints`` as ``(tails, kept)``, adding their
-        arrowheads to ``self.arrowheads``.
+        """Read the path and confounded claims of ``constraints`` as ``(tails, kept)``, adding
+        their arrowheads to ``self.arrowheads``.
 
-        An ancestor claim puts a tail at its cause and an arrowhead at its effect, and a
-        non-ancestor claim an arrowhead at its cause, as marks ``(key, at_start)``; ``kept`` holds
-        the latent links, which no test removes. A claim is ``(cause, effect, lag)``: the cause
-        ``X^cause_{t-lag}`` is the start of the link, or at lag 0 the end when ``cause > effect``.
+        A ``required_paths`` claim puts a tail at its cause and an arrowhead at its effect, and a
+        ``forbidden_paths`` claim an arrowhead at its cause, as marks ``(key, at_start)``; ``kept``
+        holds the ``confounded`` links, which no test removes. A claim is ``(cause, effect, lag)``:
+        the cause ``X^cause_{t-lag}`` is the start of the link, or at lag 0 the end when
+        ``cause > effect``.
         """
         tails: set[tuple[Key, bool]] = set()
         kept: set[Key] = set()
-        if constraints is None or constraints.ancestor is None:
+        if constraints is None or constraints.required_paths is None:
             return tails, kept
 
         def link(lag: int, cause: int, effect: int) -> tuple[Key, bool]:
@@ -289,14 +290,16 @@ class LPCMCISearch:
                 return (cause, effect, lag), True
             return (effect, cause, 0), False
 
-        assert constraints.non_ancestor is not None and constraints.latent is not None
-        for lag, i, j in np.argwhere(constraints.ancestor).tolist():
+        assert constraints.forbidden_paths is not None and constraints.confounded is not None
+        for lag, i, j in np.argwhere(constraints.required_paths).tolist():
             key, cause_at_start = link(lag, i, j)
             tails.add((key, cause_at_start))
             self.arrowheads.add((key, not cause_at_start))
-        for lag, i, j in np.argwhere(constraints.non_ancestor).tolist():
+        for lag, i, j in np.argwhere(constraints.forbidden_paths).tolist():
             self.arrowheads.add(link(lag, i, j))
-        kept.update(link(lag, i, j)[0] for lag, i, j in np.argwhere(constraints.latent).tolist())
+        kept.update(
+            link(lag, i, j)[0] for lag, i, j in np.argwhere(constraints.confounded).tolist()
+        )
         return tails, kept
 
     def initialize(self, directed: Iterable[tuple[Key, bool]] = ()) -> None:
@@ -305,7 +308,7 @@ class LPCMCISearch:
         ``directed`` holds ``(key, start_is_tail)`` pairs; their middle mark is ``"?"`` updated by
         MMR. The knowledge then leaves out the absent links, directs each required link with the
         empty middle mark, puts its arrowheads and tails in place, updating the middle mark as MMR
-        does, and gives each latent link the empty middle mark, so that no phase tests it. Test
+        does, and gives each confounded link the empty middle mark, so that no phase tests it. Test
         memories and separating sets reset.
         """
         self.edges = {}
@@ -1437,7 +1440,7 @@ def check_claims(
     ``t - lag``, joined to every node by the links ``result`` repeats at each step
     (:func:`~andrey.constraint.fci.check_path_claims`). ``label`` names a variable.
     """
-    if constraints is None or constraints.ancestor is None:
+    if constraints is None or constraints.required_paths is None:
         return
     from andrey.constraint.fci import check_path_claims
 
@@ -1459,8 +1462,10 @@ def check_claims(
         lag, i = divmod(k, n)
         return f"{label(i)} at t-{lag}" if lag else f"{label(i)} at t"
 
-    assert constraints.non_ancestor is not None
-    check_path_claims(marks, window(constraints.ancestor), window(constraints.non_ancestor), node)
+    assert constraints.forbidden_paths is not None
+    check_path_claims(
+        marks, window(constraints.required_paths), window(constraints.forbidden_paths), node
+    )
 
 
 def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:

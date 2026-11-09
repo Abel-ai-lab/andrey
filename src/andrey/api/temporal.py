@@ -1420,11 +1420,11 @@ def lpcmci(
         effect. A required link is ``-->`` from the start and no test or rule removes it. No rule
         changes a mark the knowledge sets. Tiers forbid every link from a later tier into an
         earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's links
-        to its own past stay allowed. ``ancestors``, ``non_ancestors``, and ``latent`` also name
-        each link with its lag: on a link the search keeps, an ancestor claim makes it ``-->``
-        from the cause and a non-ancestor claim puts an arrowhead at the cause, while the tests can
-        still remove it; no test removes a ``latent`` link. A claim the PAG over the time window
-        contradicts raises ``ValueError``, as for :func:`~andrey.fci`.
+        to its own past stay allowed. ``required_paths``, ``forbidden_paths``, and ``confounded``
+        also name each link with its lag: on a link the search keeps, a required path makes it
+        ``-->`` from the cause and a forbidden path puts an arrowhead at the cause, while the tests
+        can still remove it; no test removes a ``confounded`` link. A claim the PAG over the time
+        window contradicts raises ``ValueError``, as for :func:`~andrey.fci`.
 
     Returns
     -------

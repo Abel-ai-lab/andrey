@@ -2868,34 +2868,35 @@ _PATH_METHODS = (
     "mmpc",
 )
 _PATH_RULE = (
-    " With ancestors and non_ancestors, the result is the MPDAG of the DAGs in the class found "
-    "that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang et "
-    "al. 2025); claims that no such DAG meets raise."
+    " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
+    "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
+    "et al. 2025); claims that no such DAG meets raise."
 )
 _PAG_PATHS = (
-    " On an adjacent pair, ancestors (a, b) makes the edge a -> b and non_ancestors (a, b) puts an "
-    "arrowhead at a, before the rules; the tests can still remove the pair. No test removes a "
-    "latent pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and one the PAG "
-    "contradicts raises: an ancestor with no possibly directed path, or a non-ancestor with a "
-    "directed path."
+    " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
+    "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
+    "removes a confounded pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
+    "one the PAG contradicts raises: a required path with no possibly directed path, or a "
+    "forbidden path with a directed path."
 )
-_SCORE_PAG_PATHS = " The test phase also starts from every latent pair." + _PAG_PATHS
+_SCORE_PAG_PATHS = " The test phase also starts from every confounded pair." + _PAG_PATHS
 _ORDER_PATHS = (
-    " With ancestors and non_ancestors, the order search follows Shimizu et al. (2011, Section "
-    "3.4): when the claims show that no remaining variable is an ancestor of some of them, the "
-    "next variable is one of those; otherwise it is none with a claimed ancestor among the "
-    "remaining. The regression drops each non-ancestor as a parent, and metadata unmet_knowledge "
-    "lists the claims the DAG does not meet."
+    " With required_paths and forbidden_paths, the order search follows Shimizu et al. (2011, "
+    "Section 3.4): when the claims show that no remaining variable is an ancestor of some of "
+    "them, the next variable is one of those; otherwise it is none with a claimed ancestor among "
+    "the remaining. The regression drops each forbidden path as a parent, and metadata "
+    "unmet_knowledge lists the claims the DAG does not meet."
 )
 _LAGGED_PATHS = (
-    " ancestors [a, b, lag] puts a tail at a and an arrowhead at b on that link, and non_ancestors "
-    "[a, b, lag] an arrowhead at a; the tests can still remove the link. latent [a, b, lag] keeps "
-    "the link from every removal. Each claim names its lag. A claim on a link the PAG lacks sets "
-    "no mark, and one the PAG contradicts raises: an ancestor with no possibly directed path, or a "
-    "non-ancestor with a directed path."
+    " required_paths [a, b, lag] puts a tail at a and an arrowhead at b on that link, and "
+    "forbidden_paths [a, b, lag] an arrowhead at a; the tests can still remove the link. "
+    "confounded [a, b, lag] keeps the link from every removal. Each claim names its lag. A claim "
+    "on a link the PAG lacks sets no mark, and one the PAG contradicts raises: a required path "
+    "with no possibly directed path, or a forbidden path with a directed path."
 )
-_PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "latent")
-#: The methods that read the path parts, and latent, in the search, with the sentence that says how.
+_PAG_PARTS: tuple[KnowledgePart, ...] = (*PATH_PARTS, "confounded")
+#: The methods that read the path parts and confounded in the search, with the sentence that says
+#: how.
 _ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
     "fci": (_PAG_PARTS, _PAG_PATHS),
     "fci_jci": (_PAG_PARTS, _PAG_PATHS),

@@ -1,6 +1,6 @@
-"""Ancestor, non-ancestor, and latent claims in the searches that read them.
+"""Path and confounded claims in the searches that read them.
 
-The PAG methods set the claims as marks before Zhang's rules and keep the latent pairs; with
+The PAG methods set the claims as marks before Zhang's rules and keep the confounded pairs; with
 d-separation in place of the tests, every mark they set must be the true MAG's. LPCMCI reads the
 claims per lag, and DirectLiNGAM's order search follows Shimizu et al. (2011, Section 3.4).
 """
@@ -56,19 +56,23 @@ def _true_mag(dag: nx.DiGraph, d: int) -> np.ndarray:
 
 
 def _true_claims(dag: nx.DiGraph, d: int, seed: int) -> Knowledge:
-    """About a third of the true ancestor and non-ancestor facts, and every latent pair."""
+    """About a third of the true ancestor and non-ancestor facts, and every confounded pair."""
     rng = np.random.default_rng([seed, 1])
     pairs = [(a, b) for a in range(d) for b in range(d) if a != b]
-    ancestors = [p for p in pairs if nx.has_path(dag, *p) and rng.random() < 0.3]
-    non_ancestors = [p for p in pairs if not nx.has_path(dag, *p) and rng.random() < 0.3]
-    latent = {
+    required_paths = [p for p in pairs if nx.has_path(dag, *p) and rng.random() < 0.3]
+    forbidden_paths = [p for p in pairs if not nx.has_path(dag, *p) and rng.random() < 0.3]
+    confounded = {
         tuple(sorted((int(a), int(b))))
         for hidden in range(d, dag.number_of_nodes())
         for a in dag.successors(hidden)
         for b in dag.successors(hidden)
         if a != b
     }
-    return Knowledge(ancestors=ancestors, non_ancestors=non_ancestors, latent=sorted(latent))
+    return Knowledge(
+        required_paths=required_paths,
+        forbidden_paths=forbidden_paths,
+        confounded=sorted(confounded),
+    )
 
 
 def _oracle(monkeypatch: pytest.MonkeyPatch, dag: nx.DiGraph, x: np.ndarray) -> None:
@@ -99,15 +103,15 @@ def test_fci_with_true_claims_sets_only_true_marks(seed, monkeypatch):
     x = np.random.default_rng(seed).standard_normal((50, d))
     _oracle(monkeypatch, dag, x)
     constraints = resolve(knowledge, d, None, method="fci", ancestral_tiers=True)
-    assert constraints is not None and constraints.latent is not None
+    assert constraints is not None and constraints.confounded is not None
     for possible_dsep in ("fast", "order_free"):
         found = fci_engine.fci(
             x, indep_test="dsep_oracle", possible_dsep=possible_dsep, constraints=constraints
         ).to_numpy()
         np.testing.assert_array_equal(found != NULL, mag != NULL)
         assert not _wrong_marks(found, mag).any()
-        assert (found != NULL)[constraints.latent].all()
-        check_path_claims(found, constraints.ancestor, constraints.non_ancestor)
+        assert (found != NULL)[constraints.confounded].all()
+        check_path_claims(found, constraints.required_paths, constraints.forbidden_paths)
 
 
 def _minimal_imap(dag: nx.DiGraph, d: int) -> GraphStructure:
@@ -130,7 +134,7 @@ def _minimal_imap(dag: nx.DiGraph, d: int) -> GraphStructure:
 @pytest.mark.parametrize("name", ["gfci", "boss_fci", "grasp_fci"])
 def test_score_then_test_methods_with_true_claims_set_only_true_marks(name, monkeypatch):
     """The score phase returns the minimal I-map's CPDAG; on each graph where the method without
-    claims sets only true marks, it still does with the claims, and keeps every latent pair."""
+    claims sets only true marks, it still does with the claims, and keeps every confounded pair."""
     checked = 0
     for seed in range(30):
         dag, d = _latent_dag(seed)
@@ -144,12 +148,12 @@ def test_score_then_test_methods_with_true_claims_set_only_true_marks(name, monk
         if _wrong_marks(bare, mag).any():
             continue
         constraints = resolve(_true_claims(dag, d, seed), d, None, method=name)
-        assert constraints is not None and constraints.latent is not None
+        assert constraints is not None and constraints.confounded is not None
         found = getattr(engines, name)(x, indep_test="dsep_oracle", constraints=constraints)
         found = found.to_numpy()
         assert not _wrong_marks(found, mag).any(), seed
-        assert (found != NULL)[constraints.latent].all()
-        check_path_claims(found, constraints.ancestor, constraints.non_ancestor)
+        assert (found != NULL)[constraints.confounded].all()
+        check_path_claims(found, constraints.required_paths, constraints.forbidden_paths)
         checked += 1
     assert checked >= 15
 
@@ -169,38 +173,40 @@ def _fit(name, data, **kwargs):
 
 
 @pytest.mark.parametrize("name", ["fci", "fci_jci", "gfci", "boss_fci", "grasp_fci"])
-def test_a_latent_pair_stays_with_its_claimed_marks(name, independent):
-    """No test removes a latent pair, even one no score phase finds, and the claims set its marks:
-    with neither variable an ancestor of the other, the edge is ``a <-> b``."""
-    knowledge = Knowledge(latent=[("a", "b")], non_ancestors=[("a", "b"), ("b", "a")])
+def test_a_confounded_pair_stays_with_its_claimed_marks(name, independent):
+    """No test removes a confounded pair, even one no score phase finds, and the claims set its
+    marks: with neither variable an ancestor of the other, the edge is ``a <-> b``."""
+    knowledge = Knowledge(confounded=[("a", "b")], forbidden_paths=[("a", "b"), ("b", "a")])
     marks = _fit(name, independent, knowledge=knowledge).structure.to_numpy()
     assert marks[0, 1] == ARROW and marks[1, 0] == ARROW
     assert (marks[2:4, :4] == NULL).all()
-    marks = _fit(name, independent, knowledge=Knowledge(latent=[("c", "d")])).structure.to_numpy()
+    marks = _fit(
+        name, independent, knowledge=Knowledge(confounded=[("c", "d")])
+    ).structure.to_numpy()
     assert marks[2, 3] != NULL and marks[3, 2] != NULL
 
 
-def test_an_ancestor_claim_on_an_adjacent_pair_directs_it():
+def test_a_required_path_on_an_adjacent_pair_directs_it():
     marks = np.full((3, 3), CIRCLE, dtype=np.int8)
     np.fill_diagonal(marks, NULL)
     constraints = resolve(
-        Knowledge(ancestors=[(0, 1)], non_ancestors=[(2, 0)]), 3, None, method="fci"
+        Knowledge(required_paths=[(0, 1)], forbidden_paths=[(2, 0)]), 3, None, method="fci"
     )
     knowledge_marks(marks, constraints)
     assert (marks[0, 1], marks[1, 0]) == (TAIL, ARROW)
     assert marks[2, 0] == ARROW and marks[0, 2] == CIRCLE
-    clash = resolve(Knowledge(ancestors=[(0, 1)], forbidden=[(0, 1)]), 3, None, method="fci")
+    clash = resolve(Knowledge(required_paths=[(0, 1)], forbidden=[(0, 1)]), 3, None, method="fci")
     with pytest.raises(KnowledgeError, match="arrowhead at 0"):
         knowledge_marks(np.where(np.eye(3, dtype=bool), NULL, CIRCLE).astype(np.int8), clash)
 
 
 def test_a_claim_the_pag_contradicts_raises(independent):
     with pytest.raises(ValueError, match="no possibly directed path from 'a' to 'b'"):
-        _fit("fci", independent, knowledge=Knowledge(ancestors=[("a", "b")]))
+        _fit("fci", independent, knowledge=Knowledge(required_paths=[("a", "b")]))
     chain = np.zeros((3, 3), dtype=np.int8)
     chain[0, 1] = chain[1, 2] = TAIL
     chain[1, 0] = chain[2, 1] = ARROW
-    with pytest.raises(KnowledgeError, match=r"\(0, 2\) in non_ancestors, but the PAG has a"):
+    with pytest.raises(KnowledgeError, match=r"\(0, 2\) in forbidden_paths, but the PAG has a"):
         check_path_claims(chain, None, np.eye(3, k=2, dtype=bool))
     check_path_claims(chain, np.eye(3, k=2, dtype=bool), np.eye(3, k=-2, dtype=bool))
 
@@ -208,9 +214,9 @@ def test_a_claim_the_pag_contradicts_raises(independent):
 @pytest.mark.parametrize(
     "name", ["fci", "gfci", "lpcmci", "direct_lingam", "multi_group_direct_lingam"]
 )
-def test_an_ancestor_from_a_later_tier_raises_before_the_fit(name, independent):
+def test_a_required_path_from_a_later_tier_raises_before_the_fit(name, independent):
     claim = ("b", "a", 1) if name == "lpcmci" else ("b", "a")
-    knowledge = Knowledge(tiers=[["a"], ["b"]], ancestors=[claim])
+    knowledge = Knowledge(tiers=[["a"], ["b"]], required_paths=[claim])
     data = [independent, independent] if name == "multi_group_direct_lingam" else independent
     with pytest.raises(ValueError, match="later tier is no ancestor of an earlier one"):
         _fit(name, data, knowledge=knowledge)
@@ -225,13 +231,15 @@ def test_the_order_search_reads_lemmas_3_and_4():
     np.testing.assert_array_equal(
         pwling.eligible(precedence, None, [0, 1, 2, 3]), [True, False, True, True]
     )
-    non_ancestor = np.zeros((4, 4), dtype=bool)
-    non_ancestor[[0, 1, 3], 2] = True  # Lemma 3: no other variable is an ancestor of 2
+    forbidden_paths = np.zeros((4, 4), dtype=bool)
+    forbidden_paths[[0, 1, 3], 2] = True  # Lemma 3: no other variable is an ancestor of 2
     np.testing.assert_array_equal(
-        pwling.eligible(precedence, non_ancestor, [0, 1, 2, 3]), [False, False, True, False]
+        pwling.eligible(precedence, forbidden_paths, [0, 1, 2, 3]), [False, False, True, False]
     )
     # Among 0, 1, and 3 only, the claims show nothing exogenous: every candidate not excluded stays.
-    np.testing.assert_array_equal(pwling.eligible(precedence, non_ancestor, [0, 1, 3]), [1, 0, 1])
+    np.testing.assert_array_equal(
+        pwling.eligible(precedence, forbidden_paths, [0, 1, 3]), [1, 0, 1]
+    )
 
 
 @pytest.fixture
@@ -253,19 +261,19 @@ def test_order_claims_shape_the_dag(name, chain):
         out = _fit(name, data, knowledge=knowledge)
         return out[0] if isinstance(out, list) else out
 
-    # One-way non-ancestor claims around a cycle order no pair, so they raise nothing.
-    cyclic = Knowledge(non_ancestors=[("x", "w"), ("w", "z"), ("z", "x")])
+    # One-way forbidden paths around a cycle order no pair, so they raise nothing.
+    cyclic = Knowledge(forbidden_paths=[("x", "w"), ("w", "z"), ("z", "x")])
     assert fit(cyclic).metadata["unmet_knowledge"] == []
     # Claims that make z exogenous, against the data: Lemma 3 puts z first, and Lemma 5 gives it
     # no parent, so the DAG meets them.
-    exogenous = Knowledge(non_ancestors=[("x", "z"), ("y", "z"), ("w", "z")])
+    exogenous = Knowledge(forbidden_paths=[("x", "z"), ("y", "z"), ("w", "z")])
     out = fit(exogenous)
     assert not (out.structure.to_numpy()[2] == ARROW).any()
     assert out.metadata["unmet_knowledge"] == []
-    met = fit(Knowledge(ancestors=[("x", "z")]))
+    met = fit(Knowledge(required_paths=[("x", "z")]))
     assert met.metadata["unmet_knowledge"] == []
-    unmet = fit(Knowledge(ancestors=[("w", "x")]))
-    assert unmet.metadata["unmet_knowledge"] == [["ancestors", "w", "x"]]
+    unmet = fit(Knowledge(required_paths=[("w", "x")]))
+    assert unmet.metadata["unmet_knowledge"] == [["required_paths", "w", "x"]]
 
 
 # ---- LPCMCI --------------------------------------------------------------------------------------
@@ -284,26 +292,31 @@ def _series(seed: int = 1, steps: int = 600) -> np.ndarray:
 
 def test_lpcmci_sets_the_claimed_marks_on_the_links_it_keeps():
     data = _series()
-    knowledge = Knowledge(ancestors=[(1, 2, 0)], non_ancestors=[(2, 0, 0)], latent=[(0, 2, 0)])
+    knowledge = Knowledge(
+        required_paths=[(1, 2, 0)], forbidden_paths=[(2, 0, 0)], confounded=[(0, 2, 0)]
+    )
     constraints = andrey.core.knowledge.resolve_lagged(knowledge, 3, None, 2, method="lpcmci")
     result = lpcmci_engine(data, tau_max=2, constraints=constraints)
     assert (result.start_marks[0, 1, 2], result.end_marks[0, 1, 2]) == (TAIL, ARROW)
-    assert result.end_marks[0, 0, 2] == ARROW  # the cause 2 of the non-ancestor claim
+    assert result.end_marks[0, 0, 2] == ARROW  # the cause 2 of the forbidden path
     bare = lpcmci_engine(data, tau_max=2)
     assert bare.start_marks[0, 0, 2] == NULL  # x and z are separated given y
-    assert result.start_marks[0, 0, 2] != NULL  # the latent link stays
+    assert result.start_marks[0, 0, 2] != NULL  # the confounded link stays
 
 
 def test_lpcmci_claims_need_their_lag():
     data = _series()
     for knowledge, message in (
-        (Knowledge(ancestors=[(0, 1)]), "without a lag"),
-        (Knowledge(latent=[(0, 1, 3)]), "at lag 3"),
-        (Knowledge(ancestors=[(0, 1, 0)], forbidden=[(0, 1, 0)]), "arrowhead at the cause"),
-        (Knowledge(latent=[(0, 1, 1)], forbidden=[(0, 1, 1)]), "leaves out"),
-        (Knowledge(ancestors=[(0, 1, 1)], non_ancestors=[(0, 1, 1)]), "non_ancestors lists"),
+        (Knowledge(required_paths=[(0, 1)]), "without a lag"),
+        (Knowledge(confounded=[(0, 1, 3)]), "at lag 3"),
+        (Knowledge(required_paths=[(0, 1, 0)], forbidden=[(0, 1, 0)]), "arrowhead at the cause"),
+        (Knowledge(confounded=[(0, 1, 1)], forbidden=[(0, 1, 1)]), "leaves out"),
+        (
+            Knowledge(required_paths=[(0, 1, 1)], forbidden_paths=[(0, 1, 1)]),
+            "forbidden_paths lists",
+        ),
     ):
         with pytest.raises(ValueError, match=message):
             _fit("lpcmci", data, tau_max=2, knowledge=knowledge)
     with pytest.raises(ValueError, match="no possibly directed path from 2 at t-2 to 0 at t"):
-        _fit("lpcmci", data, tau_max=2, knowledge=Knowledge(ancestors=[(2, 0, 2)]))
+        _fit("lpcmci", data, tau_max=2, knowledge=Knowledge(required_paths=[(2, 0, 2)]))

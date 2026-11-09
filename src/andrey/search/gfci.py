@@ -333,9 +333,9 @@ def fci_from_pattern(
     (:func:`~andrey.constraint.fci_jci.mark_index`, with ``confounded_index``), and the rules leave
     out R5-R7, since JCI assumes no selection bias. The PAG still holds the index.
 
-    A latent pair of ``constraints`` joins the adjacencies the test phase starts from, whether
-    the pattern joins it or not, and no test removes it; a triple over it that the pattern lacks
-    is decided by the separating sets (:func:`~andrey.constraint.fci.orient_colliders`).
+    A ``confounded`` pair of ``constraints`` joins the adjacencies the test phase starts from,
+    whether the pattern joins it or not, and no test removes it; a triple over it that the pattern
+    lacks is decided by the separating sets (:func:`~andrey.constraint.fci.orient_colliders`).
     """
     check_edge_removal(edge_removal)
     pattern = from_structure(cpdag)
@@ -347,9 +347,9 @@ def fci_from_pattern(
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     support = pattern != NULL
-    latent = None if constraints is None else constraints.latent
-    if latent is not None:
-        support = support | latent
+    confounded = None if constraints is None else constraints.confounded
+    if confounded is not None:
+        support = support | confounded
     skeleton, sepsets, _ = adjacency_search(
         test,
         X.shape[1],
@@ -362,8 +362,8 @@ def fci_from_pattern(
     derived = _derive_sepsets(
         pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order
     )
-    if latent is not None:  # a latent pair stays adjacent, so it has no separating set
-        derived = {pair: found for pair, found in derived.items() if not latent[pair]}
+    if confounded is not None:  # a confounded pair stays adjacent, so it has no separating set
+        derived = {pair: found for pair, found in derived.items() if not confounded[pair]}
     sepsets.update(derived)
 
     marks = circle_pag(skeleton)

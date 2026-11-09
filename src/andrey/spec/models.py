@@ -253,8 +253,8 @@ class MethodSpec(Spec):
     # knowledge honors, and the parts it honors experimentally (ExperimentalWarning on use).
     knowledge_extra: tuple[KnowledgePart, ...] = ()
     knowledge_experimental: tuple[KnowledgePart, ...] = ()
-    # Whether ancestors and non_ancestors restrict the CPDAG the method returns, after the fit,
-    # rather than reaching the method's search.
+    # Whether required_paths and forbidden_paths restrict the CPDAG the method returns, after the
+    # fit, rather than reaching the method's search.
     restricts_paths: bool = False
 
     @property

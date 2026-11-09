@@ -36,8 +36,8 @@ def multi_group_direct_lingam(
     :data:`~andrey.lingam.pwling.MEASURES`, as in :func:`~andrey.lingam.direct.direct_lingam`; each
     group is standardized, and for ``"skew"`` sign-corrected, on its own. With background knowledge
     ``constraints``, the order keeps :meth:`~andrey.core.knowledge.Constraints.precedence` and
-    reads the non-ancestor claims, and each group's regression drops forbidden parents and
-    non-ancestors and keeps required ones unpenalized, as
+    reads ``forbidden_paths``, and each group's regression drops forbidden parents and forbidden
+    paths and keeps required ones unpenalized, as
     :func:`~andrey.lingam.direct.direct_lingam` does.
     """
     groups = [np.asarray(X, dtype=np.float64) for X in X_list]
@@ -50,7 +50,7 @@ def multi_group_direct_lingam(
         groups,
         n_features,
         precedence=constraints.precedence(),
-        non_ancestor=constraints.non_ancestor,
+        forbidden_paths=constraints.forbidden_paths,
         measure=measure,
     )
     forbidden = forbidden_parents(constraints)
@@ -66,7 +66,7 @@ def _find_shared_causal_order(
     n_features: int,
     *,
     precedence: np.ndarray | None = None,
-    non_ancestor: np.ndarray | None = None,
+    forbidden_paths: np.ndarray | None = None,
     measure: str = "pwling",
 ) -> list[int]:
     """Peel exogenous variables by size-weighted sum of per-group ``measure`` scores.
@@ -77,7 +77,7 @@ def _find_shared_causal_order(
     that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
     representative and followed directly by the other copies. With ``precedence``, as for
     :func:`pwling.find_causal_order`, no copy group is formed, and the pick is the best of
-    :func:`pwling.eligible`, which also reads ``non_ancestor``.
+    :func:`pwling.eligible`, which also reads ``forbidden_paths``.
     """
     score = pwling.scorer(measure)
     total_n = sum(len(X) for X in groups)
@@ -102,7 +102,7 @@ def _find_shared_causal_order(
             if precedence is None:
                 m = pwling.pick(neg_mg, candidates, ranks)
             else:
-                eligible = pwling.eligible(precedence, non_ancestor, candidates)
+                eligible = pwling.eligible(precedence, forbidden_paths, candidates)
                 chosen = [c for c, ok in zip(candidates, eligible, strict=True) if ok]
                 m = pwling.pick(neg_mg[eligible], chosen, ranks)
         placed = [m, *copies[m]]
