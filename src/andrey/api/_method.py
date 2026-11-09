@@ -2,11 +2,13 @@
 
 :func:`method_spec` wraps a facade so that each call maps a former argument name or value to the
 current one, checks every argument against its :class:`~andrey.spec.models.ParamSpec`, resolves
-the seed, warns that an experimental method is experimental, picks a test or a score the call
-leaves to the method, and names the method, the seed, the test and score the fit used, the score's
-penalties, and the configuration's tie-break rule in the result's metadata. The data check that
-follows, in :func:`andrey.api._adapt.data_matrix`, warns when the data are larger than the
-method's measured boundary. A facade keeps only its method's own logic.
+the seed, warns that an experimental method is experimental, checks the parts of its background
+knowledge against the ones the method honors, picks a test or a score the call leaves to the
+method, restricts a CPDAG result by the knowledge's causal paths, and names the method, the seed,
+the test and score the fit used, the score's penalties, and the configuration's tie-break rule in
+the result's metadata. The data check that follows, in :func:`andrey.api._adapt.data_matrix`,
+warns when the data are larger than the method's measured boundary. A facade keeps only its
+method's own logic.
 """
 
 from __future__ import annotations
@@ -17,17 +19,22 @@ import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from andrey.api._adapt import default_score, default_test
+import numpy as np
+
+from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.ci_missing import TESTWISE
+from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
+from andrey.core.structure import column_labels
 from andrey.core.warning_policy import DeprecatedArgumentWarning, ExperimentalWarning, warn_once
 
 if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
     from andrey.core.output import StructureOutput
     from andrey.spec.models import MethodSpec, ParamSpec
 
@@ -57,13 +64,18 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     column of the data is taken out of it (:func:`take_columns`); a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; an experimental method warns :class:`~andrey.ExperimentalWarning`
-    (:func:`warn_experimental`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
+    (:func:`warn_experimental`); a ``knowledge`` part the method does not honor raises
+    ``NotImplementedError``, one it honors experimentally warns, and ``required_paths`` and
+    ``forbidden_paths`` are resolved and set apart from the knowledge the facade gets
+    (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
     declared column types, and the facade gets the pick and the columns it reads
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
     a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
-    After it: each result's ``metadata["algorithm"]`` is ``name``, ``metadata["indep_test"]`` and
-    ``metadata["score_func"]`` are the test and the score the fit used, for a method that takes
-    them, with the penalties that score used (:func:`used_penalties`);
+    After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
+    ``forbidden_paths`` (:func:`restrict_paths`); each result's ``metadata["algorithm"]`` is
+    ``name``, ``metadata["indep_test"]`` and ``metadata["score_func"]`` are the test and the score
+    the fit used, for a method that takes them, with the penalties that score used
+    (:func:`used_penalties`);
     ``metadata["tie_break"]`` is :data:`andrey.config`'s ``tie_break`` for a method whose result it
     can change (``MethodSpec.tie_break``); when the fit draws random numbers
     (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used; and, when its tests met
@@ -89,6 +101,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                     bound.arguments[key] = check_argument(params[key], value, name)
             pool_environments(spec, bound.arguments)
             take_columns(spec, bound.arguments)
+            paths = path_constraints(spec, bound.arguments)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
                 seed = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
@@ -99,6 +112,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
             out = facade(*bound.args, **bound.kwargs)
+            if paths is not None:
+                out = restrict_paths(out, paths)
             stamp.update(chosen)
             stamp.update(used_penalties(spec, bound.arguments, chosen.get("score_func")))
             if spec.tie_break:
@@ -118,6 +133,126 @@ def warn_experimental(name: str) -> None:
         f"andrey.{name} is experimental: it has no published benchmark, and its API may change "
         "without deprecation.",
         ExperimentalWarning,
+    )
+
+
+def unhonored_part(method: str, part: str, setting: str = "") -> str:
+    """Return the message for knowledge ``part`` given to ``method``, which does not honor it.
+
+    ``setting`` names the arguments under which ``method`` does not honor it, such as an undirected
+    ``structure``, and is empty when it never does. The message names the methods that honor it,
+    from the registry, and for ``required_paths`` and ``forbidden_paths`` the methods that honor
+    them only with a CPDAG result (:func:`undirected_setting`).
+    """
+    from andrey.spec.registry import REGISTRY
+
+    honoring = [name for name, spec in REGISTRY.items() if part in spec.knowledge]
+    others = (
+        f"the methods that honor it are {', '.join(honoring)}"
+        if honoring
+        else "no method honors it"
+    )
+    local = [name for name in honoring if structure_param(REGISTRY[name]) is not None]
+    if part in PATH_PARTS and local:
+        others += f" ({', '.join(local)} with structure='cpdag' and no target)"
+    who = f"{method} with {setting}" if setting else method
+    return f"{who} does not honor knowledge {part}; {others}"
+
+
+def structure_param(spec: MethodSpec) -> ParamSpec | None:
+    """Return the ``structure`` choice of a local-structure method, else ``None``."""
+    return next((p for p in spec.params if p.concept == "structure"), None)
+
+
+def undirected_setting(spec: MethodSpec, arguments: dict[str, Any]) -> str | None:
+    """Return the setting under which the call's result is an undirected graph, else ``None``.
+
+    A method with a ``structure`` choice returns one for a ``target`` and for a ``structure`` that
+    :data:`~andrey.spec.concepts.BLANKET_STRUCTURES` makes undirected, the default when the call
+    passes none. An undirected graph stands for no set of DAGs that the causal paths could restrict.
+    """
+    from andrey.spec.concepts import BLANKET_STRUCTURES
+
+    structure = structure_param(spec)
+    if structure is None:
+        return None
+    if arguments.get("target") is not None:
+        return "a target"
+    choice = arguments.get("structure", structure.default)
+    return f"structure={choice!r}" if BLANKET_STRUCTURES[choice] == "undirected" else None
+
+
+def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints | None:
+    """Check the call's ``knowledge`` against the parts ``spec`` honors, and set its paths apart.
+
+    A part the method does not honor raises ``NotImplementedError`` (:func:`unhonored_part`), as
+    do ``required_paths`` and ``forbidden_paths`` for a call whose result is undirected
+    (:func:`undirected_setting`), and a part it honors experimentally warns
+    :class:`~andrey.ExperimentalWarning` once. Knowledge with ``required_paths`` or
+    ``forbidden_paths`` is resolved against the data's columns before the fit
+    (:func:`~andrey.core.knowledge.resolve`, which raises
+    :class:`~andrey.core.knowledge.KnowledgeError` for knowledge that contradicts itself), and the
+    facade gets it without them; the return value then holds them for :func:`restrict_paths`,
+    else it is ``None``. Anything but a :class:`~andrey.Knowledge` is left to the facade.
+    """
+    knowledge = arguments.get("knowledge")
+    if not isinstance(knowledge, Knowledge):
+        return None
+    given = knowledge.parts()
+    for part in given:
+        if part not in spec.knowledge:
+            raise NotImplementedError(unhonored_part(spec.name, part))
+    for part in given:
+        if part in spec.knowledge_experimental:
+            warn_once(
+                f"andrey.{spec.name}: knowledge {part} is experimental: it has no published "
+                "benchmark, and its meaning may change without deprecation.",
+                ExperimentalWarning,
+            )
+    if not set(given) & set(PATH_PARTS):
+        return None
+    if (setting := undirected_setting(spec, arguments)) is not None:
+        part = next(p for p in given if p in PATH_PARTS)
+        raise NotImplementedError(unhonored_part(spec.name, part, setting))
+    arguments["knowledge"] = knowledge.edge_parts()
+    data = arguments[spec.data.inputs[0].name]
+    shape = np.shape(data)
+    if len(shape) != 2:  # the facade's data check names the problem
+        return None
+    return resolve(knowledge, shape[1], column_labels(data), method=spec.name)
+
+
+def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureOutput:
+    """Return ``out`` with its CPDAG restricted by the causal paths of ``constraints``.
+
+    Of the DAGs the CPDAG stands for, the structure becomes the MPDAG of those that meet
+    ``required_paths`` and ``forbidden_paths`` (:func:`~andrey.core.ancestral.restrict`), and
+    ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each
+    ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. An
+    undirected structure, which the paths do not orient, is returned as it is.
+    """
+    from andrey.core.ancestral import restrict
+    from andrey.core.orient import from_structure, to_structure
+
+    structure = out.structure
+    if getattr(structure, "kind", None) != "cpdag":
+        return out
+    # The claims name the data's columns by position, and the graph is over the same columns.
+    assert structure.n_nodes == constraints.d, (structure.n_nodes, constraints.d)
+    labels = structure.labels
+    name = label_of(labels)
+    mpdag, clauses = restrict(
+        from_structure(structure),  # ty: ignore[invalid-argument-type]  # a cpdag is a graph
+        constraints.required_paths,
+        constraints.forbidden_paths,
+        label=lambda i: repr(name(i)) if labels is not None else str(i),
+    )
+    metadata = {
+        **out.metadata,
+        "ancestor_clauses": [[name(t), [name(h) for h in sorted(heads)]] for t, heads in clauses],
+    }
+    return dataclasses.replace(
+        out, _structure=to_structure(mpdag, kind="cpdag", labels=labels), _metadata=metadata
     )
 
 
