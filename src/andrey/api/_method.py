@@ -190,8 +190,9 @@ def restrict_paths(out: StructureOutput, constraints: Constraints) -> StructureO
 
     Of the DAGs the CPDAG stands for, the structure becomes the MPDAG of those that meet
     ``ancestors`` and ``non_ancestors`` (:func:`~andrey.core.ancestral.restrict`), and
-    ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2,
-    ...``. An undirected structure, which the paths do not orient, is returned as it is.
+    ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each
+    ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. An
+    undirected structure, which the paths do not orient, is returned as it is.
     """
     from andrey.core.ancestral import restrict
     from andrey.core.orient import from_structure, to_structure
