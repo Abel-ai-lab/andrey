@@ -361,8 +361,10 @@ def test_order_claims_shape_the_dag(name, chain):
     assert out.metadata["unmet_knowledge"] == []
     met = fit(Knowledge(required_paths=[("x", "z")]))
     assert met.metadata["unmet_knowledge"] == []
-    unmet = fit(Knowledge(required_paths=[("w", "x")]))
+    unmet, caught = _dropping(name, data, knowledge=Knowledge(required_paths=[("w", "x")]))
+    unmet = unmet[0] if isinstance(unmet, list) else unmet
     assert unmet.metadata["unmet_knowledge"] == [["required_paths", "w", "x"]]
+    assert caught and all("required_paths ('w', 'x')" in message for message in caught)
 
 
 # ---- LPCMCI --------------------------------------------------------------------------------------
