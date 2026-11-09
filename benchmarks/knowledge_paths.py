@@ -30,6 +30,8 @@ variables (``pag``), or the true window MAG (``lpcmci``); an undirected edge or 
 nothing and is never wrong, so a claim that orients an edge correctly lowers ``errors``.
 ``empty_errors`` is the empty graph's count, the floor. A fit that raises ``KnowledgeError``
 because its result cannot meet the claims is recorded as ``knowledge_error``, never as a graph.
+A seed whose graph has too few nodes with two children to hide the cell's hidden nodes is recorded
+once as ``no_dataset`` and left out.
 
 - ``cpdag``: ``pc``, ``ges``, ``boss``; linear-Gaussian, standardized; ``d`` 10, 20, 50; ``n`` 500,
   2000; expected degree 2 and 4; claims on 5, 10, 30 % of ordered pairs, ancestor and non-ancestor
@@ -460,7 +462,11 @@ def run_unit(task: tuple) -> list[dict]:
     and with false claims; with a ``part``, with true claims of that part alone instead."""
     lane, cell_name, seed, part = task
     cell = LANES[lane]["cells"][cell_name]
-    prob = problem(lane, cell, seed)
+    try:
+        prob = problem(lane, cell, seed)
+    except ValueError as exc:  # the generator cannot hide the key's hidden nodes on this graph
+        skipped = {"lane": lane, "cell": cell_name, "seed": seed, "part": part or "all"}
+        return [{**skipped, "arm": "none", "status": "no_dataset", "message": str(exc)[:300]}]
     truth = prob["truth"]
     rows = []
     arms = [("bare", None, None)]
@@ -931,7 +937,7 @@ def compare(records: list[dict]) -> list[dict]:
     bare = {(r["method"], r["dataset_id"]): r for r in records if r["arm"] == "bare"}
     groups: dict[tuple, list[dict]] = {}
     for r in records:
-        if r["arm"] != "bare":
+        if r["arm"] not in ("bare", "none"):
             groups.setdefault(
                 (r["lane"], r["method"], r["cell"], r.get("part", "all"), r["arm"], r["fraction"]),
                 [],
