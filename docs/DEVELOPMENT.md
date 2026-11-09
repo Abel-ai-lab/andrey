@@ -154,6 +154,12 @@ wordmark, title, and release over its left side (`preview_jpeg`). A post belongs
 its `version` front matter, and later builds leave it as that release rendered it: its numbers are
 typed text, and every file it includes is stored under `blog/<version>/`.
 
+When a later release makes a feature post wrong or incomplete, the post is rewritten to describe
+that release, and its `version` and `date` move to it (the release PR sets the final date). Its
+file name and address stay. Its files move to the new release's folder, named apart from any other
+post's files there, and an example is run again on the new release. A number the new release did
+not measure names the release that did, such as "in the 0.4.0 benchmarks".
+
 ## The release cards
 
 Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
