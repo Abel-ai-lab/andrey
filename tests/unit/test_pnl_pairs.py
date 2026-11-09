@@ -4,12 +4,13 @@ torch path matches NumPy's to rounding."""
 from __future__ import annotations
 
 import importlib
+import math
 import warnings
 from unittest import mock
 
 import numpy as np
 import pytest
-from scipy.special import gammainc
+from scipy.special import gammaincc
 
 import andrey
 from andrey.core import backend, env, warning_policy
@@ -19,7 +20,7 @@ from andrey.core.independence import (
     _gaussian_kernel,
     _kernel_into,
     _standardize,
-    hsic_statistic_test,
+    hsic_statistic_log_p,
 )
 
 _pnl = importlib.import_module("andrey.irregular.pnl")
@@ -34,7 +35,8 @@ def _table(n: int) -> np.ndarray:
 
 
 def _reference_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    """The HSIC gamma test from whole-matrix kernels, spelled out, for 1-D ``x`` and ``y``."""
+    """The HSIC gamma test's statistic over its mean and the logarithm of its p-value, from
+    whole-matrix kernels, spelled out, for 1-D ``x`` and ``y``."""
     n = len(x)
     kxc, kyc = (
         _center_kernel(
@@ -45,7 +47,7 @@ def _reference_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     statistic = np.sum(kxc * kyc)
     mean = np.trace(kxc) * np.trace(kyc) / n
     var = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
-    return float(statistic / mean), float(1.0 - gammainc(mean**2 / var, statistic / (var / mean)))
+    return float(statistic / mean), math.log(gammaincc(mean**2 / var, statistic / (var / mean)))
 
 
 @pytest.mark.parametrize("n", [150, 600, 1300])  # each kernel width of the HSIC test
@@ -57,7 +59,7 @@ def test_blocked_hsic_equals_the_whole_matrix_test(n):
     kxc = _kernel_into(cause.standardized, cause.width, buffers.cause, buffers.block)
     blocked = _pnl._hsic(kxc, np.trace(kxc), np.sum(kxc**2), disturbance, buffers)
     reference = _reference_test(_pnl._gaussianize(X[:, 0]), disturbance)
-    assert hsic_statistic_test(_pnl._gaussianize(X[:, 0]), disturbance) == reference
+    assert hsic_statistic_log_p(_pnl._gaussianize(X[:, 0]), disturbance) == reference
     assert blocked == reference
 
 
@@ -151,9 +153,10 @@ def _decisions(rows: np.ndarray) -> np.ndarray:
 
 @pytest.mark.parametrize("n", [150, 600, 1300])
 def test_torch_path_matches_numpy(n):
-    """On torch's CPU backend, the p-values and statistics match NumPy's to 1e-8, a batch smaller
-    than a cause's effects included, and every decision is the same, except where NumPy's two
-    statistics tie exactly (a column against itself or its copy) and rounding may break the tie.
+    """On torch's CPU backend, the p-values, the exponentials of the logarithms each row holds, and
+    the statistics match NumPy's to 1e-8, a batch smaller than a cause's effects included, and
+    every decision is the same, except where NumPy's two statistics tie exactly (a column against
+    itself or its copy) and rounding may break the tie.
 
     The tolerance covers torch's float64 ``exp``, which on some CPUs is off by up to 3e-9 relative
     in a fraction of processes.
@@ -172,6 +175,6 @@ def test_torch_path_matches_numpy(n):
     tied = expected[:, 2] == expected[:, 3]
     assert tied.sum() == 2 and not tied.all()
     for rows in (got, one_per_batch):
-        assert np.allclose(rows[:, :2], expected[:, :2], rtol=0, atol=1e-8)
+        assert np.allclose(np.exp(rows[:, :2]), np.exp(expected[:, :2]), rtol=0, atol=1e-8)
         assert np.allclose(rows[:, 2:], expected[:, 2:], rtol=1e-8, atol=0)
         assert np.array_equal(_decisions(rows)[~tied], _decisions(expected)[~tied])

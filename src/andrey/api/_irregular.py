@@ -69,10 +69,10 @@ def _direction(
 ) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
-    With ``alpha=None``, choose the direction with the larger p-value. Equal p-values, given both
-    test statistics, choose the direction with the smaller statistic, the weaker dependence; equal
-    or missing statistics give no edge. Otherwise, choose a direction only when its p-value exceeds
-    ``alpha`` and the other does not.
+    With ``alpha=None``, choose the direction with the larger p-value, which ``pval_*`` may give as
+    its logarithm. Equal p-values, given both test statistics, choose the direction with the
+    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Otherwise,
+    choose a direction only when its p-value exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
         forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
@@ -89,6 +89,7 @@ def pairwise_output(
     *,
     stat_forward: Any = None,
     stat_backward: Any = None,
+    log_p: tuple[float, float] | None = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
     extra: Mapping[str, Any] | None = None,
@@ -96,11 +97,13 @@ def pairwise_output(
     """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    Each test statistic, when given, is an HSIC statistic divided by its mean under independence:
-    with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without
-    them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the
-    same keys. A p-value or statistic may be a shape-``(1,)`` array (:func:`_coerce_float`).
-    ``extra`` adds metadata entries after them, such as ``rows_tested``.
+    ``log_p``, when given, holds the two p-values' natural logarithms, which keep their order where
+    both p-values underflow to ``0``; with ``alpha=None`` they are compared in place of the
+    p-values. Each test statistic, when given, is an HSIC statistic divided by its mean under
+    independence: with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning,
+    and without them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]``
+    under the same keys. A p-value or statistic may be a shape-``(1,)`` array
+    (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -110,7 +113,8 @@ def pairwise_output(
             "stat_backward": _coerce_float(stat_backward),
         }
     M = np.zeros((2, 2), dtype=np.int8)
-    direction = _direction(forward, backward, alpha, **stats)
+    compared = (forward, backward) if log_p is None or alpha is not None else log_p
+    direction = _direction(*compared, alpha, **stats)
     if direction:
         source, target = (0, 1) if direction > 0 else (1, 0)
         M[source, target], M[target, source] = TAIL, ARROW

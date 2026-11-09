@@ -12,17 +12,26 @@ from andrey.latent.gin import _fisher_combine
 
 
 def test_gin_pools_p_values_by_fishers_method() -> None:
-    """Fisher's statistic ``-2 sum(log p)`` against chi-square with ``2c`` degrees of freedom.
+    """Fisher's statistic ``-2 sum(log p)`` against chi-square with ``2c`` degrees of freedom, from
+    the p-values' logarithms.
 
-    One p-value pools to itself, and one strong rejection among many weak ones keeps its weight.
+    One p-value pools to itself, one strong rejection among many weak ones keeps its weight, and a
+    p-value below the smallest double enters through its finite logarithm.
     """
     for p in (0.5, 1e-3, 1e-6, 1e-12, 1e-50):
-        assert _fisher_combine([p]) == pytest.approx(p, rel=1e-9)
-    pvals = [0.5] * 19 + [1e-12]
-    expected = chi2.sf(-2.0 * np.sum(np.log(pvals)), 2 * len(pvals))
-    assert _fisher_combine(pvals) == pytest.approx(expected, rel=1e-9)
-    assert _fisher_combine(pvals) < 0.05
-    assert _fisher_combine([0.0, 0.5]) < 1e-300
+        assert _fisher_combine([np.log(p)]) == pytest.approx(p, rel=1e-9)
+    log_pvals = np.log([0.5] * 19 + [1e-12]).tolist()
+    expected = chi2.sf(-2.0 * np.sum(log_pvals), 2 * len(log_pvals))
+    assert _fisher_combine(log_pvals) == pytest.approx(expected, rel=1e-9)
+    assert _fisher_combine(log_pvals) < 0.05
+    assert _fisher_combine([-1000.0, np.log(0.5)]) < 1e-300
+
+
+def test_gin_root_test_pools_a_zero_p_value(monkeypatch) -> None:
+    """A run whose pooled p-value underflows to zero enters the root test's Fisher pooling."""
+    engine = importlib.import_module("andrey.latent.gin")
+    monkeypatch.setattr(engine, "_independence_pvalue", lambda *args: 0.0)
+    assert 0.0 <= engine._root_pvalue(np.zeros((1, 4)), np.eye(4), [], [0, 1], [2, 3], []) < 1e-300
 
 
 def test_gin_root_test_puts_every_member_in_the_surrogate(monkeypatch) -> None:
@@ -50,4 +59,6 @@ def test_gin_root_test_puts_every_member_in_the_surrogate(monkeypatch) -> None:
         assert not set(x) & set(z)
         assert sorted(m for m in z if m in candidate) == sorted(set(candidate) - set(x))
         assert all(sum(m in prefix for m in z) == 1 for prefix in ordered)
-    assert pvalue == pytest.approx(_fisher_combine([0.1, 0.2, 0.3, 0.4]), rel=1e-12)
+    assert pvalue == pytest.approx(
+        _fisher_combine(np.log([0.1, 0.2, 0.3, 0.4]).tolist()), rel=1e-12
+    )
