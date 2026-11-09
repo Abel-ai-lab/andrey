@@ -179,7 +179,8 @@ the result is the MPDAG of the DAGs of the class found that meet them (Fang et a
 `boss_fci`, `grasp_fci`, and `lpcmci` honor all three, experimentally: on a pair the tests keep, a
 required path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before
 Zhang's rules (Richardson and Spirtes 2002; Zhang 2008); no test removes a `confounded` pair; and a
-claim the PAG contradicts raises. `lpcmci` takes each claim with its lag. `direct_lingam` and
+claim the PAG contradicts raises. These marks and checks assume no selection bias. `lpcmci` takes
+each claim with its lag. `direct_lingam` and
 `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`, experimentally, as the
 order search's prior knowledge (Shimizu et al. 2011, Section 3.4), and
 `metadata["unmet_knowledge"]` lists the claims the DAG does not meet. A method given a part it does

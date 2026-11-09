@@ -275,7 +275,10 @@ class Knowledge:
     whether or not the tests would separate it, and a method that starts from a score search's graph
     adds it. A claim on a pair the PAG leaves non-adjacent sets no mark; the PAG must still allow
     it: an ancestor needs a path that some graph the PAG stands for directs from ``a`` to ``b``, and
-    a non-ancestor admits no directed path ``a -> ... -> b``. ``lpcmci`` reads each claim on the
+    a non-ancestor admits no directed path ``a -> ... -> b``. The marks and these checks assume no
+    selection bias: an arrowhead at ``a`` on an edge with ``b`` says that ``a`` is an ancestor of
+    neither ``b`` nor the selection variables [5]_, so under selection a non-ancestor can keep a
+    tail. ``lpcmci`` reads each claim on the
     link it names, over the time window. A DirectLiNGAM method reads ``required_paths`` and
     ``forbidden_paths`` as the prior knowledge of Shimizu et al. [7]_ (Section 3.4): when the claims
     show that no remaining variable is an ancestor of some of them, the next variable in the causal

@@ -2879,7 +2879,9 @@ _PAG_PATHS = (
     "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
     "removes a confounded pair. A claim on a pair the PAG leaves non-adjacent sets no mark, and "
     "one the PAG contradicts raises: a required path with no possibly directed path, or a "
-    "forbidden path with a directed path."
+    "forbidden path with a directed path. The marks and the checks assume no selection bias, as an "
+    "arrowhead at a says that a is an ancestor of neither b nor the selection variables "
+    "(Richardson and Spirtes 2002)."
 )
 _SCORE_PAG_PATHS = " The test phase also starts from every confounded pair." + _PAG_PATHS
 _ORDER_PATHS = (

@@ -130,7 +130,8 @@ SHARED = {
         "last",
         "In the PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts "
         "an arrowhead at the cause, and no test removes a ``confounded`` pair, as "
-        ":class:`~andrey.Knowledge` describes; a claim the PAG contradicts raises ``ValueError``.",
+        ":class:`~andrey.Knowledge` describes; these marks, and the check that raises "
+        "``ValueError`` for a claim the PAG contradicts, assume no selection bias.",
         lambda m: "confounded" in REGISTRY[m].knowledge and REGISTRY[m].family != "temporal",
     ),
     # The LiNGAM order searches read the path parts as Shimizu et al. (2011) define them.

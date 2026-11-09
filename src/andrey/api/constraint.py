@@ -521,7 +521,8 @@ def fci(
         ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``. In the
         PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an
         arrowhead at the cause, and no test removes a ``confounded`` pair, as
-        :class:`~andrey.Knowledge` describes; a claim the PAG contradicts raises ``ValueError``.
+        :class:`~andrey.Knowledge` describes; these marks, and the check that raises ``ValueError``
+        for a claim the PAG contradicts, assume no selection bias.
 
     Returns
     -------
@@ -969,8 +970,8 @@ def gfci(
         arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``. With
         ``env``, the environment index is unconstrained. In the PAG, ``required_paths`` makes an
         adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead at the cause, and no test
-        removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; a claim the PAG
-        contradicts raises ``ValueError``.
+        removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; these marks, and the
+        check that raises ``ValueError`` for a claim the PAG contradicts, assume no selection bias.
 
     Returns
     -------
@@ -1694,7 +1695,8 @@ def fci_jci(
         raises ``ValueError``. The environment index is unconstrained. In the PAG,
         ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
         at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
-        describes; a claim the PAG contradicts raises ``ValueError``.
+        describes; these marks, and the check that raises ``ValueError`` for a claim the PAG
+        contradicts, assume no selection bias.
 
     Returns
     -------

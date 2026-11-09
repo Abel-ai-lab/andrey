@@ -41,8 +41,9 @@ names its pull request.
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
   `forbidden_paths`, and `confounded`, experimentally: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
-  rules, no test removes a `confounded` pair, and a claim the PAG contradicts raises `ValueError`.
-  `lpcmci` takes each claim with its lag. ([#835])
+  rules, no test removes a `confounded` pair, and a claim the PAG contradicts raises `ValueError`;
+  the marks and the checks assume no selection bias. `lpcmci` takes each claim with its lag.
+  ([#835])
 - `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
   experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
   the variables the causal order may place next, a forbidden path is no parent, and

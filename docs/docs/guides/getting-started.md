@@ -466,11 +466,13 @@ result = fci(data, knowledge=knowledge)  # diet <-> exercise
 
 On a pair the tests keep, a required path makes the edge `smoking -> cancer` and a forbidden path
 puts an arrowhead at its cause; no test removes a `confounded` pair. A claim the PAG contradicts,
-such as a required path with no path that could lead to its effect, raises a `ValueError`.
-DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths` to narrow
-the causal order, as their paper describes, and list the claims their DAG does not meet in
-`metadata["unmet_knowledge"]`. Every other method raises `NotImplementedError` for a part it does
-not honor, naming the methods that do. These parts are experimental for every method.
+such as a required path with no path that could lead to its effect, raises a `ValueError`. These
+marks and checks assume no selection bias: the samples were not kept or dropped by the value of a
+variable the measured ones cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths`
+and `forbidden_paths` to narrow the causal order, as their paper describes, and list the claims
+their DAG does not meet in `metadata["unmet_knowledge"]`. Every other method raises
+`NotImplementedError` for a part it does not honor, naming the methods that do. These parts are
+experimental for every method.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
