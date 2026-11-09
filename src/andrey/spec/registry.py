@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -2756,7 +2756,8 @@ _MEMBER_RULE = (
 _BLANKET_ORIENT_RULE = (
     "Under structure=cpdag, every edge the knowledge decides is directed before the colliders, "
     "which never reverse it, and Meek's rules R1-R4 follow; the undirected structures do not read "
-    "tiers or edges forbidden one way."
+    "tiers or edges forbidden one way. With target or an undirected structure, required_paths and "
+    "forbidden_paths raise NotImplementedError."
 )
 _BLANKET_RULE = (
     _MEMBER_RULE
@@ -2863,6 +2864,30 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
+#: The methods whose result is a CPDAG (for iamb, inter_iamb, and mmpc, with structure="cpdag" and
+#: no target, else the path parts raise): they honor the path parts by restricting the class they
+#: found (Fang et al. 2025).
+_PATH_METHODS = (
+    "pc",
+    "cdnod",
+    "ges",
+    "xges",
+    "hc",
+    "tabu",
+    "mmhc",
+    "rsmax2",
+    "boss",
+    "grasp",
+    "exact_search",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
+)
+_PATH_RULE = (
+    " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
+    "found that meet them, and metadata ancestor_clauses lists the clauses no MPDAG can show (Fang "
+    "et al. 2025); claims that no such DAG meets raise."
+)
 _MAX_DEPTH = concept_param("max_depth")
 
 #: How missing values are handled, on every method the concept's template fits, after its
@@ -2876,14 +2901,21 @@ for _name in CONCEPTS["missing"].conforming:
     )
 
 for _name, _how in _KNOWLEDGE_HOW.items():
+    _extra = PATH_PARTS if _name in _PATH_METHODS else ()
+    _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(KNOWLEDGE_PARTS)}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(_parts)}. {_how}"
+        + (_PATH_RULE if _extra else ""),
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*REGISTRY[_name].params, *_depth, _knowledge)}
+        update={
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
+            "knowledge_extra": _extra,
+            "knowledge_experimental": _extra,
+        }
     )
 
 #: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
@@ -2955,7 +2987,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
-# handled, and the triples a collider vote left ambiguous.
+# handled, the triples a collider vote left ambiguous, and the clauses the path parts of knowledge
+# leave.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2974,6 +3007,7 @@ for _name, _spec in REGISTRY.items():
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("missing",) if "missing" in _concepts else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
+        *(("ancestor_clauses",) if _spec.knowledge_extra else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})
