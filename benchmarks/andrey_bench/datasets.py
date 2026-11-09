@@ -36,8 +36,19 @@ The data of CD-NOD, MultiGroupDirectLiNGAM, and GIN are drawn by :mod:`andrey_be
 instead (functional ``domain_shift``, ``multi_group``, or ``measurement``); that module gives each
 layout, truth, and column order.
 
+The synthetic pair sets of Tagasovska et al. (2020) that the LOCI paper uses are drawn by
+:mod:`andrey_bench.pair_models` (functional ``an2020``, ``ans2020``, ``ls2020``, ``lss2020``, or
+``mnu2020``; topology ``pair``, ``d = 2``, density 1.0).
+
 A key's ``shuffle`` lists the columns in an order drawn from the seed, with the truth permuted the
 same way, so the column order does not follow the graph's construction (:class:`DatasetKey`).
+
+A key's ``missing`` draws missing values over a ``sample_scm`` sample with
+:mod:`andrey.data.missingness` (:data:`MISSING_MECHANISMS`), at ``missing_rate`` and in the form
+``missing_form``. The stored data hold ``NaN`` where a value is missing, and the registry entry
+records the mechanism and the parents of each missingness indicator, the m-graph. The mask is drawn
+after scaling and shuffling, from its own stream of the seed, so the same key without ``missing``
+holds the complete values.
 """
 
 from __future__ import annotations
@@ -57,7 +68,8 @@ import numpy as np
 import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
-from andrey_bench import lingam_models, regime_models, svar_models, temporal_models
+from andrey.data import missingness
+from andrey_bench import lingam_models, pair_models, regime_models, svar_models, temporal_models
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -132,6 +144,25 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # Cause-effect pairs from the location-scale generator, ``y = f(x) + s(x) e`` with the noise
+    # scale ``s`` between the bounds of the LOCI paper's location-scale benchmark (Immer et al.
+    # 2023): Gaussian, Gumbel, and Laplace noise, z-scored, and rescaled so the cause has unit
+    # variance before the effect reads it. At ``d = 2`` and density 1.0 every pair has one edge, in
+    # a direction the seed draws.
+    "lsnm_pair": ("er", "lsnm", "gaussian", "standardized"),
+    "lsnm_gumbel_pair": ("er", "lsnm", "gumbel", "standardized"),
+    "lsnm_laplace_pair": ("er", "lsnm", "laplace", "standardized"),
+    "lsnm_rescaled_pair": ("er", "lsnm", "gaussian", "ancestral"),
+    "lsnm_gumbel_rescaled_pair": ("er", "lsnm", "gumbel", "ancestral"),
+    "lsnm_laplace_rescaled_pair": ("er", "lsnm", "laplace", "ancestral"),
+    # The synthetic pair sets of Tagasovska et al. (2020), Sect. 3.2, which the LOCI paper uses:
+    # additive (AN, AN-s), location-scale (LS, LS-s), and multiplicative (MN-U) noise, each column
+    # z-scored as the LOCI paper does (andrey_bench.pair_models; ``d = 2``, density 1.0).
+    "tagasovska_an_pair": ("pair", "an2020", "gaussian", "standardized"),
+    "tagasovska_ans_pair": ("pair", "ans2020", "gaussian", "standardized"),
+    "tagasovska_ls_pair": ("pair", "ls2020", "gaussian", "standardized"),
+    "tagasovska_lss_pair": ("pair", "lss2020", "gaussian", "standardized"),
+    "tagasovska_mnu_pair": ("pair", "mnu2020", "uniform", "standardized"),
     # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
     "anm_er": ("er", "anm", "gaussian", "standardized"),
     # The regimes of the functional-causal-model lanes (CAM, RESIT): additive noise with Gaussian and
@@ -268,6 +299,24 @@ LATENT_REGIMES: dict[str, int] = {
 
 DEFAULT_REGIME = "linear_gauss_er"
 
+#: The functional of the MVPC authors' generator (Tu et al. 2019), ``gen_data`` in their R code
+#: (:mod:`andrey_bench.adapters.mvpc_r`). Its key's ``missing`` is the generator's ``mode``,
+#: ``"mar"`` or ``"mnar"``, and ``missing_form`` the data of the draw (:data:`MVPC_PAPER_DATA`).
+MVPC_PAPER = "mvpc2019"
+#: The data of one ``gen_data`` draw: the masked values, the authors' MCAR reference (the same
+#: number of values removed from each column, at random rows), and the complete values.
+MVPC_PAPER_DATA = ("quantile", "reference", "complete")
+
+#: The mechanisms a key's ``missing`` names, from :mod:`andrey.data.missingness`; each but MCAR
+#: takes a form (``missingness.FORMS``). Each leaves its share of always-observed columns at the
+#: module's default: none under MCAR, 30% under the others.
+MISSING_MECHANISMS = {
+    "mcar": missingness.mcar,
+    "mar": missingness.mar,
+    "mnar": missingness.mnar,
+    "self_masking": missingness.self_masking,
+}
+
 # The canonical generated edge density: the degree-2 slice, the sparse regime the GES adapters'
 # limit of 4 parents is sized for. Density travels on the key, so a denser run is a different
 # dataset, a different file, and a different digest.
@@ -355,6 +404,11 @@ class DatasetKey:
     when on, and a shuffled key's label ends in ``-shuffled``: an unshuffled key keeps the label and
     digest its dataset has in records measured on the generated order. A functional in
     :data:`ORDER_FREE` takes no shuffle step and needs ``shuffle`` on.
+
+    ``missing`` names a mechanism of :data:`MISSING_MECHANISMS`, drawn at ``missing_rate`` in the
+    form ``missing_form`` (empty under MCAR) over a ``sample_scm`` sample. Empty, its default, it
+    affects neither the label nor the generator call, so a key without missing values keeps its
+    identity, and its data are the complete values of the keys that add ``missing`` to it.
     """
 
     topology: str
@@ -370,6 +424,9 @@ class DatasetKey:
     categories: tuple[int, int] = (2, 3)
     times: int = 0
     shuffle: bool = True
+    missing: str = ""
+    missing_form: str = ""
+    missing_rate: float = 0.0
 
     @property
     def label(self) -> str:
@@ -386,9 +443,12 @@ class DatasetKey:
         )
         panel = f"-T{self.times}" if self.times else ""
         shuffled = "-shuffled" if self.shuffle and self.functional not in ORDER_FREE else ""
+        form = f"-{self.missing_form}" if self.missing_form else ""
+        masked = f"-{self.missing}{form}-r{self.missing_rate:g}" if self.missing else ""
         return (
             f"{self.topology}-{self.functional}-{self.noise}-deg{self.density:g}"
             f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}{panel}{shuffled}"
+            f"{masked}"
         )
 
     @property
@@ -422,6 +482,10 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     """
     if key.functional in ORDER_FREE and not key.shuffle:
         raise ValueError(f"{key.label}: {key.functional} has no shuffle step to turn off")
+    if key.functional == MVPC_PAPER:
+        return _mvpc_paper_call(key)
+    if key.missing and key.functional not in FUNCTIONAL_TO_ANDREY:
+        raise ValueError(f"{key.label}: missing values are drawn over sample_scm samples only")
     shuffle = {"shuffle": True} if key.shuffle else {}
     if key.functional in temporal_models.MODELS:
         call: dict[str, object] = {
@@ -516,6 +580,29 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             **DISCRETE_SETTINGS,
             **shuffle,
         }
+    if key.functional in pair_models.MODELS:
+        spec = pair_models.MODELS[key.functional]
+        if (
+            key.d != 2
+            or key.density != 1.0
+            or key.latents
+            or key.times
+            or key.noise != spec.noise
+            or key.standardize not in pair_models.SCALES
+        ):
+            raise ValueError(
+                f"{key.label}: {key.functional} is one pair: d 2, density 1.0, no hidden nodes, "
+                f"noise {spec.noise!r}, a scale in {pair_models.SCALES}"
+            )
+        return {
+            "generator": "andrey_bench.pair_models.sample",
+            "model": key.functional,
+            "setup": pair_models.model_params(key.functional),
+            "n": key.n,
+            "seed": key.seed,
+            "standardize": key.standardize,
+            **shuffle,
+        }
     if key.functional in regime_models.MODELS:
         if key.latents != regime_models.latents_for(key.functional, key.d):
             raise ValueError(f"{key.label}: latents must be the model's latent count")
@@ -554,7 +641,103 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     }
     if key.latents:
         kwargs["latents"] = key.latents
+    if key.missing:
+        mechanism = missing_mechanism(key)
+        kwargs["missing"] = {
+            "mechanism": mechanism.name,
+            "form": mechanism.form,
+            "rate": mechanism.rate,
+            "observed": mechanism.observed,
+        }
     return kwargs
+
+
+def _mvpc_paper_call(key: DatasetKey) -> dict[str, object]:
+    """The ``gen_data`` call of an :data:`MVPC_PAPER` key; see :func:`generation_kwargs`.
+
+    Raises
+    ------
+    ValueError
+        If ``missing`` is not ``"mar"`` or ``"mnar"``, ``missing_form`` not one of
+        :data:`MVPC_PAPER_DATA`, or ``d`` not a size of ``PAPER_SIZES``.
+    """
+    from andrey_bench.adapters.mvpc_r import COMMIT, PAPER_SIZES
+
+    if key.missing not in ("mar", "mnar") or key.missing_form not in MVPC_PAPER_DATA:
+        raise ValueError(f"{key.label}: missing must be mar or mnar, form one of {MVPC_PAPER_DATA}")
+    if key.d not in PAPER_SIZES:
+        raise ValueError(f"{key.label}: the authors' sizes are d in {sorted(PAPER_SIZES)}")
+    num_extra_e, num_m = PAPER_SIZES[key.d]
+    call: dict[str, object] = {
+        "generator": "mvpc_r.gen_data",
+        "commit": COMMIT,
+        "num_sample": key.n,
+        "mode": key.missing,
+        "num_var": key.d,
+        "num_extra_e": num_extra_e,
+        "num_m": num_m,
+        "seed": key.seed,
+        "data": key.missing_form,
+    }
+    if key.shuffle:
+        call["shuffle"] = True
+    return call
+
+
+def _mvpc_paper(
+    key: DatasetKey,
+) -> tuple[np.ndarray, np.ndarray, str, list[int] | None, dict[str, object] | None]:
+    """Draw an :data:`MVPC_PAPER` key with the authors' generator; see :func:`_generate`.
+
+    The generator orders the columns causally; a shuffled key permutes them, the truth, and the
+    m-graph with a permutation drawn from the seed.
+    """
+    from andrey_bench.adapters.mvpc_r import PAPER_SIZES, paper_data
+    from andrey_bench.contracts import structure_from_adjacency
+
+    _mvpc_paper_call(key)  # validates the key
+    num_extra_e, num_m = PAPER_SIZES[key.d]
+    draw = paper_data(
+        n=key.n, mode=key.missing, d=key.d, num_extra_e=num_extra_e, num_m=num_m, seed=key.seed
+    )
+    values = {"quantile": draw.data, "reference": draw.reference, "complete": draw.complete}
+    order = np.random.default_rng(key.seed).permutation(key.d) if key.shuffle else np.arange(key.d)
+    where = {int(old): new for new, old in enumerate(order)}
+    data_arr = np.ascontiguousarray(values[key.missing_form][:, order], dtype=CANONICAL_DTYPE)
+    dag = draw.dag[np.ix_(order, order)]
+    marks = np.ascontiguousarray(structure_from_adjacency(dag, kind="dag").to_numpy())
+    block: dict[str, object] | None = None
+    if key.missing_form != "complete":
+        mgraph = {
+            str(where[col]): (
+                [] if key.missing_form == "reference" else sorted(where[p] for p in parents)
+            )
+            for col, parents in draw.parents.items()
+        }
+        mechanism = "mcar" if key.missing_form == "reference" else key.missing
+        block = {"mechanism": mechanism, "form": key.missing_form, "parents": mgraph}
+    return data_arr, marks, "dag", [int(j) for j in order], block
+
+
+def missing_mechanism(key: DatasetKey) -> missingness.Mechanism:
+    """The :class:`~andrey.data.missingness.Mechanism` of `key`'s ``missing``.
+
+    Raises
+    ------
+    ValueError
+        If ``missing`` is not a mechanism of :data:`MISSING_MECHANISMS`, or ``missing_form`` is set
+        under MCAR or empty under another mechanism.
+    """
+    if key.missing not in MISSING_MECHANISMS:
+        raise ValueError(f"{key.label}: missing must be one of {sorted(MISSING_MECHANISMS)}")
+    build = MISSING_MECHANISMS[key.missing]
+    if key.missing == "mcar":
+        if key.missing_form:
+            raise ValueError(f"{key.label}: MCAR takes no form")
+        return build(key.missing_rate)
+    if not key.missing_form:
+        raise ValueError(f"{key.label}: {key.missing} needs a missing_form")
+    return build(key.missing_rate, form=key.missing_form)
 
 
 def graph_record(key: DatasetKey) -> dict[str, object]:
@@ -570,6 +753,13 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "num_nodes": key.d,
             "density": key.density,
             "params": regime_models.model_params(key.functional),
+        }
+    if key.functional in pair_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": pair_models.model_params(key.functional),
         }
     if key.functional in temporal_models.MODELS:
         return {
@@ -594,6 +784,9 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
         }
     if key.functional == NETWORK_FUNCTIONAL:
         return {"model": key.topology, "num_nodes": key.d, "density": key.density, "params": {}}
+    if key.functional == MVPC_PAPER:
+        # pcalg's randomDAG(num_var, 2 / (num_var - 1)): Erdos-Renyi of mean degree 2.
+        return {"model": "randomDAG", "num_nodes": key.d, "density": 2.0, "params": {}}
     model = TOPOLOGY_TO_GRAPH[key.topology]
     return {
         "model": model,
@@ -606,18 +799,47 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
 def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int] | None]:
     """Return ``(data_f64, graph_marks_int8, graph_kind, column_order)`` for ``key``.
 
+    The data of a key with ``missing`` hold ``NaN`` where a value is missing; :func:`materialize`
+    records its mask's mechanism and parents.
+    """
+    return _generate(key)[:4]
+
+
+def _generate(
+    key: DatasetKey,
+) -> tuple[np.ndarray, np.ndarray, str, list[int] | None, dict[str, object] | None]:
+    """Return ``(data_f64, graph_marks_int8, graph_kind, column_order, missing_block)`` for ``key``.
+
+    ``missing_block`` is ``None`` without ``missing``; with it, the mechanism, form, rate,
+    always-observed share, and the parents of each missingness indicator by column
+    (``{"3": [0]}``), as ``sample_scm`` records them in its provenance.
+
     Samples are contiguous canonical ``float64``. Truth uses ``ds.graph.to_numpy()`` endpoint marks,
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
     nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
     truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
-    the module docstring says, and a :mod:`~andrey_bench.regime_models` dataset's data and truth come
-    from that module. A network key's rows and truth come from ``andrey.data.load_dataset``.
+    the module docstring says, and a :mod:`~andrey_bench.regime_models` or
+    :mod:`~andrey_bench.pair_models` dataset's data and truth come from that module. A network
+    key's rows and truth come from ``andrey.data.load_dataset``.
 
     ``column_order[j]`` is the observed column that column ``j`` holds with ``shuffle`` off: the
     identity for an unshuffled key, and ``None`` for an :data:`ORDER_FREE` functional.
     """
+    if key.functional == MVPC_PAPER:
+        return _mvpc_paper(key)
     kwargs = generation_kwargs(key)
+    no_mask = None
+    if key.functional in pair_models.MODELS:
+        data_arr, marks, columns = pair_models.sample(
+            key.functional,
+            n=key.n,
+            seed=key.seed,
+            standardize=key.standardize,
+            shuffle=key.shuffle,  # an unshuffled key's call leaves it out
+        )
+        data_arr = np.ascontiguousarray(data_arr, dtype=CANONICAL_DTYPE)
+        return data_arr, marks, "dag", columns.tolist(), no_mask
     if key.functional in regime_models.MODELS:
         data_arr, marks, kind, columns = regime_models.sample(
             key.functional,
@@ -629,26 +851,26 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
             shuffle=key.shuffle,  # an unshuffled key's call leaves it out
         )
         data_arr = np.ascontiguousarray(data_arr, dtype=CANONICAL_DTYPE)
-        return data_arr, marks, kind, None if columns is None else columns.tolist()
+        return data_arr, marks, kind, None if columns is None else columns.tolist(), no_mask
     if key.functional in temporal_models.MODELS:
         series, window = temporal_models.sample(key.functional, key.d, key.n, key.seed)
         series = np.ascontiguousarray(series, dtype=CANONICAL_DTYPE)
         if temporal_models.MODELS[key.functional].same_step:
-            return series, window, WINDOW_KIND, None
-        return series, lag_marks(window[1:] != 0), "temporal", None
+            return series, window, WINDOW_KIND, None, no_mask
+        return series, lag_marks(window[1:] != 0), "temporal", None, no_mask
     if key.functional in svar_models.MODELS:
         series, window = svar_models.sample(
             key.functional, key.d, key.n, key.seed, key.noise, key.standardize
         )
-        return series, window, WINDOW_KIND, None
+        return series, window, WINDOW_KIND, None, no_mask
     if key.functional == "varma2010":
         series, stack, columns = lingam_models.sample_varma(
             key.functional, key.d, key.n, key.seed, shuffle=key.shuffle
         )
-        return series, stack, COEFFICIENT_KINDS[key.functional], columns.tolist()
+        return series, stack, COEFFICIENT_KINDS[key.functional], columns.tolist(), no_mask
     if key.functional == "panel2013":
         panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
-        return panel, stack, COEFFICIENT_KINDS[key.functional], None
+        return panel, stack, COEFFICIENT_KINDS[key.functional], None, no_mask
     if key.functional == NETWORK_FUNCTIONAL:
         ds = data.load_dataset(
             key.topology,
@@ -668,9 +890,12 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
             marks,
             str(ds.graph.kind),
             columns,
+            no_mask,
         )
     generator = kwargs.pop("generator", None)
     kwargs["shuffle"] = key.shuffle  # an unshuffled key's call leaves it out
+    if kwargs.pop("missing", None) is not None:
+        kwargs["missing"] = missing_mechanism(key)
     if generator == "sample_discrete":
         ds = data.sample_discrete(**kwargs)  # type: ignore[arg-type]
     elif generator == "sample_mixed":
@@ -682,7 +907,7 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     columns = [int(j) for j in ds.provenance["column_order"]]
     graph = ds.graph
     if isinstance(graph, TemporalStructure):
-        return data_arr, lag_only_marks(key, graph), "temporal", columns
+        return data_arr, lag_only_marks(key, graph), "temporal", columns, no_mask
     if not hasattr(graph, "to_numpy"):
         raise TypeError(
             f"graph for {key.label} has no to_numpy() (kind={type(graph).__name__}); "
@@ -693,7 +918,8 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     if not np.array_equal(hidden, np.arange(key.d - key.latents, key.d)):
         raise ValueError(f"{key.label}: hidden nodes are not the last {key.latents} nodes")
     marks = np.ascontiguousarray(graph.to_numpy())  # int8 endpoint marks
-    return data_arr, marks, str(graph.kind), columns
+    mask_block = ds.provenance["config"].get("missing") if key.missing else None
+    return data_arr, marks, str(graph.kind), columns, mask_block
 
 
 def _network_names(name: str) -> list[str]:
@@ -777,8 +1003,9 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
 
     Deduplicates by :attr:`DatasetKey.label`, including when multiple fit dtypes share a key.
     Each :func:`generate_one` result is saved as ``data`` and ``graph`` arrays in a ``.npz`` for all
-    readers to reuse, with its ``column_order`` in the registry entry. Existing files are reused only
-    when the recorded ``generation_call`` matches.
+    readers to reuse, with its ``column_order`` in the registry entry, and a masked key's mechanism,
+    m-graph parents, and ``complete_rows``, the rows without a missing value, in the entry's
+    ``missing``. Existing files are reused only when the recorded ``generation_call`` matches.
 
     Dataset and registry writes use temporary files and atomic renames to prevent partial files
     after interruption. The registry is re-read and merged under a store lock, preserving concurrent
@@ -804,7 +1031,11 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
         if path.exists() and _same_call(recorded.get("generation_call"), generation_kwargs(key)):
             mine[label] = recorded
             continue
-        data_arr, marks, graph_kind, columns = generate_one(key)
+        if key.missing:
+            data_arr, marks, graph_kind, columns, mask_block = _generate(key)
+        else:
+            data_arr, marks, graph_kind, columns = generate_one(key)
+            mask_block = None
         # Write uncompressed arrays for fast reloads. The temporary file prevents partial writes;
         # pass a file object so savez does not append another ``.npz`` suffix.
         tmp = _scratch(out, key.filename)
@@ -828,6 +1059,9 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
             "column_order": columns,
             "generation_call": generation_kwargs(key),
         }
+        if mask_block is not None:
+            complete = int((~np.isnan(data_arr)).all(axis=1).sum())
+            mine[label]["missing"] = {**mask_block, "complete_rows": complete}
 
     # Another job may have added datasets since `entries` was read, so the registry is read again and
     # merged under the store's lock. It goes through a temp for the same reason the ``.npz`` does: a
@@ -893,6 +1127,10 @@ __all__ = [
     "DEFAULT_REGIME",
     "latents_for",
     "latent_node_types",
+    "MISSING_MECHANISMS",
+    "missing_mechanism",
+    "MVPC_PAPER",
+    "MVPC_PAPER_DATA",
     "REGISTRY_NAME",
     "DatasetKey",
     "generation_kwargs",

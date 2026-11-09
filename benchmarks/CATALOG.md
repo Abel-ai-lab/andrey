@@ -38,7 +38,9 @@ whose Reproduce table lists the driver.
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
+| [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
+| Missing values | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; listwise deletion and mean imputation | the MVPC authors' R code, MissDAG | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
 | [PCMCI on lagged series](comparisons/pcmci.md) | `pcmci_cpu.py` | PCMCI | tigramite | 0.5.0, 0.9.0 |
@@ -52,9 +54,9 @@ whose Reproduce table lists the driver.
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
-`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`,
-`start_causalnex.sh`, and `start_utigsp.sh` build the separate environments some comparisons need
-([setup](README.md#setup)).
+`start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
+`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, and `start_loci.sh` build the
+separate environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
