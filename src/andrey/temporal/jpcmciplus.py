@@ -40,7 +40,9 @@ A test whose tested column lies in the span of its conditions has no residual to
 level there is a function of the conditions, so it separates. A context there, such as a sine that
 its own lags determine, runs again without the older time contexts, where its parents lie; if the
 test still has nothing to read, the context cannot be told apart from its conditions, and the link
-stays. A system variable there raises, as in :func:`~andrey.temporal.pcmciplus.pcmciplus`.
+stays. A system variable there raises, as in :func:`~andrey.temporal.pcmciplus.pcmciplus`, and so
+does one with a copy among the conditions, such as a pulse every dataset shares, which copies a
+level of the time dummy; a dummy level or a context with a copy there separates.
 
 References
 ----------
@@ -169,6 +171,12 @@ def pooled_design(
     return np.hstack(parts), tuple(columns)
 
 
+SPAN_NOTE = (
+    "A system variable is a linear function of other columns, or of a dummy: list one that is the "
+    "same in every dataset as a time context, and drop one that sums others."
+)
+
+
 class ContextTest:
     """A :class:`~andrey.temporal.pcmci.LinkTest` over the columns ``lag * nodes.count + node``.
 
@@ -279,11 +287,7 @@ class ContextTest:
             except SingularCorrelationError as error:
                 held = {int(c[0]) for c in query[:2] if self._in_span(c, query[2])}
                 if held & self.system_columns:
-                    error.add_note(
-                        "A system variable is a linear function of other columns, or of a dummy: "
-                        "list one that is the same in every dataset as a time context, and drop "
-                        "one that sums others."
-                    )
+                    error.add_note(SPAN_NOTE)
                     raise
                 if held & (self.time_columns | self.space_columns):
                     statistics[k], p_values[k] = self._determined(*query, held)
@@ -334,6 +338,14 @@ class ContextTest:
             self._check_rows(given)
             left, right = self._levels(a), self._levels(b)
             tests[query] = len(left) * len(right)
+            for column in {left[0], right[0]} & self.system_columns:
+                if self.copies.get(column, set()) & set(given):
+                    error = SingularCorrelationError(
+                        "a tested column lies in the span of its conditioning columns; cannot run "
+                        "a partial-correlation test"
+                    )
+                    error.add_note(SPAN_NOTE)
+                    raise error
             for u in left:
                 for v in right:
                     if not (self.copies.get(u, set()) | self.copies.get(v, set())) & set(given):
