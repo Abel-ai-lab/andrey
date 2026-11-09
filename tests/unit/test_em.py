@@ -41,6 +41,7 @@ def _quiet():
         warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.DataTypeWarning)
         warnings.simplefilter("ignore", andrey.SampleSizeWarning)
+        warnings.simplefilter("ignore", andrey.SearchLimitWarning)  # the short schedule
         yield
 
 
