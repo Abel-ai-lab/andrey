@@ -2884,6 +2884,11 @@ _PAG_PATHS = (
     "(Richardson and Spirtes 2002)."
 )
 _SCORE_PAG_PATHS = " The test phase also starts from every confounded pair." + _PAG_PATHS
+#: boss_fci and grasp_fci: their order search reads required_paths as it reads the tiers.
+_ORDER_PAG_PATHS = (
+    " The order search puts the cause of each required_paths pair before its effect in every order "
+    "it visits." + _SCORE_PAG_PATHS
+)
 _ORDER_PATHS = (
     " With required_paths and forbidden_paths, the order search follows Shimizu et al. (2011, "
     "Section 3.4): when the claims show that no remaining variable is an ancestor of some of "
@@ -2905,8 +2910,8 @@ _ENGINE_PATHS: dict[str, tuple[tuple[KnowledgePart, ...], str]] = {
     "fci": (_PAG_PARTS, _PAG_PATHS),
     "fci_jci": (_PAG_PARTS, _PAG_PATHS),
     "gfci": (_PAG_PARTS, _SCORE_PAG_PATHS),
-    "boss_fci": (_PAG_PARTS, _SCORE_PAG_PATHS),
-    "grasp_fci": (_PAG_PARTS, _SCORE_PAG_PATHS),
+    "boss_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
+    "grasp_fci": (_PAG_PARTS, _ORDER_PAG_PATHS),
     "lpcmci": (_PAG_PARTS, _LAGGED_PATHS),
     "direct_lingam": (PATH_PARTS, _ORDER_PATHS),
     "multi_group_direct_lingam": (PATH_PARTS, _ORDER_PATHS),

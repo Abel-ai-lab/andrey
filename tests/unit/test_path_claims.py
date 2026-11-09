@@ -212,6 +212,29 @@ def test_a_required_path_on_an_edge_forbidden_one_way_names_the_columns(name):
         _fit(name, data, knowledge=knowledge)
 
 
+class _Pattern(Exception):
+    """Carries the score phase's pattern out of a search."""
+
+
+@pytest.mark.parametrize("name", ["boss_fci", "grasp_fci"])
+def test_the_score_phase_puts_a_required_path_in_its_order(name, monkeypatch):
+    # x -> z <- y: alone, the score phase finds the collider, with z after x. z an ancestor of x
+    # puts z first, and the sparsest DAG in such an order joins every pair.
+    rng = np.random.default_rng(0)
+    x, y, noise = rng.standard_normal((3, 2000))
+    data = pd.DataFrame({"x": x, "y": y, "z": 0.8 * x + 0.8 * y + noise})
+
+    def stop(X, pattern, **kwargs):
+        raise _Pattern(pattern)
+
+    monkeypatch.setattr(engines, "fci_from_pattern", stop)
+    for knowledge, pairs in ((None, 2), (Knowledge(required_paths=[("z", "x")]), 3)):
+        with pytest.raises(_Pattern) as found:
+            _fit(name, data, knowledge=knowledge)
+        pattern = found.value.args[0].to_numpy()
+        assert (pattern != NULL).sum() // 2 == pairs
+
+
 def test_a_claim_the_pag_contradicts_raises(independent):
     with pytest.raises(ValueError, match="no possibly directed path from 'a' to 'b'"):
         _fit("fci", independent, knowledge=Knowledge(required_paths=[("a", "b")]))
