@@ -21,7 +21,7 @@ from andrey.constraint.fci import (
     fci_orient,
     orient_colliders,
 )
-from andrey.core.structure import ARROW, CIRCLE, TAIL
+from andrey.core.structure import ARROW, CIRCLE, TAIL, GraphStructure
 from andrey.data.latent import marginal
 from andrey.search.gfci import _derive_sepsets
 
@@ -50,6 +50,24 @@ def test_rules_leave_an_endpoint_two_firings_mark_differently_a_circle():
     marks[1, 0] = marks[2, 3] = ARROW
     fci_orient(marks, _no_test, 0.5, {(0, 2): (), (1, 3): ()}, in_column_order=True)
     np.testing.assert_array_equal(marks, expected)
+
+
+def test_separating_sets_that_no_mag_fits_leave_a_graph_that_is_not_a_pag():
+    """Test errors can give separating sets that no MAG fits; the rules then return no PAG.
+
+    The colliders ``0 *-> 1 <-* 3`` and ``1 *-> 2 <-* 4`` put an arrowhead at 1 on its edge with 3,
+    so 1 is no ancestor of 3, while the separating sets of ``0, 2`` and ``3, 4`` hold 1 and 2, so R1
+    orients ``1 -> 2 -> 3``. R2 then makes the edge ``1 <-> 3``, and the MAG Zhang's construction
+    builds is not ancestral.
+    """
+    marks = _circle_graph(5, [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4)])
+    sepsets = {(0, 2): (1,), (0, 3): (), (0, 4): (1,), (1, 4): (), (3, 4): (2,)}
+    orient_colliders(marks, sepsets)
+    fci_orient(marks, _no_test, 0.5, sepsets)
+    assert (marks[1, 2], marks[2, 1], marks[2, 3], marks[3, 2]) == (TAIL, ARROW, TAIL, ARROW)
+    assert marks[1, 3] == marks[3, 1] == ARROW
+    with pytest.raises(ValueError, match="not a PAG"):
+        GraphStructure.from_numpy(marks, kind="pag").m_separated(0, 4, [])
 
 
 def _named_test(names: np.ndarray):

@@ -672,6 +672,12 @@ def fci(
     variable, it took 34 s against 23 to 29 s for ``"fast"`` over five column orders.
     ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES network with
     1,000 simulated rows, its median endpoint errors passed the empty graph's (696 against 676).
+    Test errors can give results that no MAG fits, and the ``pag`` it returns is then not the
+    PAG of any MAG. With the default settings, of 200 simulated datasets with 10 variables, mean
+    degree 3, and 2,000 rows, 36 fits with ``"fisherz"`` and 36 with ``"normal_scores"`` returned
+    one. On 28 and 29 of them, the MAG that Zhang's construction [3]_ builds from the ``pag`` is not
+    ancestral, and a graph query such as ``m_separated`` raised ``ValueError``; on the others, that
+    MAG's PAG differs from the ``pag``.
     Rule R5 stops searching a pair after a fixed number of partial paths and leaves its circles, so
     on graphs with many circle-circle edges it can miss an undirected cycle. With the mixed-data
     tests, it is experimental and not benchmarked yet; its tests run it on 5 variables with 3,000
