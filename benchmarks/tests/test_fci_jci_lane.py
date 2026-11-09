@@ -7,7 +7,9 @@ the lane's own jobs.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
+import sys
 
 import fci_jci_cpu as lane
 import numpy as np
@@ -136,6 +138,20 @@ def test_the_possible_dsep_sizes_are_recorded_and_the_engine_restored():
     assert module._possible_dsep is real
     assert seen["calls"] > 0 and 0 < seen["max"] <= 10
     assert marks.shape == (11, 11)
+
+
+def test_a_refit_the_wrapper_misses_raises(monkeypatch):
+    """A second copy of the FCI module in ``sys.modules`` takes the wrapper, and the engine runs the
+    copy it imported: the refit raises rather than record no sets."""
+    spec = importlib.util.find_spec("andrey.constraint.fci")
+    assert spec is not None and spec.loader is not None
+    copy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(copy)
+    monkeypatch.setitem(sys.modules, "andrey.constraint.fci", copy)
+    data = lane.draw(lane.CELLS["S4"], 0)
+    x, params = lane.inputs("andrey.jci1", data, 0.01)
+    with pytest.raises(RuntimeError):
+        lane.refit("andrey.jci1", x, {**AndreyFCIJCI().params(), **params})
 
 
 def test_every_cell_runs_the_gated_arms():

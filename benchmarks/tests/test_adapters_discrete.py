@@ -97,9 +97,9 @@ def test_every_comparator_arm_is_a_named_solution_of_the_driver() -> None:
 
 
 @pytest.mark.parametrize("name", list(DEFERRED_MODULES))
-def test_setup_imports_the_module_fit_defers(name: str) -> None:
+def test_setup_imports_the_module_fit_defers(name: str, unimport) -> None:
     (adapter,) = [a for a in discrete_cpu.SOLUTIONS if a.name == name]
-    sys.modules.pop(DEFERRED_MODULES[name], None)
+    unimport(DEFERRED_MODULES[name])
     adapter.setup()
     assert DEFERRED_MODULES[name] in sys.modules
 
