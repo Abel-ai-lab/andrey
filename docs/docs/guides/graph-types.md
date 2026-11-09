@@ -209,7 +209,7 @@ nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). ANM and PNL are direct
 variables: each returns a two-node `dag` with the direction its tests decide, or no edge, and
 both p-values and test statistics in `metadata`.
 
-## Reading a drawing
+## How to read a causal graph
 
 Draw any `GraphStructure`, including a temporal lag or summary, with `andrey.viz.draw`:
 

@@ -14,8 +14,8 @@ names its pull request.
 
 - `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
   by position, as `square` nodes, as `draw` does. ([#806])
-- The graph types guide has a section, "Reading a drawing", with a legend of every mark `draw`
-  uses. ([#806])
+- The graph types guide has a section, "How to read a causal graph", with a legend of every mark
+  `draw` uses. ([#806])
 - A release without its own art has a default release-card cover: the navy ground, the "Release
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same

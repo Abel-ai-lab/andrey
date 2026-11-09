@@ -1082,8 +1082,8 @@ the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout 
 variables are hollow, dashed circles. `draw(structure, targets=["x"])` marks the variables an
 experiment set: each is a square, and a cross marks the middle of each edge into it. A hard
 intervention cuts those edges, and a soft one keeps them; the marks are the same.
-`to_graphviz(structure, targets=["x"])` draws the squares. [Reading a
-drawing](guides/graph-types.md#reading-a-drawing) lists every mark.
+`to_graphviz(structure, targets=["x"])` draws the squares. [How to read a causal
+graph](guides/graph-types.md#how-to-read-a-causal-graph) lists every mark.
 
 ```{eval-rst}
 .. currentmodule:: andrey.viz
