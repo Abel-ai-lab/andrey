@@ -17,7 +17,7 @@ from andrey.core import backend
 from andrey.spec import REGISTRY
 
 ROOT = Path(__file__).resolve().parents[2]
-PAIRS = ("anm", "pnl", "loci")
+PAIRS = ("anm", "pnl")
 
 
 def _capped() -> list[str]:
@@ -162,7 +162,9 @@ def test_every_method_checks_its_data_against_the_boundary(method, monkeypatch):
         raise _Checked
 
     monkeypatch.setattr(_boundary, "past_boundary", check)
-    data = np.random.default_rng(0).standard_normal((60, 2 if method in PAIRS else 4))
+    data = np.random.default_rng(0).standard_normal(
+        (60, 2 if REGISTRY[method].family == "pairwise" else 4)
+    )
     with pytest.raises(_Checked):
         _call(method, data)
     # J-PCMCI+ checks its datasets stacked, as a space context is constant within one.
