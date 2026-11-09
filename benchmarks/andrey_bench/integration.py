@@ -212,7 +212,9 @@ def run_batch(
     """Fit every adapter on every dataset and return one record per repeat.
 
     Datasets are materialized once and estimates scored against generated truth. Failed, timed-out,
-    and OOM fits remain records; launch failures are added to ``errors``.
+    and OOM fits remain records; launch failures are added to ``errors``. On a masked dataset, a
+    solution with a ``detected_parents(native)`` method that returns an array is also scored on the
+    missingness-indicator parents it detected (:func:`~andrey_bench.scoring.missingness_parent_scores`).
 
     ``cores`` sets the per-task budget, split by adapter mode. ``cap_wall_s`` and ``cap_mem_mb``
     set resource limits; ``extra_env`` is forwarded to child processes.
@@ -249,6 +251,8 @@ def run_batch(
         # truth's family.
         truth = _truth(marks, registry["keys"][key.label]["graph_kind"], key.latents)
         sort = scoring.sortability(data, truth)
+        # The m-graph of a masked dataset, for solutions that report the parents they detected.
+        mgraph = (registry["keys"][key.label].get("missing") or {}).get("parents")
 
         for adapter in adapters:
             params = dict(adapter.params())
@@ -310,6 +314,10 @@ def run_batch(
                     ):
                         est = adapter.to_structure(measures["adj"])
                         metrics = scoring.score_result(est, truth)
+                        detected = getattr(adapter, "detected_parents", None)
+                        found = None if detected is None else detected(measures["adj"])
+                        if mgraph is not None and found is not None:
+                            metrics.update(scoring.missingness_parent_scores(found, mgraph))
                         measures = {**measures, "structure_hash": scoring.structure_hash(est)}
                 except Exception as exc:
                     # Preserve parse/scoring failures as error records.
