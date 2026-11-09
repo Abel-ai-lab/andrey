@@ -12,6 +12,7 @@ import pytest
 
 import andrey
 from andrey import Knowledge
+from andrey.api._method import structure_param
 from andrey.cli import main
 from andrey.constraint.fci import _remove_by_possible_dsep, fci_orient
 from andrey.core import ARROW, NULL, TAIL
@@ -653,14 +654,32 @@ def test_a_part_the_method_does_not_honor_raises(name, part, data):
 @pytest.mark.parametrize("name", PATH_METHODS)
 def test_a_forbidden_path_directs_the_class(name, data):
     # a - f is undirected in the class of the truth; f is not an ancestor of a, so a -> f.
-    out = _fit(name, data, knowledge=Knowledge(forbidden_paths=[("f", "a")]))
+    cpdag = {"structure": "cpdag"} if structure_param(REGISTRY[name]) else {}
+    out = _fit(name, data, knowledge=Knowledge(forbidden_paths=[("f", "a")]), **cpdag)
     marks, labels = _marks(out)
     a, f = labels.index("a"), labels.index("f")
-    if out.structure.kind != "cpdag":  # an undirected structure takes no path claims
-        assert "ancestor_clauses" not in out.metadata
-        return
     assert out.metadata["ancestor_clauses"] == []
     assert marks[a, f] == TAIL and marks[f, a] == ARROW
+
+
+#: Each blanket method with each setting whose result is undirected.
+UNDIRECTED_SETTINGS = [
+    *((name, {"structure": choice}) for name, choice in UNDIRECTED_STRUCTURES),
+    *((name, {"target": "c"}) for name in PATH_METHODS if structure_param(REGISTRY[name])),
+]
+
+
+@pytest.mark.parametrize(("name", "setting"), UNDIRECTED_SETTINGS)
+@pytest.mark.parametrize("part", PATH_PARTS)
+def test_an_undirected_result_refuses_the_path_parts(name, setting, part, data):
+    # The claims restrict a class of DAGs, which an undirected result does not stand for.
+    knowledge = Knowledge(**{part: [("f", "a")]})
+    with pytest.raises(NotImplementedError, match=f"{name} with .* not honor knowledge {part}"):
+        try:
+            _fit(name, data, knowledge=knowledge, **setting)
+        except NotImplementedError as error:
+            assert "with structure='cpdag' and no target" in str(error)
+            raise
 
 
 def test_the_path_parts_are_experimental(data):

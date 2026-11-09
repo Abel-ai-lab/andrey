@@ -215,8 +215,9 @@ class Knowledge:
         a required link without a lag, or at a lag the search does not learn; ``varma_lingam`` also
         for a forbidden lagged link with ``prune=False``.
     NotImplementedError
-        A method raises it for a part it does not honor, and a method that learns no time lags
-        for an edge with a lag.
+        A method raises it for a part it does not honor, ``iamb``, ``inter_iamb``, and ``mmpc`` for
+        ``required_paths`` and ``forbidden_paths`` with a ``target`` or an undirected ``structure``,
+        and a method that learns no time lags for an edge with a lag.
 
     Notes
     -----

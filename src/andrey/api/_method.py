@@ -134,10 +134,13 @@ def warn_experimental(name: str) -> None:
     )
 
 
-def unhonored_part(method: str, part: str) -> str:
+def unhonored_part(method: str, part: str, setting: str = "") -> str:
     """Return the message for knowledge ``part`` given to ``method``, which does not honor it.
 
-    The message names the methods that honor it, from the registry.
+    ``setting`` names the arguments under which ``method`` does not honor it, such as an undirected
+    ``structure``, and is empty when it never does. The message names the methods that honor it,
+    from the registry, and for ``required_paths`` and ``forbidden_paths`` the methods that honor
+    them only with a CPDAG result (:func:`undirected_setting`).
     """
     from andrey.spec.registry import REGISTRY
 
@@ -147,15 +150,44 @@ def unhonored_part(method: str, part: str) -> str:
         if honoring
         else "no method honors it"
     )
-    return f"{method} does not honor knowledge {part}; {others}"
+    local = [name for name in honoring if structure_param(REGISTRY[name]) is not None]
+    if part in PATH_PARTS and local:
+        others += f" ({', '.join(local)} with structure='cpdag' and no target)"
+    who = f"{method} with {setting}" if setting else method
+    return f"{who} does not honor knowledge {part}; {others}"
+
+
+def structure_param(spec: MethodSpec) -> ParamSpec | None:
+    """Return the ``structure`` choice of a local-structure method, else ``None``."""
+    return next((p for p in spec.params if p.concept == "structure"), None)
+
+
+def undirected_setting(spec: MethodSpec, arguments: dict[str, Any]) -> str | None:
+    """Return the setting under which the call's result is an undirected graph, else ``None``.
+
+    A method with a ``structure`` choice returns one for a ``target`` and for a ``structure`` that
+    :data:`~andrey.spec.concepts.BLANKET_STRUCTURES` makes undirected, the default when the call
+    passes none. An undirected graph stands for no set of DAGs that the causal paths could restrict.
+    """
+    from andrey.spec.concepts import BLANKET_STRUCTURES
+
+    structure = structure_param(spec)
+    if structure is None:
+        return None
+    if arguments.get("target") is not None:
+        return "a target"
+    choice = arguments.get("structure", structure.default)
+    return f"structure={choice!r}" if BLANKET_STRUCTURES[choice] == "undirected" else None
 
 
 def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints | None:
     """Check the call's ``knowledge`` against the parts ``spec`` honors, and set its paths apart.
 
-    A part the method does not honor raises ``NotImplementedError`` (:func:`unhonored_part`), and
-    a part it honors experimentally warns :class:`~andrey.ExperimentalWarning` once. Knowledge with
-    ``required_paths`` or ``forbidden_paths`` is resolved against the data's columns before the fit
+    A part the method does not honor raises ``NotImplementedError`` (:func:`unhonored_part`), as
+    do ``required_paths`` and ``forbidden_paths`` for a call whose result is undirected
+    (:func:`undirected_setting`), and a part it honors experimentally warns
+    :class:`~andrey.ExperimentalWarning` once. Knowledge with ``required_paths`` or
+    ``forbidden_paths`` is resolved against the data's columns before the fit
     (:func:`~andrey.core.knowledge.resolve`, which raises
     :class:`~andrey.core.knowledge.KnowledgeError` for knowledge that contradicts itself). For a
     method that ``restricts_paths``, the facade gets the knowledge without them and the return
@@ -181,6 +213,9 @@ def path_constraints(spec: MethodSpec, arguments: dict[str, Any]) -> Constraints
             )
     if not set(given) & set(PATH_PARTS) or spec.family == "temporal":
         return None
+    if (setting := undirected_setting(spec, arguments)) is not None:
+        part = next(p for p in given if p in PATH_PARTS)
+        raise NotImplementedError(unhonored_part(spec.name, part, setting))
     if spec.restricts_paths:
         arguments["knowledge"] = knowledge.edge_parts()
     data = arguments[spec.data.inputs[0].name]

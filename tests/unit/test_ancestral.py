@@ -2,7 +2,8 @@
 
 The oracle lists the DAGs of a small CPDAG's class, keeps those that meet the claims, and directs an
 edge when every kept DAG directs it the same way; the MPDAG :func:`restrict` returns must be that
-graph, and with its residual clauses it must keep exactly those DAGs.
+graph, and with its residual clauses it must keep exactly those DAGs, with no clause that follows
+from the others or that keeps a head it can drop.
 """
 
 from __future__ import annotations
@@ -126,7 +127,20 @@ def _check(start: np.ndarray, members: list[np.ndarray], required_paths, forbidd
     assert [_holds(m, clauses) for m in within] == [
         _meets(m, required_paths, forbidden_paths) for m in within
     ], (start, required_paths, forbidden_paths, clauses)
+    _check_minimal(within, clauses)
     return False
+
+
+def _check_minimal(within: list[np.ndarray], clauses) -> None:
+    """Check that no clause follows from the MPDAG and the others, and that no clause keeps a head
+    it can drop: ``within`` are the DAGs of the MPDAG."""
+    for k, clause in enumerate(clauses):
+        others = clauses[:k] + clauses[k + 1 :]
+        assert any(_holds(m, others) and not _holds(m, [clause]) for m in within), (clause, clauses)
+        t, heads = clause
+        for h in heads:
+            fewer = (t, heads - {h})
+            assert any(_holds(m, clauses) and not _holds(m, [fewer]) for m in within), (h, clauses)
 
 
 def test_every_restricted_class_matches_the_enumeration():
@@ -204,6 +218,17 @@ def test_a_required_path_through_one_of_two_edges_stays_a_clause():
     mpdag, clauses = restrict(cpdag, required_paths, None)
     assert _directed(mpdag) - _directed(cpdag) == {(A, B), (A, C), (X, B), (X, C)}
     assert clauses == [(D, frozenset({A, X}))]
+
+
+def test_a_clause_drops_a_head_another_claim_rules_out():
+    # Every pair of 0, ..., 4 is joined but 0 and 4. 1 is an ancestor of 2, so 1 -> 2, and 0 of 4,
+    # so 0 -> 1, 0 -> 2, or 0 -> 3. 0 -> 1 without 0 -> 2 closes 0 -> 1 -> 2 -> 0, so 1 is no head.
+    cpdag = _graph(5, [pair for pair in itertools.combinations(range(5), 2) if pair != (0, 4)])
+    required_paths = np.zeros((5, 5), dtype=bool)
+    required_paths[0, 4] = required_paths[1, 2] = True
+    none = np.zeros((5, 5), dtype=bool)
+    assert not _check(cpdag, _members(cpdag), required_paths, none)
+    assert restrict(cpdag, required_paths, none)[1] == [(0, frozenset({2, 3}))]
 
 
 def test_claims_no_dag_meets_together_raise():

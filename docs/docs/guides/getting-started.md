@@ -438,12 +438,13 @@ result.metadata["ancestor_clauses"]
 ```
 
 The methods whose result is a CPDAG (PC, CD-NOD, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP,
-exact search, and IAMB, Inter-IAMB, and MMPC with `structure="cpdag"`) honor them: of the DAGs
-the graph they found stands for, they keep those that meet every claim and return their MPDAG, so
-an edge is directed when all of those DAGs direct it alike. Some claims cannot be shown by
-directing edges. If `smoking` causes `cancer` exactly when it is a direct cause of `tar` or of
-`gene`, and the data leave both edges undirected, `metadata["ancestor_clauses"]` lists the claim
-as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
+exact search, and IAMB, Inter-IAMB, and MMPC with `structure="cpdag"` and no `target`) honor them:
+of the DAGs the graph they found stands for, they keep those that meet every claim and return their
+MPDAG, so an edge is directed when all of those DAGs direct it alike. With an undirected result,
+which the claims cannot restrict, IAMB, Inter-IAMB, and MMPC raise `NotImplementedError`. Some
+claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly when it is a direct
+cause of `tar` or of `gene`, and the data leave both edges undirected,
+`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
 the result is the class the search found, restricted, not a new search for the best class that
 meets them. These two parts are experimental.
 

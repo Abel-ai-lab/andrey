@@ -48,7 +48,9 @@ names its pull request.
   the variables the causal order may place next, a forbidden path is no parent, and
   `metadata["unmet_knowledge"]` lists the claims the DAG does not meet. ([#835])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
-  another part raises `NotImplementedError`, naming the methods that honor it. ([#829])
+  another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
+  `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
+  undirected `structure`. ([#829])
 
 ### Changed
 
