@@ -36,7 +36,16 @@ names its pull request.
   and `non_ancestors`, experimentally: the result is the MPDAG of the DAGs of the class found that
   meet them (Fang, Zhao, Liu, and He 2025), and `metadata["ancestor_clauses"]` lists the claims no
   MPDAG can show. Knowledge that contradicts itself raises `ValueError` before the search, and
-  claims that no DAG of the class meets raise it after; no method honors `latent`. ([#829])
+  claims that no DAG of the class meets raise it after. ([#829])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `ancestors`,
+  `non_ancestors`, and `latent`, experimentally: on a pair the tests keep, an ancestor claim makes
+  the edge `a -> b` and a non-ancestor claim puts an arrowhead at the cause before Zhang's rules,
+  no test removes a `latent` pair, and a claim the PAG contradicts raises `ValueError`. `lpcmci`
+  takes each claim with its lag. ([#835])
+- `direct_lingam` and `multi_group_direct_lingam` honor `ancestors` and `non_ancestors`,
+  experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
+  the variables the causal order may place next, a non-ancestor is no parent, and
+  `metadata["unmet_knowledge"]` lists the claims the DAG does not meet. ([#835])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
   another part raises `NotImplementedError`, naming the methods that honor it. ([#829])
 
@@ -2094,3 +2103,4 @@ First alpha release.
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
 [#829]: https://github.com/Abel-ai-lab/andrey/pull/829
+[#835]: https://github.com/Abel-ai-lab/andrey/pull/835
