@@ -51,6 +51,12 @@ names its pull request.
   another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
   `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
   undirected `structure`. ([#829])
+- `andrey.data.missingness` draws missing values whose missingness graph is known: `mcar`, `mar`,
+  `mnar`, and `self_masking` masks, in a logistic form (Muzellec et al., 2020) or the quantile form
+  of the MVPC simulations (Tu et al., 2019), with `parents=` to place each indicator. `missing=` on
+  `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
+  it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
+  indicator; `missingness.draw` masks any complete data. ([#826])
 
 ### Changed
 
@@ -2105,5 +2111,6 @@ First alpha release.
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
+[#826]: https://github.com/Abel-ai-lab/andrey/pull/826
 [#829]: https://github.com/Abel-ai-lab/andrey/pull/829
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
