@@ -332,7 +332,7 @@ def orient_colliders(
 # ---- possible-d-separation refinement -----------------------------------------------------------
 
 
-def _semidirectedreach(marks: np.ndarray) -> Callable[[int], int]:
+def _semidirected_reach(marks: np.ndarray) -> Callable[[int], int]:
     """``reach(src)``: the bitmask of every node ``dst`` with a semidirected path
     ``src o-> ... o-> dst`` of one or more steps, searched once per ``src``.
 
@@ -725,7 +725,7 @@ def _remove_in_node_order(
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     # The lists and the reach read the marks, which only a removal changes.
-    neighbors, reach = _neighbor_lists(marks), _semidirectedreach(marks)
+    neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
     for na, nb in edges:
         if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
@@ -736,7 +736,7 @@ def _remove_in_node_order(
             if _try_remove_by_dsep(
                 marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth, pool, tested
             ):
-                neighbors, reach = _neighbor_lists(marks), _semidirectedreach(marks)
+                neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
                 break
             tested = set(dsep)
 

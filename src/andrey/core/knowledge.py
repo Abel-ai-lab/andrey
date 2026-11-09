@@ -199,7 +199,12 @@ class Knowledge:
         ``non_ancestors`` whose cause ``ancestors`` and required edges make an ancestor of its
         effect, directly or through other variables, or a ``latent`` pair the knowledge makes
         non-adjacent. A method that honors ``ancestors`` and ``non_ancestors`` also raises it when
-        they admit no DAG the graph it found stands for, or when that graph stands for no DAG.
+        they admit no DAG the graph it found stands for, or when that graph stands for no DAG. A
+        PAG method, ``lpcmci``, and the DirectLiNGAM methods raise it for ``ancestors`` and
+        required edges that lead from a later tier into an earlier one; a PAG method and
+        ``lpcmci`` also for a claim their PAG contradicts, and for an ancestor claim on an edge
+        whose cause ``forbidden`` or ``tiers`` mark with an arrowhead; ``lpcmci`` for a claim
+        without its lag.
         ``boss``, ``grasp``, and the LiNGAM methods that search a causal order also raise it when
         the required edges and the tiers admit no causal order, through a column in no tier.
         ``pc``, ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a
@@ -262,6 +267,22 @@ class Knowledge:
     best class among those that meet the claims, and the search's own metadata, such as a score
     or a DAG, describe what it found.
 
+    A PAG method reads the claims in its search, as marks of a maximal ancestral graph [5]_: on a
+    pair the tests keep adjacent, ``a`` an ancestor of ``b`` makes the edge ``a -> b``, and ``a``
+    no ancestor of ``b`` puts an arrowhead at ``a``. The marks are set before Zhang's orientation
+    rules [6]_, which change circles only. A ``latent`` pair is never tested, so it stays adjacent
+    whether or not the tests would separate it, and a method that starts from a score search's
+    graph adds it. A claim on a pair the PAG leaves non-adjacent sets no mark; the PAG must still
+    allow it: an ancestor needs a path that some graph the PAG stands for directs from ``a`` to
+    ``b``, and a non-ancestor admits no directed path ``a -> ... -> b``. ``lpcmci`` reads each
+    claim on the link it names, over the time window. A DirectLiNGAM method reads ``ancestors``
+    and ``non_ancestors`` as the prior knowledge of Shimizu et al. [7]_ (Section 3.4): when the
+    claims show that no remaining variable is an ancestor of some of them, the next variable in
+    the causal order is one of those; a variable with a claimed ancestor among the remaining ones
+    is never next; and a non-ancestor of a variable is not among its parents. Such a DAG can still
+    miss an ancestor claim, so ``metadata["unmet_knowledge"]`` lists each claim the DAG does not
+    meet, as ``[part, a, b]``.
+
     References
     ----------
     .. [1] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
@@ -273,6 +294,15 @@ class Knowledge:
        Research, 26(229), 1-73.
     .. [4] Fang, Z., Liu, Y., Geng, Z., and He, Y. (2022). A local method for identifying causal
        relations under Markov equivalence. Artificial Intelligence, 305, 103669.
+    .. [5] Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+       Statistics, 30(4), 962-1030.
+    .. [6] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
+       1873-1896.
+    .. [7] Shimizu, S., Inazumi, T., Sogawa, Y., Hyvarinen, A., Kawahara, Y., Washio, T., Hoyer,
+       P. O., and Bollen, K. (2011). DirectLiNGAM: a direct method for learning a linear
+       non-Gaussian structural equation model. Journal of Machine Learning Research, 12,
+       1225-1248.
 
     Examples
     --------

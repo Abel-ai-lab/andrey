@@ -445,8 +445,29 @@ directing edges. If `smoking` causes `cancer` exactly when it is a direct cause 
 `gene`, and the data leave both edges undirected, `metadata["ancestor_clauses"]` lists the claim
 as `["smoking", ["gene", "tar"]]`. Claims that no DAG of the class meets raise a `ValueError`;
 the result is the class the search found, restricted, not a new search for the best class that
-meets them. These two parts are experimental. `latent` lists pairs with a hidden common cause,
-and no method honors it; a method raises `NotImplementedError` for a part it does not honor.
+meets them. These two parts are experimental.
+
+When hidden common causes are possible, `latent` lists the pairs that share one. The PAG methods
+(FCI, FCI-JCI, GFCI, BOSS-FCI, GRaSP-FCI, and LPCMCI over lagged links) honor all three parts:
+
+```python
+from andrey import fci
+
+knowledge = Knowledge(
+    ancestors=[("smoking", "cancer")],
+    latent=[("diet", "exercise")],  # a hidden common cause
+    non_ancestors=[("diet", "exercise"), ("exercise", "diet")],  # neither causes the other
+)
+result = fci(data, knowledge=knowledge)  # diet <-> exercise
+```
+
+On a pair the tests keep, an ancestor claim makes the edge `smoking -> cancer` and a non-ancestor
+claim puts an arrowhead at its cause; no test removes a `latent` pair. A claim the PAG
+contradicts, such as an ancestor with no path that could lead to its effect, raises a
+`ValueError`. DirectLiNGAM and multi-group DirectLiNGAM read `ancestors` and `non_ancestors` to
+narrow the causal order, as their paper describes, and list the claims their DAG does not meet in
+`metadata["unmet_knowledge"]`. Every other method raises `NotImplementedError` for a part it does
+not honor, naming the methods that do. These parts are experimental for every method.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`

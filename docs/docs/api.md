@@ -175,8 +175,15 @@ time `t`. Three more parts state causal paths and hidden common causes: `ancesto
 `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
 `structure="cpdag"` honor `ancestors` and `non_ancestors`, experimentally: the result is the MPDAG of
 the DAGs of the class found that meet them (Fang et al. 2025), and `metadata["ancestor_clauses"]`
-lists the claims no MPDAG can show. No method honors `latent`. A method given a part it does not
-honor raises `NotImplementedError`, naming the methods that honor it.
+lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci`
+honor all three, experimentally: on a pair the tests keep, an ancestor claim makes the edge
+`a -> b` and a non-ancestor claim puts an arrowhead at the cause, before Zhang's rules (Richardson
+and Spirtes 2002; Zhang 2008); no test removes a `latent` pair; and a claim the PAG contradicts
+raises. `lpcmci` takes each claim with its lag. `direct_lingam` and `multi_group_direct_lingam`
+honor `ancestors` and `non_ancestors`, experimentally, as the order search's prior knowledge
+(Shimizu et al. 2011, Section 3.4), and `metadata["unmet_knowledge"]` lists the claims the DAG
+does not meet. A method given a part it does not honor raises `NotImplementedError`, naming the
+methods that honor it.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
