@@ -159,6 +159,10 @@ class MvpcR:
 
         return structure_from_adjacency(np.asarray(native)[0], kind=self.output_type)
 
+    def detected_parents(self, native: np.ndarray) -> np.ndarray | None:
+        """The detected parents of the missingness indicators; ``None`` for test-wise PC."""
+        return np.asarray(native)[1] if self.variant == "permc" else None
+
 
 @dataclass(frozen=True)
 class PaperDraw:
