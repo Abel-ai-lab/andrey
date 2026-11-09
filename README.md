@@ -18,20 +18,16 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.15.0
+## ⭐ What's new in 0.16.0
 
-Multi-domain data come from several environments, such as sites, batches, or the conditions of an
-experiment, that share one causal structure and differ in the mechanisms of some variables. With
-each row's environment recorded as an environment index, a method can tell a dependence that
-changing mechanisms create from a causal edge, and it can orient edges that one environment leaves
-undirected. FCI-JCI learns from these data while allowing hidden common causes, BOSS-FCI and
-GRaSP-FCI allow them too, and J-PCMCI+ learns from time series of several datasets. In our
-comparisons with their authors' code, in the settings their papers study, none of the four made
-significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
-BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
+0.16.0 is a release of fixes. Drawings mark each edge into an intervention target with a cross in
+its middle, and `to_graphviz` draws the targets too; the graph types guide shows how to read every
+mark. Every method that tests with HSIC keeps its p-values precise far below 1e-16, so ANM and PNL
+pick the direction with the larger p-value even where both used to round to 0. FCI's documentation
+says when test errors make it return a graph that is not a PAG.
 
-**[Read the post](https://andrey.abel.ai/blog/20261108-andrey-0-15-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)**
 
 ---
 
@@ -191,7 +187,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.15.0},
+  version = {0.16.0},
   url = {https://andrey.abel.ai},
 }
 ```

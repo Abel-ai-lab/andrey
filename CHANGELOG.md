@@ -8,7 +8,16 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
-## [Unreleased]
+## [0.16.0] - 2026-11-09
+
+### Highlights
+
+- Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
+  in the middle of each edge into a target, and `to_graphviz(structure, targets=)` draws the
+  targets as squares. The graph types guide has a legend of every mark. ([#806])
+- Every gamma-HSIC p-value stays precise far below 1e-16, so `anm` and `pnl` follow the larger
+  p-value even where both used to round to 0; on 970 benchmark pairs no direction changed.
+  ([#808])
 
 ### Added
 
@@ -1830,7 +1839,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...HEAD
+[0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
