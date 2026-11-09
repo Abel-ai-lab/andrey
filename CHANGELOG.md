@@ -29,6 +29,12 @@ names its pull request.
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
   link preview, the wordmark and its release on navy. ([#809])
+- One package-wide argument, `missing`, on the twelve methods that accept missing values: `pc`,
+  `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
+  and `pnl`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  method's default handling, `"testwise"`, so no result changes; a value a method does not list
+  raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
+  values. ([#828])
 
 ### Changed
 
@@ -2083,3 +2089,4 @@ First alpha release.
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
+[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
