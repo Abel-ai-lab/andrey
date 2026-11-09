@@ -308,31 +308,30 @@ def pc(
     other tests, or when a continuous column is constant on its rows. With missing values, the
     skeleton search runs in one process.
 
-    **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The
-    test-wise skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y``
-    needs the missingness indicator of a variable in the test to be a common effect of ``x`` and
-    ``y``, or a descendant of one (their Proposition 2). Step 2 finds the parents of each
-    indicator: the variable's column is replaced by its 0/1 indicator, and the skeleton search
-    tests the indicator against each other variable given subsets of the indicator's neighbors,
-    with ``indep_test``, ``alpha``, and ``max_depth``; a test whose rows hold one value of the
-    indicator separates the pair. Step 3 marks as candidates the adjacent pairs that share an
-    adjacent variable or an indicator they both cause. Step 4 runs the skeleton search again
-    over the candidates, every other edge kept, with the permutation-based correction (PermC,
-    their Algorithm 2): a test of ``x`` and ``y`` given ``S`` reads ``W``, the parents of the
-    indicators of ``x``, ``y``, and ``S``, and of the indicators of ``W``'s own variables. On
-    the rows where all of them are observed, each of ``x``, ``y``, and ``S`` is regressed on
-    ``W``; ``W``'s values on as many rows, drawn in random order from the rows where ``W`` is
-    observed, plus each variable's residuals give virtual data whose distribution is that of the
-    complete data, and the test runs on them. A test with an empty ``W`` is the test-wise one.
-    The colliders follow the corrected separating sets; ``"conservative"`` and ``"majority"``
-    vote with the test-wise tests, as the authors' code does. The regression has an intercept,
-    where their Eq. (2) has none, which assumes variables of mean 0: with it, a p-value does not
-    change when a column is shifted. The authors' code also re-runs every edge, falling back to
-    the test-wise test, where Step 4 retests only the candidates, and takes a common neighbor
-    alone as a candidate. The permutations draw from ``seed`` and from where the queried
-    columns' values are missing, so a result depends on neither the column order, nor a column's
-    units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives the result of
-    ``"testwise"``.
+    **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
+    skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
+    missingness indicator of a variable in the test to be a common effect of ``x`` and ``y``, or a
+    descendant of one (their Proposition 2). Step 2 finds the parents of each indicator: the
+    variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
+    against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
+    ``alpha``, and ``max_depth``; a test whose rows hold one value of the indicator separates the
+    pair. Step 3 marks as candidates the adjacent pairs that share an adjacent variable or an
+    indicator they both cause. Step 4 runs the skeleton search again over the candidates, every
+    other edge kept, with the permutation-based correction (PermC, their Algorithm 2): a test of
+    ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``, ``y``, and
+    ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
+    observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
+    drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
+    virtual data whose distribution is that of the complete data, and the test runs on them. A test
+    with an empty ``W`` is the test-wise one. The colliders follow the corrected separating sets;
+    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
+    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
+    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
+    p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
+    where the queried columns' values are missing, so a result depends on neither the column order,
+    nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
+    the result of ``"testwise"``.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
