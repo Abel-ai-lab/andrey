@@ -1258,7 +1258,7 @@ def _summary_headers(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx e
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
     tags under its title, where a reader looks for them and where they stay on a narrow screen. A
-    post is not updated after it is published, so the version dates what it says. ABlog has read
+    post describes the release its version names, so the version dates what it says. ABlog has read
     the posts' front matter by now."""
     blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
