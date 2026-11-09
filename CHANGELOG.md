@@ -29,6 +29,16 @@ names its pull request.
   card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
   tile among the earlier releases shows the version on navy, and a post without art has the same
   link preview, the wordmark and its release on navy. ([#809])
+- `andrey.Knowledge` takes `ancestors` and `non_ancestors`, the pairs `(cause, effect)` with and
+  without a directed path from `cause` to `effect`, and `latent`, the pairs with a hidden common
+  cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+  `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` honor `ancestors`
+  and `non_ancestors`, experimentally: the result is the MPDAG of the DAGs of the class found that
+  meet them (Fang, Zhao, Liu, and He 2025), and `metadata["ancestor_clauses"]` lists the claims no
+  MPDAG can show. Knowledge that contradicts itself raises `ValueError` before the search, and
+  claims that no DAG of the class meets raise it after; no method honors `latent`. ([#829])
+- Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
+  another part raises `NotImplementedError`, naming the methods that honor it. ([#829])
 
 ### Changed
 
@@ -2083,3 +2093,4 @@ First alpha release.
 [#808]: https://github.com/Abel-ai-lab/andrey/pull/808
 [#809]: https://github.com/Abel-ai-lab/andrey/pull/809
 [#821]: https://github.com/Abel-ai-lab/andrey/pull/821
+[#829]: https://github.com/Abel-ai-lab/andrey/pull/829
