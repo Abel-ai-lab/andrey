@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
+    FIT_BY_EM,
     bic_cov,
     categorical_metadata,
     check_em,
@@ -300,15 +301,17 @@ def ges(
     observed ones, and their conditional means and covariances give the expected covariance of the
     data (the E-step); the search runs on it over every row, with all of its settings, and the
     model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). It runs 10 rounds, as Gao et al. [12]_ do, from no edges and each column's
-    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
-    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
-    which can fall in a round that changes the graph. EM holds when values are missing completely at
-    random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    returns (the M-step). A row that observes no value is dropped first: it holds no information on
+    the model. It runs 10 rounds, as Gao et al. [12]_ do, from no edges and each column's mean and
+    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
+    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
+    the last round's expected covariance. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -348,8 +351,11 @@ def ges(
     ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10 variables
     with 500 rows and up to 30% of the values missing, completely at random or at random given
     observed values. It runs the search 10 times, so it takes about 10 times as long, and under
-    values missing not at random it has no guarantee. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    values missing not at random it has no guarantee. Before EM, only a column that repeats another
+    up to scale and shift where both are observed raises; a column that is a linear function of
+    several others, which raises on complete data, is not caught, and the fit runs. The numbers are
+    a reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1246,15 +1252,17 @@ def xges(
     observed ones, and their conditional means and covariances give the expected covariance of the
     data (the E-step); the search runs on it over every row, with all of its settings, and the
     model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). It runs 10 rounds, as Gao et al. [6]_ do, from no edges and each column's
-    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
-    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
-    which can fall in a round that changes the graph. EM holds when values are missing completely at
-    random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    returns (the M-step). A row that observes no value is dropped first: it holds no information on
+    the model. It runs 10 rounds, as Gao et al. [6]_ do, from no edges and each column's mean and
+    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
+    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
+    the last round's expected covariance. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
@@ -1279,9 +1287,11 @@ def xges(
     a rank-one update. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on
     up to 10 variables with 500 rows and up to 30% of the values missing, completely at random or at
     random given observed values. It runs the search 10 times, so it takes about 10 times as long,
-    and under values missing not at random it has no guarantee. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    and under values missing not at random it has no guarantee. Before EM, only a column that
+    repeats another up to scale and shift where both are observed raises; a column that is a linear
+    function of several others, which raises on complete data, is not caught, and the fit runs. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1326,7 +1336,14 @@ def xges(
     assert score_func is not None  # method_spec picks it from the column types
     check_em("xges", missing, score_func)
     X, mask, labels, constraints = fit_inputs(
-        data, "score_func", score_func, categorical, knowledge, method="xges", missing=missing == EM
+        data,
+        "score_func",
+        score_func,
+        categorical,
+        knowledge,
+        method="xges",
+        missing=missing == EM,
+        takes_em=True,
     )
 
     def fit(cov: np.ndarray | None) -> tuple[tuple[GraphStructure, float], GraphStructure]:
@@ -1600,15 +1617,17 @@ def hc(
     observed ones, and their conditional means and covariances give the expected covariance of the
     data (the E-step); the search runs on it over every row, with all of its settings, and the
     model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's
-    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
-    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
-    which can fall in a round that changes the graph. EM holds when values are missing completely at
-    random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    returns (the M-step). A row that observes no value is dropped first: it holds no information on
+    the model. It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and
+    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
+    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
+    the last round's expected covariance. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -1643,8 +1662,10 @@ def hc(
     not benchmarked yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the
     values missing, completely at random or at random given observed values. It runs the search 10
     times, so it takes about 10 times as long, and under values missing not at random it has no
-    guarantee. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    guarantee. Before EM, only a column that repeats another up to scale and shift where both are
+    observed raises; a column that is a linear function of several others, which raises on complete
+    data, is not caught, and the fit runs. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1952,15 +1973,17 @@ def tabu(
     observed ones, and their conditional means and covariances give the expected covariance of the
     data (the E-step); the search runs on it over every row, with all of its settings, and the
     model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). It runs 10 rounds, as Gao et al. [10]_ do, from no edges and each column's
-    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
-    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
-    which can fall in a round that changes the graph. EM holds when values are missing completely at
-    random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    returns (the M-step). A row that observes no value is dropped first: it holds no information on
+    the model. It runs 10 rounds, as Gao et al. [10]_ do, from no edges and each column's mean and
+    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
+    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
+    the last round's expected covariance. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -1988,9 +2011,11 @@ def tabu(
     a parent of each variable it points into. ``missing="em"`` is experimental and not benchmarked
     yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the values missing,
     completely at random or at random given observed values. It runs the search 10 times, so it
-    takes about 10 times as long, and under values missing not at random it has no guarantee. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    takes about 10 times as long, and under values missing not at random it has no guarantee. Before
+    EM, only a column that repeats another up to scale and shift where both are observed raises; a
+    column that is a linear function of several others, which raises on complete data, is not
+    caught, and the fit runs. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2228,10 +2253,11 @@ def exact_search(
     observed ones, and their conditional means and covariances give the expected covariance of the
     data (the E-step); the search runs on it over every row, with all of its settings, and the
     model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). It runs 10 rounds, as Gao et al. [9]_ do, from no edges and each column's
-    mean and variance over its observed values, and ``metadata["em"]`` records ``iterations``, the
-    rounds, and ``log_likelihood``, the observed-data log-likelihood of the model after each round,
-    which can fall in a round that changes the graph. EM holds when values are missing completely at
+    returns (the M-step). A row that observes no value is dropped first: it holds no information on
+    the model. It runs 10 rounds, as Gao et al. [9]_ do, from no edges and each column's mean and
+    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
+    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph. EM holds when values are missing completely at
     random or at random given observed values; when whether a value is missing depends on the
     missing values themselves, the expected covariance is biased, and the data cannot show it. On
     complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
@@ -2255,8 +2281,11 @@ def exact_search(
     variance. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10
     variables with 500 rows and up to 30% of the values missing, completely at random or at random
     given observed values. It runs the search 10 times, so it takes about 10 times as long, and
-    under values missing not at random it has no guarantee. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    under values missing not at random it has no guarantee. Before EM, only a column that repeats
+    another up to scale and shift where both are observed raises; a column that is a linear function
+    of several others, which raises on complete data, is not caught, and the fit runs. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -2309,6 +2338,7 @@ def exact_search(
         knowledge,
         method="exact_search",
         missing=missing == EM,
+        takes_em=True,
     )
 
     def fit(cov: np.ndarray | None) -> tuple[GraphStructure, GraphStructure]:
@@ -2523,16 +2553,20 @@ def calm(
     of the current graph, each row's missing values are Gaussian given its observed ones, and their
     conditional means and covariances give the expected covariance of the data (the E-step); the fit
     runs on it, with all of its settings, and the model's coefficients and noise variances are fit
-    again by least squares on the parents the fit returns (the M-step). ``standardize`` scales the
-    expected covariance to unit variances. It runs 10 rounds, as Gao et al. [8]_ do, from no edges
-    and each column's mean and variance over its observed values, and ``metadata["em"]`` records
-    ``iterations``, the rounds, and ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph. EM holds when values
-    are missing completely at random or at random given observed values; when whether a value is
-    missing depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
+    M-step, the weights the fit returns and one noise variance shared by every variable; here the
+    weights and each variable's noise variance are fit again. The weights it returns are the last
+    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    variances. A row that observes no value is dropped first: it holds no information on the model.
+    It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
+    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
+    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
+    fall in a round that changes the graph. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
@@ -2554,9 +2588,11 @@ def calm(
     ``missing="em"`` is experimental and not benchmarked yet; its tests run it on a collider of 3
     variables with 1,000 rows and 30% of one variable's values missing at random, where a fit took
     about 95 s, and on 5 variables with a shortened schedule. It runs the fit 10 times, so it takes
-    about 10 times as long, and under values missing not at random it has no guarantee. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    about 10 times as long, and under values missing not at random it has no guarantee. Under EM the
+    screen's Fisher-Z tests read the expected correlations as if every row were observed, so their
+    p-values are smaller than the observed values support, and the screen keeps more candidate edges
+    than ``screen_alpha`` implies. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2596,7 +2632,7 @@ def calm(
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data, method="calm", missing=missing == EM)
+    X = data_matrix(data, method="calm", missing=missing == EM, fix=FIT_BY_EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="calm")
 

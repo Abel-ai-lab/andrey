@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
+    FIT_BY_EM,
     column_labels,
     copies_named,
     data_matrix,
@@ -205,16 +206,20 @@ def notears(
     of the current graph, each row's missing values are Gaussian given its observed ones, and their
     conditional means and covariances give the expected covariance of the data (the E-step); the fit
     runs on it, with all of its settings, and the model's coefficients and noise variances are fit
-    again by least squares on the parents the fit returns (the M-step). ``standardize`` scales the
-    expected covariance to unit variances. It runs 10 rounds, as Gao et al. [8]_ do, from no edges
-    and each column's mean and variance over its observed values, and ``metadata["em"]`` records
-    ``iterations``, the rounds, and ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph. EM holds when values
-    are missing completely at random or at random given observed values; when whether a value is
-    missing depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
+    M-step, the weights the fit returns and one noise variance shared by every variable; here the
+    weights and each variable's noise variance are fit again. The weights it returns are the last
+    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    variances. A row that observes no value is dropped first: it holds no information on the model.
+    It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
+    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
+    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
+    fall in a round that changes the graph. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
@@ -285,7 +290,7 @@ def notears(
     """
     from andrey.search.continuous import notears as _notears
 
-    X = data_matrix(data, method="notears", missing=missing == EM)
+    X = data_matrix(data, method="notears", missing=missing == EM, fix=FIT_BY_EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
 
@@ -480,16 +485,20 @@ def dagma(
     of the current graph, each row's missing values are Gaussian given its observed ones, and their
     conditional means and covariances give the expected covariance of the data (the E-step); the fit
     runs on it, with all of its settings, and the model's coefficients and noise variances are fit
-    again by least squares on the parents the fit returns (the M-step). ``standardize`` scales the
-    expected covariance to unit variances. It runs 10 rounds, as Gao et al. [8]_ do, from no edges
-    and each column's mean and variance over its observed values, and ``metadata["em"]`` records
-    ``iterations``, the rounds, and ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph. EM holds when values
-    are missing completely at random or at random given observed values; when whether a value is
-    missing depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
+    M-step, the weights the fit returns and one noise variance shared by every variable; here the
+    weights and each variable's noise variance are fit again. The weights it returns are the last
+    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    variances. A row that observes no value is dropped first: it holds no information on the model.
+    It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
+    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
+    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
+    fall in a round that changes the graph. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
@@ -516,11 +525,14 @@ def dagma(
     repeats the whole central path. A fit can stop at a local optimum, and only weights that reach
     ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other densities, row
     counts or noise types, or on non-linear data. ``missing="em"`` is experimental and not
-    benchmarked yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the
-    values missing, completely at random or at random given observed values. It runs the fit 10
-    times, so it takes about 10 times as long, and under values missing not at random it has no
-    guarantee. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    benchmarked yet; its tests run it on a collider of 3 variables with 1,000 rows and 30% of one
+    variable's values missing at random, which it learns, and on 8 variables with 500 rows and
+    values missing at random, 30% of each column that can go missing, where over 4 graphs it made no
+    more errors in total than the fit on the complete rows, fewer than the fit with each missing
+    value replaced by its column's mean, and fewer than the empty graph. It runs the fit 10 times,
+    so it takes about 10 times as long, and under values missing not at random it has no guarantee.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -558,7 +570,7 @@ def dagma(
     """
     from andrey.search.continuous import dagma as _dagma
 
-    X = data_matrix(data, method="dagma", missing=missing == EM)
+    X = data_matrix(data, method="dagma", missing=missing == EM, fix=FIT_BY_EM)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
 

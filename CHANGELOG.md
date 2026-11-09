@@ -47,8 +47,8 @@ names its pull request.
   linear-Gaussian model of the current graph, the E-step gives the expected covariance of the data,
   the method's own search runs on it over every row, and the model is fit again to the graph it
   returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
-  each. `missing=None` keeps refusing missing values, with a message that names `missing="em"`.
-  ([#842])
+  each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
+  values, with a message that names `missing="em"` where EM would run. ([#842])
 
 ### Changed
 
