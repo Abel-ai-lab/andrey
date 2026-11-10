@@ -54,6 +54,20 @@ names its pull request.
   variables: the graph found often has no consistent extension, and the fit then drops every
   claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
+- `missing="em"` is supported in `ges`. The benchmark lane `m2-tetrad` runs `ges`, `boss`, and
+  `grasp` at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under
+  its EM covariance policy, which estimates one covariance by EM before the search and is not
+  structural EM, on 132 settings of 10 to 50 variables with values missing completely at random or
+  at random. Against Tetrad's default, which counts every row as the sample size, none was less
+  accurate in any setting: `ges` had fewer errors in 107 and tied in 25, `boss` in 95 and 37, and
+  `grasp` in 89 and 43. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges`
+  had fewer errors in 81, tied in 50, and had more in 1, which tied on fresh datasets. `boss` (70,
+  58, and 4) and `grasp` (64, 62, and 6) each had more errors again on fresh datasets in one
+  setting, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, so in them
+  `missing="em"` stays experimental until the cause is known. The 100-variable settings and the
+  default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it
+  stays experimental, with no reference implementation to compare with. The
+  [comparison page][em-tetrad] has the results. ([#873])
 - The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
   `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
   so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
@@ -2315,9 +2329,11 @@ First alpha release.
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#873]: https://github.com/Abel-ai-lab/andrey/pull/873
 [#874]: https://github.com/Abel-ai-lab/andrey/pull/874
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
