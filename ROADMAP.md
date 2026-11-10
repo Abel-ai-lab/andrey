@@ -94,10 +94,10 @@ dates, grouped by what they learn.
 ## 4. Very large causal discovery
 
 Very large causal discovery means learning graphs of more than 1,000 variables. We use sparsity and
-parallel hardware to scale causal discovery past that size, toward millions of variables, starting
-with FGES, a GES built for large sparse graphs. Andrey already runs the skeleton search of PC and of
-the methods built on it, and GES, on parallel CPU workers. We plan the methods below in this rough
-order, with no promised dates.
+parallel hardware to scale past that size, toward millions of variables, starting with FGES, a GES
+built for large sparse graphs. Andrey already runs the skeleton search of PC and of the methods
+built on it, and GES, on parallel CPU workers. We plan the methods below in this rough order, with
+no promised dates.
 
 | Method | Paper | Code | What it adds |
 |---|---|---|---|
