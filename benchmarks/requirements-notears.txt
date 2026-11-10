@@ -1,0 +1,11 @@
+causaldisco==0.3.0
+cloudpickle==3.1.2
+dagma==1.1.1
+gadjid==0.1.0
+joblib==1.6.0
+narwhals==2.28.0
+numpy==2.5.4
+scikit-learn==1.9.1
+scipy==1.18.1
+threadpoolctl==3.8.0
+tqdm==4.70.1
