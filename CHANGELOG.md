@@ -91,6 +91,13 @@ names its pull request.
   `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
   blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
   graph at 50 variables and mean degree 4. ([#882])
+- The Limitations and the `n_starts` entry of `grasp` say when one search is not enough: on
+  simulated linear-Gaussian data with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+  one start's mean SHD over 40 datasets was 29.6 (median fit 1.3 s) against 18.8 with `n_starts=4`
+  (5.1 s) and 16.3 with `n_starts=8` (10.4 s), because it stops at a much worse order on some
+  datasets; at mean degree 2 one start is enough. `grasp` keeps its seeded random order of tucks,
+  which the paper leaves open: trying them from the front of the order to its back gave no more
+  accuracy for the time than more starts and took 9 to 20 times as long at 200 variables. ([#891])
 
 ### Fixed
 
@@ -2350,6 +2357,7 @@ First alpha release.
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#891]: https://github.com/Abel-ai-lab/andrey/pull/891
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
