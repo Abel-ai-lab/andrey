@@ -28,9 +28,10 @@ that runtime in its output.
 :link: quick_start
 :link-type: doc
 :img-top: /_generated/thumbs/quick_start.svg
-:img-alt: The graph this notebook learns
+:img-alt: The graph PC learns from the Sachs protein measurements
 
-Simulate a small dataset, fit one method, read the graph it learns, and draw it.
+Load the Sachs protein measurements, fit PC, GES, FCI, and DirectLiNGAM, read each result, and
+draw each graph.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

@@ -87,7 +87,7 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 No. We focus on speeding up statistical causal discovery methods, the ones built on independence
 tests and scores.
 
-### Are the classic methods accurate on very large graphs?
+### Are the classic methods accurate on large graphs?
 
 Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
 FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
@@ -146,7 +146,7 @@ PC learns a 400-variable graph in under a second, where causal-learn takes ten m
 search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
 BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
 takes eight minutes. Finishing is not the same as being accurate: see [Are the classic methods
-accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+accurate on large graphs?](#are-the-classic-methods-accurate-on-large-graphs).
 
 ### Can it use more CPU cores?
 
@@ -272,9 +272,9 @@ in any release.
 
 ### What is planned next?
 
-The [roadmap](roadmap.md) lists the planned work in order, starting with every major causal
-discovery method, benchmarked. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1)
-on GitHub tracks the progress of each stage.
+The [roadmap](roadmap.md) lists the planned work in order, starting with the major methods of each
+family. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1) on GitHub tracks the
+progress of each stage.
 
 ### What is the license?
 

@@ -102,9 +102,10 @@ names its pull request.
   that listing every small graph gives, with d-separation in place of the tests, and on simulated
   data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`,
   `boss_fci`, `lpcmci`, and `direct_lingam` (`benchmarks/knowledge_paths.py`). ([#848])
-- A Quick start notebook, `examples/quick_start.ipynb`, simulates a small dataset, fits one
-  method, reads the graph it learns, and draws it. It leads the examples gallery and replaces
-  `examples/ges_quickstart.ipynb`, whose page on the website redirects to it. ([#853])
+- A Quick start notebook, `examples/quick_start.ipynb`, loads the Sachs protein measurements, fits
+  PC, GES, FCI, and DirectLiNGAM, reads each result, and draws each graph. It leads the examples
+  gallery and replaces `examples/ges_quickstart.ipynb`, whose page on the website redirects to it.
+  ([#853])
 - The roadmap lists the methods planned for its local causal discovery and very large causal
   discovery stages, each with its paper, an existing implementation and its license, and what the
   method adds. ([#853])
@@ -133,8 +134,9 @@ names its pull request.
   `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
 - The website's Examples page holds the notebooks and the demos that run in your browser, in
   sections: Quick start, Methods, Advanced, Interactive demos, and Misc. The sidebar groups the
-  pages the same way. The demos' pages moved from `/docs/demos/` to `/docs/examples/`, the navbar
-  no longer has a Demos entry, and every old address redirects to its new one. ([#853])
+  pages the same way, each group open on the Examples pages. The demos' pages moved from
+  `/docs/demos/` to `/docs/examples/`, the navbar no longer has a Demos entry, and every old
+  address redirects to its new one. ([#853])
 - Each example notebook's title names its topic only, and "Drawing a recovered structure" is
   "Visualize a causal graph". ([#853])
 

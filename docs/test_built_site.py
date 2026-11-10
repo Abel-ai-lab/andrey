@@ -728,6 +728,26 @@ def test_the_examples_gallery_lists_the_same_pages_as_its_sidebar_section_by_sec
         assert [_resolve(html, page, href) for href in rows] == targets, title
 
 
+def _folds(page: pathlib.Path) -> dict[str, bool]:
+    """Each sidebar row that folds the pages under its title, and whether it starts open."""
+    text = page.read_text(encoding="utf-8")
+    nav = text[text.index('<nav class="bd-docs-nav docs-nav"') :]
+    folds = re.findall(r'<details class="docs-nav__more"( open)?><summary>([^<]+)<', nav)
+    return {title: bool(is_open) for is_open, title in folds}
+
+
+def test_the_examples_pages_show_every_section_of_the_sidebar_open(html):
+    sections = ["Methods", "Advanced", "Interactive demos", "Misc"]
+    examples = html / "docs" / "examples"
+    # On the gallery and on each example, the reader sees every section's pages without a click.
+    for name in ("index.html", "quick_start.html", "viz.html", "pc-replay.html"):
+        folds = _folds(examples / name)
+        assert [folds[section] for section in sections] == [True] * 4, name
+    # Elsewhere in the docs the sections stay folded, so the tree stays short.
+    folds = _folds(html / "docs" / "guides" / "getting-started.html")
+    assert [folds[section] for section in sections] == [False] * 4
+
+
 def test_the_examples_page_shows_the_live_demo_only_once_its_space_is_public(html):
     spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
     site = importlib.util.module_from_spec(spec)

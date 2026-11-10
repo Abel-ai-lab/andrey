@@ -36,7 +36,6 @@ DRAWS = {
         "sample_shift": "CHAIN",
         "sample_cut": "CHAIN",
     },
-    "quick_start": {"sample": "EDGES"},
     "rcd": {"sample": "EDGES"},
     "score_search": {"sample_intervened": "CHAIN", "sample_noise_shift": "CHAIN"},
     "time_series": {"sample_panel": "CHAIN"},

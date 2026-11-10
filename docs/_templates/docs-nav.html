@@ -3,7 +3,7 @@
     project's links with their marks (conf.py: _docs_sidebar).
     The page being read is in the accent, and a fold that holds it starts open. A page with pages of
     its own folds them under its row, its toggle at the row's end. A caption that groups a
-    section's pages is a row that folds them. -#}
+    section's pages is a row that folds them, open on every page of that section. -#}
 {%- from "nav-icons.html" import icon, logo %}
 {%- macro page(item) -%}
 <a href="{{ pathto(item.doc) }}"{% if item.doc == pagename and not item.all %} aria-current="page"{% endif %}>{% if item.mark %}{{ icon(item.mark) }}{% endif %}{{ item.title }}</a>
@@ -15,7 +15,7 @@
 <ul>
   {%- for item in items %}
   {%- if not item.doc %}
-  <li><details class="docs-nav__more"{% if pagename in item.pages %} open{% endif %}><summary>{{ item.title }}{{ icon("chevron") }}</summary>{{ rows(item.kids) }}</details></li>
+  <li><details class="docs-nav__more"{% if item.open or pagename in item.pages %} open{% endif %}><summary>{{ item.title }}{{ icon("chevron") }}</summary>{{ rows(item.kids) }}</details></li>
   {%- else %}
   <li{% if item.doc == pagename and not item.all %} class="active"{% endif %}>{{ page(item) }}
     {%- if item.kids %}{{ fold(_("Pages under %(title)s") | format(title=item.title), item.kids, pagename in item.pages) }}{% endif %}</li>

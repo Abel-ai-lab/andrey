@@ -6,12 +6,14 @@ support for agents. This roadmap lays out the planned work in a rough order; the
 Missing a method or a feature you need? Open a
 [feature request](https://github.com/Abel-ai-lab/andrey/issues/new/choose).
 
-## 1. Every major causal discovery method, benchmarked
+## 1. Major methods
 
-Each method ships as experimental and becomes supported once its benchmarks against a reference
-package are published. The stage ends when every method planned below is supported. Every method
-takes continuous data, and many take categorical or mixed data and missing values; the [API
-reference](https://andrey.abel.ai/docs/api.html) says which.
+Andrey covers the main families of causal discovery methods: constraint-based, score-based,
+permutation-based, functional causal models, temporal causal discovery, latent variables, and
+pairwise direction. Each method ships as experimental and becomes supported once its benchmark
+against a reference package is published. The stage ends when every method planned in the table
+below is supported. Every method takes continuous data, and many take categorical or mixed data and
+missing values; the [API reference](https://andrey.abel.ai/docs/api.html) says which.
 
 <!-- ROADMAP:START -->
 <!-- Generated from andrey.spec by apps/build_launch.py; do not edit. -->
@@ -52,15 +54,13 @@ children. We plan the methods below in this rough order, with no promised dates.
 | PCMB | Peña, Nilsson, Björkegren, and Tegnér, [Towards scalable and data efficient learning of Markov boundaries](https://doi.org/10.1016/j.ijar.2006.06.008), International Journal of Approximate Reasoning 45(2):211-232, 2007 | No authors' code found; a port, [`PCMB`](https://github.com/wt-hu/pyCausalFS/tree/master/pyCausalFS/CBD/MBs/PCMB) in pyCausalFS (Python, no standard license) | A Markov blanket built from parents-and-children searches, which condition on smaller sets than IAMB and so need less data. |
 | MB-by-MB | Wang, Zhou, Zhao, and Geng, [Discovering and orienting the edges connected to a target variable in a DAG via a sequential local learning approach](https://doi.org/10.1016/j.csda.2014.03.003), Computational Statistics & Data Analysis 77:252-266, 2014 | No authors' code found; a port, [`MBbyMB.py`](https://github.com/wt-hu/pyCausalFS/blob/master/pyCausalFS/LSL/MBs/MBbyMB.py) in pyCausalFS (Python, no standard license) | Local orientation: it learns Markov blankets outward from the target, one variable at a time, until the target's direct causes and direct effects are told apart. |
 | LDECC | Gupta, Childers, and Lipton, [Local Causal Discovery for Estimating Causal Effects](https://proceedings.mlr.press/v213/gupta23b.html), Conference on Causal Learning and Reasoning, PMLR 213:408-447, 2023 | The authors' [local-causal-discovery](https://github.com/acmi-lab/local-causal-discovery) (Python, no license stated) | Local discovery for effect estimation: it orients the parents of a treatment from the structure around it, which gives the possible values of the treatment's effect. |
-| LDP | Maasch, Pan, Gupta, Kuleshov, Gan, and Wang, [Local Discovery by Partitioning: Polynomial-Time Causal Discovery Around Exposure-Outcome Pairs](https://proceedings.mlr.press/v244/maasch24a.html), Conference on Uncertainty in Artificial Intelligence, PMLR 244:2350-2382, 2024 | The authors' [ldp](https://github.com/jmaasch/ldp) (Python, no license stated) | A valid adjustment set for an exposure and an outcome, with hidden common causes allowed, in a number of tests that grows with the square of the number of variables. |
+| LDP | Maasch, Pan, Gupta, Kuleshov, Gan, and Wang, [Local Discovery by Partitioning: Polynomial-Time Causal Discovery Around Exposure-Outcome Pairs](https://proceedings.mlr.press/v244/maasch24a.html) ([arXiv](https://arxiv.org/abs/2310.17816)), Conference on Uncertainty in Artificial Intelligence, PMLR 244:2350-2382, 2024 | The authors' [ldp](https://github.com/jmaasch/ldp) (Python, no license stated) | A valid adjustment set for an exposure and an outcome, with hidden common causes allowed, in a number of tests that grows with the square of the number of variables. |
+| LD3 | Maasch, Gan, Chen, Orfanoudaki, Akpinar, and Wang, [Local Causal Discovery for Structural Evidence of Direct Discrimination](https://doi.org/10.1609/aaai.v39i18.34130), Proceedings of the AAAI Conference on Artificial Intelligence 39(18):19349-19357, 2025 | The authors' [LD3](https://github.com/jmaasch/LD3) (Python, no license stated) | The parents of an outcome, in a number of tests that grows in proportion to the number of variables, with hidden common causes allowed when every parent of the outcome is measured. The parents give a valid adjustment set for the direct effect of an exposure on the outcome. |
 
-## 4. Agentic causal discovery
+## 4. Very large causal discovery
 
-Agents that run causal discovery end to end, and ensembles of methods for real-world analysis.
-
-## 5. Very large causal discovery
-
-Use sparsity and parallel hardware to scale causal discovery to millions of variables, starting
+Very large causal discovery means learning graphs of more than 1,000 variables. We use sparsity and
+parallel hardware to scale causal discovery past that size, toward millions of variables, starting
 with FGES, a GES built for large sparse graphs. Andrey already runs the skeleton search of PC and of
 the methods built on it, and GES, on parallel CPU workers. We plan the methods below in this rough
 order, with no promised dates.
@@ -73,6 +73,10 @@ order, with no promised dates.
 | GPU-accelerated PC for discrete data | Hagedorn and Huegle, [GPU-Accelerated Constraint-Based Causal Structure Learning for Discrete Data](https://doi.org/10.1137/1.9781611976700.5), SIAM International Conference on Data Mining, pages 37-45, 2021 | `DiscretePC` in [gpucsl](https://github.com/hpi-epic/gpucsl), the authors' package (Python and CUDA, MIT) | The same GPU skeleton search for categorical data. |
 | FCI+ | Claassen, Mooij, and Heskes, [Learning Sparse Causal Models is not NP-hard](https://arxiv.org/abs/1309.6824), Conference on Uncertainty in Artificial Intelligence, 2013 | `fciPlus` in [pcalg](https://cran.r-project.org/package=pcalg), written with one of the authors (R, GPL-2 or later) | A search that allows hidden variables and runs a number of tests polynomial in the number of variables when the graph is sparse. |
 | Causal graph partitioning | Shah, DePavia, Hudson, Foster, and Stevens, [Causal Discovery over High-Dimensional Structured Hypothesis Spaces with Causal Graph Partitioning](https://openreview.net/forum?id=FecsgPCOHk), Transactions on Machine Learning Research, 2025 | The authors' [causal_discovery_via_partitioning](https://github.com/shahashka/causal_discovery_via_partitioning) (Python, no license stated) | Divide and conquer: it partitions the variables with a graph of candidate edges, learns each part on its own, and merges the results. |
+
+## 5. Agentic causal discovery
+
+Agents that run causal discovery end to end, and ensembles of methods for real-world analysis.
 
 ## 6. More platforms
 

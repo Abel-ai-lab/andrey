@@ -1095,7 +1095,7 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     ``pages``, itself and every page under it, so the fold that holds the current page opens. A
     page whose toctrees each carry a caption lists its pages under those captions, as its own
     headings group them: a row without a ``doc`` per caption, or the page itself where a caption
-    holds one page.
+    holds one page. The caption rows start ``open`` on that page and on every page under it.
     ``page_kicker`` names the page's section over its title: the page that lists it, or the last
     group for a page the docs index lists itself. ``edit_url`` opens the file that holds the page's
     text on GitHub: a Markdown file or notebook it includes (the changelog, a staged notebook's
@@ -1142,6 +1142,7 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
                     "title": caption,
                     "pages": set().union(*(rows[f]["pages"] for f in files)),
                     "kids": [rows[f] for f in files],
+                    "open": pagename in pages(doc),
                 }
                 for caption, files in app.andrey_nav_captions[doc]
             ]

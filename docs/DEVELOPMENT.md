@@ -231,8 +231,8 @@ toctree: each section in `NAV_SECTIONS` heads a group under its icon
 ([`_templates/nav-icons.html`](_templates/nav-icons.html)), folding pages past `NAV_SHOWN`, and the
 other entries make the Reference group; `_docs_sidebar` in `conf.py` builds it from the toctrees.
 A page whose toctrees each carry a caption, as the Examples gallery's do, lists its pages under
-those captions: each caption is a row that folds its pages, and a caption with one page is that
-page's row.
+those captions: each caption is a row that folds its pages, open on that page and on every page
+under it, and a caption with one page is that page's row.
 The right sidebar holds the page's outline ([`_templates/page-toc.html`](_templates/page-toc.html),
 marked by [`_static/page-outline.js`](_static/page-outline.js)), then links to edit the page and
 report a problem ([`_templates/page-links.html`](_templates/page-links.html)); Edit this page opens
