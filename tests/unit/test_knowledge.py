@@ -685,18 +685,26 @@ def test_an_undirected_result_refuses_the_path_parts(name, setting, part, data):
 def test_a_part_warns_exactly_where_it_is_experimental(data):
     required = Knowledge(required_paths=[("a", "f")])
     forbidden = Knowledge(forbidden_paths=[("f", "a")])
-    for part, knowledge in (("required_paths", required), ("forbidden_paths", forbidden)):
+    experimental = [
+        *((name, part) for name in ("iamb", "inter_iamb") for part in PATH_PARTS),
+        *((name, "required_paths") for name in ("tabu", "mmhc", "rsmax2")),
+    ]
+    for name, part in experimental:
+        knowledge = required if part == "required_paths" else forbidden
         with pytest.warns(
-            andrey.ExperimentalWarning, match=f"grasp: knowledge {part} is experimental"
+            andrey.ExperimentalWarning, match=f"{name}: knowledge {part} is experimental"
         ):
-            andrey.grasp(data, knowledge=knowledge)
+            getattr(andrey, name)(data, knowledge=knowledge)
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.KnowledgeWarning)
-        for name in ("pc", "ges", "boss", "fci", "gfci", "boss_fci", "direct_lingam"):
+        both = ("pc", "ges", "xges", "hc", "boss", "grasp", "exact_search")
+        for name in (*both, "fci", "gfci", "boss_fci", "grasp_fci", "direct_lingam"):
             getattr(andrey, name)(data, knowledge=required)
             getattr(andrey, name)(data, knowledge=forbidden)
-        for name in ("fci", "gfci", "boss_fci"):
+        for name in ("tabu", "mmhc", "rsmax2"):
+            getattr(andrey, name)(data, knowledge=forbidden)
+        for name in ("fci", "gfci", "boss_fci", "grasp_fci"):
             getattr(andrey, name)(data, knowledge=Knowledge(confounded=[("a", "f")]))
 
 

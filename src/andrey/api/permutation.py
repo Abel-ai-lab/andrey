@@ -732,9 +732,17 @@ def grasp(
     observed values. It runs the search 10 times, so it takes about 10 times as long, and under
     values missing not at random it has no guarantee. Before EM, only a column that repeats another
     up to scale and shift where both are observed raises; a column that is a linear function of
-    several others, which raises on complete data, is not caught, and the fit runs. The numbers are
-    a reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    several others, which raises on complete data, is not caught, and the fit runs. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
+    no farther from the true DAG than without them in any setting. The claims direct edges of the
+    graph the search found, as their rules take the class as given: of the edges they directed, 1.7%
+    with required paths and 3.2% with forbidden paths pointed against the true DAG. No reference
+    implementation takes these claims for this search, so they were compared with the same fit
+    without them. A required path says less than a required edge and directs less: it cannot restore
+    an edge the search left out. A known edge belongs in ``required``. The numbers are a reference,
+    not a hard limit: they change with the data generator, the density, the method's settings, and
+    the machine.
 
     References
     ----------
@@ -2068,8 +2076,8 @@ def grasp_fci(
     the PAG stays wrong on these data, whose hidden nodes leave many pairs joined only through them:
     at 20 measured variables and mean degree 6 its errors were about three quarters of the empty
     graph's, and at mean degree 2 with 8 hidden and 200 rows at the defaults, 33.3 against 37.8.
-    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and
-    up to 46 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
+    Every fit at 20 measured variables took under 1 s, and at 100 under 3 s at mean degree 6 and up
+    to 46 s at mean degree 10. Its tests also run it on 7 variables simulated on the ASIA network
     with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with the
     mixed-data score and test, on 5 variables with 3,000 rows. It runs a full :func:`~andrey.grasp`
     search before any test, so it takes at least as long as GRaSP on the same data. Without the
@@ -2080,9 +2088,16 @@ def grasp_fci(
     hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from
     nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a
     number, so with three or more environments a shift that does not follow the labels' values can
-    go unnoticed. ``max_parents`` counts the index as a parent in the score phase. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    go unnoticed. ``max_parents`` counts the index as a parent in the score phase. With true
+    ``required_paths``, ``forbidden_paths``, or ``confounded`` claims on 10 or 30% of the pairs of
+    simulated linear-Gaussian data with hidden common causes (10 or 20 observed variables, 1,000 or
+    5,000 rows), its result had no more wrong marks than without them in any setting. The fits
+    dropped 7.0% of the required paths and 0.4% of the forbidden paths as claims their graph could
+    not meet, and no confounded pair. A required path says less than a required edge and directs
+    less: it cannot restore an edge the search left out, and on simulated data a required edge,
+    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
