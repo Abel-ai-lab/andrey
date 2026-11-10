@@ -2792,9 +2792,16 @@ _MOVE_RULE = (
     "edges. "
 )
 _CANDIDATE_RULE = (
-    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
-    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
-    "alone. "
+    "The restrict phase keeps the pair of each required edge without a test and conditions the "
+    "tests of the other pairs on it, and never keeps a pair the knowledge makes non-adjacent; the "
+    "score search considers the pairs it keeps. "
+)
+_RESTRICT_RULE = (
+    "With restrict=mmpc or pc, the restrict phase keeps the pair of each required edge without a "
+    "test and conditions the tests of the other pairs on it, and never keeps a pair the knowledge "
+    "makes non-adjacent; with restrict=iamb or inter_iamb it reads the data alone. The score "
+    "search considers the pairs the restrict phase keeps and the pairs of the required edges, "
+    "less the pairs the knowledge makes non-adjacent. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
@@ -2851,7 +2858,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
-    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _RESTRICT_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     **dict.fromkeys(
