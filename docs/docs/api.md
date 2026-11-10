@@ -452,6 +452,7 @@ variable.
    tabu
    exact_search
    calm
+   notears
    mmhc
    rsmax2
    boss
@@ -487,6 +488,13 @@ variable.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
+least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
+NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
+columns' units. `robust=True` follows the first fit with a refit under the Gaussian likelihood
+(Deng et al. 2024). The [0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to
+100 variables against the authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -656,15 +664,14 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   notears
    dagma
    ages
 ```
 
-NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
-under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
-with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
-(Deng et al. 2024).
+DAGMA is a continuous-optimization learner in the line of NOTEARS: it fits a weighted DAG by
+minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True`
+follows the first fit with a refit under the Gaussian likelihood, which does not depend on the scale
+of the columns (Deng et al. 2024).
 
 AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
 {py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a

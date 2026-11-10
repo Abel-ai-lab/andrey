@@ -25,6 +25,9 @@ benchmarks/.missdag/
 benchmarks/.tetrad-missing/
 # The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
 benchmarks/.loci/
+# The authors' NOTEARS code that benchmarks/start_notears.sh fetches, read from disk and never
+# committed.
+benchmarks/.notears/
 # The authors' SCORE code that benchmarks/start_stein.sh fetches, read from disk and never committed.
 benchmarks/.score/
 env/

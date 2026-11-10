@@ -151,6 +151,18 @@ export ANDREY_BENCH_STEIN_PYTHON=$PWD/benchmarks/.venv-stein/bin/python
 export ANDREY_BENCH_SCORE=$PWD/benchmarks/.score
 ```
 
+The references of the NOTEARS and DAGMA lane, `notears_cpu.py`, share an environment built from the
+lock file `requirements-notears.txt`: the authors' NOTEARS code, the authors' package dagma, and
+CausalDisco for the sortability controls. NOTEARS has no package release, so `start_notears.sh`
+downloads its file at a pinned commit, checks its SHA-256, and keeps it in the git-ignored
+`benchmarks/.notears`, from which the benchmark loads it:
+
+```shell
+benchmarks/start_notears.sh
+export ANDREY_BENCH_NOTEARS_PYTHON=$PWD/benchmarks/.venv-notears/bin/python
+export ANDREY_BENCH_NOTEARS=$PWD/benchmarks/.notears
+```
+
 The authors' LOCI code, the reference for LOCI, has no license, so the harness runs it unmodified
 and keeps it out of the repository: `start_loci.sh` downloads the files of a pinned commit, checks
 each one's SHA-256, writes them to `benchmarks/.loci`, and builds an environment from the lock file
