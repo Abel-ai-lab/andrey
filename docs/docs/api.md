@@ -206,9 +206,10 @@ than the same fit without them and than a reference package given the same knowl
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
 and `required_paths` and `forbidden_paths` are experimental in `iamb`, `inter_iamb`, and `mmpc`,
-where true claims left the CPDAG farther from the class the claims define at 50 variables. An
-experimental part warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change
-without deprecation. A CPDAG
+where the claims are mostly not applied at 50 variables: the graph found often has no consistent
+extension, and the fit then drops every claim, lists them in `metadata["unmet_knowledge"]`, and
+returns the graph it finds without them. An experimental part warns with
+{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
 says less than an edge and so directs less: when you know the edge itself, state it as `required`.

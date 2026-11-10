@@ -33,8 +33,9 @@ names its pull request.
   fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
   knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
   given the required edges those paths imply made fewer errors, and both path parts stay
-  experimental in `iamb`, `inter_iamb`, and `mmpc`, where true claims left the CPDAG farther from
-  the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the claims are mostly not applied at 50
+  variables: the graph found often has no consistent extension, and the fit then drops every
+  claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
 
 ## [0.16.0] - 2026-11-10
