@@ -658,8 +658,8 @@ def score_matching(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 6 variables and 500 rows. The
-    paper's tables are on data as simulated, and the order search reads standardized columns,
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 8 variables and up to 500 rows.
+    The paper's tables are on data as simulated, and the order search reads standardized columns,
     where it was less accurate: on the paper's simulation with 1,000 rows and as many edges as
     variables, over ten graphs of 10 variables, the order put 80% of the true edges in the true
     direction on standardized columns and 99% when the same search read the columns as simulated;
