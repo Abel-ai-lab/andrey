@@ -185,13 +185,16 @@ Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, 
 empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
 incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
-`missing="mvpc"`, an experimental correction for values whose missingness depends on the variables.
+`missing="mvpc"`, a correction for values whose missingness depends on the variables.
 Test-wise deletion is sound when values are missing completely at random; when whether a value is
 missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
 it against dropping incomplete samples. The searches whose fit reads the data only through their
-covariance, {{ em_methods }}, take `missing="em"`, which is experimental: structural EM over the
-expected covariance of the data, sound when values are missing completely at random or at random
-given observed values. The other methods refuse missing values with an error that says what to do
+covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
+the data, sound when values are missing completely at random or at random given observed values. It
+is supported in NOTEARS, hill climbing, and Tabu search, and experimental in the others, which have
+no reference implementation to compare with; the
+[0.16.0 release card](benchmarks/0.16.0.md#what-we-measured-on-missing-data) has what we measured.
+The other methods refuse missing values with an error that says what to do
 instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
 
 ### Can I tell it what I already know?

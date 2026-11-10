@@ -141,15 +141,20 @@ each conditional-independence test reads only the rows where all of its variable
 both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
 test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
 `None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
-records the one a fit used. `pc` also takes `missing="mvpc"`, experimental: Missing-Value PC (Tu et
-al., 2019) finds the parents of each missingness indicator and tests again the edges they could have
-kept. `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`,
-whose fits read the data only through their covariance, refuse missing values under `None` and take
-`missing="em"`, experimental: structural EM runs the search on the expected covariance of the data
-10 times, refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records
-the rounds and the observed-data log-likelihood after each; a row that observes no value is dropped
-first. It takes `score_func="bic"` only and no `env`, and it assumes values missing completely at
-random or at random given observed values. A value a method does not list raises a `ValueError` that
+records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
+finds the parents of each missingness indicator and tests again the edges they could have kept.
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
+fits read the data only through their covariance, refuse missing values under `None` and take
+`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
+refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records the rounds
+and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
+takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
+`hc`, and `tabu`: in the
+[missing-data benchmark](benchmarks/0.16.0.md#what-we-measured-on-missing-data), none was less
+accurate than its reference implementation in any setting. In the other methods `missing="em"` is
+experimental, as no reference implementation exists to compare them with; the benchmark reports
+their results beside the baselines. A value a method does not list raises a `ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
 for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and

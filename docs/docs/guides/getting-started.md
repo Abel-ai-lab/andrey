@@ -627,8 +627,8 @@ find dependence where the population has none and keep extra edges ([Tu et al., 
 allows for selection and stays sound when no missingness mechanism causally affects another
 ([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
 
-`andrey.pc(data, missing="mvpc")`, experimental, corrects PC for those extra edges with
-Missing-Value PC ([Tu et al., 2019][tu]). It finds the variables each missingness indicator depends
+`andrey.pc(data, missing="mvpc")` corrects PC for those extra edges with Missing-Value PC
+([Tu et al., 2019][tu]). It finds the variables each missingness indicator depends
 on, then tests again the edges such an indicator could have kept, on virtual data rebuilt from the
 rows where those variables are observed. It takes `fisherz` or `student_t`;
 `metadata["missingness_parents"]` names the parents it found and `metadata["corrected_edges"]` the
@@ -642,6 +642,13 @@ rebuilds from goes missing because of a common effect of that pair, as when two 
 causes each hide the other, the extra edge can stay. `andrey.data.missingness` simulates data whose
 missingness graph you know, to see where it helps.
 
+On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
+16 settings where values go missing for a reason and tied in the rest, and tied where they are
+missing completely at random; at 50 variables and 10,000 rows it made 5.1 errors against 14.3. It
+does not help when every missingness indicator depends weakly on many variables, and there its
+search for those variables can take long; `max_depth` bounds it. The
+[0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
+
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
 `ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
@@ -650,8 +657,8 @@ observed value, or with one value throughout, raises before the fit, and so does
 not a missing value. CD-NOD needs a complete `env`.
 
 The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
-rows per test, and refuse missing values by default. They take `missing="em"` instead, which is
-experimental: structural EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates two steps.
+rows per test, and refuse missing values by default. They take `missing="em"` instead: structural
+EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates two steps.
 Under a linear-Gaussian model of the current graph, it replaces each row's missing values by their
 expected values given the row's observed ones and adds their uncertainty, which gives the expected
 covariance of the data; then the search runs on that covariance over every row, and the model is fit
@@ -666,6 +673,14 @@ em.metadata["em"]["log_likelihood"][-1]
 EM is sound when values are missing completely at random or at random given observed values; when
 whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
 the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
+
+`missing="em"` is supported in `notears`, `hc`, and `tabu`, where it was no less accurate than a
+reference implementation in any setting we measured. With about 100 rows, `hc` and `tabu` are often
+no better than the empty graph, with EM as on complete data; from 500 rows on they were better in
+every setting. In the other searches, `ges` among them, `missing="em"` is experimental: no reference
+implementation exists to compare them with, so the
+[release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
+test-wise deletion, dropping rows, and mean imputation.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
