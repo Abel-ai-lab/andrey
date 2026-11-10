@@ -10,10 +10,13 @@ missing completely at random, shows what the parameter steps between searches ar
 1997): with them ``ges`` keeps no extra edge and settles; with one parameter fit per round it keeps
 7 and its graph still changes in the last round. On seeded ground truth, 10 variables with 500 rows,
 EM gives the complete-data fit when nothing is missing, and with values missing the searches over
-the BIC and ``notears`` make fewer errors in total by EM than on the complete rows, than with mean
-imputation, and than the empty graph; ``boss`` with values missing completely at random makes as
-many as on the complete rows. ``dagma``, on 8 variables, makes no more errors by EM than on the
-complete rows and fewer than with mean imputation.
+the BIC make fewer errors in total by EM than on the complete rows, than with mean imputation, and
+than the empty graph; ``boss`` with values missing completely at random makes as many as on the
+complete rows. ``notears`` under values missing at random makes fewer by EM than on the complete
+rows and than the empty graph, and no more than mean imputation makes plus the spread of the
+difference, which a change of 1e-12 in the data already moves: EM and mean imputation are not
+separable on these eight datasets. ``dagma``, on 8 variables, makes no more errors by EM than on
+the complete rows and fewer than with mean imputation.
 """
 
 from __future__ import annotations
@@ -161,9 +164,15 @@ def test_em_makes_fewer_errors_than_the_complete_rows_or_mean_imputation(name, m
     assert em < mean and em < empty
 
 
-def test_notears_by_em_makes_fewer_errors_than_the_complete_rows_or_mean_imputation_under_mar():
+def test_notears_by_em_beats_the_complete_rows_and_is_within_spread_of_mean_imputation_under_mar():
     em, rows, mean, empty = _errors(andrey.notears, missingness.mar(0.3)).sum(axis=0)
-    assert em < rows and em < mean < empty
+    # NOTEARS's graph moves with the last bits of its input: a relative change of 1e-12 in the data
+    # changed 16 of 80 fits by EM and 13 of 80 on the complete rows, none with mean imputation. Over
+    # ten such draws EM's sum ran from 59 to 63 (61 undisturbed, 64 on another machine), the
+    # complete rows' from 67 to 69; mean imputation's stayed 62 and the empty graph's is 80. EM's
+    # lead over the complete rows ran from 4 to 9 errors; EM minus mean imputation, from -3 to 2, so
+    # the two are not separable here, and EM may make up to 4 more.
+    assert em < rows and em < empty and em <= mean + 4 and mean < empty
 
 
 def test_dagma_by_em_makes_no_more_errors_than_the_complete_rows_under_mar():
