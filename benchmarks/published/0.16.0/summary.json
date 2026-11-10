@@ -1,0 +1,5872 @@
+{
+ "release": "0.16.0",
+ "parity_rule": "paired bootstrap",
+ "generated": "2026-11-09",
+ "theme": "LOCI against its authors' code, each criterion against the authors' variant of it, on location-scale, additive-noise, and Tagasovska et al. cause-effect pairs",
+ "build": "Andrey pre-release build of 9 November 2026 (version string 0.16.0): the fits ran on commit 73534c3a7 of the 0.16.0 release branch; on 11 pairs both criteria raised there, from a Cholesky factorization of an ill-conditioned Hessian, and those 22 fits are from commit e40f3e078, the released solver, which falls back to a damped Newton step there. Refitted on e40f3e078, the other 1,178 fits of the six cells with such a pair returned the same output, to the last bit. The rerun on fresh seeds ran Andrey on e40f3e078",
+ "verdict_rule": "per cell and criterion: D = wrong(Andrey) - wrong(authors' code) per pair, a wrong direction counting 1, on the pairs both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the pairs, default_rng(0). Each criterion is judged against the authors' variant of the same criterion, independence against LOCI-H and likelihood against LOCI-M. The independence criterion is judged in every cell; the likelihood criterion, whose model is Gaussian, where the noise is Gaussian (claim in), and its rows under Gumbel, Laplace, or uniform noise are reported, not judged (claim out). result is the published verdict: better only where a rerun on fresh seeds (replication, seeds 100-199) is better too, and a tie otherwise; the rows that came out better on the first seeds on location-scale pairs with Gaussian noise were rerun, and no other row. The floor is a coin flip, 0.5 wrong directions per pair: andrey_minus_empty and reference_minus_empty are the intervals of each package's mean wrong directions minus 0.5, the floor applies where the authors' code is below it, and there Andrey must be below it too. Floor, in every row that records one (floor): andrey_minus_empty is the 95% interval of the mean of Andrey's error minus the empty estimate's (the empty graph, or for a cause-effect pair a coin flip, 0.5 wrong directions), and reference_minus_empty the same for the reference; the floor applies only where the reference's interval lies wholly below 0, where the reference itself beats the empty estimate, and there Andrey's interval must lie wholly below 0 too; elsewhere it is reported as not applied (applies false), with its numbers. The floor is judged on the first seeds; a replication's floor (the rerun on fresh seeds) only confirms a failure there",
+ "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim, and rows with fewer than 10 paired datasets). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
+ "fit_protocol": "each fit in a fresh interpreter on one core with one BLAS thread, no timed warm-up; the authors' code after an untimed fit of 5 optimizer steps on a small table, so its imports are not timed; a cap of 1,800 s per fit (3,600 s and 28,000 MB on the size ladder), past which a fit is a timeout or out of memory, never a guess; times run from the two columns in memory to the returned direction; ratio is the median over the paired pairs of the authors' time over Andrey's",
+ "error_metric": "a pair's wrong direction: 1 when the fit names the reverse of the true direction, 0 when it names the true one; no fit of either package left a pair without a direction. andrey_shd_mean and comparator_shd_mean are the shares of pairs with the wrong direction (the SHD of a two-node graph), and the accuracy fields 1 minus them, with 95% bootstrap intervals",
+ "complete_definition": "true when every row has at least 10 paired pairs (both packages fitted)",
+ "seeds_note": "every cell holds 100 pairs, seeds 0-99; a replication holds 100 fresh pairs, seeds 100-199",
+ "regimes": {
+  "lsnm_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gaussian noise, z-scored",
+  "lsnm_rescaled_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gaussian noise, rescaled so the cause has unit variance before the effect reads it",
+  "lsnm_gumbel_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gumbel noise, z-scored",
+  "lsnm_gumbel_rescaled_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gumbel noise, rescaled so the cause has unit variance before the effect reads it",
+  "lsnm_laplace_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Laplace noise, z-scored",
+  "lsnm_laplace_rescaled_pair": "location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Laplace noise, rescaled so the cause has unit variance before the effect reads it",
+  "anm_pair": "additive-noise pairs, a constant noise scale, Gaussian noise, z-scored",
+  "tagasovska_an_pair": "the synthetic set AN of Tagasovska et al. (2020), z-scored",
+  "tagasovska_ans_pair": "the synthetic set AN-s of Tagasovska et al. (2020), z-scored",
+  "tagasovska_ls_pair": "the synthetic set LS of Tagasovska et al. (2020), z-scored",
+  "tagasovska_lss_pair": "the synthetic set LS-s of Tagasovska et al. (2020), z-scored",
+  "tagasovska_mnu_pair": "the synthetic set MN-U of Tagasovska et al. (2020), z-scored"
+ },
+ "coverage": {},
+ "packages": {
+  "LOCI": {
+   "LOCI authors' code": "commit da61b8cd",
+   "Python (authors' code)": "3.11",
+   "torch (authors' code)": "2.15.0+cpu",
+   "NumPy (authors' code)": "1.26.4",
+   "scikit-learn (authors' code)": "1.9.1",
+   "NumPy (Andrey)": "2.5.4",
+   "Python (Andrey)": "3.13.11"
+  }
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor",
+   "AMD EPYC 9534 64-Core Processor"
+  ],
+  "cores_per_fit": 1,
+  "lanes": {
+   "LOCI": {
+    "cpu_models": [
+     "AMD EPYC 7713 64-Core Processor",
+     "AMD EPYC 9534 64-Core Processor"
+    ],
+    "hosts": 15,
+    "cores_per_fit": 1,
+    "blas_threads": 1
+   }
+  }
+ },
+ "complete": true,
+ "pending_fits": 0,
+ "incomplete": [],
+ "methods": [
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.082,
+     "comparator_s": 51.6761,
+     "ratio": 627.4,
+     "ratio_quartiles": [
+      473.4,
+      810.6
+     ],
+     "andrey_correct": 83,
+     "andrey_reversed": 17,
+     "andrey_no_edge": 0,
+     "comparator_correct": 81,
+     "comparator_reversed": 19,
+     "comparator_no_edge": 0,
+     "same_graph": 88,
+     "andrey_right_comparator_wrong": 7,
+     "comparator_right_andrey_wrong": 5,
+     "andrey_shd_mean": 0.17,
+     "comparator_shd_mean": 0.19,
+     "mean_D": -0.02,
+     "bootstrap_95": [
+      -0.09,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.33,
+       "bootstrap_95": [
+        -0.4,
+        -0.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.31,
+       "bootstrap_95": [
+        -0.38,
+        -0.23
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.83,
+     "comparator_direction_correct": 0.81,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0353,
+     "comparator_s": 51.3223,
+     "ratio": 1431.9,
+     "ratio_quartiles": [
+      1077.3,
+      1807.5
+     ],
+     "andrey_correct": 85,
+     "andrey_reversed": 15,
+     "andrey_no_edge": 0,
+     "comparator_correct": 77,
+     "comparator_reversed": 23,
+     "comparator_no_edge": 0,
+     "same_graph": 84,
+     "andrey_right_comparator_wrong": 12,
+     "comparator_right_andrey_wrong": 4,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.23,
+     "mean_D": -0.08,
+     "bootstrap_95": [
+      -0.16,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.35,
+       "bootstrap_95": [
+        -0.42,
+        -0.28
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.27,
+       "bootstrap_95": [
+        -0.35,
+        -0.18
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.85,
+     "comparator_direction_correct": 0.77,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2293,
+     "comparator_s": 37.9736,
+     "ratio": 169.9,
+     "ratio_quartiles": [
+      121.4,
+      238.7
+     ],
+     "andrey_correct": 90,
+     "andrey_reversed": 10,
+     "andrey_no_edge": 0,
+     "comparator_correct": 89,
+     "comparator_reversed": 11,
+     "comparator_no_edge": 0,
+     "same_graph": 93,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 3,
+     "andrey_shd_mean": 0.1,
+     "comparator_shd_mean": 0.11,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.06,
+      0.04
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.46,
+        -0.34
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.39,
+       "bootstrap_95": [
+        -0.45,
+        -0.33
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.9,
+     "comparator_direction_correct": 0.89,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0449,
+     "comparator_s": 37.2259,
+     "ratio": 830.5,
+     "ratio_quartiles": [
+      621.9,
+      1071.8
+     ],
+     "andrey_correct": 93,
+     "andrey_reversed": 7,
+     "andrey_no_edge": 0,
+     "comparator_correct": 87,
+     "comparator_reversed": 13,
+     "comparator_no_edge": 0,
+     "same_graph": 94,
+     "andrey_right_comparator_wrong": 6,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.07,
+     "comparator_shd_mean": 0.13,
+     "mean_D": -0.06,
+     "bootstrap_95": [
+      -0.11,
+      -0.02
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.43,
+       "bootstrap_95": [
+        -0.47,
+        -0.38
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.37,
+       "bootstrap_95": [
+        -0.43,
+        -0.3
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.93,
+     "comparator_direction_correct": 0.87,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8202,
+     "comparator_s": 30.9712,
+     "ratio": 39.8,
+     "ratio_quartiles": [
+      30.5,
+      51.3
+     ],
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 98,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "same_graph": 100,
+     "andrey_right_comparator_wrong": 0,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.02,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.48,
+       "bootstrap_95": [
+        -0.5,
+        -0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.48,
+       "bootstrap_95": [
+        -0.5,
+        -0.45
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "comparator_direction_correct": 0.98,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "anm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "anm_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.078,
+     "comparator_s": 27.9427,
+     "ratio": 376.5,
+     "ratio_quartiles": [
+      292.2,
+      512.1
+     ],
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "same_graph": 100,
+     "andrey_right_comparator_wrong": 0,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "comparator_direction_correct": 0.99,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0708,
+     "comparator_s": 63.7031,
+     "ratio": 878.6,
+     "ratio_quartiles": [
+      729.3,
+      1130.0
+     ],
+     "andrey_correct": 79,
+     "andrey_reversed": 21,
+     "andrey_no_edge": 0,
+     "comparator_correct": 52,
+     "comparator_reversed": 48,
+     "comparator_no_edge": 0,
+     "same_graph": 73,
+     "andrey_right_comparator_wrong": 27,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.21,
+     "comparator_shd_mean": 0.48,
+     "mean_D": -0.27,
+     "bootstrap_95": [
+      -0.36,
+      -0.19
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.29,
+       "bootstrap_95": [
+        -0.37,
+        -0.21
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.02,
+       "bootstrap_95": [
+        -0.12,
+        0.08
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.79,
+     "comparator_direction_correct": 0.52,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0317,
+     "comparator_s": 63.6153,
+     "ratio": 1873.2,
+     "ratio_quartiles": [
+      1566.1,
+      2506.3
+     ],
+     "andrey_correct": 35,
+     "andrey_reversed": 65,
+     "andrey_no_edge": 0,
+     "comparator_correct": 31,
+     "comparator_reversed": 69,
+     "comparator_no_edge": 0,
+     "same_graph": 86,
+     "andrey_right_comparator_wrong": 9,
+     "comparator_right_andrey_wrong": 5,
+     "andrey_shd_mean": 0.65,
+     "comparator_shd_mean": 0.69,
+     "mean_D": -0.04,
+     "bootstrap_95": [
+      -0.11,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.19,
+       "bootstrap_95": [
+        0.1,
+        0.28
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.35,
+     "comparator_direction_correct": 0.31,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2251,
+     "comparator_s": 65.3634,
+     "ratio": 292.6,
+     "ratio_quartiles": [
+      208.9,
+      358.1
+     ],
+     "andrey_correct": 95,
+     "andrey_reversed": 5,
+     "andrey_no_edge": 0,
+     "comparator_correct": 79,
+     "comparator_reversed": 21,
+     "comparator_no_edge": 0,
+     "same_graph": 78,
+     "andrey_right_comparator_wrong": 19,
+     "comparator_right_andrey_wrong": 3,
+     "andrey_shd_mean": 0.05,
+     "comparator_shd_mean": 0.21,
+     "mean_D": -0.16,
+     "bootstrap_95": [
+      -0.25,
+      -0.08
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.45,
+       "bootstrap_95": [
+        -0.49,
+        -0.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.29,
+       "bootstrap_95": [
+        -0.37,
+        -0.21
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.95,
+     "comparator_direction_correct": 0.79,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0537,
+     "comparator_s": 64.2718,
+     "ratio": 1240.6,
+     "ratio_quartiles": [
+      881.0,
+      1462.2
+     ],
+     "andrey_correct": 37,
+     "andrey_reversed": 63,
+     "andrey_no_edge": 0,
+     "comparator_correct": 35,
+     "comparator_reversed": 65,
+     "comparator_no_edge": 0,
+     "same_graph": 92,
+     "andrey_right_comparator_wrong": 5,
+     "comparator_right_andrey_wrong": 3,
+     "andrey_shd_mean": 0.63,
+     "comparator_shd_mean": 0.65,
+     "mean_D": -0.02,
+     "bootstrap_95": [
+      -0.08,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.13,
+       "bootstrap_95": [
+        0.03,
+        0.22
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.37,
+     "comparator_direction_correct": 0.35,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8037,
+     "comparator_s": 70.8455,
+     "ratio": 85.9,
+     "ratio_quartiles": [
+      60.7,
+      101.3
+     ],
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 94,
+     "comparator_reversed": 6,
+     "comparator_no_edge": 0,
+     "same_graph": 95,
+     "andrey_right_comparator_wrong": 5,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.06,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.1,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.44,
+       "bootstrap_95": [
+        -0.48,
+        -0.39
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "comparator_direction_correct": 0.94,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0858,
+     "comparator_s": 67.3464,
+     "ratio": 736.9,
+     "ratio_quartiles": [
+      556.1,
+      924.6
+     ],
+     "andrey_correct": 35,
+     "andrey_reversed": 65,
+     "andrey_no_edge": 0,
+     "comparator_correct": 35,
+     "comparator_reversed": 65,
+     "comparator_no_edge": 0,
+     "same_graph": 98,
+     "andrey_right_comparator_wrong": 1,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.65,
+     "comparator_shd_mean": 0.65,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.03,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.35,
+     "comparator_direction_correct": 0.35,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0715,
+     "comparator_s": 65.8731,
+     "ratio": 911.6,
+     "ratio_quartiles": [
+      664.2,
+      1098.0
+     ],
+     "andrey_correct": 80,
+     "andrey_reversed": 20,
+     "andrey_no_edge": 0,
+     "comparator_correct": 59,
+     "comparator_reversed": 41,
+     "comparator_no_edge": 0,
+     "same_graph": 73,
+     "andrey_right_comparator_wrong": 24,
+     "comparator_right_andrey_wrong": 3,
+     "andrey_shd_mean": 0.2,
+     "comparator_shd_mean": 0.41,
+     "mean_D": -0.21,
+     "bootstrap_95": [
+      -0.3,
+      -0.12
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.3,
+       "bootstrap_95": [
+        -0.38,
+        -0.22
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.09,
+       "bootstrap_95": [
+        -0.19,
+        0.01
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.8,
+     "comparator_direction_correct": 0.59,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0321,
+     "comparator_s": 66.0702,
+     "ratio": 1947.9,
+     "ratio_quartiles": [
+      1392.9,
+      2513.9
+     ],
+     "andrey_correct": 35,
+     "andrey_reversed": 65,
+     "andrey_no_edge": 0,
+     "comparator_correct": 33,
+     "comparator_reversed": 67,
+     "comparator_no_edge": 0,
+     "same_graph": 90,
+     "andrey_right_comparator_wrong": 6,
+     "comparator_right_andrey_wrong": 4,
+     "andrey_shd_mean": 0.65,
+     "comparator_shd_mean": 0.67,
+     "mean_D": -0.02,
+     "bootstrap_95": [
+      -0.08,
+      0.04
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.17,
+       "bootstrap_95": [
+        0.08,
+        0.26
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.35,
+     "comparator_direction_correct": 0.33,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2236,
+     "comparator_s": 61.7558,
+     "ratio": 278.9,
+     "ratio_quartiles": [
+      210.0,
+      341.6
+     ],
+     "andrey_correct": 97,
+     "andrey_reversed": 3,
+     "andrey_no_edge": 0,
+     "comparator_correct": 79,
+     "comparator_reversed": 21,
+     "comparator_no_edge": 0,
+     "same_graph": 80,
+     "andrey_right_comparator_wrong": 19,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.03,
+     "comparator_shd_mean": 0.21,
+     "mean_D": -0.18,
+     "bootstrap_95": [
+      -0.26,
+      -0.1
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.47,
+       "bootstrap_95": [
+        -0.5,
+        -0.43
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.29,
+       "bootstrap_95": [
+        -0.37,
+        -0.21
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.97,
+     "comparator_direction_correct": 0.79,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0515,
+     "comparator_s": 61.6202,
+     "ratio": 1213.2,
+     "ratio_quartiles": [
+      855.3,
+      1514.0
+     ],
+     "andrey_correct": 38,
+     "andrey_reversed": 62,
+     "andrey_no_edge": 0,
+     "comparator_correct": 37,
+     "comparator_reversed": 63,
+     "comparator_no_edge": 0,
+     "same_graph": 95,
+     "andrey_right_comparator_wrong": 3,
+     "comparator_right_andrey_wrong": 2,
+     "andrey_shd_mean": 0.62,
+     "comparator_shd_mean": 0.63,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.05,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.12,
+       "bootstrap_95": [
+        0.02,
+        0.21
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.13,
+       "bootstrap_95": [
+        0.03,
+        0.22
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.38,
+     "comparator_direction_correct": 0.37,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8045,
+     "comparator_s": 70.3267,
+     "ratio": 85.3,
+     "ratio_quartiles": [
+      58.6,
+      100.1
+     ],
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 91,
+     "comparator_reversed": 9,
+     "comparator_no_edge": 0,
+     "same_graph": 92,
+     "andrey_right_comparator_wrong": 8,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.09,
+     "mean_D": -0.08,
+     "bootstrap_95": [
+      -0.14,
+      -0.03
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.41,
+       "bootstrap_95": [
+        -0.46,
+        -0.35
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "comparator_direction_correct": 0.91,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_gumbel_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_gumbel_rescaled_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.09,
+     "comparator_s": 67.2949,
+     "ratio": 671.5,
+     "ratio_quartiles": [
+      511.0,
+      898.3
+     ],
+     "andrey_correct": 35,
+     "andrey_reversed": 65,
+     "andrey_no_edge": 0,
+     "comparator_correct": 34,
+     "comparator_reversed": 66,
+     "comparator_no_edge": 0,
+     "same_graph": 97,
+     "andrey_right_comparator_wrong": 2,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.65,
+     "comparator_shd_mean": 0.66,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.04,
+      0.02
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.05,
+        0.24
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.16,
+       "bootstrap_95": [
+        0.06,
+        0.25
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.35,
+     "comparator_direction_correct": 0.34,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0833,
+     "comparator_s": 67.1425,
+     "ratio": 831.2,
+     "ratio_quartiles": [
+      636.7,
+      987.8
+     ],
+     "andrey_correct": 83,
+     "andrey_reversed": 17,
+     "andrey_no_edge": 0,
+     "comparator_correct": 71,
+     "comparator_reversed": 29,
+     "comparator_no_edge": 0,
+     "same_graph": 80,
+     "andrey_right_comparator_wrong": 16,
+     "comparator_right_andrey_wrong": 4,
+     "andrey_shd_mean": 0.17,
+     "comparator_shd_mean": 0.29,
+     "mean_D": -0.12,
+     "bootstrap_95": [
+      -0.21,
+      -0.04
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.33,
+       "bootstrap_95": [
+        -0.4,
+        -0.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.21,
+       "bootstrap_95": [
+        -0.3,
+        -0.12
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.83,
+     "comparator_direction_correct": 0.71,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0382,
+     "comparator_s": 67.256,
+     "ratio": 1802.8,
+     "ratio_quartiles": [
+      1320.0,
+      2247.9
+     ],
+     "andrey_correct": 37,
+     "andrey_reversed": 63,
+     "andrey_no_edge": 0,
+     "comparator_correct": 31,
+     "comparator_reversed": 69,
+     "comparator_no_edge": 0,
+     "same_graph": 80,
+     "andrey_right_comparator_wrong": 13,
+     "comparator_right_andrey_wrong": 7,
+     "andrey_shd_mean": 0.63,
+     "comparator_shd_mean": 0.69,
+     "mean_D": -0.06,
+     "bootstrap_95": [
+      -0.15,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.13,
+       "bootstrap_95": [
+        0.04,
+        0.22
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.19,
+       "bootstrap_95": [
+        0.1,
+        0.28
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.37,
+     "comparator_direction_correct": 0.31,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2211,
+     "comparator_s": 64.5478,
+     "ratio": 285.4,
+     "ratio_quartiles": [
+      227.3,
+      323.7
+     ],
+     "andrey_correct": 91,
+     "andrey_reversed": 9,
+     "andrey_no_edge": 0,
+     "comparator_correct": 83,
+     "comparator_reversed": 17,
+     "comparator_no_edge": 0,
+     "same_graph": 88,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 2,
+     "andrey_shd_mean": 0.09,
+     "comparator_shd_mean": 0.17,
+     "mean_D": -0.08,
+     "bootstrap_95": [
+      -0.15,
+      -0.02
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.41,
+       "bootstrap_95": [
+        -0.46,
+        -0.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.33,
+       "bootstrap_95": [
+        -0.4,
+        -0.25
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.91,
+     "comparator_direction_correct": 0.83,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0544,
+     "comparator_s": 63.8405,
+     "ratio": 1132.1,
+     "ratio_quartiles": [
+      861.8,
+      1392.9
+     ],
+     "andrey_correct": 44,
+     "andrey_reversed": 56,
+     "andrey_no_edge": 0,
+     "comparator_correct": 35,
+     "comparator_reversed": 65,
+     "comparator_no_edge": 0,
+     "same_graph": 89,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.56,
+     "comparator_shd_mean": 0.65,
+     "mean_D": -0.09,
+     "bootstrap_95": [
+      -0.15,
+      -0.03
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.06,
+       "bootstrap_95": [
+        -0.04,
+        0.16
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.06,
+        0.24
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.44,
+     "comparator_direction_correct": 0.35,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8531,
+     "comparator_s": 67.4046,
+     "ratio": 79.0,
+     "ratio_quartiles": [
+      60.3,
+      90.6
+     ],
+     "andrey_correct": 96,
+     "andrey_reversed": 4,
+     "andrey_no_edge": 0,
+     "comparator_correct": 96,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "same_graph": 96,
+     "andrey_right_comparator_wrong": 2,
+     "comparator_right_andrey_wrong": 2,
+     "andrey_shd_mean": 0.04,
+     "comparator_shd_mean": 0.04,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.04,
+      0.04
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.96,
+     "comparator_direction_correct": 0.96,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.1043,
+     "comparator_s": 64.4051,
+     "ratio": 613.7,
+     "ratio_quartiles": [
+      465.4,
+      715.5
+     ],
+     "andrey_correct": 59,
+     "andrey_reversed": 41,
+     "andrey_no_edge": 0,
+     "comparator_correct": 50,
+     "comparator_reversed": 50,
+     "comparator_no_edge": 0,
+     "same_graph": 89,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.41,
+     "comparator_shd_mean": 0.5,
+     "mean_D": -0.09,
+     "bootstrap_95": [
+      -0.16,
+      -0.03
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.09,
+       "bootstrap_95": [
+        -0.19,
+        0.01
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        -0.1,
+        0.1
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.59,
+     "comparator_direction_correct": 0.5,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0781,
+     "comparator_s": 66.5522,
+     "ratio": 825.2,
+     "ratio_quartiles": [
+      700.5,
+      966.2
+     ],
+     "andrey_correct": 82,
+     "andrey_reversed": 18,
+     "andrey_no_edge": 0,
+     "comparator_correct": 69,
+     "comparator_reversed": 31,
+     "comparator_no_edge": 0,
+     "same_graph": 83,
+     "andrey_right_comparator_wrong": 15,
+     "comparator_right_andrey_wrong": 2,
+     "andrey_shd_mean": 0.18,
+     "comparator_shd_mean": 0.31,
+     "mean_D": -0.13,
+     "bootstrap_95": [
+      -0.21,
+      -0.06
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.32,
+       "bootstrap_95": [
+        -0.39,
+        -0.24
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.19,
+       "bootstrap_95": [
+        -0.28,
+        -0.1
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.82,
+     "comparator_direction_correct": 0.69,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0361,
+     "comparator_s": 66.7508,
+     "ratio": 1743.6,
+     "ratio_quartiles": [
+      1463.9,
+      2120.5
+     ],
+     "andrey_correct": 37,
+     "andrey_reversed": 63,
+     "andrey_no_edge": 0,
+     "comparator_correct": 36,
+     "comparator_reversed": 64,
+     "comparator_no_edge": 0,
+     "same_graph": 81,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 9,
+     "andrey_shd_mean": 0.63,
+     "comparator_shd_mean": 0.64,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.1,
+      0.08
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.13,
+       "bootstrap_95": [
+        0.04,
+        0.22
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.14,
+       "bootstrap_95": [
+        0.04,
+        0.23
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.37,
+     "comparator_direction_correct": 0.36,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2198,
+     "comparator_s": 63.2254,
+     "ratio": 280.7,
+     "ratio_quartiles": [
+      204.8,
+      317.9
+     ],
+     "andrey_correct": 93,
+     "andrey_reversed": 7,
+     "andrey_no_edge": 0,
+     "comparator_correct": 84,
+     "comparator_reversed": 16,
+     "comparator_no_edge": 0,
+     "same_graph": 89,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.07,
+     "comparator_shd_mean": 0.16,
+     "mean_D": -0.09,
+     "bootstrap_95": [
+      -0.16,
+      -0.03
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.43,
+       "bootstrap_95": [
+        -0.48,
+        -0.38
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.34,
+       "bootstrap_95": [
+        -0.41,
+        -0.26
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.93,
+     "comparator_direction_correct": 0.84,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.054,
+     "comparator_s": 61.8766,
+     "ratio": 1112.0,
+     "ratio_quartiles": [
+      793.7,
+      1302.3
+     ],
+     "andrey_correct": 47,
+     "andrey_reversed": 53,
+     "andrey_no_edge": 0,
+     "comparator_correct": 37,
+     "comparator_reversed": 63,
+     "comparator_no_edge": 0,
+     "same_graph": 88,
+     "andrey_right_comparator_wrong": 11,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.53,
+     "comparator_shd_mean": 0.63,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.17,
+      -0.04
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.03,
+       "bootstrap_95": [
+        -0.07,
+        0.13
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.13,
+       "bootstrap_95": [
+        0.04,
+        0.23
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.47,
+     "comparator_direction_correct": 0.37,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8358,
+     "comparator_s": 67.1572,
+     "ratio": 80.9,
+     "ratio_quartiles": [
+      67.8,
+      88.8
+     ],
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 93,
+     "comparator_reversed": 7,
+     "comparator_no_edge": 0,
+     "same_graph": 95,
+     "andrey_right_comparator_wrong": 5,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.07,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.1,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.48,
+       "bootstrap_95": [
+        -0.5,
+        -0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.43,
+       "bootstrap_95": [
+        -0.48,
+        -0.38
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "comparator_direction_correct": 0.93,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_laplace_rescaled_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_laplace_rescaled_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0956,
+     "comparator_s": 64.1067,
+     "ratio": 639.0,
+     "ratio_quartiles": [
+      550.0,
+      769.7
+     ],
+     "andrey_correct": 57,
+     "andrey_reversed": 43,
+     "andrey_no_edge": 0,
+     "comparator_correct": 53,
+     "comparator_reversed": 47,
+     "comparator_no_edge": 0,
+     "same_graph": 96,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.43,
+     "comparator_shd_mean": 0.47,
+     "mean_D": -0.04,
+     "bootstrap_95": [
+      -0.08,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.07,
+       "bootstrap_95": [
+        -0.17,
+        0.03
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.03,
+       "bootstrap_95": [
+        -0.13,
+        0.07
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.57,
+     "comparator_direction_correct": 0.53,
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0697,
+     "comparator_s": 59.939,
+     "ratio": 852.0,
+     "ratio_quartiles": [
+      704.7,
+      1055.4
+     ],
+     "andrey_correct": 85,
+     "andrey_reversed": 15,
+     "andrey_no_edge": 0,
+     "comparator_correct": 75,
+     "comparator_reversed": 25,
+     "comparator_no_edge": 0,
+     "same_graph": 80,
+     "andrey_right_comparator_wrong": 15,
+     "comparator_right_andrey_wrong": 5,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.25,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.19,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.35,
+       "bootstrap_95": [
+        -0.42,
+        -0.28
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.33,
+        -0.16
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.85,
+     "comparator_direction_correct": 0.75,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.1,
+      "comparator_shd_mean": 0.33,
+      "mean_D": -0.23,
+      "bootstrap_95": [
+       -0.32,
+       -0.15
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.4,
+        "bootstrap_95": [
+         -0.45,
+         -0.34
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.17,
+        "bootstrap_95": [
+         -0.26,
+         -0.08
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0304,
+     "comparator_s": 59.9035,
+     "ratio": 1873.0,
+     "ratio_quartiles": [
+      1503.0,
+      2391.1
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 91,
+     "comparator_reversed": 9,
+     "comparator_no_edge": 0,
+     "same_graph": 91,
+     "andrey_right_comparator_wrong": 9,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.09,
+     "mean_D": -0.09,
+     "bootstrap_95": [
+      -0.15,
+      -0.04
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.41,
+       "bootstrap_95": [
+        -0.46,
+        -0.35
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.91,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.15,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.22,
+       -0.08
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.5,
+        "bootstrap_95": [
+         -0.5,
+         -0.5
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.35,
+        "bootstrap_95": [
+         -0.42,
+         -0.28
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2156,
+     "comparator_s": 62.3519,
+     "ratio": 287.3,
+     "ratio_quartiles": [
+      227.8,
+      339.4
+     ],
+     "andrey_correct": 94,
+     "andrey_reversed": 6,
+     "andrey_no_edge": 0,
+     "comparator_correct": 87,
+     "comparator_reversed": 13,
+     "comparator_no_edge": 0,
+     "same_graph": 91,
+     "andrey_right_comparator_wrong": 8,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.06,
+     "comparator_shd_mean": 0.13,
+     "mean_D": -0.07,
+     "bootstrap_95": [
+      -0.13,
+      -0.02
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.44,
+       "bootstrap_95": [
+        -0.48,
+        -0.39
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.37,
+       "bootstrap_95": [
+        -0.43,
+        -0.3
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.94,
+     "comparator_direction_correct": 0.87,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 98,
+      "andrey_shd_mean": 0.0306,
+      "comparator_shd_mean": 0.1327,
+      "mean_D": -0.102,
+      "bootstrap_95": [
+       -0.1735,
+       -0.0408
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 2
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 98,
+        "mean": -0.4694,
+        "bootstrap_95": [
+         -0.5,
+         -0.4286
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 98,
+        "mean": -0.3673,
+        "bootstrap_95": [
+         -0.4286,
+         -0.2959
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0472,
+     "comparator_s": 61.4944,
+     "ratio": 1236.2,
+     "ratio_quartiles": [
+      1028.8,
+      1482.0
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "same_graph": 99,
+     "andrey_right_comparator_wrong": 1,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.01,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.99,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8171,
+     "comparator_s": 68.1907,
+     "ratio": 81.5,
+     "ratio_quartiles": [
+      59.1,
+      94.1
+     ],
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 95,
+     "comparator_reversed": 5,
+     "comparator_no_edge": 0,
+     "same_graph": 95,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.01
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.48,
+       "bootstrap_95": [
+        -0.5,
+        -0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.45,
+       "bootstrap_95": [
+        -0.49,
+        -0.4
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "comparator_direction_correct": 0.95,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0808,
+     "comparator_s": 64.927,
+     "ratio": 763.5,
+     "ratio_quartiles": [
+      587.8,
+      892.9
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "same_graph": 100,
+     "andrey_right_comparator_wrong": 0,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 1.0,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=500|independence",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0837,
+     "comparator_s": 64.1274,
+     "ratio": 766.8,
+     "ratio_quartiles": [
+      610.5,
+      973.2
+     ],
+     "andrey_correct": 86,
+     "andrey_reversed": 14,
+     "andrey_no_edge": 0,
+     "comparator_correct": 66,
+     "comparator_reversed": 34,
+     "comparator_no_edge": 0,
+     "same_graph": 78,
+     "andrey_right_comparator_wrong": 21,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.14,
+     "comparator_shd_mean": 0.34,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.28,
+      -0.12
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.36,
+       "bootstrap_95": [
+        -0.43,
+        -0.29
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.16,
+       "bootstrap_95": [
+        -0.25,
+        -0.07
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.86,
+     "comparator_direction_correct": 0.66,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.1,
+      "comparator_shd_mean": 0.32,
+      "mean_D": -0.22,
+      "bootstrap_95": [
+       -0.31,
+       -0.14
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.4,
+        "bootstrap_95": [
+         -0.46,
+         -0.34
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.18,
+        "bootstrap_95": [
+         -0.27,
+         -0.08
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=500|likelihood",
+     "n": 500,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.036,
+     "comparator_s": 63.9702,
+     "ratio": 1735.8,
+     "ratio_quartiles": [
+      1377.1,
+      2263.6
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 90,
+     "comparator_reversed": 10,
+     "comparator_no_edge": 0,
+     "same_graph": 90,
+     "andrey_right_comparator_wrong": 10,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.1,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.16,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.45,
+        -0.34
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.9,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.08,
+      "mean_D": -0.08,
+      "bootstrap_95": [
+       -0.14,
+       -0.03
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.5,
+        "bootstrap_95": [
+         -0.5,
+         -0.5
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.42,
+        "bootstrap_95": [
+         -0.47,
+         -0.36
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.213,
+     "comparator_s": 58.5496,
+     "ratio": 276.6,
+     "ratio_quartiles": [
+      208.2,
+      329.3
+     ],
+     "andrey_correct": 93,
+     "andrey_reversed": 7,
+     "andrey_no_edge": 0,
+     "comparator_correct": 76,
+     "comparator_reversed": 24,
+     "comparator_no_edge": 0,
+     "same_graph": 81,
+     "andrey_right_comparator_wrong": 18,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.07,
+     "comparator_shd_mean": 0.24,
+     "mean_D": -0.17,
+     "bootstrap_95": [
+      -0.25,
+      -0.09
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.43,
+       "bootstrap_95": [
+        -0.47,
+        -0.38
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.26,
+       "bootstrap_95": [
+        -0.34,
+        -0.17
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.93,
+     "comparator_direction_correct": 0.76,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 99,
+      "andrey_shd_mean": 0.0404,
+      "comparator_shd_mean": 0.101,
+      "mean_D": -0.0606,
+      "bootstrap_95": [
+       -0.1212,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 1
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 99,
+        "mean": -0.4596,
+        "bootstrap_95": [
+         -0.4899,
+         -0.4192
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 99,
+        "mean": -0.399,
+        "bootstrap_95": [
+         -0.4596,
+         -0.3384
+        ]
+       }
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0468,
+     "comparator_s": 57.9159,
+     "ratio": 1231.8,
+     "ratio_quartiles": [
+      1001.3,
+      1471.4
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 97,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "same_graph": 97,
+     "andrey_right_comparator_wrong": 3,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.03,
+     "mean_D": -0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.47,
+       "bootstrap_95": [
+        -0.5,
+        -0.43
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.97,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=2000|independence",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.8057,
+     "comparator_s": 67.4867,
+     "ratio": 82.2,
+     "ratio_quartiles": [
+      59.0,
+      95.6
+     ],
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 97,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "same_graph": 98,
+     "andrey_right_comparator_wrong": 2,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.03,
+     "mean_D": -0.02,
+     "bootstrap_95": [
+      -0.05,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.47,
+       "bootstrap_95": [
+        -0.5,
+        -0.43
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "comparator_direction_correct": 0.97,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "lsnm_rescaled_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "lsnm_rescaled_pair|n=2000|likelihood",
+     "n": 2000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0837,
+     "comparator_s": 64.2861,
+     "ratio": 699.9,
+     "ratio_quartiles": [
+      546.1,
+      908.6
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "same_graph": 100,
+     "andrey_right_comparator_wrong": 0,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 1.0,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_an_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_an_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2421,
+     "comparator_s": 61.0365,
+     "ratio": 243.9,
+     "ratio_quartiles": [
+      156.6,
+      318.3
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 97,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "same_graph": 97,
+     "andrey_right_comparator_wrong": 3,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.03,
+     "mean_D": -0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.47,
+       "bootstrap_95": [
+        -0.5,
+        -0.43
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.97,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_an_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_an_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.048,
+     "comparator_s": 60.1454,
+     "ratio": 1216.6,
+     "ratio_quartiles": [
+      933.2,
+      1624.5
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 96,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "same_graph": 96,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.04,
+     "mean_D": -0.04,
+     "bootstrap_95": [
+      -0.08,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.96,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_ans_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_ans_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.247,
+     "comparator_s": 54.3632,
+     "ratio": 210.5,
+     "ratio_quartiles": [
+      153.3,
+      282.9
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "same_graph": 99,
+     "andrey_right_comparator_wrong": 1,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.01,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.99,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_ans_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_ans_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0545,
+     "comparator_s": 53.9131,
+     "ratio": 995.3,
+     "ratio_quartiles": [
+      684.2,
+      1328.3
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "same_graph": 99,
+     "andrey_right_comparator_wrong": 1,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.01,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.99,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_ls_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_ls_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2375,
+     "comparator_s": 69.7588,
+     "ratio": 286.2,
+     "ratio_quartiles": [
+      229.9,
+      359.3
+     ],
+     "andrey_correct": 94,
+     "andrey_reversed": 6,
+     "andrey_no_edge": 0,
+     "comparator_correct": 86,
+     "comparator_reversed": 14,
+     "comparator_no_edge": 0,
+     "same_graph": 90,
+     "andrey_right_comparator_wrong": 9,
+     "comparator_right_andrey_wrong": 1,
+     "andrey_shd_mean": 0.06,
+     "comparator_shd_mean": 0.14,
+     "mean_D": -0.08,
+     "bootstrap_95": [
+      -0.14,
+      -0.02
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.44,
+       "bootstrap_95": [
+        -0.48,
+        -0.39
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.36,
+       "bootstrap_95": [
+        -0.43,
+        -0.29
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.94,
+     "comparator_direction_correct": 0.86,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.04,
+      "comparator_shd_mean": 0.14,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.17,
+       -0.03
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.46,
+        "bootstrap_95": [
+         -0.49,
+         -0.42
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.36,
+        "bootstrap_95": [
+         -0.42,
+         -0.29
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_ls_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_ls_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0502,
+     "comparator_s": 69.2308,
+     "ratio": 1352.9,
+     "ratio_quartiles": [
+      1021.7,
+      1838.6
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 92,
+     "comparator_reversed": 8,
+     "comparator_no_edge": 0,
+     "same_graph": 92,
+     "andrey_right_comparator_wrong": 8,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.08,
+     "mean_D": -0.08,
+     "bootstrap_95": [
+      -0.14,
+      -0.03
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.42,
+       "bootstrap_95": [
+        -0.47,
+        -0.36
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.92,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.04,
+      "mean_D": -0.04,
+      "bootstrap_95": [
+       -0.08,
+       -0.01
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.5,
+        "bootstrap_95": [
+         -0.5,
+         -0.5
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.46,
+        "bootstrap_95": [
+         -0.49,
+         -0.42
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_lss_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_lss_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2285,
+     "comparator_s": 76.9012,
+     "ratio": 334.2,
+     "ratio_quartiles": [
+      294.5,
+      401.1
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 50,
+     "comparator_reversed": 50,
+     "comparator_no_edge": 0,
+     "same_graph": 50,
+     "andrey_right_comparator_wrong": 50,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.5,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -0.6,
+      -0.4
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        -0.1,
+        0.1
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.5,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.01,
+      "comparator_shd_mean": 0.53,
+      "mean_D": -0.52,
+      "bootstrap_95": [
+       -0.62,
+       -0.42
+      ],
+      "above_zero": false,
+      "verdict": "better",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": false,
+       "pass": null,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.49,
+        "bootstrap_95": [
+         -0.5,
+         -0.47
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": 0.03,
+        "bootstrap_95": [
+         -0.07,
+         0.13
+        ]
+       }
+      }
+     },
+     "card_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_lss_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_lss_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0557,
+     "comparator_s": 76.2767,
+     "ratio": 1421.7,
+     "ratio_quartiles": [
+      1125.7,
+      1706.6
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 96,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "same_graph": 96,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.04,
+     "mean_D": -0.04,
+     "bootstrap_95": [
+      -0.08,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.96,
+     "replication": {
+      "seeds": [
+       100,
+       101,
+       102,
+       103,
+       104,
+       105,
+       106,
+       107,
+       108,
+       109,
+       110,
+       111,
+       112,
+       113,
+       114,
+       115,
+       116,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126,
+       127,
+       128,
+       129,
+       130,
+       131,
+       132,
+       133,
+       134,
+       135,
+       136,
+       137,
+       138,
+       139,
+       140,
+       141,
+       142,
+       143,
+       144,
+       145,
+       146,
+       147,
+       148,
+       149,
+       150,
+       151,
+       152,
+       153,
+       154,
+       155,
+       156,
+       157,
+       158,
+       159,
+       160,
+       161,
+       162,
+       163,
+       164,
+       165,
+       166,
+       167,
+       168,
+       169,
+       170,
+       171,
+       172,
+       173,
+       174,
+       175,
+       176,
+       177,
+       178,
+       179,
+       180,
+       181,
+       182,
+       183,
+       184,
+       185,
+       186,
+       187,
+       188,
+       189,
+       190,
+       191,
+       192,
+       193,
+       194,
+       195,
+       196,
+       197,
+       198,
+       199
+      ],
+      "paired": 100,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.03,
+      "mean_D": -0.03,
+      "bootstrap_95": [
+       -0.07,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.5,
+        "bootstrap_95": [
+         -0.5,
+         -0.5
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.47,
+        "bootstrap_95": [
+         -0.5,
+         -0.43
+        ]
+       }
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.independence.numpy",
+   "setting": "criterion=\"independence\", the default, alpha=None",
+   "comparator": "LOCI authors' code, LOCI-H",
+   "comparator_solution": "immer.loci.independence",
+   "comparator_setting": "loci(x, y, independence_test=True, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_mnu_pair",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_mnu_pair|n=1000|independence",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.2332,
+     "comparator_s": 41.3317,
+     "ratio": 159.0,
+     "ratio_quartiles": [
+      109.1,
+      246.2
+     ],
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 96,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "same_graph": 97,
+     "andrey_right_comparator_wrong": 3,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.04,
+     "mean_D": -0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.49,
+       "bootstrap_95": [
+        -0.5,
+        -0.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "comparator_direction_correct": 0.96,
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LOCI",
+   "family": "pairwise",
+   "solution": "andrey.loci.likelihood.numpy",
+   "setting": "criterion=\"likelihood\", alpha=None",
+   "comparator": "LOCI authors' code, LOCI-M",
+   "comparator_solution": "immer.loci.likelihood",
+   "comparator_setting": "loci(x, y, independence_test=False, neural_network=False) on standardized columns, at commit da61b8cd",
+   "lane": "loci.likelihood",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 9 November 2026",
+   "same_graph_test": "equal structure_hash (both return a two-node DAG with one edge)",
+   "regime": "tagasovska_mnu_pair",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "a pair's wrong direction, the SHD of its two-node graph: andrey_shd_mean and comparator_shd_mean are the shares of pairs with the reversed direction",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "tagasovska_mnu_pair|n=1000|likelihood",
+     "n": 1000,
+     "d": 2,
+     "fits": 100,
+     "paired": 100,
+     "andrey_s": 0.0486,
+     "comparator_s": 41.1391,
+     "ratio": 787.1,
+     "ratio_quartiles": [
+      497.8,
+      1249.7
+     ],
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 96,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "same_graph": 96,
+     "andrey_right_comparator_wrong": 4,
+     "comparator_right_andrey_wrong": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.04,
+     "mean_D": -0.04,
+     "bootstrap_95": [
+      -0.08,
+      -0.01
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.5,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.46,
+       "bootstrap_95": [
+        -0.49,
+        -0.42
+       ]
+      }
+     },
+     "seeds": 100,
+     "andrey_ok": 100,
+     "comparator_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "comparator_direction_correct": 0.96,
+     "card_verdict": null
+    }
+   ]
+  }
+ ]
+}

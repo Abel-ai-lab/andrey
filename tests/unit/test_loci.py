@@ -6,7 +6,7 @@ import pytest
 from andrey.api._irregular import likelihood_output
 from andrey.api.irregular import _pair_matrix, loci
 from andrey.data import sample_scm
-from andrey.irregular.loci import _gradient_hessian, _maximize
+from andrey.irregular.loci import _gradient_hessian, _maximize, _newton_direction
 from tests.recovery.helpers import datagen
 
 
@@ -55,3 +55,20 @@ def test_the_fit_ends_at_the_maximum(seed):
         on_bound = np.r_[np.zeros(dim, dtype=bool), weights[dim:] == 0]
         assert np.abs(gradient[~on_bound]).max() < 1e-5
         assert gradient[on_bound].min(initial=0.0) > -1e-5
+
+
+def test_the_newton_direction_solves_a_positive_definite_hessian():
+    hessian = np.array([[2.0, 0.5], [0.5, 1.0]])
+    gradient = np.array([1.0, -3.0])
+    np.testing.assert_allclose(
+        _newton_direction(hessian, gradient), -np.linalg.solve(hessian, gradient)
+    )
+
+
+def test_a_hessian_without_a_cholesky_factor_still_gives_a_descent_direction():
+    # Singular in floating point: the second pivot of its Cholesky factor is exactly zero.
+    hessian = np.ones((2, 2))
+    gradient = np.array([1.0, -2.0])
+    direction = _newton_direction(hessian, gradient)
+    assert np.isfinite(direction).all()
+    assert gradient @ direction < 0

@@ -165,7 +165,7 @@ BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confoun
 :img-top: /_generated/thumbs/pairwise.svg
 :img-alt: The true graph of this notebook's pair
 
-ANM and PNL test which of two variables causes the other.
+ANM, PNL, and LOCI test which of two variables causes the other.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
