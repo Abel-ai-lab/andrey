@@ -635,12 +635,12 @@ rows where those variables are observed. It takes `fisherz` or `student_t`;
 edges it tested again and removed. A corrected test reads the rows where its pair, its conditioning
 set, and those parents are all observed. When they are too few for it, the test-wise test answers
 instead, so the pair keeps its test-wise result for that conditioning set, and
-`metadata["corrected_edges"]["uncorrected"]` lists the pair. The correction holds when no indicator causes a variable and no
-value causes its own missingness, which the data cannot check. It also needs the rows it rebuilds
-from to keep the independence of each pair it tests: when a variable it rebuilds from goes missing
-because of a common effect of that pair, as when two effects of the same causes each hide the
-other, the extra edge can stay. `andrey.data.missingness` simulates
-data whose missingness graph you know, to see where it helps.
+`metadata["corrected_edges"]["uncorrected"]` lists the pair. The correction holds when no indicator
+causes a variable and no value causes its own missingness, which the data cannot check. It also
+needs the rows it rebuilds from to keep the independence of each pair it tests: when a variable it
+rebuilds from goes missing because of a common effect of that pair, as when two effects of the same
+causes each hide the other, the extra edge can stay. `andrey.data.missingness` simulates data whose
+missingness graph you know, to see where it helps.
 
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
