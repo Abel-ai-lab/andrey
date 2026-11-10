@@ -190,6 +190,22 @@ def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> N
         assert qg.pair_kwargs("lsnm_pair", qg.PAIR_N, key.seed) == bench.generation_kwargs(key)
 
 
+@pytest.mark.parametrize("cell", sorted(qg.ORDER_CELLS))
+def test_order_cells_are_the_papers_simulation_at_the_drivers_size(cell: str) -> None:
+    """SCORE's and NoGAM's cells are regimes of their benchmark driver, drawn with z-scored
+    columns, 1,000 rows, and ``d`` edges (``er1``) or ``4 d`` (``er4``)."""
+    regime, d, density = qg.ORDER_CELLS[cell]
+    assert regime in qg.stein_cpu.REGIMES
+    assert regime.endswith("_standardized")
+    assert cell == f"{regime}_d{d}_{density}"
+    edges = d * qg.stein_cpu.DENSITIES[density] / 2
+    for draw in qg.draws(cell):
+        assert draw.data.shape == (qg.stein_cpu.ROWS, d)
+        assert np.allclose(draw.data.mean(axis=0), 0, atol=1e-9)
+        assert np.allclose(draw.data.std(axis=0), 1)
+        assert len(draw.truth.oriented_edges()) == edges
+
+
 def test_time_series_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate's time-series regimes are the harness's, and its Granger draws its driver's."""
     pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl

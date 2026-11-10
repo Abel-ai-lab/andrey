@@ -1,11 +1,14 @@
 #!/usr/bin/env python
-"""Screen SCORE and NoGAM, through their authors' code, in the setting their papers claim.
+"""Compare SCORE and NoGAM, Andrey's and the authors', in the setting their papers claim.
 
-The screen decides whether Andrey implements the two methods; it runs no Andrey implementation of
-either. Every solution fits the same datasets in the same run:
+Every solution fits the same datasets in the same run:
 
     rolland.score, rolland.score.order          the authors' SCORE (Rolland et al. 2022)
     dodiscover.nogam, dodiscover.nogam.order    the authors' NoGAM (Montagna et al. 2023)
+    andrey.score_matching.numpy,                Andrey's SCORE
+    andrey.score_matching.order.numpy
+    andrey.nogam.numpy,                         Andrey's NoGAM
+    andrey.nogam.order.numpy
     andrey.cam.numpy, andrey.cam.order.numpy    Andrey's cam, shown beside every cell
     causaldisco.r2_sort_regress,                R2-SortnRegress (Reisach et al. 2023), the
     causaldisco.r2_sort.order                   sortability control
@@ -29,12 +32,14 @@ line per dataset to ``oracle.jsonl`` in ``--out``; the solutions fit the same da
 their own.
 
 A method passes the screen when, in most of its decision cells, its SHD interval lies below the
-empty graph's and the interval of its order's correct share lies above R2-SortnRegress's.
+empty graph's and the interval of its order's correct share lies above R2-SortnRegress's. An
+Andrey method meets the reference in a cell when the paired difference of its SHD, or of its
+order's correct share, has an interval that excludes zero on the side of the reference.
 
 The reference solutions run in the interpreter ``$ANDREY_BENCH_STEIN_PYTHON`` names and read the
 SCORE files from ``$ANDREY_BENCH_SCORE``; `start_stein.sh` builds both and prints the exports.
 SCORE's pruning starts ``Rscript``, which needs ``mgcv``: load R as `start_r.sh --env` prints.
-Andrey's ``cam`` runs in ``$ANDREY_BENCH_CAM_PYTHON``, an environment holding the build under test.
+Andrey's solutions run in ``$ANDREY_BENCH_CAM_PYTHON``, an environment holding the build under test.
 
 Use ``--seed-start``, ``--regimes``, ``--densities``, and ``--solutions`` to cut a campaign into
 small runs, each with its own ``--out``. Share the dataset store, ``ANDREY_BENCH_DATA``, and fill it
@@ -58,6 +63,11 @@ from pathlib import Path
 
 from andrey_bench import datasets, memcap, rundir, score_oracle
 from andrey_bench.adapters.andrey_cam import AndreyCAM, AndreyCAMOrder
+from andrey_bench.adapters.andrey_nogam import AndreyNoGAM, AndreyNoGAMOrder
+from andrey_bench.adapters.andrey_score_matching import (
+    AndreyScoreMatching,
+    AndreyScoreMatchingOrder,
+)
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causaldisco_r2sort import CausalDiscoR2Sort, CausalDiscoR2SortnRegress
 from andrey_bench.adapters.dodiscover_nogam import DodiscoverNoGAM, DodiscoverNoGAMOrder
@@ -72,6 +82,10 @@ SOLUTIONS = [
     RollandSCOREOrder(),
     DodiscoverNoGAM(),
     DodiscoverNoGAMOrder(),
+    AndreyScoreMatching(),
+    AndreyScoreMatchingOrder(),
+    AndreyNoGAM(),
+    AndreyNoGAMOrder(),
     AndreyCAM(),
     AndreyCAMOrder(),
     CausalDiscoR2SortnRegress(),
@@ -181,7 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         choices=names,
         default=names,
-        help="solutions to run (default: all); NoGAM's claim stops at d = 20",
+        help="solutions to run (default: all); NoGAM's claim stops at d = 20, so a ladder with d = 50 "
+        "leaves its solutions out",
     )
     p.add_argument("--seeds", type=int, default=20, help="datasets per cell (default: 20)")
     p.add_argument(

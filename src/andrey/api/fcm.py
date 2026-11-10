@@ -595,9 +595,6 @@ def score_matching(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -658,26 +655,45 @@ def score_matching(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 8 variables and up to 500 rows.
-    The paper's tables are on data as simulated, and the order search reads standardized columns,
-    where it was less accurate: on the paper's simulation with 1,000 rows and as many edges as
-    variables, over ten graphs of 10 variables, the order put 80% of the true edges in the true
-    direction on standardized columns and 99% when the same search read the columns as simulated;
-    with four times as many edges, 96% and 97%. One kernel bandwidth serves every variable, and
-    links it does not resolve leave a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``,
-    ``x2 -> x3`` with ``x2 = 2 x0 / (1 + x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise
-    of standard deviation 0.7 or 1, over 400 and 800 rows, the search took ``x0`` and ``x1`` for
-    the leaves in 24 of 24 fits.
-    The leaf rule is exact only for Gaussian noise: under other noise a leaf's entry changes with
-    its residual, and :func:`~andrey.resit` drops that assumption. Each step factors a matrix with
+    **Limitations.** The numbers below were measured on the paper's simulation with standardized
+    columns, Gaussian noise, and 1,000 rows, on one core, 20 graphs per setting: Erdos-Renyi graphs
+    with as many edges as variables or four times as many, each link one draw of a Gaussian process,
+    at 10, 20, and 50 variables. With as many edges as variables the order put 81%, 73%, and 65% of
+    the true edges in the true direction at 10, 20, and 50 variables, and the DAG was 2.8, 7.8, and
+    25.0 edges from the true one (SHD), where the empty graph is 10, 20, and 50 away; with four
+    times as many edges the order put 97%, 90%, and 85% in the true direction, and the SHD was 22.1,
+    51.9, and 142.7 against the empty graph's 40, 80, and 200. On the graphs with as many edges as
+    variables :func:`~andrey.cam` was more accurate on the same data: its order put 96% to 98% of
+    the true edges in the true direction and its SHD was 0.7, 2.1, and 5.5. At 50 variables with
+    four times as many edges, over 40 graphs, the order put 0.007 to 0.010 less of the true edges in
+    the true direction than the code published with the paper did (86% against 87%). The paper's
+    tables are on data as simulated, and the order search reads standardized columns, where it
+    orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
+    variables with as many edges, the same search put 99% of the true edges in the true direction
+    when it read the columns as simulated and 80% on standardized columns. On standardized columns
+    the error of the search's estimate for a variable grows with about the square of that variable's
+    variance-to-noise ratio (its variance over the variance of its noise term). Where links have a
+    strong linear part, variance builds up along the causal order, the sinks have the largest
+    ratios, and the search ranks them last: on additive-noise data with links ``z + sin z`` (1,000
+    rows, 10 and 20 variables, as many edges as variables), where a sink's ratio had a median of 10
+    to 13 against 1.6 to 1.7 in the paper's simulation, the order put 41% to 53% of the true edges
+    in the true direction, a random order's share, and 16,000 rows (52%), another ridge term, or
+    another bandwidth did not change that. Use :func:`~andrey.cam` on such data (76% to 94% on the
+    same datasets). One kernel bandwidth serves every variable, and links it does not resolve leave
+    a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 -> x3`` with ``x2 = 2 x0 / (1 +
+    x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard deviation 0.7 or 1, over 400
+    and 800 rows, the search took ``x0`` and ``x1`` for the leaves in 24 of 24 fits. The leaf rule
+    is exact only for Gaussian noise: under other noise a leaf's entry changes with its residual,
+    and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. A fit took 1.0 s at 10
+    variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB. Each step factors a matrix with
     one row and one column per sample, so the order search's time grows with the cube of
     ``n_samples`` and its memory with the square. The pruning starts from the complete DAG of the
     order, so its last fits have nearly ``n_variables`` smooth terms each: it needs at least twice
     as many rows as columns, and it takes most of a fit's time as the variables grow. Binary
-    columns, and any column with fewer than 3 distinct values, are not supported: the pruning
-    fits a smooth term of each parent, and such a column raises ``ValueError`` before the fit.
-    The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    columns, and any column with fewer than 3 distinct values, are not supported: the pruning fits a
+    smooth term of each parent, and such a column raises ``ValueError`` before the fit. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -793,9 +809,6 @@ def nogam(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -860,21 +873,39 @@ def nogam(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 8 variables and up to 500 rows.
-    The paper's tables are on data as simulated, and the order search reads standardized columns,
-    where it was less accurate on sparse graphs: on the paper's simulation with 10 variables and
-    1,000 rows, over ten graphs per setting, with as many edges as variables the order put 87% of
-    the true edges in the true direction under Gaussian noise and 91% under Laplace noise, against
-    99% and 98% when the same search read the columns as simulated; with four times as many edges,
-    98% under either noise, against 98% and 99%.
-    Each step fits ten kernel ridge regressions per remaining variable, each on four fifths of
-    the rows, so the order search's time grows with the square of ``n_variables`` and the cube of
-    ``n_samples``, and its memory with the square of ``n_samples``. The pruning starts from the
-    complete DAG of the order, so its last fits have nearly ``n_variables`` smooth terms each, and
-    it needs at least twice as many rows as columns. Binary columns, and any column with fewer than
-    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such
-    a column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** The numbers below were measured on the paper's simulation with standardized
+    columns and 1,000 rows, on one core, 20 graphs per setting: Erdos-Renyi graphs with as many
+    edges as variables or four times as many, each link one draw of a Gaussian process, with
+    Gaussian, Laplace, or Gumbel noise, at 10 and 20 variables. With as many edges as variables the
+    order put 90% to 92% of the true edges in the true direction at 10 variables and 81% to 86% at
+    20, and the DAG was 1.2 to 1.7 and 4.2 to 6.0 edges from the true one (SHD), where the empty
+    graph is 10 and 20 away; with four times as many edges the order put 98% to 99% and 92% to 95%
+    in the true direction, and the SHD was 19.6 to 21.1 and 48.8 to 49.4 against the empty graph's
+    40 and 80. On the graphs with as many edges as variables :func:`~andrey.cam` was at least as
+    accurate on the same data, under every noise: its order put 90% to 98% of the true edges in the
+    true direction, and its SHD was 0.7 to 0.9 at 10 variables and 1.4 to 3.3 at 20. The paper's
+    tables are on data as simulated, and the order search reads standardized columns, where it
+    orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
+    variables with as many edges, the same search put 99% of the true edges in the true direction
+    under Gaussian noise and 98% under Laplace noise when it read the columns as simulated, and 87%
+    and 91% on standardized columns. The search compares the variables' prediction errors in
+    absolute terms on standardized columns, and a sink's error grows with its variance-to-noise
+    ratio (its variance over the variance of its noise term), since the same error in its residual
+    costs more where the noise is a small part of the variable. Where links have a strong linear
+    part that ratio is largest at the sinks: on additive-noise data with links ``z + sin z`` (10 and
+    20 variables, as many edges as variables; Gaussian, Laplace, and Gumbel noise) the order put 47%
+    to 62% of the true edges in the true direction at 1,000 rows, and 4,000 rows raised it only from
+    56% to 62% under Gaussian noise at 10 variables. Use :func:`~andrey.cam` on such data (76% to
+    94% on the same datasets). A fit took 7.5 to 9.7 s at 10 variables and 28 to 40 s at 20, within
+    0.16 GB; it was not measured in graphs of 50 variables, where a single fit took 194 s. Each step
+    fits ten kernel ridge regressions per remaining variable, each on four fifths of the rows, so
+    the order search's time grows with the square of ``n_variables`` and the cube of ``n_samples``,
+    and its memory with the square of ``n_samples``. The pruning starts from the complete DAG of the
+    order, so its last fits have nearly ``n_variables`` smooth terms each, and it needs at least
+    twice as many rows as columns. Binary columns, and any column with fewer than 3 distinct values,
+    are not supported: the pruning fits a smooth term of each parent, and such a column raises
+    ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

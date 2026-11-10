@@ -147,7 +147,7 @@ SPEC: dict[str, dict] = {
         "numeric": {},
     },
     # SCORE: the DAG and the causal order of its leaf search, both exact.
-    "SCORE": {
+    "ScoreMatching": {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
