@@ -263,6 +263,12 @@ def _marks(d: int, parents: np.ndarray, children: np.ndarray) -> np.ndarray:
 
 
 def _domain_shift(spec: DomainShift, d, n, density, draw, rng):
+    x, dag, shifted = _domain_shift_draw(spec, d, n, density, draw, rng)
+    return x, domain_cpdag(dag, shifted), "cpdag"
+
+
+def _domain_shift_draw(spec: DomainShift, d, n, density, draw, rng):
+    """The data, the DAG's marks, and the shifted variables of a ``domain_shift`` draw."""
     level = domain_index(n, spec.n_domains)[:, 0] / (spec.n_domains - 1)
     parents, children, order = _er_dag(d, density, rng)
     weights = _weights(len(parents), rng)
@@ -270,7 +276,18 @@ def _domain_shift(spec: DomainShift, d, n, density, draw, rng):
     offset = np.zeros((n, d))
     offset[:, shifted] = np.outer(level, rng.uniform(*spec.shift, len(shifted)))
     x = _linear(parents, children, order, weights, n, draw, rng, offset)
-    return x, domain_cpdag(_marks(d, parents, children), shifted), "cpdag"
+    return x, _marks(d, parents, children), shifted
+
+
+def domain_shift_dag(
+    *, d: int, n: int, seed: int, density: float, noise: str, shuffle: bool = True
+) -> np.ndarray:
+    """The DAG behind the ``domain_shift`` dataset of the same arguments, as endpoint marks in the
+    column order :func:`sample` gives that dataset."""
+    rng = np.random.default_rng(seed)
+    _, dag, _ = _domain_shift_draw(MODELS["domain_shift"], d, n, density, _NOISE[noise], rng)
+    variables = column_order("domain_shift", d, seed, shuffle)
+    return np.ascontiguousarray(dag[np.ix_(variables, variables)])
 
 
 def domain_cpdag(dag_marks: np.ndarray, shifted: np.ndarray) -> np.ndarray:

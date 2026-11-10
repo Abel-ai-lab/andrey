@@ -282,8 +282,14 @@ def iamb(
     smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
     datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
     tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    random. ``required_paths`` and ``forbidden_paths`` are experimental. With true claims on 5 to
+    30% of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree 2
+    or 4, 500 or 2,000 rows), the CPDAG was no farther from the true DAG than without them in any
+    setting, but at 50 variables with 2,000 rows it was farther from the graph that the true class
+    and the claims define, by up to 4.2 edges per graph, on two sets of 20 datasets. The fits
+    dropped 71% of the required and 53% of the forbidden paths as claims their graph could not meet.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -525,8 +531,14 @@ def inter_iamb(
     variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
     collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets 0.9 to 1.3 s.
     Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    fifth of the values missing completely at random. ``required_paths`` and ``forbidden_paths`` are
+    experimental. With true claims on 5 to 30% of the variable pairs of simulated linear-Gaussian
+    data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), the CPDAG was no farther from
+    the true DAG than without them in any setting, but at 50 variables with 2,000 rows it was
+    farther from the graph that the true class and the claims define, by up to 4.4 edges per graph,
+    on two sets of 20 datasets. The fits dropped 71% of the required and 53% of the forbidden paths
+    as claims their graph could not meet. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -776,8 +788,14 @@ def mmpc(
     mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose
     smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
     Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    fifth of the values missing completely at random. ``required_paths`` and ``forbidden_paths`` are
+    experimental. With true claims on 5 to 30% of the variable pairs of simulated linear-Gaussian
+    data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), the CPDAG was no farther from
+    the true DAG than without them in any setting, but at 50 variables it was farther from the graph
+    that the true class and the claims define, by up to 4.9 edges per graph, on two sets of 20
+    datasets. The fits dropped 77% of the required and 62% of the forbidden paths as claims their
+    graph could not meet. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

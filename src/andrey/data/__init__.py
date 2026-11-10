@@ -22,7 +22,8 @@ for the mixed-data tests and scores. :meth:`SCM.do` and ``envs=`` on :meth:`SCM.
 of :mod:`interventions`. ``missing=`` on :meth:`SCM.sample` and :func:`sample_scm` draws missing
 values with a known missingness graph, from :mod:`missingness`.
 :func:`sample_context_series` draws time series from several datasets with shared contexts, the
-data for :func:`~andrey.jpcmciplus`.
+data for :func:`~andrey.jpcmciplus`. ``measurements=`` on :meth:`SCM.sample` and
+:func:`sample_scm` appends noisy measurement columns of chosen variables, from :mod:`measurement`.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from . import (
     graphs,
     interventions,
     latent,
+    measurement,
     missingness,
     noise,
     qa,
@@ -40,7 +42,7 @@ from . import (
     temporal,
 )
 from .contexts import ContextSeries, sample_context_series
-from .dataset import CausalDataset, Missingness, QAReport, SCMParams
+from .dataset import CausalDataset, Measurements, Missingness, QAReport, SCMParams
 from .discrete import sample_discrete
 from .generate import Ensemble, generate
 from .mixed import sample_mixed
@@ -59,6 +61,7 @@ __all__ = [
     "generate",
     "CausalDataset",
     "Missingness",
+    "Measurements",
     "QAReport",
     "SCMParams",
     "FaithfulnessScreen",
@@ -70,6 +73,7 @@ __all__ = [
     "noise",
     "interventions",
     "missingness",
+    "measurement",
     "latent",
     "sortability",
     "qa",

@@ -471,12 +471,15 @@ no selection bias: the samples were not kept or dropped by the value of a variab
 cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths` to
 narrow the causal order, as their paper describes (Shimizu et al., 2011). Every other method raises
 `NotImplementedError` for a part it does not honor, naming the methods that do. The parts are
-supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM: with true claims, each
-measured no worse than the same fit without them and than reference packages given the same
-knowledge, on the [0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims). In the
-other methods, which we have not measured, they are experimental. A path claim says less than an
-edge and so directs less: a required path cannot restore an edge the search left out. When you know
-the edge itself, state it as `required`.
+supported wherever true claims [measured no
+worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+than the same fit without them and than a reference package given the same knowledge, which is every
+method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
+RSMAX2, where a reference package given the edges those paths imply made fewer errors. Both path
+parts are experimental in IAMB, Inter-IAMB, and MMPC, where true claims left the graph farther from
+the one the claims define at 50 variables. A path claim says less than an edge and so directs less:
+a required path cannot restore an edge the search left out. When you know the edge itself, state it
+as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
