@@ -360,9 +360,12 @@ the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of s
 `igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
 of 87 groups and were worse in none, and tied with each other in every group; for `ut_igsp`, on 15
 groups of simulated datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors
-than 5 in 4 groups, 2 of them in that setting, and more in none. Each search builds its own caches
-and drops the previous one's, so more starts take more time but little more memory. `1`, the default
-for the others, runs one search.
+than 5 in 4 groups, 2 of them in that setting, and more in none. On dense graphs one `grasp` search
+can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
+`n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
+Each search builds its own caches and drops the previous one's, so more starts take more time but
+little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
