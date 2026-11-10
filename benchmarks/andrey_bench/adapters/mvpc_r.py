@@ -78,10 +78,14 @@ andrey_mvpc_gen <- function(num_sample, mode, num_var, num_extra_e, num_m, seed)
     g <- gen_data(num_sample = num_sample, mode = mode, num_var = num_var,
                   num_extra_e = num_extra_e, num_m = num_m, seed = seed)
     dag <- as(g$ground_truth$dag, "matrix")
+    # On a graph with fewer collider-parent pairs than num_extra_e, the "mnar" generator fills
+    # the open indicator slots with NA: those slots mask no column and are dropped here.
+    m_ind <- as.integer(g$ground_truth$m_ind)
+    parent_m_ind <- as.integer(g$ground_truth$parent_m_ind)
+    drawn <- !is.na(m_ind) & !is.na(parent_m_ind)
     list(data_m = as.matrix(g$data_m), data_complete = as.matrix(g$data_complete),
          data_ref = as.matrix(g$data_ref), dag = (dag != 0) * 1,
-         m_ind = as.integer(g$ground_truth$m_ind),
-         parent_m_ind = as.integer(g$ground_truth$parent_m_ind))
+         m_ind = m_ind[drawn], parent_m_ind = parent_m_ind[drawn])
 }
 """
 
