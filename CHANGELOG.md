@@ -108,7 +108,9 @@ names its pull request.
   ([#853])
 - The roadmap lists the methods planned for its local causal discovery and very large causal
   discovery stages, each with its paper, an existing implementation and its license, and what the
-  method adds. ([#853])
+  method adds; the local methods are grouped by what they learn. Stage 1 is "Major methods", very
+  large causal discovery means more than 1,000 variables, and it comes before agentic causal
+  discovery. ([#853])
 
 ### Changed
 
