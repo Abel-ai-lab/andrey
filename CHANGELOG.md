@@ -62,6 +62,17 @@ names its pull request.
   default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it
   stays experimental, with no reference implementation to compare with. The
   [comparison page][em-tetrad] has the results. ([#873])
+- `missing="em"` gives other results: it now runs the alternating structural EM of Friedman
+  (1997) in every method that takes it (`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`,
+  `grasp`, `notears`, `dagma`, and `calm`). Before each search after the first, 5 parameter-only EM
+  steps refit the current graph's coefficients and noise variances; before, each round refit them
+  once. With one refit per round, the first search, on the expected covariance under the model with
+  no edge, returned many extra edges, the later rounds removed them slowly, and the graph was still
+  changing after the 10 rounds, which is why `boss` and `grasp` made more errors than their
+  reference on dense graphs. The 10 rounds and the sample size of the BIC, every row, stay.
+  `metadata["em"]` gains `parameter_steps` and `graph_changed`, whether each round changed the
+  graph, and a fit whose last round changed it logs a warning. A fit runs 56 E-steps where it ran
+  11, so it takes longer. Results on complete data do not change. ([#887])
 - The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
   `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
   so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
@@ -2328,5 +2339,6 @@ First alpha release.
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
