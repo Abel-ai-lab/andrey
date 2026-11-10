@@ -4,7 +4,8 @@ The algorithm, its settings, and its references are described on :func:`andrey.r
 restrict phase learns an undirected candidate graph with conditional-independence tests; the
 maximize phase runs hill climbing or tabu search with every pair outside it forbidden in both
 directions, through the same :class:`~andrey.core.knowledge.Constraints` that carry background
-knowledge.
+knowledge. Both phases read the knowledge: the restrict phase as its learner does on its own, so
+the two ends of a required edge condition the tests of the other candidates.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.constraint.blanket import local_structure
-from andrey.constraint.pc import adjacency_search
+from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import NULL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
 from andrey.core.knowledge import Constraints
@@ -34,6 +35,7 @@ def candidate_graph(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """The restrict phase: the pairs the maximize phase may join, a symmetric boolean matrix.
 
@@ -45,12 +47,21 @@ def candidate_graph(
     ``indep_test`` test at level ``alpha``; ``categorical`` marks the categorical columns for a
     mixed-data test; ``seed`` fixes the draws of a stochastic test (``None`` uses
     ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning set.
+
+    ``constraints`` reach the learner as they do when it runs on its own: the pair of a required
+    edge is kept without a test and conditions the tests of the other pairs (each end is a member
+    of the other's set from the start), and a pair the knowledge makes non-adjacent is never a
+    candidate. A neighbor the knowledge names can separate a pair that the neighbors found from
+    the data leave together.
     """
     if restrict == "pc":
+        allowed, keep, _ = knowledge_masks(constraints)
         skeleton, _, _ = adjacency_search(
             make_indep_test(indep_test, X, categorical=categorical, seed=seed),
             X.shape[1],
             alpha,
+            support=allowed,
+            keep=keep,
             max_depth=max_depth,
             workers=backend.worker_count(None),
             warn_expensive=True,
@@ -65,6 +76,7 @@ def candidate_graph(
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
+        constraints=constraints,
     )
     return marks != NULL
 
@@ -108,8 +120,9 @@ def rsmax2(
     """Run the ``restrict`` phase, then the ``maximize`` score search inside its candidate graph.
 
     Returns the CPDAG, the total score of the DAG found (lower is better), and the candidate graph.
-    ``constraints`` reach the maximize phase whole, and the candidate graph as its allowed pairs
-    together with the pairs of the required edges (:func:`restricted`). ``seed`` fixes the draws of
+    ``constraints`` reach both phases: the restrict phase as :func:`candidate_graph` describes, and
+    the maximize phase whole, with the candidate graph as its allowed pairs together with the pairs
+    of the required edges (:func:`restricted`). ``seed`` fixes the draws of
     a stochastic ``indep_test`` in the restrict phase (``None`` uses ``ANDREY_SEED``). ``max_depth``
     caps the restrict phase's conditioning sets and ``max_parents`` each node's parents in the
     maximize phase.
@@ -122,6 +135,7 @@ def rsmax2(
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
+        constraints=constraints,
     )
     limits = restricted(constraints, candidates)
     if maximize == "hc":

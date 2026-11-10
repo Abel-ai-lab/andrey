@@ -8,6 +8,7 @@ class.
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pytest
 
@@ -191,6 +192,63 @@ def test_a_required_edge_joins_a_pair_the_skeleton_leaves_out(restrict):
     knowledge = andrey.Knowledge(required=[(0, 1)])
     out = andrey.rsmax2(_collider_data(), restrict=restrict, knowledge=knowledge)
     assert frozenset((0, 1)) in _adjacent(out)
+
+
+class _MissesEdges(DSeparation):
+    """The d-separation oracle of a DAG, except that it never rejects on the pairs in ``missed``:
+    a test without the power to see those edges."""
+
+    def __init__(self, dag, missed: set[frozenset[int]]) -> None:
+        super().__init__(dag)
+        self.missed = missed
+
+    def __call__(self, x, y, condition_set=()) -> float:
+        if frozenset((x, y)) in self.missed:
+            return 1.0
+        return super().__call__(x, y, condition_set)
+
+
+@pytest.mark.parametrize("restrict", ["mmpc", "iamb", "inter_iamb", "pc"])
+def test_a_required_edge_separates_a_pair_in_the_restrict_phase(restrict, oracle_test):
+    """On the chain 0 -> 1 -> 2 with a test that sees neither edge, the restrict phase keeps the
+    pair 0, 2, which only column 1 separates, and the maximize phase joins it. The required edge
+    1 -> 2 makes 1 a neighbor of 2 in the restrict phase, so the pair 0, 2 is separated there."""
+    rng = np.random.default_rng(0)
+    a, e, f = rng.standard_normal((3, 2000))
+    b = a + e
+    x = np.column_stack([a, b, b + f])
+    chain = andrey.GraphStructure.from_networkx(nx.DiGraph([(0, 1), (1, 2)]), kind="dag")
+    oracle_test["oracle"] = _MissesEdges(chain, {frozenset((0, 1)), frozenset((1, 2))})
+    alone = andrey.rsmax2(x, restrict=restrict, indep_test="dsep")
+    assert _adjacent(alone) == {frozenset((0, 2))}
+    knowledge = andrey.Knowledge(required=[(1, 2)])
+    out = andrey.rsmax2(x, restrict=restrict, indep_test="dsep", knowledge=knowledge)
+    assert _edges(out) == {(1, 2, "directed")}
+
+
+@pytest.mark.parametrize("restrict", ["mmpc", "iamb", "inter_iamb", "pc"])
+def test_the_restrict_phase_reads_knowledge_as_its_learner_does_alone(restrict):
+    """The candidates under required edges, a forbidden pair, and a one-way forbidden edge are the
+    skeleton the restrict learner returns for the same knowledge."""
+    from andrey.core.knowledge import resolve
+    from andrey.search.hybrid import rsmax2
+
+    sample = data.sample_scm(
+        graph="erdos_renyi", d=15, n=500, seed=1, density=4.0, scale="standardize"
+    )
+    true = [(i, j) for i, j, _ in sample.graph.oriented_edges(index=True)]
+    apart = next(
+        (i, j) for i in range(15) for j in range(i) if (i, j) not in true and (j, i) not in true
+    )
+    knowledge = andrey.Knowledge(required=true[::3], forbidden=[apart, apart[::-1], true[1][::-1]])
+    constraints = resolve(knowledge, 15, None, method="rsmax2")
+    *_, candidates = rsmax2(sample.data, restrict=restrict, constraints=constraints)
+    pairs = {frozenset(map(int, pair)) for pair in np.argwhere(np.triu(candidates))}
+    setting = {} if restrict in ("mmpc", "pc") else {"structure": "skeleton"}
+    alone = getattr(andrey, restrict)(sample.data, knowledge=knowledge, **setting)
+    assert pairs == _adjacent(alone)
+    assert {frozenset(edge) for edge in true[::3]} <= pairs
+    assert frozenset(apart) not in pairs
 
 
 @pytest.mark.parametrize("seed", range(5))

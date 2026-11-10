@@ -2792,9 +2792,9 @@ _MOVE_RULE = (
     "edges. "
 )
 _CANDIDATE_RULE = (
-    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
-    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
-    "alone. "
+    "The restrict phase keeps the pair of each required edge without a test and conditions the "
+    "tests of the other pairs on it, and never keeps a pair the knowledge makes non-adjacent; the "
+    "score search considers the pairs it keeps. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "

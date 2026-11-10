@@ -168,13 +168,15 @@ def mmhc(
         the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and temporal tiers, all honored. The score search considers the
-        pairs of the MMPC skeleton and of the required edges, less the pairs the knowledge makes
-        non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The MMPC phase reads
-        the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
-        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
-        describes; a claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and
-        listed in ``metadata["unmet_knowledge"]``.
+        allowed to be adjacent, and temporal tiers, all honored. Both phases read them. The MMPC
+        phase reads them as :func:`~andrey.mmpc` does: each end of a required edge is in the
+        other's set from the start, so it conditions the tests of the other candidates, and a pair
+        the knowledge makes non-adjacent is never a candidate. The score search considers the pairs
+        of that skeleton, and then honors the knowledge as :func:`~andrey.hc` does. In a CPDAG,
+        ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
+        listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
+        meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -399,13 +401,16 @@ def rsmax2(
         the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
-        pairs the restrict phase keeps and the pairs of the required edges, less the pairs the
-        knowledge makes non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The
-        restrict phase reads the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths``
-        keep the DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        allowed to be adjacent, and temporal tiers, all honored. Both phases read them. The
+        restrict phase reads them as its learner does on its own (:func:`~andrey.mmpc`,
+        :func:`~andrey.iamb`, :func:`~andrey.inter_iamb`, :func:`~andrey.pc`): the pair of a
+        required edge is kept without a test and conditions the tests of the other pairs, and a
+        pair the knowledge makes non-adjacent is never a candidate. The maximize phase considers
+        the pairs the restrict phase keeps, and then honors the knowledge as :func:`~andrey.hc`
+        does. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands
+        for in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a
+        claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
