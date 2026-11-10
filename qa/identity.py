@@ -184,6 +184,7 @@ FITS: dict[str, Fit] = {
     "NoGAM": Fit(andrey.nogam),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
+    "NOTEARS": Fit(andrey.notears),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
@@ -246,6 +247,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "score_paper_laplace_standardized_d12_er1": functools.partial(
         qg.order_draws, "score_paper_laplace_standardized", 12, "er1"
     ),
+    "notears_paper_standardized_d60": functools.partial(qg.linear_sem_draws, "standardized", 60),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
     "fci_jci_x100": functools.partial(qg.index_pag_draws, "X100"),
@@ -299,6 +301,7 @@ LARGER: dict[str, str] = {
     "ScoreMatching": "score_paper_standardized_d15_er1",
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
     "CALM": "linear_gauss_er_d15",
+    "NOTEARS": "notears_paper_standardized_d60",
     "CDNOD": "domain_shift_er_d70",
     "FCI-JCI": "fci_jci_x100",
     "GIES": "interventional_gauss_er_d100",

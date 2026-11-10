@@ -155,17 +155,18 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
-XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP,
-DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV,
-GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and
-DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
-UT-IGSP learns:
+XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI,
+UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM,
+CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM,
+Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported
+nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the
+targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
+| `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
@@ -234,6 +235,16 @@ UT-IGSP learns:
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
+- **Linear models in the data's units.** NOTEARS's published regime, drawn by its benchmark driver
+  (`benchmarks/notears_cpu.py`) as two of its comparison's cells: the simulation of Zheng et al.
+  (2018), a linear model on an Erdos-Renyi graph with `2d` edges, weights from +/-[0.5, 2], Gaussian
+  noise of unit variance, and 1,000 rows. NOTEARS's least-squares fit reads the columns' units, so
+  one cell is standardized and one raw. `notears_paper_standardized` z-scores each column, the
+  scale of the comparison's decision cells, and runs at 50 variables, the published size where the
+  check has power: over the gate's seeds NOTEARS's median SHD is 18.5 against the empty graph's 20
+  at 10 variables and 40 against 40 at 20. `notears_paper_raw` keeps the columns as generated,
+  where the variances grow along the causal order and the fit reads the order from them, at 10
+  variables. A fit at 50 standardized variables takes about half a minute on one core.
 - **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,
   MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and the
   benchmark drivers of GIES and GnIES): `interventional_gauss_er` at `n = 50d`, with intervention
@@ -304,10 +315,10 @@ UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI,
-GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables. GIES is
-scored against the interventional essential graph of the true DAG under the rows' targets, IGSP
-against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
+NOTEARS, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its groups,
+and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables.
+GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
+IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
 FCI-JCI is scored by endpoint SHD over the variables and the environment against its PAG at the true
 distribution, the truth its benchmark driver builds. UT-IGSP's targets are scored apart, as
