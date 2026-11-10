@@ -61,6 +61,7 @@ from .api import (
     rcd,
     resit,
     rsmax2,
+    score_matching,
     tabu,
     ut_igsp,
     varma_lingam,
@@ -150,6 +151,7 @@ __all__ = [
     "ica_lingam",
     "cam",
     "resit",
+    "score_matching",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

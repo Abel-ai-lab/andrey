@@ -4,7 +4,8 @@ Each node with candidate parents is fit as an additive model of them
 (:func:`andrey.fcm.gam.fit_gam`), and a parent stays when its smooth term's p-value is at most
 ``cutoff`` (Buhlmann, Peters, Ernest 2014, Section 5.3). The paper declares significance at
 p-values "lower or equal" to 0.001 at every sample size and suggests a larger cutoff for small
-samples. CAM prunes the DAG of its order search with this step.
+samples. CAM prunes the DAG of its order search with this step, and a method that finds only a
+causal order prunes the complete DAG of that order (:func:`prune_order`).
 
 References
 ----------
@@ -78,3 +79,48 @@ def prune(
         kept[parents[p_values <= cutoff], child] = 1
         _log.debug("node %d: parents %s, p-values %s", child, parents.tolist(), p_values)
     return kept
+
+
+def prune_order(
+    X: np.ndarray,
+    order: np.ndarray,
+    *,
+    cutoff: float = 0.001,
+    k: int = 10,
+    forbidden: np.ndarray | None = None,
+    required: np.ndarray | None = None,
+) -> np.ndarray:
+    """Prune the complete DAG of a causal order.
+
+    Each variable's candidate parents are the variables before it in ``order``, less the
+    ``forbidden`` ones; :func:`prune` keeps the significant ones, and a ``required`` edge stays
+    whatever its p-value.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        ``(n, d)`` data matrix.
+    order : np.ndarray
+        The ``d`` columns, causes first.
+    cutoff : float, default 0.001
+        An edge stays when its p-value is at most ``cutoff``.
+    k : int, default 10
+        Basis rank of each smooth term before :func:`andrey.fcm.gam.effective_k` adjusts it.
+    forbidden : np.ndarray or None, default None
+        ``(d, d)`` bool; ``forbidden[i, j]`` keeps ``i`` out of ``j``'s candidate parents.
+    required : np.ndarray or None, default None
+        ``(d, d)`` bool; ``required[i, j]`` keeps the edge ``i -> j``, which ``order`` must allow.
+
+    Returns
+    -------
+    np.ndarray
+        ``(d, d)`` bool DAG; ``out[i, j]`` is the edge ``i -> j``.
+    """
+    d = X.shape[1]
+    position = np.empty(d, dtype=np.int64)
+    position[order] = np.arange(d)
+    complete = position[:, None] < position[None, :]
+    if forbidden is not None:
+        complete &= ~forbidden
+    dag = prune(X, complete, cutoff=cutoff, k=k).astype(bool)
+    return dag if required is None else dag | required
