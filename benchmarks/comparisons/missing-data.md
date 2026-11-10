@@ -90,7 +90,8 @@ below the empty graph in its claimed setting.
 Every number is on simulated data, one core per fit, on AMD EPYC 7713 and AMD EPYC 9555 processors.
 The record holds 192,700 fits; with the reruns on fresh seeds, the reruns of the fits that raised,
 and the reference check on fresh seeds, 200,860 were run, in 232 CPU-hours of fit time. The lane
-`m2-tetrad` holds 47,820 more, on AMD EPYC 7713 processors, in 50 CPU-hours of fit time.
+`m2-tetrad` holds 47,820 more; with its control on fresh seeds and the refit of 3 fits that raised,
+48,043 were run, on AMD EPYC 7713 processors, in 50.5 CPU-hours of fit time.
 
 | method | lane | reference | better / tie / worse | worse again | floor | median fit time, Andrey / reference | status |
 |---|---|---|---|---|---|---|---|
@@ -437,13 +438,13 @@ packages' searches on the data before the mask, the same 20 datasets per setting
 | er, degree 1 | 15 | 100 | 8.00 | 7.75 / 7.50, +0.25 [+0.00, +0.70] tie | 7.50 / 7.65, -0.15 [-0.70, +0.35] tie | 6.40 / 6.70, -0.30 [-1.10, +0.50] tie |
 | er, degree 2 | 15 | 100 | 15.00 | 11.05 / 10.55, +0.50 [+0.00, +1.20] tie | 7.85 / 8.80, -0.95 [-3.55, +0.80] tie | 6.15 / 7.00, -0.85 [-2.40, +0.65] tie |
 | scale_free, degree 2 | 15 | 100 | 14.00 | 8.75 / 8.75, +0.00 [-0.25, +0.20] tie | 9.50 / 8.50, +1.00 [-1.10, +3.55] tie | 9.65 / 7.75, +1.90 [-0.30, +4.10] tie |
-| er, degree 2 | 10 | 100 | 10.00 | 5.50 / 4.10, +1.40 [+0.40, +2.50] **worse** | 5.00 / 5.50, -0.50 [-1.90, +0.80] tie | 4.85 / 4.90, -0.05 [-2.00, +1.90] tie |
+| er, degree 2 | 10 | 100 | 10.00 | 5.50 / 4.10, +1.40 [+0.40, +2.50] **worse**; tie on fresh datasets | 5.00 / 5.50, -0.50 [-1.90, +0.80] tie | 4.85 / 4.90, -0.05 [-2.00, +1.90] tie |
 | er, degree 2 | 10 | 500 | 10.00 | 2.75 / 2.90, -0.15 [-1.05, +0.60] tie | 3.10 / 1.85, +1.25 [-0.25, +3.00] tie | 1.85 / 2.35, -0.50 [-1.85, +0.70] tie |
 | er, degree 2 | 10 | 2,000 | 10.00 | 1.20 / 1.05, +0.15 [-0.15, +0.60] tie | 2.00 / 1.25, +0.75 [-0.40, +2.00] tie | 2.05 / 1.25, +0.80 [+0.00, +1.95] tie |
 | er, degree 2 | 20 | 100 | 20.00 | 15.25 / 14.55, +0.70 [-0.30, +1.75] tie | 14.65 / 14.40, +0.25 [-2.35, +2.75] tie | 13.65 / 13.25, +0.40 [-2.45, +3.35] tie |
 | er, degree 2 | 20 | 500 | 20.00 | 8.55 / 8.45, +0.10 [-0.50, +0.65] tie | 6.45 / 7.35, -0.90 [-3.50, +1.70] tie | 5.45 / 6.40, -0.95 [-3.10, +1.25] tie |
 | er, degree 2 | 20 | 2,000 | 20.00 | 4.10 / 4.35, -0.25 [-1.65, +1.00] tie | 5.20 / 4.50, +0.70 [-0.85, +2.35] tie | 4.10 / 3.45, +0.65 [-1.70, +3.15] tie |
-| er, degree 2 | 50 | 100 | 50.00 | 66.40 / 63.85, +2.55 [+0.55, +4.55] **worse** | 71.20 / 65.10, +6.10 [+1.50, +10.60] **worse** | 64.15 / 63.70, +0.45 [-2.60, +3.60] tie |
+| er, degree 2 | 50 | 100 | 50.00 | 66.40 / 63.85, +2.55 [+0.55, +4.55] **worse**; tie on fresh datasets | 71.20 / 65.10, +6.10 [+1.50, +10.60] **worse**; tie on fresh datasets | 64.15 / 63.70, +0.45 [-2.60, +3.60] tie |
 | er, degree 2 | 50 | 500 | 50.00 | 36.85 / 34.65, +2.20 [-0.45, +5.05] tie | 29.85 / 28.65, +1.20 [-0.45, +2.85] tie | 23.80 / 24.05, -0.25 [-2.95, +2.45] tie |
 | er, degree 2 | 50 | 2,000 | 50.00 | 17.05 / 17.70, -0.65 [-2.90, +1.10] tie | 12.65 / 15.10, -2.45 [-4.70, -0.35] **better** | 11.35 / 9.95, +1.40 [-1.00, +3.40] tie |
 | er, degree 4 | 10 | 100 | 20.00 | 18.95 / 19.70, -0.75 [-1.55, +0.00] tie | 11.10 / 15.45, -4.35 [-8.45, -0.55] **better** | 13.40 / 11.90, +1.50 [-3.60, +6.35] tie |
@@ -453,7 +454,7 @@ packages' searches on the data before the mask, the same 20 datasets per setting
 | er, degree 4 | 20 | 500 | 40.00 | 41.85 / 46.75, -4.90 [-9.85, -1.15] **better** | 9.50 / 8.35, +1.15 [-7.05, +7.35] tie | 8.15 / 7.85, +0.30 [-5.55, +6.00] tie |
 | er, degree 4 | 20 | 2,000 | 40.00 | 35.05 / 41.55, -6.50 [-13.10, -0.90] **better** | 9.70 / 5.90, +3.80 [-1.90, +10.60] tie | 4.95 / 4.25, +0.70 [-2.15, +4.20] tie |
 | er, degree 4 | 50 | 100 | 100.00 | 108.45 / 109.85, -1.40 [-6.40, +5.45] tie | 61.65 / 60.35, +1.30 [-5.80, +8.45] tie | 75.20 / 78.05, -2.85 [-22.00, +15.70] tie |
-| er, degree 4 | 50 | 500 | 100.00 | 99.35 / 108.05, -8.70 [-16.75, -1.15] **better** | 26.60 / 26.45, +0.15 [-11.50, +12.10] tie | 31.20 / 20.50, +10.70 [+1.10, +21.55] **worse** |
+| er, degree 4 | 50 | 500 | 100.00 | 99.35 / 108.05, -8.70 [-16.75, -1.15] **better** | 26.60 / 26.45, +0.15 [-11.50, +12.10] tie | 31.20 / 20.50, +10.70 [+1.10, +21.55] **worse**; worse on fresh datasets |
 | er, degree 4 | 50 | 2,000 | 100.00 | 102.00 / 106.85, -4.85 [-19.50, +9.25] tie | 8.35 / 14.15, -5.80 [-15.70, +0.60] tie | 14.85 / 8.25, +6.60 [-0.60, +17.60] tie |
 
 The plain searches tie in 53 of the 63 comparisons. Andrey's is behind in 4: `ges` at mean degree
@@ -462,8 +463,27 @@ The plain searches tie in 53 of the 63 comparisons. Andrey's is behind in 4: `ge
 (20 variables with 500 and 2,000 rows, 50 with 500), `boss` at mean degree 2 with 50 variables and
 2,000 rows and at mean degree 4 with 10 variables and 100 rows, and `grasp` at mean degree 4 with
 10 variables and 2,000 rows. In those 6 settings a margin with EM may be the search and not the
-EM layer. None of the 10 was rerun on fresh datasets; with 63 comparisons at 95%, about 3 would
-differ by chance. Elsewhere the searches tie, so the margin is the missing-data layer.
+EM layer. The 4 settings where it is behind ran again on 20 fresh datasets each, seeds 20 to 39 (60
+datasets: `ges` and `boss` share the 50-variable ones): Andrey's plain search, Tetrad's, and the
+empty graph, 220 fits, the complete-data units of this lane at `--first-seed 20`. The difference is
+Andrey minus Tetrad.
+
+| search | graph | variables | rows | seeds 0 to 19: Andrey / Tetrad, difference | seeds 20 to 39: Andrey / Tetrad, difference | empty graph | repeats |
+|---|---|---|---|---|---|---|---|
+| `ges` | er, degree 2 | 10 | 100 | 5.50 / 4.10, +1.40 [+0.40, +2.50] worse | 3.15 / 3.90, -0.75 [-2.30, +0.10] tie | 10.00 | no |
+| `ges` | er, degree 2 | 50 | 100 | 66.40 / 63.85, +2.55 [+0.55, +4.55] worse | 65.65 / 65.70, -0.05 [-2.30, +2.30] tie | 50.00 | no |
+| `boss` | er, degree 2 | 50 | 100 | 71.20 / 65.10, +6.10 [+1.50, +10.60] worse | 67.80 / 69.70, -1.90 [-5.20, +1.30] tie | 50.00 | no |
+| `grasp` | er, degree 4 | 50 | 500 | 31.20 / 20.50, +10.70 [+1.10, +21.55] worse | 27.90 / 16.90, +11.00 [+2.25, +21.40] worse | 100.00 | yes |
+
+In three of the four settings the difference does not repeat: the packages tie on the fresh
+datasets (`ges` with 10 and with 50 variables, `boss` with 50 variables). In `grasp` at mean degree
+4 with 50 variables and 500 rows it does: Andrey's plain search is behind Tetrad's by 10.7 SHD on
+the first datasets and by 11.0 on the fresh ones, both intervals above 0, with SHD 31.2 and 27.9
+against 20.5 and 16.9 and the empty graph at 100. With EM in that setting `grasp` is better than
+Tetrad's EM arm in 5 of its 6 cells and ties in 1, because Tetrad's EM arm has a mean SHD of 32 to
+398 there: the margin with EM is the reference's missing-data layer and not a better search. The 6
+settings where Andrey is ahead were not rerun; with 63 comparisons at 95%, about 3 would differ by
+chance. Elsewhere the searches tie, so the margin is the missing-data layer.
 
 Against the baselines:
 
@@ -602,9 +622,10 @@ repeats, and below the empty graph in its claimed setting.
   `tabu` at the plain BIC miss it in 13 and 9 of the 24 cells with 100 rows, at low rates too, as
   their complete-data fits do on ER1.
 - **GES, BOSS, and GRaSP with EM: what was not compared.** The 100-variable cells and the
-  quantile MAR mask of the generic grid, self-masking, and the default `ebic_gamma=1.0` did not run
-  against Tetrad. At 100 variables one dataset of 100 rows took Tetrad's six fits 365 s. Those
-  cells are in `m2-generic` against the baselines.
+  quantile MAR mask of the generic grid, self-masking, the default `ebic_gamma=1.0`, and Tetrad's
+  effective-sample-size modes other than `FULL_N` did not run against Tetrad. At 100 variables one
+  dataset of 100 rows took Tetrad's six fits 365 s. Those cells are in `m2-generic` against the
+  baselines.
 - **GES with EM on denser graphs.** At the plain BIC and mean degree 4, `ges` with EM is below the
   empty graph in 5 of 54 cells and worse than test-wise PC in 22.
 - **Values missing not at random.** EM has no guarantee under self-masking; the rows of that mask

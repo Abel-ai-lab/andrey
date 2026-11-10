@@ -96,11 +96,179 @@
   "rows_worse_again": 0,
   "about": "no row is worse than the reference, so none ran again; the worse rows against test-wise PC, a baseline, were not rerun"
  },
+ "control_replication": {
+  "about": "the four settings where Andrey's plain search was worse than Tetrad's on the complete data on seeds 0 to 19, fit again on 20 fresh datasets each (seeds 20 to 39): the two packages' plain searches at the plain BIC and the empty graph, the same arms and settings as the control of the lane. A difference repeats when it is worse on both blocks.",
+  "fits": 220,
+  "settings": [
+   {
+    "search": "ges",
+    "graph": "er",
+    "density": 2.0,
+    "d": 10,
+    "n": 100,
+    "seeds_0_to_19": {
+     "paired": 20,
+     "mean_D": 1.4,
+     "bootstrap_95": [
+      0.4,
+      2.5
+     ],
+     "verdict": "worse",
+     "failures": 0,
+     "andrey_mean_shd": 5.5,
+     "tetrad_mean_shd": 4.1,
+     "empty_mean_shd": 10.0,
+     "andrey_fit_s_median": 0.4556,
+     "tetrad_fit_s_median": 0.9617,
+     "datasets": 20
+    },
+    "seeds_20_to_39": {
+     "paired": 20,
+     "mean_D": -0.75,
+     "bootstrap_95": [
+      -2.3,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0,
+     "andrey_mean_shd": 3.15,
+     "tetrad_mean_shd": 3.9,
+     "empty_mean_shd": 10.0,
+     "andrey_fit_s_median": 0.6835,
+     "tetrad_fit_s_median": 1.0692,
+     "datasets": 20
+    },
+    "repeats": false
+   },
+   {
+    "search": "ges",
+    "graph": "er",
+    "density": 2.0,
+    "d": 50,
+    "n": 100,
+    "seeds_0_to_19": {
+     "paired": 20,
+     "mean_D": 2.55,
+     "bootstrap_95": [
+      0.55,
+      4.55
+     ],
+     "verdict": "worse",
+     "failures": 0,
+     "andrey_mean_shd": 66.4,
+     "tetrad_mean_shd": 63.85,
+     "empty_mean_shd": 50.0,
+     "andrey_fit_s_median": 0.73,
+     "tetrad_fit_s_median": 2.763,
+     "datasets": 20
+    },
+    "seeds_20_to_39": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -2.3,
+      2.3
+     ],
+     "verdict": "tie",
+     "failures": 0,
+     "andrey_mean_shd": 65.65,
+     "tetrad_mean_shd": 65.7,
+     "empty_mean_shd": 50.0,
+     "andrey_fit_s_median": 0.8387,
+     "tetrad_fit_s_median": 2.8133,
+     "datasets": 20
+    },
+    "repeats": false
+   },
+   {
+    "search": "boss",
+    "graph": "er",
+    "density": 2.0,
+    "d": 50,
+    "n": 100,
+    "seeds_0_to_19": {
+     "paired": 20,
+     "mean_D": 6.1,
+     "bootstrap_95": [
+      1.5,
+      10.6
+     ],
+     "verdict": "worse",
+     "failures": 0,
+     "andrey_mean_shd": 71.2,
+     "tetrad_mean_shd": 65.1,
+     "empty_mean_shd": 50.0,
+     "andrey_fit_s_median": 0.7945,
+     "tetrad_fit_s_median": 1.6677,
+     "datasets": 20
+    },
+    "seeds_20_to_39": {
+     "paired": 20,
+     "mean_D": -1.9,
+     "bootstrap_95": [
+      -5.2,
+      1.3
+     ],
+     "verdict": "tie",
+     "failures": 0,
+     "andrey_mean_shd": 67.8,
+     "tetrad_mean_shd": 69.7,
+     "empty_mean_shd": 50.0,
+     "andrey_fit_s_median": 0.9661,
+     "tetrad_fit_s_median": 1.532,
+     "datasets": 20
+    },
+    "repeats": false
+   },
+   {
+    "search": "grasp",
+    "graph": "er",
+    "density": 4.0,
+    "d": 50,
+    "n": 500,
+    "seeds_0_to_19": {
+     "paired": 20,
+     "mean_D": 10.7,
+     "bootstrap_95": [
+      1.1,
+      21.55
+     ],
+     "verdict": "worse",
+     "failures": 0,
+     "andrey_mean_shd": 31.2,
+     "tetrad_mean_shd": 20.5,
+     "empty_mean_shd": 100.0,
+     "andrey_fit_s_median": 1.6122,
+     "tetrad_fit_s_median": 4.8072,
+     "datasets": 20
+    },
+    "seeds_20_to_39": {
+     "paired": 20,
+     "mean_D": 11.0,
+     "bootstrap_95": [
+      2.25,
+      21.4
+     ],
+     "verdict": "worse",
+     "failures": 0,
+     "andrey_mean_shd": 27.9,
+     "tetrad_mean_shd": 16.9,
+     "empty_mean_shd": 100.0,
+     "andrey_fit_s_median": 2.1537,
+     "tetrad_fit_s_median": 4.9936,
+     "datasets": 20
+    },
+    "repeats": true
+   }
+  ],
+  "repeat_count": 1
+ },
  "not_compared": [
   "100 variables",
   "quantile MAR",
   "self-masking",
-  "ebic_gamma=1.0, Andrey's default"
+  "ebic_gamma=1.0, Andrey's default",
+  "Tetrad's effective-sample-size modes other than FULL_N (MEAN_PAIRWISE, MIN_PAIRWISE)"
  ],
  "refits": {
   "about": "three fits failed on a read of the Python environment's files and were fit again; their records replace the failed ones",
@@ -119,7 +287,8 @@
  "timeouts": {
   "tetrad.grasp.testwise at 50 variables and 2,000 rows": 6
  },
- "fits_all_runs": 47823,
+ "fits_all_runs": 48043,
+ "fit_hours_all_runs": 50.5,
  "parity_rule": "paired bootstrap",
  "bootstrap": {
   "resamples": 10000,
