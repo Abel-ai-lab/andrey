@@ -520,7 +520,8 @@ variable pairs, of the number of rows on which both variables are observed", and
 the minimum of those counts. Tetrad's BIC takes the count in place of the number of rows, in the
 likelihood and in the penalty's `log n`. The lane fits `tetrad.<search>.em_covariance.mean_pairwise`
 on the same 2,640 masked datasets as the first arm, with the same EM estimate, search, and plain
-BIC; `essMode` is the only difference. It is judged as the first arm is, and it decides no status on
+BIC; `essMode` is the only difference. Andrey's EM arm is compared with it by the same paired
+bootstrap, the cells where Andrey is worse ran again on fresh seeds, and it decides no status on
 this page: the statuses above rest on the first arm.
 
 Andrey's EM arm is better than it in 81 (`ges`), 70 (`boss`), and 64 (`grasp`) of the 132 cells,
