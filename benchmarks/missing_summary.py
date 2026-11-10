@@ -24,7 +24,9 @@ finished, with the 95% percentile-bootstrap interval of its mean over 10,000 res
 otherwise; fewer than 10 paired datasets are reported, not judged. A dataset the other arm finished
 and the method did not is listed in ``failures``: an error or a timeout is never scored as a graph.
 The reference comparison is also made on the skeleton F1 alone. A dataset's error is recorded with
-its arm and never moves a verdict. ``--replications`` adds each row's rerun on fresh seeds: a worse
+its arm and never moves a verdict. In the lanes at the papers' sizes and the 100-row cells of
+``m2-bnlearn``, a judged row whose reference lies below the empty graph fails when the method does
+not. ``--replications`` adds each row's rerun on fresh seeds: a worse
 verdict against the reference counts only when the rerun agrees, and a better one is the first
 run's. A worse verdict against test-wise PC, listwise deletion, or mean imputation carries
 ``worse_again``, whether its rerun is worse too.
@@ -51,9 +53,11 @@ MIN_PAIRS = 10
 REFERENCE_ALPHA = 0.01
 #: The mechanisms each method's claim covers; the others are reported as limits.
 CLAIMED = {"mvpc": ("mcar", "mar", "mnar"), "em": ("mcar", "mar")}
-#: The lanes at the papers' sizes, where the floor is judged. ``m2-bnlearn`` mixes sizes and is not
-#: one of them: the floor is reported there, never applied.
+#: The lanes at the papers' sizes, where the floor is judged.
 PAPER_LANES = ("m1-paper", "m2-a", "m2-b", "m2-c")
+#: ``m2-bnlearn`` mixes sizes: its cells at this row count are the ``m2-b`` and ``m2-c`` cells, the
+#: papers' size, and the floor is judged in them; in its other cells it is reported.
+BNLEARN_PAPER_ROWS = 100
 #: Another package's arm for the same method: lane -> method -> arm.
 REFERENCES = {
     "m1-paper": {"pc": "mvpc-r.permc"},
@@ -304,7 +308,10 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
         row["judged"] = claimed and "reference" in row and row["reference"]["verdict"] is not None
         if row["judged"]:
             ref = row["reference"]
-            floor_applies = lane in PAPER_LANES and ref["minus_empty"][1] < 0
+            paper_size = lane in PAPER_LANES or (
+                lane == "m2-bnlearn" and cell["n"] == BNLEARN_PAPER_ROWS
+            )
+            floor_applies = paper_size and ref["minus_empty"][1] < 0
             row["floor"]["applies"] = floor_applies
             if floor_applies and not row["floor"]["pass"]:
                 row["result"] = "fail: not better than the empty graph"
@@ -328,6 +335,9 @@ def all_rows(table: pd.DataFrame) -> list[dict[str, Any]]:
         cell = dict(zip(CELL, key))
         cell = {k: (v.item() if isinstance(v, np.generic) else v) for k, v in cell.items()}
         cell["rate"] = None if cell["rate"] < 0 else cell["rate"]
+        # A part without records reads its sizes as floats, and the rows of a rerun are matched to
+        # the first run's by the cell's text.
+        cell["d"], cell["n"] = int(cell["d"]), int(cell["n"])
         same = complete.get(tuple(cell[k] for k in on), whole.iloc[:0])
         if cell["lane"] == "m1-paper":
             # A complete draw belongs to the mode (MAR or MNAR) of the generator call it came from.

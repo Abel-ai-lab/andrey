@@ -41,7 +41,7 @@ whose Reproduce table lists the driver.
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
-| Missing values | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; listwise deletion and mean imputation | the MVPC authors' R code, MissDAG | |
+| [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em` | 0.16.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; lingam's DirectLiNGAM with `prior_knowledge` as context | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
@@ -90,7 +90,9 @@ tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with
 fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
 The path and confounder claims are in no release summary:
 [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds their rows,
-which their [comparison page](comparisons/knowledge-paths.md) presents.
+which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
+rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
+[comparison page](comparisons/missing-data.md).
 
 | Release | Release card | Summary |
 |---|---|---|

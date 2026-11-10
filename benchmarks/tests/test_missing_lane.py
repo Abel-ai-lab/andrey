@@ -367,6 +367,40 @@ def test_the_bnlearn_lane_compares_the_distance_between_equivalence_classes():
     assert hc["control"]["other"] == "bnlearn.hc" and hc["control"]["mean_D"] == 1.0
 
 
+def _bnlearn_cell(method_shd: float, rows: int) -> pd.DataFrame:
+    """One ``m2-bnlearn`` cell: ``hc`` with EM, bnlearn at 19, and the empty graph at 20."""
+    table = pd.concat(
+        [
+            _records("andrey.hc.em.ebic_gamma0", 12, "cpdag", method_shd, None),
+            _records("bnlearn.structural_em.hc.iter10", 12, "dag", 30.0, 19.0),
+            _records("baseline.empty", 12, "cpdag", 20.0, None),
+        ]
+    ).assign(lane="m2-bnlearn", graph="er", density=2.0, d=15, n=rows, mechanism="mcar", form="")
+    table["rate"] = 0.2
+    table["class_shd"] = missing_summary.class_shd(table)
+    return table
+
+
+def test_the_floor_decides_the_paper_size_cells_of_the_bnlearn_lane():
+    """At the empty graph's distance where bnlearn is below it, a 100-row cell fails; a 500-row
+    cell reports the floor and keeps the verdict against bnlearn."""
+    [small] = missing_summary.all_rows(_bnlearn_cell(20.0, 100))
+    assert small["floor"] == {"andrey_minus_empty": [0.0, 0.0], "pass": False, "applies": True}
+    assert small["result"] == "fail: not better than the empty graph"
+    [large] = missing_summary.all_rows(_bnlearn_cell(20.0, 500))
+    assert not large["floor"]["applies"] and large["result"] == "worse"
+    [below] = missing_summary.all_rows(_bnlearn_cell(18.0, 100))
+    assert below["floor"]["pass"] and below["result"] == "better"
+
+
+def test_a_cell_is_named_alike_whatever_type_its_sizes_were_read_as():
+    """A rerun's rows are matched to the first run's by the cell's name."""
+    table = _bnlearn_cell(18.0, 100)
+    [row] = missing_summary.all_rows(table.astype({"d": float, "n": float}))
+    assert row["regime"] == missing_summary.all_rows(table)[0]["regime"]
+    assert (row["d"], row["n"]) == (15, 100) and "15|100" in row["regime"]
+
+
 def test_the_class_distance_is_the_cpdag_distance_of_every_arm():
     table = pd.DataFrame(
         {

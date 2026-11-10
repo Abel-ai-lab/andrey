@@ -116,7 +116,8 @@ names its pull request.
   the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and `hc` and `tabu` with
   `missing="em"` beside bnlearn's `structural.em`, each with test-wise PC, listwise deletion, mean
   imputation, the complete data, and the empty graph, and `missing_summary.py` pairs the records
-  into summary rows with a paired bootstrap. ([#843], [#856])
+  into summary rows with a paired bootstrap. `benchmarks/comparisons/missing-data.md` presents the
+  results, and `benchmarks/published/0.16.0/missing-data.json` holds the rows. ([#843], [#856])
 - The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
   that listing every small graph gives, with d-separation in place of the tests, and on simulated
   data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`,
