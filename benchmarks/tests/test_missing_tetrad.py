@@ -53,8 +53,8 @@ needs_tetrad = pytest.mark.skipif(_unavailable() is not None, reason=_unavailabl
 
 def _cells() -> set[tuple]:
     """The masked cells of ``m2-tetrad``, written out: MissDAG's three graphs at 15 variables and
-    100 rows (MCAR at 0.1 to 0.5, logistic MAR at 0.1, 0.3, 0.5), and ER2 and ER4 at 10 to 100
-    variables and 100 to 2,000 rows (MCAR and logistic MAR at 0.1 to 0.3)."""
+    100 rows (MCAR at 0.1 to 0.5, logistic MAR at 0.1, 0.3, 0.5), and ER2 and ER4 at 10, 20, and
+    50 variables and 100 to 2,000 rows (MCAR and logistic MAR at 0.1 to 0.3)."""
     graphs = (("er", 1.0), ("er", 2.0), ("scale_free", 2.0))
     paper = {
         (*g, 15, 100, "raw", "mcar", "", r) for g in graphs for r in (0.1, 0.2, 0.3, 0.4, 0.5)
@@ -63,7 +63,7 @@ def _cells() -> set[tuple]:
         ("er", degree, d, n, "standardized", *mask, r)
         for degree, d, n, mask, r in itertools.product(
             (2.0, 4.0),
-            (10, 20, 50, 100),
+            (10, 20, 50),
             (100, 500, 2000),
             (("mcar", ""), ("mar", "logistic")),
             (0.1, 0.2, 0.3),
@@ -89,7 +89,7 @@ def test_the_lane_runs_the_claimed_cells_of_the_three_searches_once_each():
     units = missing_cpu.plan("m2-tetrad", seeds=2)
     masked = [u.key for u in units if u.key.missing]
     assert {_cell(k) for k in masked} == _cells()
-    assert len(masked) == 2 * len(_cells()) == 2 * 168
+    assert len(masked) == 2 * len(_cells()) == 2 * 132
     keys = [u.key for u in units]
     assert len(keys) == len(set(keys))
     # The datasets are those of the lanes the cells come from: one key, one file.

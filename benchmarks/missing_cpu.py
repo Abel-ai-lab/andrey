@@ -40,10 +40,10 @@ complete values of every mask drawn over it. Lanes:
   Andrey at ``ebic_gamma`` 0.0 and Tetrad at ``penaltyDiscount`` 1.0. The cells are those of
   ``m2-b`` (15 variables, 100 rows, MCAR at 0.1 to 0.5, raw data, on MissDAG's three graphs), the
   logistic MAR cells of ``m2-c`` at 15 variables, and the MCAR and logistic MAR cells of
-  ``m2-generic`` (ER2 and ER4, 10 to 100 variables, 100 to 2,000 rows, standardized). Each masked
-  dataset also fits Tetrad's searches under test-wise deletion, its default without a policy, and
-  test-wise PC; each complete dataset fits both packages' plain searches. Needs tetrad-lib 8.0.0
-  (``benchmarks/start_tetrad_missing.sh``).
+  ``m2-generic`` up to 50 variables (ER2 and ER4; 10, 20, and 50 variables; 100 to 2,000 rows;
+  standardized). Each masked dataset also fits Tetrad's searches under test-wise deletion, its
+  default without a policy, and test-wise PC; each complete dataset fits both packages' plain
+  searches. Needs tetrad-lib 8.0.0 (``benchmarks/start_tetrad_missing.sh``).
 
 ``--part i --parts k`` runs every k-th unit of the lane from the i-th, so a lane splits into
 independent jobs; ``--first-seed`` moves the seeds, for a rerun on fresh ones; ``--budget-s`` stops
@@ -98,6 +98,9 @@ M2_REDUCED = ("hc", "tabu", "xges", "exact_search", "calm", "notears", "dagma")
 BNLEARN_EM_ITERATIONS = 10
 #: ``m2-tetrad``: Tetrad's search for each of Andrey's.
 TETRAD_SEARCHES = {"ges": "fges", "boss": "boss", "grasp": "grasp"}
+#: ``m2-tetrad``: the most variables of its generic grid. At 100 variables and 100 rows one
+#: dataset's six Tetrad fits take about six minutes, on graphs far denser than the truth.
+TETRAD_MAX_VARIABLES = 50
 
 
 @dataclass(frozen=True)
@@ -310,6 +313,7 @@ def _tetrad_units(seeds: int) -> list[Unit]:
     """The ``m2-tetrad`` units: ``ges``, ``boss``, and ``grasp`` with EM beside Tetrad's FGES,
     BOSS, and GRaSP under its EM covariance policy, on the cells of the EM claim (MCAR and logistic
     MAR) that ``m2-b``, ``m2-c``, and ``m2-generic`` run for the three searches, each dataset once.
+    The generic grid stops at :data:`TETRAD_MAX_VARIABLES`.
 
     A masked dataset fits Andrey's three EM arms with their listwise and mean-imputation baselines
     at ``ebic_gamma`` 0.0 (the standard BIC, which Tetrad scores at ``penaltyDiscount`` 1.0),
@@ -325,7 +329,9 @@ def _tetrad_units(seeds: int) -> list[Unit]:
         *_cells(PAPER_GRAPHS, paper, mar, F2_RATES, seeds, "raw"),
         *_cells(
             [("er", 2.0), ("er", 4.0)],
-            itertools.product((10, 20, 50, 100), (100, 500, 2000)),
+            itertools.product(
+                [d for d in (10, 20, 50, 100) if d <= TETRAD_MAX_VARIABLES], (100, 500, 2000)
+            ),
             [*mcar, *mar],
             GENERIC_RATES,
             seeds,
