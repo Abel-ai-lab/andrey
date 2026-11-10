@@ -8,6 +8,17 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Fixed
+
+- `mmhc` and `rsmax2` pass background knowledge to the restrict phase, which reads it as `mmpc`,
+  `iamb`, `inter_iamb`, and `pc` do on their own: the two ends of a required edge condition the
+  tests of the other pairs, and a pair the knowledge makes non-adjacent is never a candidate. The
+  restrict phase read the data alone, so a pair that only a required neighbor separates stayed a
+  candidate and the score search could join it. Graphs fitted with required edges, or with a pair
+  forbidden both ways, can change; fits without knowledge are unchanged. ([#880])
+
 ## [0.16.0] - 2026-11-10
 
 ### Highlights
@@ -2240,3 +2251,4 @@ First alpha release.
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
+[#880]: https://github.com/Abel-ai-lab/andrey/pull/880
