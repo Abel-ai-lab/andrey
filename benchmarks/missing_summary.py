@@ -7,6 +7,21 @@ the paired comparison of the method with each other arm (the reference where the
 test-wise PC, listwise deletion, mean imputation), the empty graph as the floor, the complete-data
 fit of the same method, and the fit times.
 
+A reference is another package's implementation of the same method, and its row is judged. In
+``m2-bnlearn`` it is bnlearn's ``structural.em`` with the same search inside:
+``bnlearn.structural_em.hc`` for ``hc`` and ``bnlearn.structural_em.tabu`` for ``tabu``, with the
+complete-data control ``bnlearn.hc`` or ``bnlearn.tabu`` against Andrey's plain search, and the
+``max_iter`` 10 arm of the reference as ``reference_iter10``. A method with no reference (``ges``,
+``boss``, ``grasp``, ``xges``, ``exact_search``) carries ``same_data`` instead: the comparison with
+another package's structural EM on the same datasets, with ``package`` naming it and ``control``
+its complete-data pair (plain search against ``bnlearn.hc``). It is not a reference and is never
+judged.
+
+The SHD of every pair is ``shd``, except in ``m2-bnlearn``: bnlearn returns a DAG, whose ``shd`` is
+the directed distance, and Andrey's searches return CPDAGs, whose ``shd`` is the distance between
+the equivalence classes. There every arm is scored on ``class_shd``, ``mec_shd`` for a DAG arm and
+``shd`` for a CPDAG arm, the distance between the CPDAGs of the estimate and the truth.
+
 A comparison is the per-seed difference ``D = SHD(method) - SHD(other)`` on the datasets both
 finished, with the 95% percentile-bootstrap interval of its mean over 10,000 resamples
 (``default_rng(0)``): worse when the interval lies wholly above 0, better when wholly below, a tie
@@ -39,14 +54,40 @@ MIN_PAIRS = 10
 REFERENCE_ALPHA = 0.01
 #: The mechanisms each method's claim covers; the others are reported as limits.
 CLAIMED = {"mvpc": ("mcar", "mar", "mnar"), "em": ("mcar", "mar")}
-#: The lanes at the papers' sizes, where the floor is judged.
+#: The lanes at the papers' sizes, where the floor is judged. ``m2-bnlearn`` mixes sizes and is not
+#: one of them: the floor is reported there, never applied.
 PAPER_LANES = ("m1-paper", "m2-a", "m2-b", "m2-c")
-REFERENCES = {"m1-paper": "mvpc-r.permc", "m2-a": "missdag.miss_dag_gaussian.notears"}
+#: Another package's arm for the same method: lane -> method -> arm.
+REFERENCES = {
+    "m1-paper": {"pc": "mvpc-r.permc"},
+    "m2-a": {"notears": "missdag.miss_dag_gaussian.notears"},
+    "m2-bnlearn": {"hc": "bnlearn.structural_em.hc", "tabu": "bnlearn.structural_em.tabu"},
+}
 REFERENCES["m2-c"] = REFERENCES["m2-a"]
-COMPLETE_REFERENCE = {"m1-paper": "mvpc-r.testwise", "m2-a": "missdag.notears"}
+#: The reference's complete-data arm, the control against the method's plain search.
+COMPLETE_REFERENCE = {
+    "m1-paper": {"pc": "mvpc-r.testwise"},
+    "m2-a": {"notears": "missdag.notears"},
+    "m2-bnlearn": {"hc": "bnlearn.hc", "tabu": "bnlearn.tabu"},
+}
 COMPLETE_REFERENCE["m2-c"] = COMPLETE_REFERENCE["m2-a"]
+#: The reference's arm with more EM iterations, reported beside it.
+MORE_ITERATIONS = {
+    "bnlearn.structural_em.hc": "bnlearn.structural_em.hc.iter10",
+    "bnlearn.structural_em.tabu": "bnlearn.structural_em.tabu.iter10",
+}
+#: For a method with no reference, another package's arm fitted on the same datasets: lane ->
+#: method -> arm, and the complete-data arm of each.
+SAME_DATA = {
+    "m2-bnlearn": dict.fromkeys(
+        ("ges", "boss", "grasp", "xges", "exact_search"), "bnlearn.structural_em.hc"
+    )
+}
+SAME_DATA_COMPLETE = {"bnlearn.structural_em.hc": "bnlearn.hc"}
+#: The lanes that score on ``class_shd``: they pair a DAG arm with CPDAG arms.
+CLASS_LANES = ("m2-bnlearn",)
 CELL = ["lane", "graph", "density", "d", "n", "mechanism", "form", "rate"]
-OTHERS = ("reference", "testwise", "listwise", "mean")
+OTHERS = ("reference", "reference_iter10", "same_data", "testwise", "listwise", "mean")
 
 
 def bootstrap(values: np.ndarray) -> list[float] | None:
@@ -125,7 +166,25 @@ def load(dirs: list[str], store: str) -> pd.DataFrame:
     if len(kept) > known_rows:
         counts.write_text(json.dumps(kept))
     table["complete_rows"] = table["dataset_id"].map(kept)
+    table["class_shd"] = class_shd(table)
     return table
+
+
+def class_shd(table: pd.DataFrame) -> pd.Series:
+    """The SHD between equivalence classes: a DAG arm's ``mec_shd``, a CPDAG arm's ``shd``.
+
+    A DAG whose ``mec_shd`` is absent (a cyclic graph has no CPDAG) stays ``NaN``, never its
+    directed ``shd``.
+    """
+    mec = table["mec_shd"] if "mec_shd" in table else np.nan
+    return pd.Series(
+        np.where(table["output_type"] == "dag", mec, table["shd"]), index=table.index, dtype=float
+    )
+
+
+def shd_column(lane: str) -> str:
+    """The SHD column the pairs of `lane` are compared on."""
+    return "class_shd" if lane in CLASS_LANES else "shd"
 
 
 def arms_of(lane: str, name: str) -> dict[str, str] | None:
@@ -133,13 +192,19 @@ def arms_of(lane: str, name: str) -> dict[str, str] | None:
     if (m := re.fullmatch(r"andrey\.pc\.mvpc(\.alpha[\d.]+)\.seed0", name)) is not None:
         suffix, plain = m[1], f"andrey.pc.default{m[1]}"
         arms = {"method": name, "testwise": plain, "complete": plain}
-        if lane in REFERENCES and float(suffix.removeprefix(".alpha")) == REFERENCE_ALPHA:
-            arms["reference"] = REFERENCES[lane]
+        if float(suffix.removeprefix(".alpha")) == REFERENCE_ALPHA and (
+            theirs := REFERENCES.get(lane, {}).get("pc")
+        ):
+            arms["reference"] = theirs
     elif (m := re.fullmatch(r"andrey\.(\w+)\.em(\.ebic_gamma\d)?", name)) is not None:
         plain = f"andrey.{m[1]}.default{m[2] or ''}"
         arms = {"method": name, "testwise": "andrey.pc.default", "complete": plain}
-        if lane in REFERENCES and m[1] == "notears":
-            arms["reference"] = REFERENCES[lane]
+        if theirs := REFERENCES.get(lane, {}).get(m[1]):
+            arms["reference"] = theirs
+            if more := MORE_ITERATIONS.get(theirs):
+                arms["reference_iter10"] = more
+        elif same := SAME_DATA.get(lane, {}).get(m[1]):
+            arms["same_data"] = same
     else:
         return None
     return arms | {"listwise": f"listwise.{plain}", "mean": f"impute_mean.{plain}"}
@@ -170,27 +235,29 @@ def compare(mine: pd.Series, other: pd.Series, finished: pd.Index) -> dict[str, 
 def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame) -> list[dict]:
     """The rows of one cell: `frame` holds its masked records, `complete` its complete-data ones."""
     lane = cell["lane"]
+    shd = shd_column(lane)
     by_arm = {name: group.set_index("data_seed") for name, group in frame.groupby("name")}
     whole = {name: group.set_index("data_seed") for name, group in complete.groupby("name")}
-    empty = by_arm["baseline.empty"]["shd"]
+    empty = by_arm["baseline.empty"][shd]
     kept = frame.drop_duplicates("data_seed")["complete_rows"].dropna()
     rows = []
     for name in sorted(by_arm):
         if (arms := arms_of(lane, name)) is None:
             continue
         kind = "mvpc" if ".mvpc." in name else "em"
+        method = "pc" if kind == "mvpc" else name.split(".")[1]
         ok = {}
         for role, arm in arms.items():
             records = whole.get(arm) if role == "complete" else by_arm.get(arm)
             ok[role] = None if records is None else records[records["status"] == "ok"]
-        mine = ok["method"]["shd"]
+        mine = ok["method"][shd]
         floor = bootstrap((mine - empty[mine.index]).to_numpy())
         claimed = cell["mechanism"] in CLAIMED[kind]
         row: dict[str, Any] = {
             "regime": "|".join(str(cell[k]) for k in CELL) + f"|{name}",
             **cell,
             "arm": name,
-            "method": "pc" if kind == "mvpc" else name.split(".")[1],
+            "method": method,
             "missing": kind,
             "claim": "in" if claimed else "out",
             "datasets": int(frame["data_seed"].nunique()),
@@ -199,7 +266,18 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
             "status": _statuses(by_arm[name]),
             "floor": {"andrey_minus_empty": floor, "pass": floor is not None and floor[1] < 0},
         }
-        for role in ("method", "reference", "testwise", "listwise", "mean", "complete"):
+        if shd != "shd":
+            row["shd_column"] = shd
+        for role in (
+            "method",
+            "reference",
+            "reference_iter10",
+            "same_data",
+            "testwise",
+            "listwise",
+            "mean",
+            "complete",
+        ):
             if (records := ok.get(role)) is None:
                 continue
             source = whole if role == "complete" else by_arm
@@ -207,12 +285,14 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
                 "arm": arms[role],
                 "finished": len(records),
                 "status": _statuses(source[arms[role]]),
-                "mean_shd": _round(records["shd"].mean()),
+                "mean_shd": _round(records[shd].mean()),
                 "mean_skeleton_f1": _round(records["skeleton_f1"].mean()),
                 "fit_s_median": _round(records["wall_s"].median(), 4),
             }
+            if role == "same_data":
+                row[role]["package"] = arms[role].split(".")[0]
             if role in OTHERS:
-                row[role] |= compare(mine, records["shd"], records.index)
+                row[role] |= compare(mine, records[shd], records.index)
                 if role == "reference":
                     # The skeleton alone, which the orientation rules of the two packages do not
                     # reach: D = F1(reference) - F1(method), so above 0 is worse here too.
@@ -223,23 +303,29 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
                         "bootstrap_95": (interval := bootstrap(f1.to_numpy())),
                         "verdict": verdict(interval, len(both)),
                     }
-                    interval = bootstrap((records["shd"] - empty[records.index]).to_numpy())
+                    interval = bootstrap((records[shd] - empty[records.index]).to_numpy())
                     row[role]["minus_empty"] = interval
                     both = mine.index.intersection(records.index)
                     ratio = ok["method"]["wall_s"][both] / records["wall_s"][both]
                     row[role]["speed_ratio_median"] = _round(ratio.median(), 4)
-        if (theirs := COMPLETE_REFERENCE.get(lane)) is not None and "reference" in row:
-            # The same two packages without the method under test: both NOTEARS on the complete
-            # data (M2), both test-wise PC on the masked data (M1).
-            source = by_arm if lane == "m1-paper" else whole
-            plain = source.get(arms["complete"])
+        # The same two packages without the method under test: both NOTEARS on the complete data
+        # (M2), both test-wise PC on the masked data (M1), both searches without EM (M2 bnlearn).
+        source = by_arm if lane == "m1-paper" else whole
+        plain = source.get(arms["complete"])
+        for role, theirs in (
+            ("reference", COMPLETE_REFERENCE.get(lane, {}).get(method)),
+            ("same_data", SAME_DATA_COMPLETE.get(arms.get("same_data", ""))),
+        ):
             other = source.get(theirs)
-            if plain is not None and other is not None:
-                a = plain[plain["status"] == "ok"]["shd"]
-                b = other[other["status"] == "ok"]
-                row["control"] = {"arm": arms["complete"], "other": theirs} | compare(
-                    a, b["shd"], b.index
-                )
+            if role not in row or plain is None or other is None:
+                continue
+            a = plain[plain["status"] == "ok"][shd]
+            b = other[other["status"] == "ok"]
+            control = {"arm": arms["complete"], "other": theirs} | compare(a, b[shd], b.index)
+            if role == "reference":
+                row["control"] = control
+            else:
+                row[role]["control"] = control
         row["judged"] = claimed and "reference" in row and row["reference"]["verdict"] is not None
         if row["judged"]:
             ref = row["reference"]
