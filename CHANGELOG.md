@@ -43,6 +43,23 @@ names its pull request.
   the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
   ([#870])
 
+### Fixed
+
+- `mmhc`, and `rsmax2` with `restrict="mmpc"` or `"pc"`, pass background knowledge to the restrict
+  phase, which reads it as `mmpc` and `pc` do on their own: the two ends of a required edge
+  condition the tests of the other pairs, and a pair the knowledge makes non-adjacent is never a
+  candidate. The restrict phase read the data alone, so a pair that only a required neighbor
+  separates stayed a candidate and the score search could join it. On simulated linear-Gaussian
+  graphs of mean degree 4 with 10 to 50 variables and required edges taken from the true graph,
+  `mmhc` now makes 1.0 to 1.5 fewer errors against the true DAG on average (a missing, extra, or
+  reversed edge counts 2, an undirected one 1), and `rsmax2(restrict="pc")` 0.9 to 1.9 fewer with
+  20 and 50 variables; at mean degree 2 the change is 0.2 or less. `restrict="iamb"` and
+  `"inter_iamb"` keep reading the data alone, with the pairs of the required edges added to their
+  skeleton: given the knowledge they made 0.3 to 0.5 more errors on the same graphs with up to
+  about four in ten of the true edges required, since larger blankets let the step that turns
+  blankets into a skeleton separate more true pairs. Fits without knowledge are unchanged.
+  ([#880])
+
 ## [0.16.0] - 2026-11-10
 
 ### Highlights
@@ -2278,4 +2295,5 @@ First alpha release.
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
+[#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
