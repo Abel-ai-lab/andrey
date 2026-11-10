@@ -41,11 +41,12 @@ conditions as a real test set.
 
 ## 3. Local causal discovery
 
-Local causal discovery learns the structure around one variable, such as its direct causes and
-effects or its Markov blanket, without learning the whole graph. Andrey already has `iamb` and
-`inter_iamb`, which learn a variable's Markov blanket, and `mmpc`, which learns its parents and
-children. We plan the methods below in this rough order, with no promised dates, grouped by what
-they learn.
+Local causal discovery methods search around one variable at a time: its Markov blanket, its
+direct causes and effects, or the variables to adjust for. Most return that local structure
+without learning the whole graph, and some put local searches together into a whole graph. Andrey
+already has `iamb` and `inter_iamb`, which learn a variable's Markov blanket, and `mmpc`, which
+learns its parents and children. We plan the methods below in this rough order, with no promised
+dates, grouped by what they learn.
 
 ### Markov blankets, and parents and children
 
