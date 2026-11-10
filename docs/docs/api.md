@@ -463,6 +463,8 @@ variable.
    multi_group_direct_lingam
    cam
    resit
+   score_matching
+   nogam
    camuv
    anm
    pnl
@@ -498,6 +500,23 @@ finds most independent of the remaining variables, then removes each parent whos
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
 causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
 variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
+SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
+effects with additive Gaussian noise, without a regression in its order search: under that model a
+variable is a leaf exactly when the second derivative of the log density in that variable is the
+same at every point. It estimates those derivatives at the rows with a Stein kernel estimator on the
+standardized columns, takes the variable whose derivative varies least as the next leaf, and prunes
+the complete DAG of the order with CAM's smooth-term tests at `alpha=0.001`. It returns a DAG and a
+causal order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it from 10 to
+50 variables against the authors' code.
+
+NoGAM (Montagna et al. 2023), {py:func}`~andrey.nogam`, drops SCORE's Gaussian noise: with additive
+noise of any distribution, a leaf's entry of the score is a function of the leaf's noise alone. It
+estimates the score with the same Stein estimator and each variable's residual by kernel ridge
+regression on all the others, takes as the next leaf the variable whose score entry its residual
+predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
+order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it at 10 and 20
+variables against dodiscover.
 
 LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
 location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
@@ -637,29 +656,12 @@ its first call in a process.
 
    notears
    dagma
-   score_matching
-   nogam
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
-effects with additive Gaussian noise, without a regression in its order search: under that model a
-variable is a leaf exactly when the second derivative of the log density in that variable is the
-same at every point. It estimates those derivatives at the rows with a Stein kernel estimator on
-the standardized columns, takes the variable whose derivative varies least as the next leaf, and
-prunes the complete DAG of the order with CAM's smooth-term tests at `alpha=0.001`. It returns a DAG
-and a causal order.
-
-NoGAM (Montagna et al. 2023), {py:func}`~andrey.nogam`, drops SCORE's Gaussian noise: with additive
-noise of any distribution, a leaf's entry of the score is a function of the leaf's noise alone. It
-estimates the score with the same Stein estimator and each variable's residual by kernel ridge
-regression on all the others, takes as the next leaf the variable whose score entry its residual
-predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
-order.
 
 A method becomes supported once it has:
 

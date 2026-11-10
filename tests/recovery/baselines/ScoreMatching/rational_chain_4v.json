@@ -1,5 +1,5 @@
 {
-  "algorithm": "SCORE",
+  "algorithm": "ScoreMatching",
   "case": "rational_chain_4v",
   "input": {
     "case": "rational_chain_4v",

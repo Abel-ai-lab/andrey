@@ -137,7 +137,8 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
-The references of the Stein-score screen, `stein_cpu.py`, need NumPy 1 and share an environment
+The references of [SCORE and NoGAM](comparisons/score-nogam.md), `stein_cpu.py`, need NumPy 1 and
+share an environment
 built from the lock file `requirements-stein.txt`: the authors' SCORE code, NoGAM in dodiscover at
 a pinned commit, and CausalDisco. SCORE has no package release, so `start_stein.sh` downloads its
 files at a pinned commit, checks each one's SHA-256, and keeps them in the git-ignored

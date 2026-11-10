@@ -12,17 +12,24 @@ names its pull request.
 
 ### Added
 
-- `score_matching`, experimental, is SCORE (Rolland et al., 2022) for nonlinear effects with
-  additive Gaussian noise. It finds a causal order from the leaf up, each leaf the variable whose
-  second derivative of the log density varies least over the rows, estimated by a Stein kernel
-  estimator on the standardized columns, and prunes the complete DAG of the order with the
-  smooth-term tests of `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not
-  depend on the columns' units or order. ([#872])
-- `nogam`, experimental, is NoGAM (Montagna et al., 2023) for nonlinear effects with additive noise
-  of any distribution. It finds a causal order from the leaf up, each leaf the variable whose entry
-  of the Stein score estimate is best predicted from the variable's kernel-ridge residual on the
-  others, and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a
-  causal order, takes `knowledge`, and does not depend on the columns' units or order. ([#874])
+- `score_matching` is SCORE (Rolland et al., 2022) for nonlinear effects with additive Gaussian
+  noise. It finds a causal order from the leaf up, each leaf the variable whose second derivative of
+  the log density varies least over the rows, estimated by a Stein kernel estimator on the
+  standardized columns, and prunes the complete DAG of the order with the smooth-term tests of
+  `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not depend on the columns'
+  units or order. It is supported: against its authors' code on the paper's simulation at 10, 20,
+  and 50 variables, z-scored and rescaled, its SHD tied in all 12 settings, its order was no less
+  accurate in any setting that repeated on fresh datasets, and its median fit was 4 to 9 times
+  faster. ([#872], [#879])
+- `nogam` is NoGAM (Montagna et al., 2023) for nonlinear effects with additive noise of any
+  distribution. It finds a causal order from the leaf up, each leaf the variable whose entry of the
+  Stein score estimate is best predicted from the variable's kernel-ridge residual on the others,
+  and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a causal
+  order, takes `knowledge`, and does not depend on the columns' units or order. It is supported:
+  against dodiscover on the paper's simulation at 10 and 20 variables under Gaussian, Laplace, and
+  Gumbel noise, z-scored and rescaled, its SHD was lower in 16 of 24 settings, on the first datasets
+  and again on fresh ones, and higher in none, and its median fit was 1.6 to 3 times faster.
+  ([#874], [#879])
 - `andrey.data` draws more kinds of data: Student-t and two-component Gaussian-mixture noise
   (`noise.student_t(df=)`, `noise.gaussian_mixture(weight=, means=, sds=)`), each of mean 0 and
   variance 1 like the other families; `functional.random_features(n_features=, length_scale=)`, an
@@ -2337,6 +2344,7 @@ First alpha release.
 [#873]: https://github.com/Abel-ai-lab/andrey/pull/873
 [#874]: https://github.com/Abel-ai-lab/andrey/pull/874
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
+[#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#887]: https://github.com/Abel-ai-lab/andrey/pull/887
