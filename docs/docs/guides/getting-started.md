@@ -632,7 +632,10 @@ Missing-Value PC ([Tu et al., 2019][tu]). It finds the variables each missingnes
 on, then tests again the edges such an indicator could have kept, on virtual data rebuilt from the
 rows where those variables are observed. It takes `fisherz` or `student_t`;
 `metadata["missingness_parents"]` names the parents it found and `metadata["corrected_edges"]` the
-edges it tested again and removed. The correction holds when no indicator causes a variable and no
+edges it tested again and removed. A corrected test reads the rows where its pair, its conditioning
+set, and those parents are all observed. When they are too few for it, the test-wise test answers
+instead, so the pair keeps its test-wise result for that conditioning set, and
+`metadata["corrected_edges"]["uncorrected"]` lists the pair. The correction holds when no indicator causes a variable and no
 value causes its own missingness, which the data cannot check. It also needs the rows it rebuilds
 from to keep the independence of each pair it tests: when a variable it rebuilds from goes missing
 because of a common effect of that pair, as when two effects of the same causes each hide the

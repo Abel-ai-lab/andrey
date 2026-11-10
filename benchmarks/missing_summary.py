@@ -30,7 +30,8 @@ and the method did not is listed in ``failures``: an error or a timeout is never
 The reference comparison is also made on the skeleton F1 alone. A dataset's error is recorded with
 its arm and never moves a verdict. ``--replications`` adds each row's rerun on fresh seeds: a worse
 verdict against the reference counts only when the rerun agrees, and a better one is the first
-run's.
+run's. A worse verdict against test-wise PC, listwise deletion, or mean imputation carries
+``worse_again``, whether its rerun is worse too.
 
     $ANDREY_BENCH_PYTHON benchmarks/missing_summary.py --runs outputs/*/ --data outputs/data \
         --out missing-data.json
@@ -87,6 +88,8 @@ SAME_DATA_COMPLETE = {"bnlearn.structural_em.hc": "bnlearn.hc"}
 #: The lanes that score on ``class_shd``: they pair a DAG arm with CPDAG arms.
 CLASS_LANES = ("m2-bnlearn",)
 CELL = ["lane", "graph", "density", "d", "n", "mechanism", "form", "rate"]
+#: The arms every lane has beside the method: a worse verdict against one is checked on a rerun.
+BASELINES = ("testwise", "listwise", "mean")
 OTHERS = ("reference", "reference_iter10", "same_data", "testwise", "listwise", "mean")
 
 
@@ -361,7 +364,7 @@ def all_rows(table: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
-REPLICATION_KEYS = ("datasets", "status", "floor", "reference", "result")
+REPLICATION_KEYS = ("datasets", "status", "floor", "reference", "result", *BASELINES)
 
 
 def summarize(args) -> int:
@@ -378,6 +381,9 @@ def summarize(args) -> int:
                 agrees = rep.get("reference", {}).get("verdict") == "worse"
                 row["result"] = "worse" if agrees else "tie (did not replicate)"
                 row["rerun"] = False
+            for role in BASELINES:
+                if row.get(role, {}).get("verdict") == "worse":
+                    row[role]["worse_again"] = rep.get(role, {}).get("verdict") == "worse"
     judged = [r for r in rows if r["judged"]]
     results: dict[str, int] = {}
     for row in judged:
