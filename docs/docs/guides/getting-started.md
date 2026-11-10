@@ -689,10 +689,23 @@ EM is sound when values are missing completely at random or at random given obse
 whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
 the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
 
-`missing="em"` is supported in `notears`, `hc`, and `tabu`, where it was no less accurate than a
-reference implementation in any setting we measured. With about 100 rows, `hc` and `tabu` are often
-no better than the empty graph, both with EM and on complete data. From 500 rows on they were better
-in every setting. In the other searches, `ges` among them, `missing="em"` is experimental: no
+`missing="em"` is supported in `notears`, `hc`, `tabu`, and `ges`, where no setting we measured was
+less accurate than a reference implementation on the first datasets and again on fresh ones. With
+about 100 rows, `hc` and `tabu` are often no better than the empty graph, both with EM and on
+complete data. From 500 rows on they were better in every setting. We measured `ges`, `boss`, and
+`grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one covariance
+by EM before its search, a simpler method than structural EM, at two settings of the sample size
+its score counts. On denser graphs (mean degree 4) `ges` at that penalty was rarely better than the
+empty graph, with EM and on complete data alike.
+
+In `boss` and `grasp`, `missing="em"` is experimental. Against the reference's default setting they
+had fewer errors or tied in all 132 settings, and they were better than the empty graph in 101 and
+102 of 108 settings. Against the reference's stronger setting, each was less accurate in one
+setting, on the first datasets and again on fresh ones: 2,000 rows on graphs of mean degree 4 with
+30% of the values missing completely at random, at 20 variables for `boss` and 50 for `grasp`. We do
+not know the cause yet. The
+[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
 reference implementation exists to compare them with, so the
 [release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
 test-wise deletion, dropping rows, and mean imputation.

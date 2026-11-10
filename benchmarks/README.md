@@ -175,6 +175,17 @@ benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
 ```
 
+The `m2-tetrad` lane runs Tetrad's FGES, BOSS, and GRaSP under its EM covariance policy, with its
+effective sample size at the number of rows and at the mean pairwise count, which tetrad-lib has
+from 8.0.0. `start_tetrad_missing.sh` downloads that release's shaded jar from Maven
+Central into the git-ignored `benchmarks/.tetrad-missing` and checks its SHA-256; the other Tetrad
+lanes keep the jars their pages name:
+
+```shell
+benchmarks/start_tetrad_missing.sh    # prints the export below
+export ANDREY_BENCH_TETRAD_MISSING_JAR=$PWD/benchmarks/.tetrad-missing/tetrad-lib-8.0.0-shaded.jar
+```
+
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
