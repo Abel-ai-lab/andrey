@@ -12,7 +12,7 @@ import numpy as np
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
-from andrey.core.ci_missing import EM, EM_METHODS
+from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
     DISCRETE_SCORES,
@@ -51,17 +51,25 @@ DROP_ROWS = (
     f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
     f"{_listed(TESTWISE_SERIES_METHODS)}"
 )
-#: The way on of a call that ``missing="em"`` would run: a method that takes it, on continuous data
-#: under the linear-Gaussian BIC and without ``env``.
-FIT_BY_EM = (
-    'pass missing="em" (experimental), which fits the method by expectation-maximization over '
-    "the expected covariance, or drop the rows that hold one (for a DataFrame, {name}.dropna())"
-)
 FILL_STEPS = (
     "fill in the missing steps first, as dropping one would join the steps around it, or use "
     f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
 )
 DROP_UNITS = "drop the units that hold one from every dataset of {name}"
+
+
+def fit_by_em(method: str | None) -> str:
+    """Return the way on of a call of ``method`` that ``missing="em"`` would run.
+
+    Such a call is of a method that takes ``"em"``, on continuous data under the linear-Gaussian
+    BIC and without ``env``. The value is marked experimental unless ``method`` is one of
+    :data:`~andrey.core.ci_missing.EM_SUPPORTED`.
+    """
+    mark = "" if method in EM_SUPPORTED else " (experimental)"
+    return (
+        f'pass missing="em"{mark}, which fits the method by expectation-maximization over '
+        "the expected covariance, or drop the rows that hold one (for a DataFrame, {name}.dropna())"
+    )
 
 
 def data_matrix(
@@ -391,7 +399,7 @@ def checked_data(
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
     and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value. With
     ``takes_em``, the call would run with ``missing="em"`` on continuous data, so there a refused
-    missing value names it (:data:`FIT_BY_EM`); categorical and mixed data, which EM does not take,
+    missing value names it (:func:`fit_by_em`); categorical and mixed data, which EM does not take,
     get :data:`DROP_ROWS`.
 
     Raises ``ValueError`` when two columns share a name
@@ -435,7 +443,7 @@ def checked_data(
         data,
         method=method,
         missing=missing,
-        fix=FIT_BY_EM if takes_em else DROP_ROWS,
+        fix=fit_by_em(method) if takes_em else DROP_ROWS,
         reads_categories=True,
     )
     what = "test" if option == "indep_test" else "score"

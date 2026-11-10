@@ -28,7 +28,7 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
-from andrey.core.ci_missing import EM_METHODS
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 
@@ -172,7 +172,19 @@ SHARED = {
         "handling used. See **Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming,
     ),
+    # "em" is supported where a reference implementation exists and the comparison with it passed.
     "missing_em": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"em"`` fits the method by structural '
+        "expectation-maximization (EM) over the expected covariance of the data, which assumes "
+        "values missing completely at random or at random given observed values. ``None`` refuses "
+        'missing values. On data with missing values, ``metadata["missing"]`` records the handling '
+        'used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        lambda m: m in EM_SUPPORTED,
+    ),
+    "missing_em_experimental": Shared(
         "Parameters",
         "missing",
         "entry",
@@ -181,7 +193,7 @@ SHARED = {
         "assumes values missing completely at random or at random given observed values. ``None`` "
         'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
         'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
-        lambda m: m in EM_METHODS,
+        lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(

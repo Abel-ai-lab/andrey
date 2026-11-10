@@ -50,7 +50,8 @@
    "floor_applies": 0,
    "floor_met_where_it_applies": 0,
    "below_empty_graph": 23,
-   "status": "supported"
+   "status": "supported",
+   "limit": "at 15 variables and 100 rows the result is often no better than the empty graph: the floor is met in 11 of 24 cells; the cause is the plain search at that sample size, which misses the floor on the complete data too; at 20 variables with 500 and 2,000 rows the floor is met in 12 of 12 cells"
   },
   "tabu(missing=\"em\")": {
    "reference_lane": "m2-bnlearn",
@@ -61,7 +62,8 @@
    "floor_applies": 1,
    "floor_met_where_it_applies": 1,
    "below_empty_graph": 27,
-   "status": "supported"
+   "status": "supported",
+   "limit": "at 15 variables and 100 rows the result is often no better than the empty graph: the floor is met in 15 of 24 cells; the cause is the plain search at that sample size, which misses the floor on the complete data too; at 20 variables with 500 and 2,000 rows the floor is met in 12 of 12 cells"
   },
   "ges, boss, grasp, xges, exact_search, calm, dagma with missing=\"em\"": {
    "status": "experimental",

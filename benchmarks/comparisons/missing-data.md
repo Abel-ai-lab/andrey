@@ -353,10 +353,12 @@ repeats, and below the empty graph in its claimed setting.
 
 - `pc(missing="mvpc")`, `notears(missing="em")`, `hc(missing="em")`, and `tabu(missing="em")` are
   supported: none is worse than its reference in any cell, so no cell needed a rerun for that
-  comparison, and each meets the floor wherever it decides a cell. For `hc` and `tabu` the floor
-  decides one of the 100-row cells, because bnlearn is above the empty graph in the others; their
-  claimed setting is 500 rows and more with 10 to 30% missing (Friedman, 1997, runs 250 to 4,000
-  rows), where they meet it in every cell.
+  comparison, and each meets the floor wherever it decides a cell.
+- `hc` and `tabu` with `missing="em"` are supported with a stated limit. At 15 variables and 100
+  rows the result is often no better than the empty graph: `hc` meets the floor in 11 of those 24
+  cells and `tabu` in 15. The cause is the plain search at that sample size, which misses the floor
+  on the complete data too (on ER1, 8.8 for `hc` and 8.45 for `tabu` against the empty graph's
+  8.0). At 20 variables with 500 and 2,000 rows both meet the floor in 12 of 12 cells.
 - `ges`, `boss`, `grasp`, `xges`, `exact_search`, `calm`, and `dagma` with `missing="em"` stay
   experimental: no reference implementation exists to measure them against.
 
@@ -373,7 +375,8 @@ repeats, and below the empty graph in its claimed setting.
   minutes in the search for the indicators' parents.
 - **EM at 100 rows.** With 40 to 50% missing and 100 rows, EM misses the floor: `notears` at 50%
   under MCAR on two of three graphs, and `ges`, `boss`, and `grasp` in 5 of 9 cells. `hc` and
-  `tabu` at the plain BIC miss it in about half of the 100-row cells at every rate.
+  `tabu` at the plain BIC miss it in 13 and 9 of the 24 cells with 100 rows, at low rates too, as
+  their complete-data fits do on ER1.
 - **Values missing not at random.** EM has no guarantee under self-masking; the rows of that mask
   are reported and not judged.
 

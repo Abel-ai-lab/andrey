@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
-from andrey.core.ci_missing import EM_METHODS
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -580,11 +580,14 @@ def render_skill() -> str:
         "sound when no missingness mechanism causally affects another. The searches whose fit "
         "reads only a covariance, "
         + ", ".join(f"`{name}`" for name in EM_METHODS)
-        + ", refuse a missing value under `null` and take `em`, experimental: structural EM, "
-        "which runs the search on the expected covariance of the data 10 times and assumes values "
-        "missing completely at random or at random given observed values; `metadata.em` records "
-        "its rounds and the observed-data log-likelihood after each. Every other method refuses a "
-        "missing value with a data error that says what to do instead."
+        + ", refuse a missing value under `null` and take `em`: structural EM, which runs the "
+        "search on the expected covariance of the data 10 times and assumes values missing "
+        "completely at random or at random given observed values; `metadata.em` records its "
+        "rounds and the observed-data log-likelihood after each. `em` is supported in "
+        + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
+        + ", where it measured no less accurate than a reference implementation, and "
+        "experimental in the others, which have none to compare with. Every other method refuses "
+        "a missing value with a data error that says what to do instead."
     )
     a("")
     a("## Background knowledge")

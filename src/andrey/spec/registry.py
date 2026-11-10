@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
-from andrey.core.ci_missing import EM, EM_METHODS
+from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
@@ -182,10 +182,10 @@ _add(
                 choices=("testwise", "mvpc"),
                 doc="How missing values (NaN) are handled: testwise = each test reads only the "
                 "rows where all of its variables are observed (test-wise deletion); mvpc = "
-                "Missing-Value PC, experimental: after the test-wise skeleton, the parents of each "
-                "missingness indicator are found and the edges they could have kept are tested "
-                "again on virtual data that correct for them, with fisherz or student_t; null "
-                "picks the method's default, testwise.",
+                "Missing-Value PC: after the test-wise skeleton, the parents of each missingness "
+                "indicator are found and the edges they could have kept are tested again on "
+                "virtual data that correct for them, with fisherz or student_t; null picks the "
+                "method's default, testwise.",
             ),
             _TEST_SEED,
         ),
@@ -3009,20 +3009,24 @@ for _name in CONCEPTS["missing"].conforming:
     )
 
 #: Structural EM on the searches whose fit reads only a covariance and the row count, after their
-#: categorical columns where they have them.
-_MISSING_EM = concept_param(
-    "missing",
-    choices=(EM,),
-    doc="How missing values (NaN) are handled: em = experimental structural EM, which alternates "
-    "the search on the expected covariance of the data with a linear-Gaussian fit of the graph it "
-    "returns, 10 times; it assumes values missing completely at random or at random given "
-    "observed values. null refuses missing values.",
-)
+#: categorical columns where they have them: supported in EM_SUPPORTED, experimental in the others.
+_MISSING_EM = {
+    supported: concept_param(
+        "missing",
+        choices=(EM,),
+        doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
+        "the search on the expected covariance of the data with a linear-Gaussian fit of the "
+        "graph it returns, 10 times; it assumes values missing completely at random or at random "
+        "given observed values. null refuses missing values.",
+    )
+    for supported, status in ((True, ""), (False, "experimental "))
+}
 for _name in EM_METHODS:
     _params = REGISTRY[_name].params
     _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
+    _missing_em = _MISSING_EM[_name in EM_SUPPORTED]
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*_params[:_cut], _MISSING_EM, *_params[_cut:])}
+        update={"params": (*_params[:_cut], _missing_em, *_params[_cut:])}
     )
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of

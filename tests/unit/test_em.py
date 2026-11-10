@@ -18,7 +18,7 @@ import pytest
 import andrey
 from andrey import data
 from andrey.core import GraphStructure
-from andrey.core.ci_missing import EM_METHODS
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
 from andrey.core.score import CopiedColumnsError
 from andrey.data import missingness
 from andrey.search.em import (
@@ -185,8 +185,13 @@ def test_a_fit_on_missing_values_records_its_handling_and_repeats(name):
 @pytest.mark.parametrize("name", EM_METHODS)
 def test_without_em_a_missing_value_raises_naming_em(name):
     fit = _method(name)
-    with pytest.raises(ValueError, match=rf'^{name} does not accept .*pass missing="em"'):
+    with pytest.raises(ValueError, match=rf'^{name} does not accept .*pass missing="em"') as error:
         fit(_gaps(_chain(), 0.1))
+    # The message and the schema mark "em" experimental exactly where it is not supported.
+    marked = name not in EM_SUPPORTED
+    assert ("experimental" in str(error.value)) is marked
+    doc = next(p.doc for p in REGISTRY[name].params if p.name == "missing")
+    assert ("experimental" in doc) is marked
 
 
 @pytest.mark.parametrize("name", EM_METHODS)
