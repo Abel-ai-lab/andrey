@@ -476,8 +476,10 @@ worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/kn
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Both path
-parts are experimental in IAMB, Inter-IAMB, and MMPC, where true claims left the graph farther from
-the one the claims define at 50 variables. A path claim says less than an edge and so directs less:
+parts are experimental in IAMB, Inter-IAMB, and MMPC, where the claims are mostly not applied at 50
+variables: the graph found often has no consistent extension, and the fit then drops every claim,
+lists them in `metadata["unmet_knowledge"]`, and returns the graph it finds without them. A path
+claim says less than an edge and so directs less:
 a required path cannot restore an edge the search left out. When you know the edge itself, state it
 as `required`.
 

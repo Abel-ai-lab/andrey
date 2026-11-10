@@ -484,7 +484,16 @@ not farther from the class the claims leave either in any row that repeated: `gr
 with forbidden paths (50 variables, 500 samples, expected degree 2, 10 % of the pairs), which did
 not repeat. `iamb`, `inter_iamb`, and `mmpc` were, at 50 variables: with 2,000 samples, by up to
 4.2, 4.35, and 4.85 edges per graph, in rows that repeated on fresh seeds, and they fail this check
-in both parts. Their fits dropped 53 to 77 % of the claims. In `mmhc` and `rsmax2`, 18.2 % of the
+in both parts. Their fits dropped 53 to 77 % of the claims. The claims did not change those graphs
+for the worse: mostly they were not applied. A graph with no consistent extension stands for no DAG,
+so the fit drops every claim and returns the graph it finds without them, and the class it is scored
+against is more directed with the claims. Refitting the two cells with 50 variables and 2,000
+samples on both sets of seeds (40 datasets each, each part on its own), the graph found without
+claims had no consistent extension in 40, 40, and 38 of 40 datasets at expected degree 4, where the
+graph with claims equaled the graph without in every such fit, and in 12, 12, and 18 of 40 at
+expected degree 2. At expected degree 2 the fits whose graph has a consistent extension applied the
+claims, dropped 3 to 6 % of them, and were 0.2 to 0.6 edges closer to the class than without, and
+the fits whose graph has none were 4.4 to 9.7 farther. In `mmhc` and `rsmax2`, 18.2 % of the
 edges that required paths directed and 24.7 % of those that forbidden paths directed point against
 the true DAG, the most of any method, and the fits were still closer to the true DAG in 33 and 31 of
 their 36 rows. `fci_jci`, `grasp_fci`, and `multi_group_direct_lingam` pass every part:
@@ -600,10 +609,11 @@ row that repeats. Where no reference takes the knowledge, the first two decide.
 | `forbidden_paths` | the same, and `tabu`, `mmhc`, `rsmax2` | `iamb`, `inter_iamb`, `mmpc` |
 | `confounded` | `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci` | |
 
-Why a part is experimental: in `iamb`, `inter_iamb`, and `mmpc`, true claims left the CPDAG farther
-from the class the claims define at 50 variables, in rows that repeated; in `tabu` with the plain
-BIC, and in `mmhc` and `rsmax2` at expected degree 4, the reference given the required edges the
-paths imply made fewer errors in rows that repeated.
+Why a part is experimental: in `iamb`, `inter_iamb`, and `mmpc`, the claims are mostly not applied
+at 50 variables, where the graph found often has no consistent extension and the fit then drops
+every claim (`metadata["unmet_knowledge"]` lists them), in rows that repeated; in `tabu` with the
+plain BIC, and in `mmhc` and `rsmax2` at expected degree 4, the reference given the required edges
+the paths imply made fewer errors in rows that repeated.
 
 The limits the measurements show:
 
