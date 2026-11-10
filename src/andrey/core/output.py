@@ -148,7 +148,7 @@ class StructureOutput:
         """Causal order as node indices, causes first; ``None`` unless the method finds one.
 
         Set by ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``, ``cam``,
-        ``resit``, and ``varma_lingam`` (the order within one time step).
+        ``resit``, ``score_matching``, and ``varma_lingam`` (the order within one time step).
         """
         return self._ordering
 
