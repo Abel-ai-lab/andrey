@@ -85,6 +85,15 @@ names its pull request.
   datasets; at mean degree 2 one start is enough. `grasp` keeps its seeded random order of tucks,
   which the paper leaves open: trying them from the front of the order to its back gave no more
   accuracy for the time than more starts and took 9 to 20 times as long at 200 variables. ([#891])
+- The Limitations of `pc` and the missing-data comparison page say why `missing="mvpc"` is behind
+  test-wise deletion under quantile MNAR at 50 and 100 variables: the loss is true edges that the
+  correction removes, because a corrected test reads a median of 13% and 19% of the rows the
+  test-wise test reads when the parents of the missingness indicators have missing values
+  themselves, and because Step 3 re-tests pairs that share only an indicator, which falsely detected
+  indicator parents make candidates (44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true
+  edges). The regression's intercept, the direction a pair is tested in, the seed, orientation, and
+  the fallback to the test-wise test are not the cause. Use `missing="testwise"` in these settings.
+  ([#893])
 
 ### Fixed
 
@@ -2344,5 +2353,6 @@ First alpha release.
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
