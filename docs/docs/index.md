@@ -44,12 +44,7 @@ Install Andrey and learn your first graph.
 :::{grid-item-card} Examples
 :link: examples/index
 :link-type: doc
-Notebooks that run one method or task each.
-:::
-:::{grid-item-card} Demos
-:link: demos/index
-:link-type: doc
-Step through methods and explore results in your browser.
+Notebooks that run one method or task each, and demos that run in your browser.
 :::
 :::{grid-item-card} FAQ
 :link: faq
@@ -67,8 +62,8 @@ What changed in each release.
 
 - [Install](guides/getting-started.md#install): the package and optional GPU acceleration.
 - [Get started](guides/getting-started.md#learn-a-graph): learn a causal graph from real data.
-- [Examples](examples/index): notebooks that run one method or task each.
-- [Demos](demos/index): methods to step through in your browser.
+- [Examples](examples/index): notebooks that run one method or task each, and demos of methods to
+  step through in your browser.
 - [API reference](api.md): methods, graph structures, and visualization.
 - [CLI reference](api.md#command-line-interface): run methods from the shell.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
@@ -93,7 +88,6 @@ What changed in each release.
 
 guides/index
 examples/index
-demos/index
 api
 configuration
 benchmarks

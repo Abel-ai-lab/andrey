@@ -30,7 +30,6 @@ DRAWS = {
         "sample_confounded_domains": "CONFOUNDED_DOMAINS",
         "sample_environments": "ENVIRONMENTS",
     },
-    "ges_quickstart": {"sample": "CHAIN"},
     "lingam": {"sample_groups": "CHAIN", "sample_indicators": "INDICATORS"},
     "permutation_based": {
         "sample_hidden": "HIDDEN",

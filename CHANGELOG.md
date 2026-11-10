@@ -116,6 +116,15 @@ names its pull request.
   class the truth and its claims define, and by its distance to the true DAG. The same lanes run
   Tetrad, pcalg, tigramite, and lingam under the same knowledge, and `ges` with the plain BIC beside
   its default. ([#848], [#854])
+- A Quick start notebook, `examples/quick_start.ipynb`, loads the Sachs protein measurements, fits
+  PC, GES, FCI, and DirectLiNGAM, reads each result, and draws each graph. It leads the examples
+  gallery and replaces `examples/ges_quickstart.ipynb`, whose page on the website redirects to it.
+  ([#853])
+- The roadmap lists the methods planned for its local causal discovery and very large causal
+  discovery stages, each with its paper, an existing implementation and its license, and what the
+  method adds; the local methods are grouped by what they learn. Stage 1 is "Major methods", very
+  large causal discovery means more than 1,000 variables, and it comes before agentic causal
+  discovery. ([#853])
 
 ### Changed
 
@@ -139,6 +148,13 @@ names its pull request.
   970 pairs drawn as the ANM and PNL benchmarks draw theirs, from 200 to 16,000 rows, no direction
   changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
   `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
+- The website's Examples page holds the notebooks and the demos that run in your browser, in
+  sections: Quick start, Methods, Advanced, Interactive demos, and Misc. The sidebar groups the
+  pages the same way, each group open on the Examples pages. The demos' pages moved from
+  `/docs/demos/` to `/docs/examples/`, the navbar no longer has a Demos entry, and every old
+  address redirects to its new one. ([#853])
+- Each example notebook's title names its topic only, and "Drawing a recovered structure" is
+  "Visualize a causal graph". ([#853])
 
 ### Fixed
 
@@ -2184,4 +2200,5 @@ First alpha release.
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
+[#853]: https://github.com/Abel-ai-lab/andrey/pull/853
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
