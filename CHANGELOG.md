@@ -44,8 +44,9 @@ names its pull request.
   fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
   knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
   given the required edges those paths imply made fewer errors, and both path parts stay
-  experimental in `iamb`, `inter_iamb`, and `mmpc`, where true claims left the CPDAG farther from
-  the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the claims are mostly not applied at 50
+  variables: the graph found often has no consistent extension, and the fit then drops every
+  claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
 - `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
   them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
@@ -56,6 +57,15 @@ names its pull request.
   `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it stays
   experimental, with no reference implementation to compare with. The
   [comparison page][em-tetrad] has the results. ([#873])
+- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
+  `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
+  so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
+  graph it finds without them. On simulated data with 50 variables, 2,000 rows, and mean degree 4
+  that happened in 38 to 40 of 40 fits; where the graph has a consistent extension, the claims were
+  applied and the CPDAG was 0.2 to 0.6 edges closer to the class they define. The Limitations of
+  `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
+  blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
+  graph at 50 variables and mean degree 4. ([#882])
 
 ### Fixed
 
@@ -2312,5 +2322,6 @@ First alpha release.
 [#874]: https://github.com/Abel-ai-lab/andrey/pull/874
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
+[#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
