@@ -18,6 +18,11 @@ names its pull request.
   estimator on the standardized columns, and prunes the complete DAG of the order with the
   smooth-term tests of `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not
   depend on the columns' units or order. ([#872])
+- `nogam`, experimental, is NoGAM (Montagna et al., 2023) for nonlinear effects with additive noise
+  of any distribution. It finds a causal order from the leaf up, each leaf the variable whose entry
+  of the Stein score estimate is best predicted from the variable's kernel-ridge residual on the
+  others, and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a
+  causal order, takes `knowledge`, and does not depend on the columns' units or order. ([#874])
 
 ## [0.16.0] - 2026-11-10
 
@@ -2252,3 +2257,4 @@ First alpha release.
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#874]: https://github.com/Abel-ai-lab/andrey/pull/874
