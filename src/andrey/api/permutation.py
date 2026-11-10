@@ -517,11 +517,13 @@ def grasp(
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
         in which the search visits variables. Different seeds can reach different graphs.
     n_starts : int, default=1
-        Number of searches, at least ``1``, each from its own random starting order: the first
-        from ``seed``'s, each later one from an order drawn from ``seed`` and its own index. The
-        result is the best-scoring search; a later one replaces an earlier one only when it scores
-        better by more than ``1e-6``. Each search builds its own caches and drops the previous
-        one's, so more starts take more time but little more memory. See Notes.
+        Number of searches, at least ``1``, each from its own random starting order: the first from
+        ``seed``'s, each later one from an order drawn from ``seed`` and its own index. The result
+        is the best-scoring search; a later one replaces an earlier one only when it scores better
+        by more than ``1e-6``. Each search builds its own caches and drops the previous one's, so
+        more starts take more time but little more memory. Raise it on dense graphs, where one
+        search can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows, 4
+        starts took about 4 times as long as one and 8 about 8 times. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -646,12 +648,15 @@ def grasp(
     variables allowed to precede it. The search starts from a shuffled order and changes it with
     tucks. A tuck on an edge ``x -> y`` moves ``y`` just before ``x``, along with its ancestors that
     sit between ``x`` and ``y``. A depth-first search tries a tuck on every edge of the current DAG,
-    in random order. A tuck that leaves the score unchanged starts a chain, which goes on with tucks
-    on covered edges, those where ``y``'s parents are ``x`` and ``x``'s parents, to DAGs the chain
-    has not visited, up to ``grasp_depth`` tucks. The search keeps the first tuck or chain that
-    improves the total score and repeats until none does. This is the paper's GRaSP2 at the depths
-    of its simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP
-    does not. The final parent sets form a DAG, which is reduced to its CPDAG.
+    in random order; the paper leaves the order open [1]_. Trying the edges from the front of the
+    current order to its back instead gave no more accuracy for the time than more starts of the
+    random order, and took 9 to 20 times as long with 200 variables and 1,000 rows. A tuck that
+    leaves the score unchanged starts a chain, which goes on with tucks on covered edges, those
+    where ``y``'s parents are ``x`` and ``x``'s parents, to DAGs the chain has not visited, up to
+    ``grasp_depth`` tucks. The search keeps the first tuck or chain that improves the total score
+    and repeats until none does. This is the paper's GRaSP2 at the depths of its simulations [1]_;
+    the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP does not. The final parent
+    sets form a DAG, which is reduced to its CPDAG.
 
     Tucks and parent changes must improve the score by more than ``1e-6``, the fixed absolute
     tolerance used by :func:`~andrey.boss`, and candidate parents within it of the best count as
@@ -745,20 +750,25 @@ def grasp(
     fits ran past 1 h. Every ladder ended when three fits of the next size ran past 1 h. The median
     fit took 3,108 s at 800 variables (mean degree 8, 2,000 rows). At ``penalty_discount=1.0`` on
     denser graphs (mean degree 4) of 50 to 200 variables, it stopped at a DAG that scores worse than
-    the true DAG in 26 of 60 fits, one that no chain of up to ``grasp_depth`` tucks improves. On the
-    223-variable ANDES network with 1,000 simulated rows, at ``penalty_discount=1.0``, its median
-    errors passed the empty graph's (471 against 338). With fewer rows than columns the standard BIC
-    is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so
-    the search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` on small simulated
-    categorical networks, with BDeu or the multinomial BIC, GRaSP stopped at a DAG that scores worse
-    than the optimum on some draws; comparing a few seeds shows whether a result depends on the
-    seed. Neither categorical score is benchmarked with GRaSP yet. The mixed-data scores are
-    experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000 rows. With
-    ``env``, GRaSP is experimental and not benchmarked yet; its tests run it on up to 12 variables
-    with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from nine
-    conditions, with ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three
-    or more environments a shift that does not follow the labels' values, such as one in the middle
+    the true DAG in 26 of 60 fits, one that no chain of up to ``grasp_depth`` tucks improves. With
+    50 variables, mean degree 4, and 500 rows at that penalty, one start stopped at a much worse
+    order on some of 40 datasets: its mean errors were 29.6 (median fit 1.3 s), against 18.8 with
+    ``n_starts=4`` (5.1 s) and 16.3 with ``n_starts=8`` (10.4 s). With mean degree 2 and the same
+    size, one start and 4 starts both made 24 to 25 errors on average over 20 datasets. On dense
+    graphs, raise ``n_starts``. On the 223-variable ANDES network with 1,000 simulated rows, at
+    ``penalty_discount=1.0``, its median errors passed the empty graph's (471 against 338). With
+    fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. Against
+    :func:`~andrey.exact_search` on small simulated categorical networks, with BDeu or the
+    multinomial BIC, GRaSP stopped at a DAG that scores worse than the optimum on some draws;
+    comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
+    benchmarked with GRaSP yet. The mixed-data scores are experimental and not benchmarked yet;
+    their tests run GRaSP on 5 variables with 3,000 rows. With ``env``, GRaSP is experimental and
+    not benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two
+    environments, and on Sachs's 11 proteins, 7,466 cells from nine conditions, with
+    ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
+    environments a shift that does not follow the labels' values, such as one in the middle
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
     result. ``max_parents`` counts the index as a parent of each variable it points into.
     ``missing="em"`` was measured on simulated linear-Gaussian data with values missing completely
