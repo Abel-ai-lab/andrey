@@ -588,9 +588,8 @@ def render_skill() -> str:
         "graph, and a fit whose last round changed it logs a warning. `em` is supported in "
         + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
         + ", where it measured no less accurate than a reference implementation, and "
-        "experimental in the others: `boss` and `grasp` each measured less accurate than their "
-        "reference in one setting, and the rest have none to compare with. Every other method "
-        "refuses a missing value with a data error that says what to do instead."
+        "experimental in the others, which have none to compare with. Every other method refuses "
+        "a missing value with a data error that says what to do instead."
     )
     a("")
     a("## Background knowledge")
