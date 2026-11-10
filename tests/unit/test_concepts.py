@@ -375,6 +375,7 @@ UNIT_CASES = {
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "score_matching": "rational_chain_4v",
+    "nogam": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
 }
@@ -600,10 +601,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
 
 def keeps_the_required_edge(method: str) -> bool:
     """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
-    a constant column, CAM, RESIT, SCORE, and CAM-UV, which need three distinct values per column,
-    and GnIES, which needs every column to vary within each environment, on data where its weight
-    is exactly 0."""
-    smooth = ("cam", "resit", "score_matching", "camuv")
+    a constant column, CAM, RESIT, SCORE, NoGAM, and CAM-UV, which need three distinct values per
+    column, and GnIES, which needs every column to vary within each environment, on data where its
+    weight is exactly 0."""
+    smooth = ("cam", "resit", "score_matching", "nogam", "camuv")
     flat = () if method in (*PCMCI_FAMILY, *smooth, "gnies") else ("flat",)
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 

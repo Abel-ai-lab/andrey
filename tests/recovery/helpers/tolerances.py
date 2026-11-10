@@ -151,6 +151,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
+    # NoGAM: the DAG and the causal order of its leaf search, both exact.
+    "NoGAM": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {
         "structural": ["graph", "causal_order"],
