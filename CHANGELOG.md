@@ -37,6 +37,15 @@ names its pull request.
   variables: the graph found often has no consistent extension, and the fit then drops every
   claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
+- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
+  `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
+  so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
+  graph it finds without them. On simulated data with 50 variables, 2,000 rows, and mean degree 4
+  that happened in 38 to 40 of 40 fits; where the graph has a consistent extension, the claims were
+  applied and the CPDAG was 0.2 to 0.6 edges closer to the class they define. The Limitations of
+  `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
+  blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
+  graph at 50 variables and mean degree 4. ([#882])
 
 ## [0.16.0] - 2026-11-10
 
@@ -2272,4 +2281,5 @@ First alpha release.
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
+[#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
