@@ -22,7 +22,7 @@ scipy==1.17.1
 setuptools==84.2.1
 sympy==1.14.0
 threadpoolctl==3.8.0
-torch==2.15.0+cpu
+torch==2.13.0
 tueplots==0.2.6
 typing-extensions==4.16.0
 tzdata==2026.6
