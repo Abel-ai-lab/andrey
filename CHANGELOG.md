@@ -18,6 +18,30 @@ names its pull request.
   estimator on the standardized columns, and prunes the complete DAG of the order with the
   smooth-term tests of `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not
   depend on the columns' units or order. ([#872])
+- `andrey.data` draws more kinds of data: Student-t and two-component Gaussian-mixture noise
+  (`noise.student_t(df=)`, `noise.gaussian_mixture(weight=, means=, sds=)`), each of mean 0 and
+  variance 1 like the other families; `functional.random_features(n_features=, length_scale=)`, an
+  additive-noise model whose functions are approximate Gaussian-process draws by random Fourier
+  features (Rahimi and Recht, 2007); `outer="cube"`, `"cube_root"`, and `"sigmoid"` on
+  `functional.post_nonlinear`; and `measurements=measurement.noisy_children(...)` on `SCM.sample`
+  and `sample_scm`, which adds for each selected variable a column that is it plus independent
+  noise, a child of it in the true graph and shuffled with the other columns, with
+  `measurements.parents` naming the column each one measures. Each option draws from its own stream
+  and is off by default, so every seed drawn without them gives the data it gave before. ([#875])
+
+### Changed
+
+- Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
+  in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
+  `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
+  `grasp_fci`. With true claims none measured worse than the same fit without them, or than
+  causal-learn, bnlearn, Tetrad, or lingam given the same knowledge, in a setting that repeated on
+  fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
+  knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
+  given the required edges those paths imply made fewer errors, and both path parts stay
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where true claims left the CPDAG farther from
+  the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
+  ([#870])
 
 ## [0.16.0] - 2026-11-10
 
@@ -2251,4 +2275,7 @@ First alpha release.
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
+[#870]: https://github.com/Abel-ai-lab/andrey/pull/870
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#875]: https://github.com/Abel-ai-lab/andrey/pull/875
+[kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
