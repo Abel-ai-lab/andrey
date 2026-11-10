@@ -1,0 +1,6466 @@
+{
+ "release": "0.16.0",
+ "generated": "2026-11-09",
+ "lane": "loci",
+ "method": "LOCI",
+ "status": "supported",
+ "about": "LOCI's own published measurements, one file per lane; the release summary's LOCI entries are built from it",
+ "build": "Andrey pre-release build of 9 November 2026 (version string 0.16.0): the fits ran on commit 73534c3a7 of the 0.16.0 release branch; on 11 pairs both criteria raised there, from a Cholesky factorization of an ill-conditioned Hessian, and those 22 fits are from commit e40f3e078, the released solver, which falls back to a damped Newton step there. Refitted on e40f3e078, the other 1,178 fits of the six cells with such a pair returned the same output, to the last bit. The rerun on fresh seeds ran Andrey on e40f3e078",
+ "comparator": "the LOCI authors' code, github.com/aleximmer/loci at commit da61b8cdf95cbbc00fc42d351f89e64410f535f4: loci(x, y, independence_test=True) is LOCI-H and independence_test=False is LOCI-M, both with neural_network=False, the paper's estimator with spline features, on columns the adapter standardizes, at the code's other defaults",
+ "packages": {
+  "LOCI authors' code": "commit da61b8cd",
+  "Python (authors' code)": "3.11",
+  "torch (authors' code)": "2.15.0+cpu",
+  "NumPy (authors' code)": "1.26.4",
+  "scikit-learn (authors' code)": "1.9.1",
+  "NumPy (Andrey)": "2.5.4",
+  "Python (Andrey)": "3.13.11"
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor",
+   "AMD EPYC 9534 64-Core Processor"
+  ],
+  "judged_cells": [
+   "AMD EPYC 7713 64-Core Processor"
+  ],
+  "size_ladder": [
+   "AMD EPYC 9534 64-Core Processor"
+  ],
+  "hosts": 15,
+  "cores_per_fit": 1,
+  "blas_threads": 1
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "per cell and criterion: D = wrong(Andrey) - wrong(authors' code) per pair, a wrong direction counting 1, on the pairs both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the pairs, default_rng(0). Each criterion is judged against the authors' variant of the same criterion, independence against LOCI-H and likelihood against LOCI-M. The independence criterion is judged in every cell; the likelihood criterion, whose model is Gaussian, where the noise is Gaussian (claim in), and its rows under Gumbel, Laplace, or uniform noise are reported, not judged (claim out). result is the published verdict: better only where a rerun on fresh seeds (replication, seeds 100-199) is better too, and a tie otherwise; the rows that came out better on the first seeds on location-scale pairs with Gaussian noise were rerun, and no other row. The floor is a coin flip, 0.5 wrong directions per pair: andrey_minus_empty and reference_minus_empty are the intervals of each package's mean wrong directions minus 0.5, the floor applies where the authors' code is below it, and there Andrey must be below it too",
+ "fit_protocol": "each fit in a fresh interpreter on one core with one BLAS thread, no timed warm-up; the authors' code after an untimed fit of 5 optimizer steps on a small table, so its imports are not timed; a cap of 1,800 s per fit (3,600 s and 28,000 MB on the size ladder), past which a fit is a timeout or out of memory, never a guess; times run from the two columns in memory to the returned direction; ratio is the median over the paired pairs of the authors' time over Andrey's",
+ "error_metric": "a pair's wrong direction: 1 when the fit names the reverse of the true direction, 0 when it names the true one; no fit of either package left a pair without a direction. andrey_shd_mean and comparator_shd_mean are the shares of pairs with the wrong direction (the SHD of a two-node graph), and the accuracy fields 1 minus them, with 95% bootstrap intervals",
+ "seeds_note": "every cell holds 100 pairs, seeds 0-99; a replication holds 100 fresh pairs, seeds 100-199",
+ "cells": {
+  "lsnm_pair": "lsnm_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gaussian noise, z-scored",
+  "lsnm_rescaled_pair": "lsnm_rescaled_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gaussian noise, rescaled so the cause has unit variance before the effect reads it",
+  "lsnm_gumbel_pair": "lsnm_gumbel_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gumbel noise, z-scored",
+  "lsnm_gumbel_rescaled_pair": "lsnm_gumbel_rescaled_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Gumbel noise, rescaled so the cause has unit variance before the effect reads it",
+  "lsnm_laplace_pair": "lsnm_laplace_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Laplace noise, z-scored",
+  "lsnm_laplace_rescaled_pair": "lsnm_laplace_rescaled_pair: location-scale pairs, y = f(x) + g(x) n at the paper's scale range, Laplace noise, rescaled so the cause has unit variance before the effect reads it",
+  "anm_pair": "anm_pair: additive-noise pairs, a constant noise scale, Gaussian noise, z-scored",
+  "tagasovska_an_pair": "tagasovska_an_pair: the synthetic set AN of Tagasovska et al. (2020), z-scored",
+  "tagasovska_ans_pair": "tagasovska_ans_pair: the synthetic set AN-s of Tagasovska et al. (2020), z-scored",
+  "tagasovska_ls_pair": "tagasovska_ls_pair: the synthetic set LS of Tagasovska et al. (2020), z-scored",
+  "tagasovska_lss_pair": "tagasovska_lss_pair: the synthetic set LS-s of Tagasovska et al. (2020), z-scored",
+  "tagasovska_mnu_pair": "tagasovska_mnu_pair: the synthetic set MN-U of Tagasovska et al. (2020), z-scored"
+ },
+ "likelihood_out_of_claim": [
+  "lsnm_gumbel_pair",
+  "lsnm_gumbel_rescaled_pair",
+  "lsnm_laplace_pair",
+  "lsnm_laplace_rescaled_pair",
+  "tagasovska_mnu_pair"
+ ],
+ "rerun_setting": [
+  "lsnm_pair",
+  "lsnm_rescaled_pair",
+  "tagasovska_ls_pair",
+  "tagasovska_lss_pair"
+ ],
+ "complete": true,
+ "pending_fits": 0,
+ "fit_status": {
+  "ok": 20595,
+  "error": 25,
+  "oom": 20
+ },
+ "fit_status_note": "every record of the first seeds, the rerun, and the size ladder: the errors are the 22 fits of Andrey that raised on the campaign's build, which the rows replace by the released solver's fits (refit_after_fix), and fits of the authors' code on fresh pairs that did not start because a file its environment reads was not found, which their rows leave out; oom counts Andrey's independence fits at 32,000 rows, past the 28,000 MB cap",
+ "refit_after_fix": {
+  "fits": 22,
+  "pairs": 11
+ },
+ "bootstrap": {
+  "resamples": 10000,
+  "interval": "percentile 95%",
+  "rng": "default_rng(0)"
+ },
+ "min_pairs": 10,
+ "first_seed_verdicts": {
+  "independence": {
+   "better": 17,
+   "tie": 9
+  },
+  "likelihood": {
+   "better": 7,
+   "tie": 6
+  }
+ },
+ "results": {
+  "independence": {
+   "better": 5,
+   "tie": 21
+  },
+  "likelihood": {
+   "better": 3,
+   "tie": 10
+  }
+ },
+ "rows": [
+  {
+   "regime": "anm_pair|n=500|independence",
+   "cell": "anm_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 83,
+   "andrey_reversed": 17,
+   "andrey_no_edge": 0,
+   "comparator_correct": 81,
+   "comparator_reversed": 19,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.83,
+   "andrey_accuracy_95": [
+    0.75,
+    0.9
+   ],
+   "comparator_accuracy": 0.81,
+   "comparator_accuracy_95": [
+    0.73,
+    0.88
+   ],
+   "andrey_right_comparator_wrong": 7,
+   "comparator_right_andrey_wrong": 5,
+   "same_graph": 88,
+   "andrey_shd_mean": 0.17,
+   "comparator_shd_mean": 0.19,
+   "mean_D": -0.02,
+   "bootstrap_95": [
+    -0.09,
+    0.05
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.33,
+     "bootstrap_95": [
+      -0.4,
+      -0.25
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.31,
+     "bootstrap_95": [
+      -0.38,
+      -0.23
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.082,
+   "comparator_s": 51.6761,
+   "ratio": 627.4,
+   "ratio_quartiles": [
+    473.4,
+    810.6
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 419.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "anm_pair|n=500|likelihood",
+   "cell": "anm_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 85,
+   "andrey_reversed": 15,
+   "andrey_no_edge": 0,
+   "comparator_correct": 77,
+   "comparator_reversed": 23,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.85,
+   "andrey_accuracy_95": [
+    0.78,
+    0.92
+   ],
+   "comparator_accuracy": 0.77,
+   "comparator_accuracy_95": [
+    0.68,
+    0.85
+   ],
+   "andrey_right_comparator_wrong": 12,
+   "comparator_right_andrey_wrong": 4,
+   "same_graph": 84,
+   "andrey_shd_mean": 0.15,
+   "comparator_shd_mean": 0.23,
+   "mean_D": -0.08,
+   "bootstrap_95": [
+    -0.16,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -0.42,
+      -0.28
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.27,
+     "bootstrap_95": [
+      -0.35,
+      -0.18
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0353,
+   "comparator_s": 51.3223,
+   "ratio": 1431.9,
+   "ratio_quartiles": [
+    1077.3,
+    1807.5
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "anm_pair|n=1000|independence",
+   "cell": "anm_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 90,
+   "andrey_reversed": 10,
+   "andrey_no_edge": 0,
+   "comparator_correct": 89,
+   "comparator_reversed": 11,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.9,
+   "andrey_accuracy_95": [
+    0.84,
+    0.96
+   ],
+   "comparator_accuracy": 0.89,
+   "comparator_accuracy_95": [
+    0.83,
+    0.95
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 3,
+   "same_graph": 93,
+   "andrey_shd_mean": 0.1,
+   "comparator_shd_mean": 0.11,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.06,
+    0.04
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -0.46,
+      -0.34
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.39,
+     "bootstrap_95": [
+      -0.45,
+      -0.33
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2293,
+   "comparator_s": 37.9736,
+   "ratio": 169.9,
+   "ratio_quartiles": [
+    121.4,
+    238.7
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "anm_pair|n=1000|likelihood",
+   "cell": "anm_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 93,
+   "andrey_reversed": 7,
+   "andrey_no_edge": 0,
+   "comparator_correct": 87,
+   "comparator_reversed": 13,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.93,
+   "andrey_accuracy_95": [
+    0.88,
+    0.97
+   ],
+   "comparator_accuracy": 0.87,
+   "comparator_accuracy_95": [
+    0.8,
+    0.93
+   ],
+   "andrey_right_comparator_wrong": 6,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 94,
+   "andrey_shd_mean": 0.07,
+   "comparator_shd_mean": 0.13,
+   "mean_D": -0.06,
+   "bootstrap_95": [
+    -0.11,
+    -0.02
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.43,
+     "bootstrap_95": [
+      -0.47,
+      -0.38
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.37,
+     "bootstrap_95": [
+      -0.43,
+      -0.3
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0449,
+   "comparator_s": 37.2259,
+   "ratio": 830.5,
+   "ratio_quartiles": [
+    621.9,
+    1071.8
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "anm_pair|n=2000|independence",
+   "cell": "anm_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 98,
+   "andrey_reversed": 2,
+   "andrey_no_edge": 0,
+   "comparator_correct": 98,
+   "comparator_reversed": 2,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.98,
+   "andrey_accuracy_95": [
+    0.95,
+    1.0
+   ],
+   "comparator_accuracy": 0.98,
+   "comparator_accuracy_95": [
+    0.95,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 0,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 100,
+   "andrey_shd_mean": 0.02,
+   "comparator_shd_mean": 0.02,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    0.0,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.48,
+     "bootstrap_95": [
+      -0.5,
+      -0.45
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.48,
+     "bootstrap_95": [
+      -0.5,
+      -0.45
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8202,
+   "comparator_s": 30.9712,
+   "ratio": 39.8,
+   "ratio_quartiles": [
+    30.5,
+    51.3
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 598.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "anm_pair|n=2000|likelihood",
+   "cell": "anm_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 99,
+   "andrey_reversed": 1,
+   "andrey_no_edge": 0,
+   "comparator_correct": 99,
+   "comparator_reversed": 1,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.99,
+   "andrey_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "comparator_accuracy": 0.99,
+   "comparator_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 0,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 100,
+   "andrey_shd_mean": 0.01,
+   "comparator_shd_mean": 0.01,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    0.0,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.078,
+   "comparator_s": 27.9427,
+   "ratio": 376.5,
+   "ratio_quartiles": [
+    292.2,
+    512.1
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=500|independence",
+   "cell": "lsnm_gumbel_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 79,
+   "andrey_reversed": 21,
+   "andrey_no_edge": 0,
+   "comparator_correct": 52,
+   "comparator_reversed": 48,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.79,
+   "andrey_accuracy_95": [
+    0.71,
+    0.87
+   ],
+   "comparator_accuracy": 0.52,
+   "comparator_accuracy_95": [
+    0.42,
+    0.62
+   ],
+   "andrey_right_comparator_wrong": 27,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 73,
+   "andrey_shd_mean": 0.21,
+   "comparator_shd_mean": 0.48,
+   "mean_D": -0.27,
+   "bootstrap_95": [
+    -0.36,
+    -0.19
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.29,
+     "bootstrap_95": [
+      -0.37,
+      -0.21
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.02,
+     "bootstrap_95": [
+      -0.12,
+      0.08
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "at",
+   "andrey_s": 0.0708,
+   "comparator_s": 63.7031,
+   "ratio": 878.6,
+   "ratio_quartiles": [
+    729.3,
+    1130.0
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 420.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=500|likelihood",
+   "cell": "lsnm_gumbel_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 35,
+   "andrey_reversed": 65,
+   "andrey_no_edge": 0,
+   "comparator_correct": 31,
+   "comparator_reversed": 69,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.35,
+   "andrey_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "comparator_accuracy": 0.31,
+   "comparator_accuracy_95": [
+    0.22,
+    0.4
+   ],
+   "andrey_right_comparator_wrong": 9,
+   "comparator_right_andrey_wrong": 5,
+   "same_graph": 86,
+   "andrey_shd_mean": 0.65,
+   "comparator_shd_mean": 0.69,
+   "mean_D": -0.04,
+   "bootstrap_95": [
+    -0.11,
+    0.03
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.19,
+     "bootstrap_95": [
+      0.1,
+      0.28
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0317,
+   "comparator_s": 63.6153,
+   "ratio": 1873.2,
+   "ratio_quartiles": [
+    1566.1,
+    2506.3
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=1000|independence",
+   "cell": "lsnm_gumbel_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 95,
+   "andrey_reversed": 5,
+   "andrey_no_edge": 0,
+   "comparator_correct": 79,
+   "comparator_reversed": 21,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.95,
+   "andrey_accuracy_95": [
+    0.9,
+    0.99
+   ],
+   "comparator_accuracy": 0.79,
+   "comparator_accuracy_95": [
+    0.71,
+    0.87
+   ],
+   "andrey_right_comparator_wrong": 19,
+   "comparator_right_andrey_wrong": 3,
+   "same_graph": 78,
+   "andrey_shd_mean": 0.05,
+   "comparator_shd_mean": 0.21,
+   "mean_D": -0.16,
+   "bootstrap_95": [
+    -0.25,
+    -0.08
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.45,
+     "bootstrap_95": [
+      -0.49,
+      -0.4
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.29,
+     "bootstrap_95": [
+      -0.37,
+      -0.21
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2251,
+   "comparator_s": 65.3634,
+   "ratio": 292.6,
+   "ratio_quartiles": [
+    208.9,
+    358.1
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 455.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=1000|likelihood",
+   "cell": "lsnm_gumbel_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 37,
+   "andrey_reversed": 63,
+   "andrey_no_edge": 0,
+   "comparator_correct": 35,
+   "comparator_reversed": 65,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.37,
+   "andrey_accuracy_95": [
+    0.28,
+    0.47
+   ],
+   "comparator_accuracy": 0.35,
+   "comparator_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "andrey_right_comparator_wrong": 5,
+   "comparator_right_andrey_wrong": 3,
+   "same_graph": 92,
+   "andrey_shd_mean": 0.63,
+   "comparator_shd_mean": 0.65,
+   "mean_D": -0.02,
+   "bootstrap_95": [
+    -0.08,
+    0.03
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.13,
+     "bootstrap_95": [
+      0.03,
+      0.22
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0537,
+   "comparator_s": 64.2718,
+   "ratio": 1240.6,
+   "ratio_quartiles": [
+    881.0,
+    1462.2
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=2000|independence",
+   "cell": "lsnm_gumbel_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 2,
+   "andrey_correct": 99,
+   "andrey_reversed": 1,
+   "andrey_no_edge": 0,
+   "comparator_correct": 94,
+   "comparator_reversed": 6,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.99,
+   "andrey_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "comparator_accuracy": 0.94,
+   "comparator_accuracy_95": [
+    0.89,
+    0.98
+   ],
+   "andrey_right_comparator_wrong": 5,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 95,
+   "andrey_shd_mean": 0.01,
+   "comparator_shd_mean": 0.06,
+   "mean_D": -0.05,
+   "bootstrap_95": [
+    -0.1,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.44,
+     "bootstrap_95": [
+      -0.48,
+      -0.39
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8037,
+   "comparator_s": 70.8455,
+   "ratio": 85.9,
+   "ratio_quartiles": [
+    60.7,
+    101.3
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 595.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_pair|n=2000|likelihood",
+   "cell": "lsnm_gumbel_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 2,
+   "andrey_correct": 35,
+   "andrey_reversed": 65,
+   "andrey_no_edge": 0,
+   "comparator_correct": 35,
+   "comparator_reversed": 65,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.35,
+   "andrey_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "comparator_accuracy": 0.35,
+   "comparator_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "andrey_right_comparator_wrong": 1,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 98,
+   "andrey_shd_mean": 0.65,
+   "comparator_shd_mean": 0.65,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    -0.03,
+    0.03
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0858,
+   "comparator_s": 67.3464,
+   "ratio": 736.9,
+   "ratio_quartiles": [
+    556.1,
+    924.6
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=500|independence",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 2,
+   "andrey_correct": 80,
+   "andrey_reversed": 20,
+   "andrey_no_edge": 0,
+   "comparator_correct": 59,
+   "comparator_reversed": 41,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.8,
+   "andrey_accuracy_95": [
+    0.72,
+    0.88
+   ],
+   "comparator_accuracy": 0.59,
+   "comparator_accuracy_95": [
+    0.49,
+    0.69
+   ],
+   "andrey_right_comparator_wrong": 24,
+   "comparator_right_andrey_wrong": 3,
+   "same_graph": 73,
+   "andrey_shd_mean": 0.2,
+   "comparator_shd_mean": 0.41,
+   "mean_D": -0.21,
+   "bootstrap_95": [
+    -0.3,
+    -0.12
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.3,
+     "bootstrap_95": [
+      -0.38,
+      -0.22
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.09,
+     "bootstrap_95": [
+      -0.19,
+      0.01
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "at",
+   "andrey_s": 0.0715,
+   "comparator_s": 65.8731,
+   "ratio": 911.6,
+   "ratio_quartiles": [
+    664.2,
+    1098.0
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 419.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=500|likelihood",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 2,
+   "andrey_correct": 35,
+   "andrey_reversed": 65,
+   "andrey_no_edge": 0,
+   "comparator_correct": 33,
+   "comparator_reversed": 67,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.35,
+   "andrey_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "comparator_accuracy": 0.33,
+   "comparator_accuracy_95": [
+    0.24,
+    0.42
+   ],
+   "andrey_right_comparator_wrong": 6,
+   "comparator_right_andrey_wrong": 4,
+   "same_graph": 90,
+   "andrey_shd_mean": 0.65,
+   "comparator_shd_mean": 0.67,
+   "mean_D": -0.02,
+   "bootstrap_95": [
+    -0.08,
+    0.04
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.17,
+     "bootstrap_95": [
+      0.08,
+      0.26
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0321,
+   "comparator_s": 66.0702,
+   "ratio": 1947.9,
+   "ratio_quartiles": [
+    1392.9,
+    2513.9
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=1000|independence",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 97,
+   "andrey_reversed": 3,
+   "andrey_no_edge": 0,
+   "comparator_correct": 79,
+   "comparator_reversed": 21,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.97,
+   "andrey_accuracy_95": [
+    0.93,
+    1.0
+   ],
+   "comparator_accuracy": 0.79,
+   "comparator_accuracy_95": [
+    0.71,
+    0.87
+   ],
+   "andrey_right_comparator_wrong": 19,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 80,
+   "andrey_shd_mean": 0.03,
+   "comparator_shd_mean": 0.21,
+   "mean_D": -0.18,
+   "bootstrap_95": [
+    -0.26,
+    -0.1
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.47,
+     "bootstrap_95": [
+      -0.5,
+      -0.43
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.29,
+     "bootstrap_95": [
+      -0.37,
+      -0.21
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2236,
+   "comparator_s": 61.7558,
+   "ratio": 278.9,
+   "ratio_quartiles": [
+    210.0,
+    341.6
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=1000|likelihood",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 38,
+   "andrey_reversed": 62,
+   "andrey_no_edge": 0,
+   "comparator_correct": 37,
+   "comparator_reversed": 63,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.38,
+   "andrey_accuracy_95": [
+    0.29,
+    0.48
+   ],
+   "comparator_accuracy": 0.37,
+   "comparator_accuracy_95": [
+    0.28,
+    0.47
+   ],
+   "andrey_right_comparator_wrong": 3,
+   "comparator_right_andrey_wrong": 2,
+   "same_graph": 95,
+   "andrey_shd_mean": 0.62,
+   "comparator_shd_mean": 0.63,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.05,
+    0.03
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.12,
+     "bootstrap_95": [
+      0.02,
+      0.21
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.13,
+     "bootstrap_95": [
+      0.03,
+      0.22
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0515,
+   "comparator_s": 61.6202,
+   "ratio": 1213.2,
+   "ratio_quartiles": [
+    855.3,
+    1514.0
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=2000|independence",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 4,
+   "andrey_correct": 99,
+   "andrey_reversed": 1,
+   "andrey_no_edge": 0,
+   "comparator_correct": 91,
+   "comparator_reversed": 9,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.99,
+   "andrey_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "comparator_accuracy": 0.91,
+   "comparator_accuracy_95": [
+    0.85,
+    0.96
+   ],
+   "andrey_right_comparator_wrong": 8,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 92,
+   "andrey_shd_mean": 0.01,
+   "comparator_shd_mean": 0.09,
+   "mean_D": -0.08,
+   "bootstrap_95": [
+    -0.14,
+    -0.03
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.41,
+     "bootstrap_95": [
+      -0.46,
+      -0.35
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8045,
+   "comparator_s": 70.3267,
+   "ratio": 85.3,
+   "ratio_quartiles": [
+    58.6,
+    100.1
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 595.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_gumbel_rescaled_pair|n=2000|likelihood",
+   "cell": "lsnm_gumbel_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 4,
+   "andrey_correct": 35,
+   "andrey_reversed": 65,
+   "andrey_no_edge": 0,
+   "comparator_correct": 34,
+   "comparator_reversed": 66,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.35,
+   "andrey_accuracy_95": [
+    0.26,
+    0.45
+   ],
+   "comparator_accuracy": 0.34,
+   "comparator_accuracy_95": [
+    0.25,
+    0.44
+   ],
+   "andrey_right_comparator_wrong": 2,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 97,
+   "andrey_shd_mean": 0.65,
+   "comparator_shd_mean": 0.66,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.04,
+    0.02
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.05,
+      0.24
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.16,
+     "bootstrap_95": [
+      0.06,
+      0.25
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.09,
+   "comparator_s": 67.2949,
+   "ratio": 671.5,
+   "ratio_quartiles": [
+    511.0,
+    898.3
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=500|independence",
+   "cell": "lsnm_laplace_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 83,
+   "andrey_reversed": 17,
+   "andrey_no_edge": 0,
+   "comparator_correct": 71,
+   "comparator_reversed": 29,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.83,
+   "andrey_accuracy_95": [
+    0.75,
+    0.9
+   ],
+   "comparator_accuracy": 0.71,
+   "comparator_accuracy_95": [
+    0.62,
+    0.8
+   ],
+   "andrey_right_comparator_wrong": 16,
+   "comparator_right_andrey_wrong": 4,
+   "same_graph": 80,
+   "andrey_shd_mean": 0.17,
+   "comparator_shd_mean": 0.29,
+   "mean_D": -0.12,
+   "bootstrap_95": [
+    -0.21,
+    -0.04
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.33,
+     "bootstrap_95": [
+      -0.4,
+      -0.25
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.21,
+     "bootstrap_95": [
+      -0.3,
+      -0.12
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0833,
+   "comparator_s": 67.1425,
+   "ratio": 831.2,
+   "ratio_quartiles": [
+    636.7,
+    987.8
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 419.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=500|likelihood",
+   "cell": "lsnm_laplace_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 37,
+   "andrey_reversed": 63,
+   "andrey_no_edge": 0,
+   "comparator_correct": 31,
+   "comparator_reversed": 69,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.37,
+   "andrey_accuracy_95": [
+    0.28,
+    0.46
+   ],
+   "comparator_accuracy": 0.31,
+   "comparator_accuracy_95": [
+    0.22,
+    0.4
+   ],
+   "andrey_right_comparator_wrong": 13,
+   "comparator_right_andrey_wrong": 7,
+   "same_graph": 80,
+   "andrey_shd_mean": 0.63,
+   "comparator_shd_mean": 0.69,
+   "mean_D": -0.06,
+   "bootstrap_95": [
+    -0.15,
+    0.03
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.13,
+     "bootstrap_95": [
+      0.04,
+      0.22
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.19,
+     "bootstrap_95": [
+      0.1,
+      0.28
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0382,
+   "comparator_s": 67.256,
+   "ratio": 1802.8,
+   "ratio_quartiles": [
+    1320.0,
+    2247.9
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=1000|independence",
+   "cell": "lsnm_laplace_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 91,
+   "andrey_reversed": 9,
+   "andrey_no_edge": 0,
+   "comparator_correct": 83,
+   "comparator_reversed": 17,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.91,
+   "andrey_accuracy_95": [
+    0.85,
+    0.96
+   ],
+   "comparator_accuracy": 0.83,
+   "comparator_accuracy_95": [
+    0.75,
+    0.9
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 2,
+   "same_graph": 88,
+   "andrey_shd_mean": 0.09,
+   "comparator_shd_mean": 0.17,
+   "mean_D": -0.08,
+   "bootstrap_95": [
+    -0.15,
+    -0.02
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.41,
+     "bootstrap_95": [
+      -0.46,
+      -0.35
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.33,
+     "bootstrap_95": [
+      -0.4,
+      -0.25
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2211,
+   "comparator_s": 64.5478,
+   "ratio": 285.4,
+   "ratio_quartiles": [
+    227.3,
+    323.7
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 455.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=1000|likelihood",
+   "cell": "lsnm_laplace_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 1,
+   "andrey_correct": 44,
+   "andrey_reversed": 56,
+   "andrey_no_edge": 0,
+   "comparator_correct": 35,
+   "comparator_reversed": 65,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.44,
+   "andrey_accuracy_95": [
+    0.34,
+    0.54
+   ],
+   "comparator_accuracy": 0.35,
+   "comparator_accuracy_95": [
+    0.26,
+    0.44
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 89,
+   "andrey_shd_mean": 0.56,
+   "comparator_shd_mean": 0.65,
+   "mean_D": -0.09,
+   "bootstrap_95": [
+    -0.15,
+    -0.03
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.06,
+     "bootstrap_95": [
+      -0.04,
+      0.16
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.15,
+     "bootstrap_95": [
+      0.06,
+      0.24
+     ]
+    }
+   },
+   "andrey_floor": "at",
+   "comparator_floor": "below",
+   "andrey_s": 0.0544,
+   "comparator_s": 63.8405,
+   "ratio": 1132.1,
+   "ratio_quartiles": [
+    861.8,
+    1392.9
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=2000|independence",
+   "cell": "lsnm_laplace_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 96,
+   "andrey_reversed": 4,
+   "andrey_no_edge": 0,
+   "comparator_correct": 96,
+   "comparator_reversed": 4,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.96,
+   "andrey_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "comparator_accuracy": 0.96,
+   "comparator_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 2,
+   "comparator_right_andrey_wrong": 2,
+   "same_graph": 96,
+   "andrey_shd_mean": 0.04,
+   "comparator_shd_mean": 0.04,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    -0.04,
+    0.04
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8531,
+   "comparator_s": 67.4046,
+   "ratio": 79.0,
+   "ratio_quartiles": [
+    60.3,
+    90.6
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 595.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_pair|n=2000|likelihood",
+   "cell": "lsnm_laplace_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 59,
+   "andrey_reversed": 41,
+   "andrey_no_edge": 0,
+   "comparator_correct": 50,
+   "comparator_reversed": 50,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.59,
+   "andrey_accuracy_95": [
+    0.49,
+    0.69
+   ],
+   "comparator_accuracy": 0.5,
+   "comparator_accuracy_95": [
+    0.4,
+    0.6
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 89,
+   "andrey_shd_mean": 0.41,
+   "comparator_shd_mean": 0.5,
+   "mean_D": -0.09,
+   "bootstrap_95": [
+    -0.16,
+    -0.03
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.09,
+     "bootstrap_95": [
+      -0.19,
+      0.01
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.0,
+     "bootstrap_95": [
+      -0.1,
+      0.1
+     ]
+    }
+   },
+   "andrey_floor": "at",
+   "comparator_floor": "at",
+   "andrey_s": 0.1043,
+   "comparator_s": 64.4051,
+   "ratio": 613.7,
+   "ratio_quartiles": [
+    465.4,
+    715.5
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=500|independence",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 82,
+   "andrey_reversed": 18,
+   "andrey_no_edge": 0,
+   "comparator_correct": 69,
+   "comparator_reversed": 31,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.82,
+   "andrey_accuracy_95": [
+    0.74,
+    0.89
+   ],
+   "comparator_accuracy": 0.69,
+   "comparator_accuracy_95": [
+    0.6,
+    0.78
+   ],
+   "andrey_right_comparator_wrong": 15,
+   "comparator_right_andrey_wrong": 2,
+   "same_graph": 83,
+   "andrey_shd_mean": 0.18,
+   "comparator_shd_mean": 0.31,
+   "mean_D": -0.13,
+   "bootstrap_95": [
+    -0.21,
+    -0.06
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.32,
+     "bootstrap_95": [
+      -0.39,
+      -0.24
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.19,
+     "bootstrap_95": [
+      -0.28,
+      -0.1
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0781,
+   "comparator_s": 66.5522,
+   "ratio": 825.2,
+   "ratio_quartiles": [
+    700.5,
+    966.2
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 419.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=500|likelihood",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 37,
+   "andrey_reversed": 63,
+   "andrey_no_edge": 0,
+   "comparator_correct": 36,
+   "comparator_reversed": 64,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.37,
+   "andrey_accuracy_95": [
+    0.28,
+    0.46
+   ],
+   "comparator_accuracy": 0.36,
+   "comparator_accuracy_95": [
+    0.27,
+    0.46
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 9,
+   "same_graph": 81,
+   "andrey_shd_mean": 0.63,
+   "comparator_shd_mean": 0.64,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.1,
+    0.08
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.13,
+     "bootstrap_95": [
+      0.04,
+      0.22
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.14,
+     "bootstrap_95": [
+      0.04,
+      0.23
+     ]
+    }
+   },
+   "andrey_floor": "below",
+   "comparator_floor": "below",
+   "andrey_s": 0.0361,
+   "comparator_s": 66.7508,
+   "ratio": 1743.6,
+   "ratio_quartiles": [
+    1463.9,
+    2120.5
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=1000|independence",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 93,
+   "andrey_reversed": 7,
+   "andrey_no_edge": 0,
+   "comparator_correct": 84,
+   "comparator_reversed": 16,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.93,
+   "andrey_accuracy_95": [
+    0.88,
+    0.98
+   ],
+   "comparator_accuracy": 0.84,
+   "comparator_accuracy_95": [
+    0.76,
+    0.91
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 89,
+   "andrey_shd_mean": 0.07,
+   "comparator_shd_mean": 0.16,
+   "mean_D": -0.09,
+   "bootstrap_95": [
+    -0.16,
+    -0.03
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.43,
+     "bootstrap_95": [
+      -0.48,
+      -0.38
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.34,
+     "bootstrap_95": [
+      -0.41,
+      -0.26
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2198,
+   "comparator_s": 63.2254,
+   "ratio": 280.7,
+   "ratio_quartiles": [
+    204.8,
+    317.9
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=1000|likelihood",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 47,
+   "andrey_reversed": 53,
+   "andrey_no_edge": 0,
+   "comparator_correct": 37,
+   "comparator_reversed": 63,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.47,
+   "andrey_accuracy_95": [
+    0.37,
+    0.57
+   ],
+   "comparator_accuracy": 0.37,
+   "comparator_accuracy_95": [
+    0.27,
+    0.46
+   ],
+   "andrey_right_comparator_wrong": 11,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 88,
+   "andrey_shd_mean": 0.53,
+   "comparator_shd_mean": 0.63,
+   "mean_D": -0.1,
+   "bootstrap_95": [
+    -0.17,
+    -0.04
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.13
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.13,
+     "bootstrap_95": [
+      0.04,
+      0.23
+     ]
+    }
+   },
+   "andrey_floor": "at",
+   "comparator_floor": "below",
+   "andrey_s": 0.054,
+   "comparator_s": 61.8766,
+   "ratio": 1112.0,
+   "ratio_quartiles": [
+    793.7,
+    1302.3
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=2000|independence",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 98,
+   "andrey_reversed": 2,
+   "andrey_no_edge": 0,
+   "comparator_correct": 93,
+   "comparator_reversed": 7,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.98,
+   "andrey_accuracy_95": [
+    0.95,
+    1.0
+   ],
+   "comparator_accuracy": 0.93,
+   "comparator_accuracy_95": [
+    0.88,
+    0.98
+   ],
+   "andrey_right_comparator_wrong": 5,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 95,
+   "andrey_shd_mean": 0.02,
+   "comparator_shd_mean": 0.07,
+   "mean_D": -0.05,
+   "bootstrap_95": [
+    -0.1,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.48,
+     "bootstrap_95": [
+      -0.5,
+      -0.45
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.43,
+     "bootstrap_95": [
+      -0.48,
+      -0.38
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8358,
+   "comparator_s": 67.1572,
+   "ratio": 80.9,
+   "ratio_quartiles": [
+    67.8,
+    88.8
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 595.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_laplace_rescaled_pair|n=2000|likelihood",
+   "cell": "lsnm_laplace_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 57,
+   "andrey_reversed": 43,
+   "andrey_no_edge": 0,
+   "comparator_correct": 53,
+   "comparator_reversed": 47,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.57,
+   "andrey_accuracy_95": [
+    0.47,
+    0.67
+   ],
+   "comparator_accuracy": 0.53,
+   "comparator_accuracy_95": [
+    0.43,
+    0.63
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 96,
+   "andrey_shd_mean": 0.43,
+   "comparator_shd_mean": 0.47,
+   "mean_D": -0.04,
+   "bootstrap_95": [
+    -0.08,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.07,
+     "bootstrap_95": [
+      -0.17,
+      0.03
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.03,
+     "bootstrap_95": [
+      -0.13,
+      0.07
+     ]
+    }
+   },
+   "andrey_floor": "at",
+   "comparator_floor": "at",
+   "andrey_s": 0.0956,
+   "comparator_s": 64.1067,
+   "ratio": 639.0,
+   "ratio_quartiles": [
+    550.0,
+    769.7
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_pair|n=500|independence",
+   "cell": "lsnm_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 85,
+   "andrey_reversed": 15,
+   "andrey_no_edge": 0,
+   "comparator_correct": 75,
+   "comparator_reversed": 25,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.85,
+   "andrey_accuracy_95": [
+    0.78,
+    0.92
+   ],
+   "comparator_accuracy": 0.75,
+   "comparator_accuracy_95": [
+    0.66,
+    0.83
+   ],
+   "andrey_right_comparator_wrong": 15,
+   "comparator_right_andrey_wrong": 5,
+   "same_graph": 80,
+   "andrey_shd_mean": 0.15,
+   "comparator_shd_mean": 0.25,
+   "mean_D": -0.1,
+   "bootstrap_95": [
+    -0.19,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -0.42,
+      -0.28
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.25,
+     "bootstrap_95": [
+      -0.33,
+      -0.16
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0697,
+   "comparator_s": 59.939,
+   "ratio": 852.0,
+   "ratio_quartiles": [
+    704.7,
+    1055.4
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 420.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 90,
+    "andrey_reversed": 10,
+    "andrey_no_edge": 0,
+    "comparator_correct": 67,
+    "comparator_reversed": 33,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.9,
+    "andrey_accuracy_95": [
+     0.84,
+     0.95
+    ],
+    "comparator_accuracy": 0.67,
+    "comparator_accuracy_95": [
+     0.58,
+     0.76
+    ],
+    "andrey_right_comparator_wrong": 24,
+    "comparator_right_andrey_wrong": 1,
+    "same_graph": 75,
+    "andrey_shd_mean": 0.1,
+    "comparator_shd_mean": 0.33,
+    "mean_D": -0.23,
+    "bootstrap_95": [
+     -0.32,
+     -0.15
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.4,
+      "bootstrap_95": [
+       -0.45,
+       -0.34
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.17,
+      "bootstrap_95": [
+       -0.26,
+       -0.08
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.0784,
+    "comparator_s": 70.4196,
+    "ratio": 852.9,
+    "ratio_quartiles": [
+     710.7,
+     1129.6
+    ],
+    "andrey_peak_mb": 197.0,
+    "comparator_peak_mb": 420.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "lsnm_pair|n=500|likelihood",
+   "cell": "lsnm_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 91,
+   "comparator_reversed": 9,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.91,
+   "comparator_accuracy_95": [
+    0.85,
+    0.96
+   ],
+   "andrey_right_comparator_wrong": 9,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 91,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.09,
+   "mean_D": -0.09,
+   "bootstrap_95": [
+    -0.15,
+    -0.04
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.41,
+     "bootstrap_95": [
+      -0.46,
+      -0.35
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0304,
+   "comparator_s": 59.9035,
+   "ratio": 1873.0,
+   "ratio_quartiles": [
+    1503.0,
+    2391.1
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 100,
+    "andrey_reversed": 0,
+    "andrey_no_edge": 0,
+    "comparator_correct": 85,
+    "comparator_reversed": 15,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 1.0,
+    "andrey_accuracy_95": [
+     1.0,
+     1.0
+    ],
+    "comparator_accuracy": 0.85,
+    "comparator_accuracy_95": [
+     0.78,
+     0.92
+    ],
+    "andrey_right_comparator_wrong": 15,
+    "comparator_right_andrey_wrong": 0,
+    "same_graph": 85,
+    "andrey_shd_mean": 0.0,
+    "comparator_shd_mean": 0.15,
+    "mean_D": -0.15,
+    "bootstrap_95": [
+     -0.22,
+     -0.08
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.5,
+      "bootstrap_95": [
+       -0.5,
+       -0.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.35,
+      "bootstrap_95": [
+       -0.42,
+       -0.28
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.0348,
+    "comparator_s": 69.8007,
+    "ratio": 1840.4,
+    "ratio_quartiles": [
+     1441.4,
+     2579.7
+    ],
+    "andrey_peak_mb": 187.0,
+    "comparator_peak_mb": 406.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "lsnm_pair|n=1000|independence",
+   "cell": "lsnm_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 94,
+   "andrey_reversed": 6,
+   "andrey_no_edge": 0,
+   "comparator_correct": 87,
+   "comparator_reversed": 13,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.94,
+   "andrey_accuracy_95": [
+    0.89,
+    0.98
+   ],
+   "comparator_accuracy": 0.87,
+   "comparator_accuracy_95": [
+    0.8,
+    0.93
+   ],
+   "andrey_right_comparator_wrong": 8,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 91,
+   "andrey_shd_mean": 0.06,
+   "comparator_shd_mean": 0.13,
+   "mean_D": -0.07,
+   "bootstrap_95": [
+    -0.13,
+    -0.02
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.44,
+     "bootstrap_95": [
+      -0.48,
+      -0.39
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.37,
+     "bootstrap_95": [
+      -0.43,
+      -0.3
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2156,
+   "comparator_s": 62.3519,
+   "ratio": 287.3,
+   "ratio_quartiles": [
+    227.8,
+    339.4
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 448.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 98,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 98,
+     "error": 2
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 95,
+    "andrey_reversed": 3,
+    "andrey_no_edge": 0,
+    "comparator_correct": 85,
+    "comparator_reversed": 13,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.9694,
+    "andrey_accuracy_95": [
+     0.9286,
+     1.0
+    ],
+    "comparator_accuracy": 0.8673,
+    "comparator_accuracy_95": [
+     0.7959,
+     0.9286
+    ],
+    "andrey_right_comparator_wrong": 11,
+    "comparator_right_andrey_wrong": 1,
+    "same_graph": 86,
+    "andrey_shd_mean": 0.0306,
+    "comparator_shd_mean": 0.1327,
+    "mean_D": -0.102,
+    "bootstrap_95": [
+     -0.1735,
+     -0.0408
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 98,
+      "mean": -0.4694,
+      "bootstrap_95": [
+       -0.5,
+       -0.4286
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 98,
+      "mean": -0.3673,
+      "bootstrap_95": [
+       -0.4286,
+       -0.2959
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.24,
+    "comparator_s": 72.998,
+    "ratio": 295.1,
+    "ratio_quartiles": [
+     230.0,
+     344.7
+    ],
+    "andrey_peak_mb": 226.0,
+    "comparator_peak_mb": 456.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 2
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "lsnm_pair|n=1000|likelihood",
+   "cell": "lsnm_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 99,
+   "comparator_reversed": 1,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.99,
+   "comparator_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 1,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 99,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.01,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.03,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0472,
+   "comparator_s": 61.4944,
+   "ratio": 1236.2,
+   "ratio_quartiles": [
+    1028.8,
+    1482.0
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_pair|n=2000|independence",
+   "cell": "lsnm_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 98,
+   "andrey_reversed": 2,
+   "andrey_no_edge": 0,
+   "comparator_correct": 95,
+   "comparator_reversed": 5,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.98,
+   "andrey_accuracy_95": [
+    0.95,
+    1.0
+   ],
+   "comparator_accuracy": 0.95,
+   "comparator_accuracy_95": [
+    0.9,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 95,
+   "andrey_shd_mean": 0.02,
+   "comparator_shd_mean": 0.05,
+   "mean_D": -0.03,
+   "bootstrap_95": [
+    -0.07,
+    0.01
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.48,
+     "bootstrap_95": [
+      -0.5,
+      -0.45
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.45,
+     "bootstrap_95": [
+      -0.49,
+      -0.4
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8171,
+   "comparator_s": 68.1907,
+   "ratio": 81.5,
+   "ratio_quartiles": [
+    59.1,
+    94.1
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 591.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_pair|n=2000|likelihood",
+   "cell": "lsnm_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 100,
+   "comparator_reversed": 0,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 1.0,
+   "comparator_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 0,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 100,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.0,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    0.0,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0808,
+   "comparator_s": 64.927,
+   "ratio": 763.5,
+   "ratio_quartiles": [
+    587.8,
+    892.9
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=500|independence",
+   "cell": "lsnm_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 86,
+   "andrey_reversed": 14,
+   "andrey_no_edge": 0,
+   "comparator_correct": 66,
+   "comparator_reversed": 34,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.86,
+   "andrey_accuracy_95": [
+    0.79,
+    0.93
+   ],
+   "comparator_accuracy": 0.66,
+   "comparator_accuracy_95": [
+    0.57,
+    0.75
+   ],
+   "andrey_right_comparator_wrong": 21,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 78,
+   "andrey_shd_mean": 0.14,
+   "comparator_shd_mean": 0.34,
+   "mean_D": -0.2,
+   "bootstrap_95": [
+    -0.28,
+    -0.12
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.36,
+     "bootstrap_95": [
+      -0.43,
+      -0.29
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.16,
+     "bootstrap_95": [
+      -0.25,
+      -0.07
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0837,
+   "comparator_s": 64.1274,
+   "ratio": 766.8,
+   "ratio_quartiles": [
+    610.5,
+    973.2
+   ],
+   "andrey_peak_mb": 197.0,
+   "comparator_peak_mb": 419.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 90,
+    "andrey_reversed": 10,
+    "andrey_no_edge": 0,
+    "comparator_correct": 68,
+    "comparator_reversed": 32,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.9,
+    "andrey_accuracy_95": [
+     0.84,
+     0.96
+    ],
+    "comparator_accuracy": 0.68,
+    "comparator_accuracy_95": [
+     0.58,
+     0.77
+    ],
+    "andrey_right_comparator_wrong": 23,
+    "comparator_right_andrey_wrong": 1,
+    "same_graph": 76,
+    "andrey_shd_mean": 0.1,
+    "comparator_shd_mean": 0.32,
+    "mean_D": -0.22,
+    "bootstrap_95": [
+     -0.31,
+     -0.14
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.4,
+      "bootstrap_95": [
+       -0.46,
+       -0.34
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.18,
+      "bootstrap_95": [
+       -0.27,
+       -0.08
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.079,
+    "comparator_s": 76.1316,
+    "ratio": 941.1,
+    "ratio_quartiles": [
+     709.1,
+     1103.1
+    ],
+    "andrey_peak_mb": 197.0,
+    "comparator_peak_mb": 419.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=500|likelihood",
+   "cell": "lsnm_rescaled_pair",
+   "n": 500,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 90,
+   "comparator_reversed": 10,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.9,
+   "comparator_accuracy_95": [
+    0.84,
+    0.95
+   ],
+   "andrey_right_comparator_wrong": 10,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 90,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.1,
+   "mean_D": -0.1,
+   "bootstrap_95": [
+    -0.16,
+    -0.05
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -0.45,
+      -0.34
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.036,
+   "comparator_s": 63.9702,
+   "ratio": 1735.8,
+   "ratio_quartiles": [
+    1377.1,
+    2263.6
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 100,
+    "andrey_reversed": 0,
+    "andrey_no_edge": 0,
+    "comparator_correct": 92,
+    "comparator_reversed": 8,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 1.0,
+    "andrey_accuracy_95": [
+     1.0,
+     1.0
+    ],
+    "comparator_accuracy": 0.92,
+    "comparator_accuracy_95": [
+     0.86,
+     0.97
+    ],
+    "andrey_right_comparator_wrong": 8,
+    "comparator_right_andrey_wrong": 0,
+    "same_graph": 92,
+    "andrey_shd_mean": 0.0,
+    "comparator_shd_mean": 0.08,
+    "mean_D": -0.08,
+    "bootstrap_95": [
+     -0.14,
+     -0.03
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.5,
+      "bootstrap_95": [
+       -0.5,
+       -0.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.42,
+      "bootstrap_95": [
+       -0.47,
+       -0.36
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.0359,
+    "comparator_s": 75.1407,
+    "ratio": 2108.0,
+    "ratio_quartiles": [
+     1491.7,
+     2497.9
+    ],
+    "andrey_peak_mb": 187.0,
+    "comparator_peak_mb": 407.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=1000|independence",
+   "cell": "lsnm_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 93,
+   "andrey_reversed": 7,
+   "andrey_no_edge": 0,
+   "comparator_correct": 76,
+   "comparator_reversed": 24,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.93,
+   "andrey_accuracy_95": [
+    0.88,
+    0.97
+   ],
+   "comparator_accuracy": 0.76,
+   "comparator_accuracy_95": [
+    0.67,
+    0.84
+   ],
+   "andrey_right_comparator_wrong": 18,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 81,
+   "andrey_shd_mean": 0.07,
+   "comparator_shd_mean": 0.24,
+   "mean_D": -0.17,
+   "bootstrap_95": [
+    -0.25,
+    -0.09
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.43,
+     "bootstrap_95": [
+      -0.47,
+      -0.38
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.26,
+     "bootstrap_95": [
+      -0.34,
+      -0.17
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.213,
+   "comparator_s": 58.5496,
+   "ratio": 276.6,
+   "ratio_quartiles": [
+    208.2,
+    329.3
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 99,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 99,
+     "error": 1
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 95,
+    "andrey_reversed": 4,
+    "andrey_no_edge": 0,
+    "comparator_correct": 89,
+    "comparator_reversed": 10,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.9596,
+    "andrey_accuracy_95": [
+     0.9192,
+     0.9899
+    ],
+    "comparator_accuracy": 0.899,
+    "comparator_accuracy_95": [
+     0.8384,
+     0.9596
+    ],
+    "andrey_right_comparator_wrong": 8,
+    "comparator_right_andrey_wrong": 2,
+    "same_graph": 89,
+    "andrey_shd_mean": 0.0404,
+    "comparator_shd_mean": 0.101,
+    "mean_D": -0.0606,
+    "bootstrap_95": [
+     -0.1212,
+     0.0
+    ],
+    "above_zero": false,
+    "verdict": "tie",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 99,
+      "mean": -0.4596,
+      "bootstrap_95": [
+       -0.4899,
+       -0.4192
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 99,
+      "mean": -0.399,
+      "bootstrap_95": [
+       -0.4596,
+       -0.3384
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.2351,
+    "comparator_s": 71.6988,
+    "ratio": 293.4,
+    "ratio_quartiles": [
+     249.1,
+     349.7
+    ],
+    "andrey_peak_mb": 226.0,
+    "comparator_peak_mb": 442.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 1
+    }
+   },
+   "rerun": true,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=1000|likelihood",
+   "cell": "lsnm_rescaled_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 97,
+   "comparator_reversed": 3,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.97,
+   "comparator_accuracy_95": [
+    0.93,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 3,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 97,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.03,
+   "mean_D": -0.03,
+   "bootstrap_95": [
+    -0.07,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.47,
+     "bootstrap_95": [
+      -0.5,
+      -0.43
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0468,
+   "comparator_s": 57.9159,
+   "ratio": 1231.8,
+   "ratio_quartiles": [
+    1001.3,
+    1471.4
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=2000|independence",
+   "cell": "lsnm_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 99,
+   "andrey_reversed": 1,
+   "andrey_no_edge": 0,
+   "comparator_correct": 97,
+   "comparator_reversed": 3,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.99,
+   "andrey_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "comparator_accuracy": 0.97,
+   "comparator_accuracy_95": [
+    0.93,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 2,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 98,
+   "andrey_shd_mean": 0.01,
+   "comparator_shd_mean": 0.03,
+   "mean_D": -0.02,
+   "bootstrap_95": [
+    -0.05,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.47,
+     "bootstrap_95": [
+      -0.5,
+      -0.43
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.8057,
+   "comparator_s": 67.4867,
+   "ratio": 82.2,
+   "ratio_quartiles": [
+    59.0,
+    95.6
+   ],
+   "andrey_peak_mb": 340.0,
+   "comparator_peak_mb": 595.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "lsnm_rescaled_pair|n=2000|likelihood",
+   "cell": "lsnm_rescaled_pair",
+   "n": 2000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 100,
+   "comparator_reversed": 0,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 1.0,
+   "comparator_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 0,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 100,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.0,
+   "mean_D": 0.0,
+   "bootstrap_95": [
+    0.0,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0837,
+   "comparator_s": 64.2861,
+   "ratio": 699.9,
+   "ratio_quartiles": [
+    546.1,
+    908.6
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 407.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_an_pair|n=1000|independence",
+   "cell": "tagasovska_an_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 97,
+   "comparator_reversed": 3,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.97,
+   "comparator_accuracy_95": [
+    0.93,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 3,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 97,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.03,
+   "mean_D": -0.03,
+   "bootstrap_95": [
+    -0.07,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.47,
+     "bootstrap_95": [
+      -0.5,
+      -0.43
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2421,
+   "comparator_s": 61.0365,
+   "ratio": 243.9,
+   "ratio_quartiles": [
+    156.6,
+    318.3
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_an_pair|n=1000|likelihood",
+   "cell": "tagasovska_an_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 96,
+   "comparator_reversed": 4,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.96,
+   "comparator_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 96,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.04,
+   "mean_D": -0.04,
+   "bootstrap_95": [
+    -0.08,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.048,
+   "comparator_s": 60.1454,
+   "ratio": 1216.6,
+   "ratio_quartiles": [
+    933.2,
+    1624.5
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_ans_pair|n=1000|independence",
+   "cell": "tagasovska_ans_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 99,
+   "comparator_reversed": 1,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.99,
+   "comparator_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 1,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 99,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.01,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.03,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.247,
+   "comparator_s": 54.3632,
+   "ratio": 210.5,
+   "ratio_quartiles": [
+    153.3,
+    282.9
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 455.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_ans_pair|n=1000|likelihood",
+   "cell": "tagasovska_ans_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 99,
+   "comparator_reversed": 1,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.99,
+   "comparator_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "andrey_right_comparator_wrong": 1,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 99,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.01,
+   "mean_D": -0.01,
+   "bootstrap_95": [
+    -0.03,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0545,
+   "comparator_s": 53.9131,
+   "ratio": 995.3,
+   "ratio_quartiles": [
+    684.2,
+    1328.3
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_ls_pair|n=1000|independence",
+   "cell": "tagasovska_ls_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 94,
+   "andrey_reversed": 6,
+   "andrey_no_edge": 0,
+   "comparator_correct": 86,
+   "comparator_reversed": 14,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.94,
+   "andrey_accuracy_95": [
+    0.89,
+    0.98
+   ],
+   "comparator_accuracy": 0.86,
+   "comparator_accuracy_95": [
+    0.79,
+    0.93
+   ],
+   "andrey_right_comparator_wrong": 9,
+   "comparator_right_andrey_wrong": 1,
+   "same_graph": 90,
+   "andrey_shd_mean": 0.06,
+   "comparator_shd_mean": 0.14,
+   "mean_D": -0.08,
+   "bootstrap_95": [
+    -0.14,
+    -0.02
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.44,
+     "bootstrap_95": [
+      -0.48,
+      -0.39
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.36,
+     "bootstrap_95": [
+      -0.43,
+      -0.29
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2375,
+   "comparator_s": 69.7588,
+   "ratio": 286.2,
+   "ratio_quartiles": [
+    229.9,
+    359.3
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 455.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 96,
+    "andrey_reversed": 4,
+    "andrey_no_edge": 0,
+    "comparator_correct": 86,
+    "comparator_reversed": 14,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.96,
+    "andrey_accuracy_95": [
+     0.92,
+     0.99
+    ],
+    "comparator_accuracy": 0.86,
+    "comparator_accuracy_95": [
+     0.79,
+     0.92
+    ],
+    "andrey_right_comparator_wrong": 12,
+    "comparator_right_andrey_wrong": 2,
+    "same_graph": 86,
+    "andrey_shd_mean": 0.04,
+    "comparator_shd_mean": 0.14,
+    "mean_D": -0.1,
+    "bootstrap_95": [
+     -0.17,
+     -0.03
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.46,
+      "bootstrap_95": [
+       -0.49,
+       -0.42
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.36,
+      "bootstrap_95": [
+       -0.42,
+       -0.29
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.2334,
+    "comparator_s": 77.1136,
+    "ratio": 308.1,
+    "ratio_quartiles": [
+     247.9,
+     402.3
+    ],
+    "andrey_peak_mb": 226.0,
+    "comparator_peak_mb": 456.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "tagasovska_ls_pair|n=1000|likelihood",
+   "cell": "tagasovska_ls_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 92,
+   "comparator_reversed": 8,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.92,
+   "comparator_accuracy_95": [
+    0.86,
+    0.97
+   ],
+   "andrey_right_comparator_wrong": 8,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 92,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.08,
+   "mean_D": -0.08,
+   "bootstrap_95": [
+    -0.14,
+    -0.03
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.42,
+     "bootstrap_95": [
+      -0.47,
+      -0.36
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0502,
+   "comparator_s": 69.2308,
+   "ratio": 1352.9,
+   "ratio_quartiles": [
+    1021.7,
+    1838.6
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 100,
+    "andrey_reversed": 0,
+    "andrey_no_edge": 0,
+    "comparator_correct": 96,
+    "comparator_reversed": 4,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 1.0,
+    "andrey_accuracy_95": [
+     1.0,
+     1.0
+    ],
+    "comparator_accuracy": 0.96,
+    "comparator_accuracy_95": [
+     0.92,
+     0.99
+    ],
+    "andrey_right_comparator_wrong": 4,
+    "comparator_right_andrey_wrong": 0,
+    "same_graph": 96,
+    "andrey_shd_mean": 0.0,
+    "comparator_shd_mean": 0.04,
+    "mean_D": -0.04,
+    "bootstrap_95": [
+     -0.08,
+     -0.01
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.5,
+      "bootstrap_95": [
+       -0.5,
+       -0.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.46,
+      "bootstrap_95": [
+       -0.49,
+       -0.42
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.0532,
+    "comparator_s": 75.3725,
+    "ratio": 1456.1,
+    "ratio_quartiles": [
+     954.1,
+     2050.6
+    ],
+    "andrey_peak_mb": 188.0,
+    "comparator_peak_mb": 406.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "tagasovska_lss_pair|n=1000|independence",
+   "cell": "tagasovska_lss_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 50,
+   "comparator_reversed": 50,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.5,
+   "comparator_accuracy_95": [
+    0.4,
+    0.6
+   ],
+   "andrey_right_comparator_wrong": 50,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 50,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.5,
+   "mean_D": -0.5,
+   "bootstrap_95": [
+    -0.6,
+    -0.4
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.0,
+     "bootstrap_95": [
+      -0.1,
+      0.1
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "at",
+   "andrey_s": 0.2285,
+   "comparator_s": 76.9012,
+   "ratio": 334.2,
+   "ratio_quartiles": [
+    294.5,
+    401.1
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 99,
+    "andrey_reversed": 1,
+    "andrey_no_edge": 0,
+    "comparator_correct": 47,
+    "comparator_reversed": 53,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 0.99,
+    "andrey_accuracy_95": [
+     0.97,
+     1.0
+    ],
+    "comparator_accuracy": 0.47,
+    "comparator_accuracy_95": [
+     0.37,
+     0.57
+    ],
+    "andrey_right_comparator_wrong": 52,
+    "comparator_right_andrey_wrong": 0,
+    "same_graph": 48,
+    "andrey_shd_mean": 0.01,
+    "comparator_shd_mean": 0.53,
+    "mean_D": -0.52,
+    "bootstrap_95": [
+     -0.62,
+     -0.42
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "floor": {
+     "applies": false,
+     "pass": null,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.49,
+      "bootstrap_95": [
+       -0.5,
+       -0.47
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": 0.03,
+      "bootstrap_95": [
+       -0.07,
+       0.13
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "at",
+    "andrey_s": 0.2324,
+    "comparator_s": 77.7442,
+    "ratio": 326.9,
+    "ratio_quartiles": [
+     274.1,
+     379.9
+    ],
+    "andrey_peak_mb": 226.0,
+    "comparator_peak_mb": 456.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "better"
+  },
+  {
+   "regime": "tagasovska_lss_pair|n=1000|likelihood",
+   "cell": "tagasovska_lss_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 96,
+   "comparator_reversed": 4,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.96,
+   "comparator_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 96,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.04,
+   "mean_D": -0.04,
+   "bootstrap_95": [
+    -0.08,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0557,
+   "comparator_s": 76.2767,
+   "ratio": 1421.7,
+   "ratio_quartiles": [
+    1125.7,
+    1706.6
+   ],
+   "andrey_peak_mb": 188.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "replication": {
+    "seeds": [
+     100,
+     199
+    ],
+    "fits": 100,
+    "paired": 100,
+    "andrey_status": {
+     "ok": 100
+    },
+    "comparator_status": {
+     "ok": 100
+    },
+    "andrey_refit": 0,
+    "andrey_correct": 100,
+    "andrey_reversed": 0,
+    "andrey_no_edge": 0,
+    "comparator_correct": 97,
+    "comparator_reversed": 3,
+    "comparator_no_edge": 0,
+    "andrey_accuracy": 1.0,
+    "andrey_accuracy_95": [
+     1.0,
+     1.0
+    ],
+    "comparator_accuracy": 0.97,
+    "comparator_accuracy_95": [
+     0.93,
+     1.0
+    ],
+    "andrey_right_comparator_wrong": 3,
+    "comparator_right_andrey_wrong": 0,
+    "same_graph": 97,
+    "andrey_shd_mean": 0.0,
+    "comparator_shd_mean": 0.03,
+    "mean_D": -0.03,
+    "bootstrap_95": [
+     -0.07,
+     0.0
+    ],
+    "above_zero": false,
+    "verdict": "tie",
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 100,
+      "mean": -0.5,
+      "bootstrap_95": [
+       -0.5,
+       -0.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 100,
+      "mean": -0.47,
+      "bootstrap_95": [
+       -0.5,
+       -0.43
+      ]
+     }
+    },
+    "andrey_floor": "above",
+    "comparator_floor": "above",
+    "andrey_s": 0.0569,
+    "comparator_s": 77.255,
+    "ratio": 1370.6,
+    "ratio_quartiles": [
+     1114.8,
+     1669.1
+    ],
+    "andrey_peak_mb": 187.0,
+    "comparator_peak_mb": 407.0,
+    "coverage": {
+     "datasets": 100,
+     "andrey_short": 0,
+     "reference_short": 0
+    }
+   },
+   "rerun": true,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_mnu_pair|n=1000|independence",
+   "cell": "tagasovska_mnu_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "independence",
+   "variant": "LOCI-H",
+   "claim": "in",
+   "judged": true,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 99,
+   "andrey_reversed": 1,
+   "andrey_no_edge": 0,
+   "comparator_correct": 96,
+   "comparator_reversed": 4,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 0.99,
+   "andrey_accuracy_95": [
+    0.97,
+    1.0
+   ],
+   "comparator_accuracy": 0.96,
+   "comparator_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 3,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 97,
+   "andrey_shd_mean": 0.01,
+   "comparator_shd_mean": 0.04,
+   "mean_D": -0.03,
+   "bootstrap_95": [
+    -0.07,
+    0.0
+   ],
+   "above_zero": false,
+   "verdict": "tie",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.49,
+     "bootstrap_95": [
+      -0.5,
+      -0.47
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.2332,
+   "comparator_s": 41.3317,
+   "ratio": 159.0,
+   "ratio_quartiles": [
+    109.1,
+    246.2
+   ],
+   "andrey_peak_mb": 226.0,
+   "comparator_peak_mb": 456.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  },
+  {
+   "regime": "tagasovska_mnu_pair|n=1000|likelihood",
+   "cell": "tagasovska_mnu_pair",
+   "n": 1000,
+   "d": 2,
+   "criterion": "likelihood",
+   "variant": "LOCI-M",
+   "claim": "out",
+   "judged": false,
+   "seeds": [
+    0,
+    99
+   ],
+   "fits": 100,
+   "paired": 100,
+   "andrey_status": {
+    "ok": 100
+   },
+   "comparator_status": {
+    "ok": 100
+   },
+   "andrey_refit": 0,
+   "andrey_correct": 100,
+   "andrey_reversed": 0,
+   "andrey_no_edge": 0,
+   "comparator_correct": 96,
+   "comparator_reversed": 4,
+   "comparator_no_edge": 0,
+   "andrey_accuracy": 1.0,
+   "andrey_accuracy_95": [
+    1.0,
+    1.0
+   ],
+   "comparator_accuracy": 0.96,
+   "comparator_accuracy_95": [
+    0.92,
+    0.99
+   ],
+   "andrey_right_comparator_wrong": 4,
+   "comparator_right_andrey_wrong": 0,
+   "same_graph": 96,
+   "andrey_shd_mean": 0.0,
+   "comparator_shd_mean": 0.04,
+   "mean_D": -0.04,
+   "bootstrap_95": [
+    -0.08,
+    -0.01
+   ],
+   "above_zero": false,
+   "verdict": "better",
+   "floor": {
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -0.5,
+      -0.5
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.46,
+     "bootstrap_95": [
+      -0.49,
+      -0.42
+     ]
+    }
+   },
+   "andrey_floor": "above",
+   "comparator_floor": "above",
+   "andrey_s": 0.0486,
+   "comparator_s": 41.1391,
+   "ratio": 787.1,
+   "ratio_quartiles": [
+    497.8,
+    1249.7
+   ],
+   "andrey_peak_mb": 187.0,
+   "comparator_peak_mb": 406.0,
+   "coverage": {
+    "datasets": 100,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "rerun": false,
+   "result": "tie"
+  }
+ ],
+ "context": {
+  "anm_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.02,
+    "bootstrap_95": [
+     -0.07,
+     0.11
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 88,
+    "accuracy": 0.88,
+    "fit_s": 0.8725
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 69,
+    "accuracy": 0.69,
+    "fit_s": 0.2664
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 98,
+    "accuracy": 0.98,
+    "fit_s": 0.037
+   }
+  },
+  "anm_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.03,
+    "bootstrap_95": [
+     -0.03,
+     0.1
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 93,
+    "accuracy": 0.93,
+    "fit_s": 5.3257
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 65,
+    "accuracy": 0.65,
+    "fit_s": 2.2919
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.0447
+   }
+  },
+  "anm_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.01,
+    "bootstrap_95": [
+     0.0,
+     0.03
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 94,
+    "accuracy": 0.94,
+    "fit_s": 16.0259
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 69,
+    "accuracy": 0.69,
+    "fit_s": 0.5221
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.0683
+   }
+  },
+  "lsnm_gumbel_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.44,
+    "bootstrap_95": [
+     -0.54,
+     -0.33
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 30,
+    "accuracy": 0.3,
+    "fit_s": 0.6878
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 39,
+    "accuracy": 0.39,
+    "fit_s": 0.1825
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 47,
+    "accuracy": 0.47,
+    "fit_s": 0.0319
+   }
+  },
+  "lsnm_gumbel_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.58,
+    "bootstrap_95": [
+     -0.69,
+     -0.47
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 25,
+    "accuracy": 0.25,
+    "fit_s": 2.9863
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 42,
+    "accuracy": 0.42,
+    "fit_s": 0.261
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 45,
+    "accuracy": 0.45,
+    "fit_s": 0.045
+   }
+  },
+  "lsnm_gumbel_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.64,
+    "bootstrap_95": [
+     -0.73,
+     -0.54
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 28,
+    "accuracy": 0.28,
+    "fit_s": 14.5854
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 36,
+    "accuracy": 0.36,
+    "fit_s": 0.5116
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 46,
+    "accuracy": 0.46,
+    "fit_s": 0.0684
+   }
+  },
+  "lsnm_gumbel_rescaled_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.45,
+    "bootstrap_95": [
+     -0.55,
+     -0.34
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 31,
+    "accuracy": 0.31,
+    "fit_s": 0.7312
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 39,
+    "accuracy": 0.39,
+    "fit_s": 0.2556
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 47,
+    "accuracy": 0.47,
+    "fit_s": 0.0323
+   }
+  },
+  "lsnm_gumbel_rescaled_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.59,
+    "bootstrap_95": [
+     -0.69,
+     -0.49
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 25,
+    "accuracy": 0.25,
+    "fit_s": 5.5944
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 43,
+    "accuracy": 0.43,
+    "fit_s": 2.3416
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 45,
+    "accuracy": 0.45,
+    "fit_s": 0.0443
+   }
+  },
+  "lsnm_gumbel_rescaled_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.64,
+    "bootstrap_95": [
+     -0.73,
+     -0.54
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 27,
+    "accuracy": 0.27,
+    "fit_s": 14.4091
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 36,
+    "accuracy": 0.36,
+    "fit_s": 0.5311
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 46,
+    "accuracy": 0.46,
+    "fit_s": 0.0686
+   }
+  },
+  "lsnm_laplace_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.46,
+    "bootstrap_95": [
+     -0.57,
+     -0.35
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 76,
+    "accuracy": 0.76,
+    "fit_s": 0.83
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 85,
+    "accuracy": 0.85,
+    "fit_s": 0.2197
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 68,
+    "accuracy": 0.68,
+    "fit_s": 0.036
+   }
+  },
+  "lsnm_laplace_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.47,
+    "bootstrap_95": [
+     -0.57,
+     -0.37
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 79,
+    "accuracy": 0.79,
+    "fit_s": 2.9189
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 99,
+    "accuracy": 0.99,
+    "fit_s": 0.2593
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 78,
+    "accuracy": 0.78,
+    "fit_s": 0.0449
+   }
+  },
+  "lsnm_laplace_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.37,
+    "bootstrap_95": [
+     -0.47,
+     -0.27
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 88,
+    "accuracy": 0.88,
+    "fit_s": 15.1513
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.6051
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 84,
+    "accuracy": 0.84,
+    "fit_s": 0.0758
+   }
+  },
+  "lsnm_laplace_rescaled_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.45,
+    "bootstrap_95": [
+     -0.56,
+     -0.34
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 76,
+    "accuracy": 0.76,
+    "fit_s": 0.7612
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 84,
+    "accuracy": 0.84,
+    "fit_s": 0.2272
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 66,
+    "accuracy": 0.66,
+    "fit_s": 0.0341
+   }
+  },
+  "lsnm_laplace_rescaled_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.46,
+    "bootstrap_95": [
+     -0.56,
+     -0.36
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 78,
+    "accuracy": 0.78,
+    "fit_s": 4.6881
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 98,
+    "accuracy": 0.98,
+    "fit_s": 1.4947
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 76,
+    "accuracy": 0.76,
+    "fit_s": 0.0454
+   }
+  },
+  "lsnm_laplace_rescaled_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": -0.41,
+    "bootstrap_95": [
+     -0.51,
+     -0.31
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 87,
+    "accuracy": 0.87,
+    "fit_s": 15.162
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.5738
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 84,
+    "accuracy": 0.84,
+    "fit_s": 0.0703
+   }
+  },
+  "lsnm_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.15,
+    "bootstrap_95": [
+     0.08,
+     0.22
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 10,
+    "accuracy": 0.1,
+    "fit_s": 0.718
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 44,
+    "accuracy": 0.44,
+    "fit_s": 0.182
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 57,
+    "accuracy": 0.57,
+    "fit_s": 0.0311
+   }
+  },
+  "lsnm_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.06,
+    "bootstrap_95": [
+     0.02,
+     0.11
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 9,
+    "accuracy": 0.09,
+    "fit_s": 2.9439
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 45,
+    "accuracy": 0.45,
+    "fit_s": 0.256
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 48,
+    "accuracy": 0.48,
+    "fit_s": 0.0434
+   }
+  },
+  "lsnm_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.02,
+    "bootstrap_95": [
+     0.0,
+     0.05
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 8,
+    "accuracy": 0.08,
+    "fit_s": 15.7815
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 42,
+    "accuracy": 0.42,
+    "fit_s": 0.527
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 45,
+    "accuracy": 0.45,
+    "fit_s": 0.0678
+   }
+  },
+  "lsnm_rescaled_pair|n=500": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.14,
+    "bootstrap_95": [
+     0.07,
+     0.21
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 10,
+    "accuracy": 0.1,
+    "fit_s": 0.8816
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 44,
+    "accuracy": 0.44,
+    "fit_s": 0.2627
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 55,
+    "accuracy": 0.55,
+    "fit_s": 0.0349
+   }
+  },
+  "lsnm_rescaled_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.07,
+    "bootstrap_95": [
+     0.03,
+     0.12
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 9,
+    "accuracy": 0.09,
+    "fit_s": 3.4692
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 44,
+    "accuracy": 0.44,
+    "fit_s": 0.7646
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 49,
+    "accuracy": 0.49,
+    "fit_s": 0.0435
+   }
+  },
+  "lsnm_rescaled_pair|n=2000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.01,
+    "bootstrap_95": [
+     0.0,
+     0.03
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 8,
+    "accuracy": 0.08,
+    "fit_s": 15.5744
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 43,
+    "accuracy": 0.43,
+    "fit_s": 0.5393
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 45,
+    "accuracy": 0.45,
+    "fit_s": 0.0678
+   }
+  },
+  "tagasovska_an_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 3.5863
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.3466
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.0536
+   }
+  },
+  "tagasovska_ans_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 3.1958
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 79,
+    "accuracy": 0.79,
+    "fit_s": 0.34
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.0516
+   }
+  },
+  "tagasovska_ls_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.06,
+    "bootstrap_95": [
+     0.02,
+     0.11
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 61,
+    "accuracy": 0.61,
+    "fit_s": 3.6053
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.3602
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 100,
+    "accuracy": 1.0,
+    "fit_s": 0.0519
+   }
+  },
+  "tagasovska_lss_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 14,
+    "accuracy": 0.14,
+    "fit_s": 3.2183
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 47,
+    "accuracy": 0.47,
+    "fit_s": 0.3581
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 63,
+    "accuracy": 0.63,
+    "fit_s": 0.0476
+   }
+  },
+  "tagasovska_mnu_pair|n=1000": {
+   "independence_minus_likelihood_errors": {
+    "mean_D": 0.01,
+    "bootstrap_95": [
+     0.0,
+     0.03
+    ]
+   },
+   "anm": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 2,
+    "accuracy": 0.02,
+    "fit_s": 3.3384
+   },
+   "pnl": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 39,
+    "accuracy": 0.39,
+    "fit_s": 0.3325
+   },
+   "cam": {
+    "pairs": 100,
+    "ok": 100,
+    "correct": 92,
+    "accuracy": 0.92,
+    "fit_s": 0.0477
+   }
+  }
+ },
+ "ladder": [
+  {
+   "n": 4000,
+   "solution": "andrey.loci.independence.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 3.934,
+   "peak_mb": 807.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 4000,
+   "solution": "andrey.loci.likelihood.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 0.138,
+   "peak_mb": 190.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 4000,
+   "solution": "immer.loci.independence",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 19,
+   "fit_s": 85.757,
+   "peak_mb": 1065.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 4000,
+   "solution": "immer.loci.likelihood",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 61.155,
+   "peak_mb": 410.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 8000,
+   "solution": "andrey.loci.independence.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 15.342,
+   "peak_mb": 2661.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 8000,
+   "solution": "andrey.loci.likelihood.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 0.272,
+   "peak_mb": 193.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 8000,
+   "solution": "immer.loci.independence",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 19,
+   "fit_s": 257.155,
+   "peak_mb": 2911.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 8000,
+   "solution": "immer.loci.likelihood",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 19,
+   "fit_s": 83.682,
+   "peak_mb": 415.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 16000,
+   "solution": "andrey.loci.independence.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 59.66,
+   "peak_mb": 9966.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 16000,
+   "solution": "andrey.loci.likelihood.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 0.537,
+   "peak_mb": 199.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 32000,
+   "solution": "andrey.loci.independence.numpy",
+   "pairs": 20,
+   "status": {
+    "oom": 20
+   },
+   "correct": 0,
+   "fit_s": null,
+   "peak_mb": null,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  },
+  {
+   "n": 32000,
+   "solution": "andrey.loci.likelihood.numpy",
+   "pairs": 20,
+   "status": {
+    "ok": 20
+   },
+   "correct": 20,
+   "fit_s": 1.369,
+   "peak_mb": 211.0,
+   "cap_wall_s": 3600.0,
+   "cap_mem_mb": 28000.0
+  }
+ ]
+}

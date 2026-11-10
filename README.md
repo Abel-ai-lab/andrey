@@ -24,8 +24,9 @@ banner links the website's homepage. -->
 whose cause you know, then fit incomplete data with MVPC, which corrects PC when missingness depends
 on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM. Tell a method that
 one variable causes another by some path, that it does not, or that two share a hidden common cause.
-LOCI reads the direction of a pair whose noise changes with the cause. MVPC, EM, and LOCI are
-experimental, and so are the new claims in the methods we have not measured. Drawings also mark
+LOCI reads the direction of a pair whose noise changes with the cause, and made no more errors than
+its authors' code. MVPC and EM are experimental, and so are the new claims in the methods we have
+not measured. Drawings also mark
 intervened variables, and every HSIC p-value stays precise far below 1e-16.
 
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
@@ -41,7 +42,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 44 supported methods, each one function call.
+- **One API**: 45 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -71,7 +72,7 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 44 supported methods. Data types: continuous,
+    <img alt="Andrey: accelerated, accurate, agentic. 45 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
       confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
@@ -97,7 +98,7 @@ You install andrey-core and then `import andrey`.
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html) | DAG |
 | Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html), [`camuv`](https://andrey.abel.ai/docs/api/andrey.camuv.html) | DAG, PAG |
-| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html)\* | Two-node DAG |
+| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html) | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/api.html#experimental-methods):
 no published benchmark yet, and the API may change.

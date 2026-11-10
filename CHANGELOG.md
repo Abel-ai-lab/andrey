@@ -25,8 +25,12 @@ names its pull request.
   the same fit without them and than reference packages given the same knowledge, and experimental
   in the other methods, which the benchmark does not run. A path claim says less than an edge and
   directs less: a known edge belongs in `required`. ([#829], [#835], [#854])
-- `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
-  et al. (2023), whose noise scale changes with the cause. ([#830])
+- `loci` decides a pair's direction under the location-scale noise model of Immer et al. (2023),
+  whose noise scale changes with the cause, and is supported. Against its authors' code on 100 pairs
+  in each of 26 settings, neither criterion made significantly more errors in any of the 39 judged
+  comparisons, and fewer in 8 that repeated on fresh pairs, and the median fit was 40 to 912 times
+  faster with the default criterion. The [0.16.0 release
+  card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html#loci) gives the numbers. ([#830], [#857])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
   in the middle of each edge into a target, and `to_graphviz(structure, targets=)` draws the
   targets as squares. The graph types guide has a legend of every mark. ([#806])
@@ -36,12 +40,13 @@ names its pull request.
 
 ### Added
 
-- `loci`, experimental, decides the direction of a variable pair under the location-scale noise
-  model of Immer et al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose
-  mean and variance are spline functions of the proposed cause in each direction, and decides by
-  an HSIC test of the scaled residual against the cause (`criterion="independence"`, the default)
-  or by the larger likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows
-  where both columns are observed and takes `missing`. ([#830])
+- `loci` decides the direction of a variable pair under the location-scale noise model of Immer et
+  al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose mean and variance
+  are spline functions of the proposed cause in each direction, and decides by an HSIC test of the
+  scaled residual against the cause (`criterion="independence"`, the default) or by the larger
+  likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows where both columns
+  are observed and takes `missing`. It joins the quality gate, and its docstring gives its measured
+  accuracy, times, and memory. ([#830], [#857])
 - `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
   by position, as `square` nodes, as `draw` does. ([#806])
 - The graph types guide has a section, "How to read a causal graph", with a legend of every mark
@@ -166,6 +171,11 @@ names its pull request.
   benchmark harness, which recorded each conflict of Andrey's arm as `o-o` where tigramite marks it
   `x-x`. On the comparison page, 7 of the 21 counts in the claim go up, and no claim changes.
   ([#821])
+- `loci` keeps fitting when the Hessian of a Newton step is too ill-conditioned for a Cholesky
+  factorization, as a fitted variance near zero can leave it: the step adds a growing multiple of
+  the Hessian's diagonal (Nocedal and Wright 2006), where it raised `LinAlgError`. Both criteria
+  raised on 11 of 2,600 benchmark pairs, all with Gumbel or Laplace noise; no other fit changes.
+  ([#857])
 
 ## [0.15.0] - 2026-11-08
 
@@ -2202,3 +2212,4 @@ First alpha release.
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
 [#853]: https://github.com/Abel-ai-lab/andrey/pull/853
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
+[#857]: https://github.com/Abel-ai-lab/andrey/pull/857

@@ -486,9 +486,6 @@ def loci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -504,7 +501,10 @@ def loci(
     effect's spread changes with the cause, which the additive noise model of :func:`~andrey.anm`
     does not allow, and it returns a two-node DAG whose edge depends on ``criterion``. For more
     than two variables, use :func:`~andrey.cam`, whose Limitations give its errors under such
-    noise.
+    noise. Keep the default ``criterion="independence"`` unless the noise is known to be Gaussian:
+    it named the true direction on most pairs under every noise distribution measured, while
+    ``criterion="likelihood"`` was ahead of it under Gaussian noise and below one pair in two under
+    Gumbel noise (Limitations).
 
     With ``criterion="independence"``, LOCI-H in [1]_, each direction's scaled residual
     ``(y - mu(x)) / sigma(x)`` is tested against the proposed cause by HSIC with Gaussian kernels,
@@ -538,15 +538,29 @@ def loci(
     missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
     rows, or a column constant on them, raises ``ValueError``.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on simulated location-scale pairs of up
-    to 500 rows. It decides one pair: the paper defines no procedure for more variables. The
-    model's noise is Gaussian, so under non-Gaussian noise the likelihood criterion is
-    misspecified. A spline at either end of the cause's range covers few rows, where the fitted
-    variance can shrink toward zero as the likelihood grows, which only the prior bounds. Each HSIC
-    test builds matrices with one row and one column per sample, so under
-    ``criterion="independence"`` time and memory grow with the square of ``n_samples``; the
-    likelihood fit grows linearly with it. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated cause-effect pairs of 500, 1,000, and 2,000 rows, 100
+    pairs per setting, on one core: location-scale pairs with Gaussian, Gumbel, or Laplace noise,
+    additive-noise pairs with Gaussian noise, and, at 1,000 rows, the five synthetic sets of
+    Tagasovska et al. (2020) [5]_. With ``criterion="independence"`` it named the true direction on
+    79% to 86% of the pairs of each setting at 500 rows, 90% to 100% at 1,000, and 96% to 99% at
+    2,000, and the median fit took 0.07, 0.2, and 0.8 s. With ``criterion="likelihood"`` it named it
+    on every location-scale pair with Gaussian noise at each size and on 85%, 93%, and 99% of the
+    additive-noise pairs, in a median of at most 0.1 s. The model's noise is Gaussian, so under
+    other noise the likelihood criterion is misspecified: it named the true direction on 35% to 38%
+    of the pairs under Gumbel noise at every size, fewer than a coin flip, and under Laplace noise
+    on 37% at 500 rows, 44% to 47% at 1,000, and 57% to 59% at 2,000. On 20 location-scale pairs
+    with Gaussian noise of more rows, with a cap of 1 h and 28 GB per fit, both criteria named the
+    true direction on every pair they fitted; under ``criterion="independence"`` the median fit took
+    3.9 s and at most 0.8 GB at 4,000 rows, 15 s and 2.7 GB at 8,000, and 60 s and 10 GB at 16,000,
+    and every fit at 32,000 rows ran out of the 28 GB, while under ``criterion="likelihood"`` it
+    took 1.4 s and 0.2 GB at 32,000. Each HSIC test builds matrices with one row and one column per
+    sample, so under ``criterion="independence"`` time and memory grow with the square of
+    ``n_samples``; the likelihood fit grows linearly with it. It decides one pair: the paper defines
+    no procedure for more variables. A spline at either end of the cause's range covers few rows,
+    where the fitted variance can shrink toward zero as the likelihood grows, which only the prior
+    bounds. Missing values are not benchmarked yet; the tests run them on pairs with values missing
+    completely at random. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -560,6 +574,8 @@ def loci(
        17(32), 1-102.
     .. [4] Bertsekas, D. P. (1982). Projected Newton methods for optimization problems with simple
        constraints. SIAM Journal on Control and Optimization 20(2), 221-246.
+    .. [5] Tagasovska, N., Chavez-Demoulin, V., and Vatter, T. (2020). Distinguishing cause from
+       effect using quantiles: bivariate quantile causal discovery. ICML, PMLR 119, 9311-9323.
 
     Examples
     --------

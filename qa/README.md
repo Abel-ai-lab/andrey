@@ -157,8 +157,8 @@ fails, or no such run, runs the gate.
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
 XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL,
-PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the
-datasets whose assumptions each method needs, PC with each supported nonlinear
+LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on
+the datasets whose assumptions each method needs, PC with each supported nonlinear
 conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
 UT-IGSP learns:
 
@@ -182,6 +182,7 @@ UT-IGSP learns:
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
+| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
@@ -259,10 +260,10 @@ UT-IGSP learns:
   given. Each row's environment and its setting's targets sit beside the samples. IGSP runs at its
   defaults, where alpha, one over the observational rows, is `1e-3`, the level of the comparison's
   rows in these cells.
-- **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
-  edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
-  with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
-  they name the true direction on most draws.
+- **Pairs.** `anm_pair`, `pnl_pair`, and `lsnm_pair` are the published cause-effect pairs: two
+  variables and one edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test
+  keeps them in step with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM, PNL,
+  and LOCI pass only when they name the true direction on most draws.
 - **Time series.** The published time-series regimes, drawn by the benchmark harness
   (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
   adapter with the published settings. The sizes are published sizes at which the method's median
