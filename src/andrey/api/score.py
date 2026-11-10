@@ -486,9 +486,8 @@ def ages(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent, the minimum penalty of the
         solution path: the result has the skeleton of the CPDAG that :func:`~andrey.ges` returns
         with this ``penalty_discount``, ``ebic_gamma=0.0``, and ``max_parents=n_variables - 1``
-        (see Notes). Larger values give sparser graphs;
-        ``1.0`` is the standard BIC, the minimum the method's paper uses [1]_. Must be finite and
-        non-negative.
+        (see Notes). Larger values give sparser graphs; ``1.0`` is the standard BIC, the minimum the
+        method's paper uses [1]_. Must be finite and non-negative.
 
     Returns
     -------
@@ -503,8 +502,8 @@ def ages(
         CPDAG of the solution path, the lowest one that gives it, and
         ``metadata["path_aggregated"]`` whether the orientations of each were taken; the first
         entries are the minimum penalty and ``True``. ``metadata["tie_break"]`` is the tie-break
-        rule the fit ran under, ``andrey.config.tie_break``, and ``metadata["penalty_discount"]``
-        the minimum penalty.
+        rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records the
+        penalties its score used, under their parameter names.
 
     Raises
     ------
@@ -512,11 +511,12 @@ def ages(
         If an argument has the wrong type, such as a string for a number; the message names the
         method, the argument, what it accepts, and the value.
     ValueError
-        If an argument lies outside its range; the message names the method, the argument, what it
-        accepts, and the value. Also if ``data`` holds a missing value, or a column declared
-        categorical by its type. Also if a column repeats another up to scale and shift given more
-        than two rows or, with more rows than columns, is a linear function of other columns. One
-        message names every group of copies and says to keep one column per group.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` holds a missing
+        value, or a column declared categorical by its type. Also if a column repeats another up to
+        scale and shift given more than two rows or, with more rows than columns, is a linear
+        function of other columns. One message names every group of copies and says to keep one
+        column per group.
 
     Warns
     -----
@@ -524,8 +524,8 @@ def ages(
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
     DataTypeWarning
-        When columns look like category codes, which the score reads as numbers. Each message warns
-        once per process.
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -580,16 +580,27 @@ def ages(
     aggregation for complete data from one environment, without background knowledge or a cap on
     the parents.
 
-    **Limitations.** Not benchmarked yet. An orientation beyond the CPDAG is as reliable as the
-    sparser CPDAG it comes from: when path strong faithfulness fails, a CPDAG of the path can
-    direct an edge against the true DAG, and the paper reports a small loss of precision against
-    GES on sparse graphs without weak edges. The skeleton is that of GES at the minimum penalty,
-    so its missing and extra edges stay, and with few rows, where GES misses the weak edges, the
-    result is the GES CPDAG: the paper finds almost no gain at 100 rows on 10 variables. A CPDAG
-    of the path can hold an unshielded collider that the first lacks, so the DAGs the result
-    stands for need not be in the equivalence class of the GES CPDAG. The backward phase runs
-    once per forward result, in one process, so a fit costs several times one of
-    :func:`~andrey.ges`.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet; the fit times below are the only measurements. An
+    orientation beyond the CPDAG is as reliable as the sparser CPDAG it comes from: when path strong
+    faithfulness fails, a CPDAG of the path can direct an edge against the true DAG, and the paper
+    reports a small loss of precision against GES on sparse graphs without weak edges. The skeleton
+    is that of GES at the minimum penalty, so its missing and extra edges stay, and with few rows,
+    where GES misses the weak edges, the result is the GES CPDAG: the paper finds almost no gain at
+    100 rows on 10 variables. A CPDAG of the path can hold an unshielded collider that the first
+    lacks, so the DAGs the result stands for need not be in the equivalence class of the GES CPDAG.
+    The backward phase runs once per forward result, in one process, so a fit costs several times
+    one of :func:`~andrey.ges`: on one core with 10,000 rows, the median of five fits took 0.19 s
+    against 0.03 s for ``ges`` at 10 variables, 0.31 s against 0.06 s at 20, and 1.2 s against
+    0.13 s at 50. The data were linear-Gaussian from the paper's simulation, with 30% of the
+    possible edges strong and 70% weak at 10 variables, and an average of 4 neighbors per variable,
+    half of them weak, at 20 and 50. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -618,7 +629,15 @@ def ages(
     """
     from andrey.search.ages import ages as _ages
 
-    X, _, labels, _ = fit_inputs(data, "score_func", "bic", None, None, method="ages")
+    labels = column_labels(data)
+    if (declared := declared_columns(data, None)) is not None:
+        name = column_namer(labels)
+        columns = ", ".join(name(int(j)) for j in np.flatnonzero(declared))
+        raise ValueError(
+            f"ages reads continuous data, but data columns {columns} are declared categorical by "
+            "a category, bool, or text type; pass them as numbers or leave them out"
+        )
+    X = data_matrix(data, method="ages")
     with copies_named(labels):
         graph, penalties, taken = _ages(X, penalty_discount=penalty_discount)
     metadata = {"path_penalties": penalties, "path_aggregated": taken}

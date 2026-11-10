@@ -3245,6 +3245,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     **dict.fromkeys(("gfci", "boss_fci", "grasp_fci"), ("index_edges",)),
     "gnies": ("score", "changing_variables", "environments"),
+    "ages": ("path_penalties", "path_aggregated"),
     "exact_search": ("dag",),
     "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
     "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
