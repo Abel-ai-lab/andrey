@@ -372,34 +372,255 @@ of 2,160 fits with knowledge, tigramite refused the link assumptions of 15 of 64
 the 30-minute cap on 2, and lingam raised on 140 of 240 datasets with forbidden paths. pcalg's
 `addBgKnowledge` refused 5,004 of 15,908 required edges and 539 of 52,320 forbidden edges.
 
+## The other methods
+
+The 14 other methods that honor these parts ran in the same lanes, or in a lane with data of their
+kind, on Andrey's pre-release build of 10 November 2026 on the 0.17.0 release branch, on AMD EPYC
+7713 processors with one BLAS thread per fit. Every number below is in
+[`published/0.17.0/knowledge-paths.json`](../published/0.17.0/knowledge-paths.json). The exactness
+lanes above cover these methods through the step they share: the CPDAG step for the 11 that return a
+CPDAG, the PAG rule for `fci_jci` and `grasp_fci`, and the order rule of `direct_lingam` for
+`multi_group_direct_lingam`.
+
+| lane | methods | data | sizes | claims |
+|---|---|---|---|---|
+| `cpdag` | `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `grasp`, `exact_search`, `iamb`, `inter_iamb`, `mmpc` | as above | as above; `exact_search` at `d` 10 and, with expected degree 2, `d` 20 | 5, 10, 30 % of ordered pairs |
+| `cdnod` | `cdnod` | 4 domains whose means shift, linear-Gaussian, Erdos-Renyi | `d` 10, 20, 50; `n` 500, 2000; expected degree 2 and 4 | 5, 10, 30 % of ordered pairs |
+| `jci` | `fci_jci` | two domains and one context variable, hidden confounders, linear-Gaussian, the simulation of Mooij et al. (2020) | 10 and 20 system variables; 500 and 2000 rows per domain | 10, 30 % of ordered pairs and of the confounded pairs |
+| `pag` | `grasp_fci` | as above | as above | as above |
+| `multigroup` | `multi_group_direct_lingam` | 3 groups that share one DAG, linear, uniform noise | `d` 10, 20, 50; `n` 500, 2000 per group | 10, 30 % of ordered pairs |
+
+`iamb`, `inter_iamb`, and `mmpc` run with `structure="cpdag"` and no `target`, the only output in
+which a path claim has a meaning: with a `target` or an undirected `structure` the path parts raise
+`NotImplementedError`, and those outputs are not measured. `cdnod` is judged by `dag_errors`, its
+distance to the true DAG; its `errors`, the distance to the class the domain index identifies, are
+reported. In `multigroup` a fit returns one graph per group, and `errors` and the floor are sums
+over the 3 groups. `hc`, `tabu`, and `xges` suit sparse graphs as `ges` does, so their rows at
+expected degree 4 are reported and left out of their verdicts.
+
+| method | reference | settings | knowledge |
+|---|---|---|---|
+| `cdnod` | causal-learn 0.1.4.8 CD-NOD | Fisher z, `alpha` 0.05 | required and forbidden edges as `background_knowledge` |
+| `hc`, `tabu` | bnlearn 5.2.1 `hc`, `tabu` | score `bic-g`, the plain BIC | required edges as `whitelist`, forbidden edges as `blacklist` |
+| `mmhc`, `rsmax2` | bnlearn 5.2.1 `mmhc`, `rsmax2` (`mmpc`, then `hc`) | Fisher z, `alpha` 0.05; `bic-g` | `whitelist`, `blacklist` |
+| `iamb`, `inter_iamb` | bnlearn 5.2.1 `iamb`, `inter.iamb` | Fisher z, `alpha` 0.05 | `whitelist`, `blacklist` |
+| `grasp_fci` | Tetrad 7.6.10 GRaSP-FCI | `excludeSelectionBias=true` | `Knowledge` |
+| `multi_group_direct_lingam` | lingam 1.12.2 MultiGroupDirectLiNGAM | its defaults | the claims as `prior_knowledge` |
+
+bnlearn scores with the plain BIC and `hc` and `tabu` by default with the extended BIC
+(`ebic_gamma=1`), so the lane also runs them with `ebic_gamma=0` (`hc_bic`, `tabu_bic`), the same
+score; that arm is like for like. bnlearn's DAG is read as its CPDAG with the listed arcs kept
+directed. Five methods have no reference that takes the knowledge: the XGES package takes none, the
+Tetrad driver passes none to GRaSP, no package with an exact search takes any, bnlearn's `mmpc`
+returns only a skeleton, and how Tetrad's FCI with a context tier combines the tier with edge claims
+is unverified. For `xges`, `grasp`, `exact_search`, `mmpc`, and `fci_jci` the comparison is with the
+same fit without the claims only, as it is for `confounded` everywhere. With its default phases
+`rsmax2` is the same search as `mmhc`, and their rows are equal.
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --seeds 0 20 \
+    --methods hc hc_bic tabu tabu_bic mmhc rsmax2 iamb inter_iamb bnlearn.hc bnlearn.tabu \
+    bnlearn.mmhc bnlearn.rsmax2 bnlearn.iamb bnlearn.inter_iamb --arms bare true edges \
+    --out outputs/kp-rest-cpdag
+$ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cdnod --seeds 0 20 \
+    --methods cdnod causal_learn.cdnod --arms bare true edges --out outputs/kp-rest-cdnod
+$ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane multigroup --seeds 0 20 \
+    --methods multi_group_direct_lingam lingam.multi_group_direct_lingam --arms bare true \
+    --out outputs/kp-rest-multigroup
+```
+
+`--lane jci --methods fci_jci`, `--lane pag --methods grasp_fci tetrad.grasp_fci`, and `--lane cpdag
+--methods grasp xges mmpc exact_search` run the rest; `--part` and `--cell` select as above, and
+`--seeds 100 120` gives the fresh seeds. bnlearn needs R with the package on `R_LIBS_USER`, and
+causal-learn and lingam the benchmark environment.
+
+### One part at a time, the other methods
+
+The columns are those of the tables above. Every fit of every method returned a graph. Only the rows
+that were worse on seeds 0 to 19 were fit again on seeds 100 to 119. Of the fresh datasets, one at
+50 variables, 2,000 samples, and expected degree 4 is missing from the all-parts rows of `iamb` and
+`inter_iamb`, which pair 19: the reference's fits on it ran past the run's budget, and the run was
+stopped.
+
+| Method | Part | Rows | Worse | Worse again | Better | D | Worse | Worse again | Better | D | Edges directed | Against the true DAG | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `cdnod` | `required_paths` | 36 | 0 | 0 | 16 | -2.90 to +0.40 | 0 | 0 | 28 | -6.20 to -0.05 | 1,506 | 150 (10.0 %) | 0 | 24,151 of 37,750 (64.0 %) | yes |
+| `cdnod` | `forbidden_paths` | 36 | 0 | 0 | 14 | -1.75 to 0 | 0 | 0 | 21 | -2.50 to 0 | 658 | 102 (15.5 %) | 0 | 20,732 of 52,320 (39.6 %) | yes |
+| `xges` | `required_paths` | 18 | 0 | 0 | 1 | -0.50 to +0.05 | 0 | 0 | 18 | -12.75 to -0.85 | 2,191 | 3 (0.1 %) | 0 | 223 of 13,536 (1.6 %) | yes |
+| `xges` | `forbidden_paths` | 18 | 0 | 0 | 0 | -0.30 to +0.40 | 0 | 0 | 18 | -7.45 to -0.60 | 836 | 3 (0.4 %) | 0 | 83 of 26,160 (0.3 %) | yes |
+| `hc` | `required_paths` | 18 | 0 | 0 | 18 | -8.35 to -0.50 | 0 | 0 | 18 | -17.05 to -0.90 | 3,066 | 82 (2.7 %) | 0 | 2,377 of 13,536 (17.6 %) | yes |
+| `hc` | `forbidden_paths` | 18 | 0 | 0 | 8 | -3.85 to -0.10 | 0 | 0 | 18 | -9.05 to -0.45 | 1,366 | 149 (10.9 %) | 0 | 944 of 26,160 (3.6 %) | yes |
+| `tabu` | `required_paths` | 18 | 0 | 0 | 15 | -4.50 to -0.15 | 0 | 0 | 18 | -14.65 to -0.80 | 2,387 | 43 (1.8 %) | 0 | 2,079 of 13,536 (15.4 %) | yes |
+| `tabu` | `forbidden_paths` | 18 | 0 | 0 | 6 | -2.35 to +0.05 | 0 | 0 | 18 | -8.10 to -0.45 | 972 | 70 (7.2 %) | 0 | 697 of 26,160 (2.7 %) | yes |
+| `mmhc` | `required_paths` | 36 | 0 | 0 | 32 | -8.40 to +0.05 | 0 | 0 | 33 | -13.05 to +0.05 | 5,840 | 1,063 (18.2 %) | 0 | 19,691 of 37,726 (52.2 %) | yes |
+| `mmhc` | `forbidden_paths` | 36 | 0 | 0 | 23 | -5.45 to +0.05 | 0 | 0 | 31 | -7.15 to +0.05 | 2,966 | 732 (24.7 %) | 0 | 1,453 of 52,320 (2.8 %) | yes |
+| `rsmax2` | `required_paths` | 36 | 0 | 0 | 32 | -8.40 to +0.05 | 0 | 0 | 33 | -13.05 to +0.05 | 5,840 | 1,063 (18.2 %) | 0 | 19,691 of 37,726 (52.2 %) | yes |
+| `rsmax2` | `forbidden_paths` | 36 | 0 | 0 | 23 | -5.45 to +0.05 | 0 | 0 | 31 | -7.15 to +0.05 | 2,966 | 732 (24.7 %) | 0 | 1,453 of 52,320 (2.8 %) | yes |
+| `grasp` | `required_paths` | 36 | 0 | 0 | 12 | -1.20 to +0.05 | 0 | 0 | 35 | -13.45 to -0.15 | 3,429 | 57 (1.7 %) | 0 | 2,169 of 37,726 (5.7 %) | yes |
+| `grasp` | `forbidden_paths` | 36 | 1 | 0 | 7 | -1.30 to +0.45 | 0 | 0 | 36 | -7.85 to -0.35 | 1,734 | 56 (3.2 %) | 0 | 1,072 of 52,320 (2.0 %) | yes |
+| `exact_search` | `required_paths` | 18 | 0 | 0 | 2 | -0.50 to +0.10 | 0 | 0 | 16 | -5.30 to -0.20 | 846 | 6 (0.7 %) | 0 | 107 of 4,176 (2.6 %) | yes |
+| `exact_search` | `forbidden_paths` | 18 | 0 | 0 | 1 | -0.55 to +0.10 | 0 | 0 | 18 | -2.70 to -0.40 | 426 | 6 (1.4 %) | 0 | 50 of 4,920 (1.0 %) | yes |
+| `iamb` | `required_paths` | 36 | 3 | 2 | 2 | -0.75 to +4.20 | 0 | 0 | 31 | -10.65 to +0.05 | 2,311 | 180 (7.8 %) | 0 | 26,768 of 37,726 (71.0 %) | no |
+| `iamb` | `forbidden_paths` | 36 | 5 | 3 | 2 | -0.55 to +3.40 | 0 | 0 | 21 | -6.40 to +0.05 | 993 | 129 (13.0 %) | 0 | 27,709 of 52,320 (53.0 %) | no |
+| `inter_iamb` | `required_paths` | 36 | 3 | 2 | 2 | -0.75 to +4.35 | 0 | 0 | 29 | -10.65 to +0.05 | 2,326 | 181 (7.8 %) | 0 | 26,653 of 37,726 (70.6 %) | no |
+| `inter_iamb` | `forbidden_paths` | 36 | 6 | 2 | 2 | -0.55 to +3.50 | 0 | 0 | 24 | -6.40 to +0.05 | 1,018 | 135 (13.3 %) | 0 | 27,670 of 52,320 (52.9 %) | no |
+| `mmpc` | `required_paths` | 36 | 3 | 3 | 1 | -0.80 to +4.85 | 0 | 0 | 18 | -11.65 to +0.15 | 2,183 | 171 (7.8 %) | 0 | 29,079 of 37,726 (77.1 %) | no |
+| `mmpc` | `forbidden_paths` | 36 | 4 | 3 | 0 | -0.20 to +3.30 | 0 | 0 | 19 | -6.60 to +0.10 | 1,022 | 152 (14.9 %) | 0 | 32,326 of 52,320 (61.8 %) | no |
+
+| Method | Part | Rows | Datasets | Worse | Worse again | Better | D, least to most | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `fci_jci` | `required_paths` | 8 | 160 of 160 | 0 | 0 | 8 | -13.65 to -2.25 | 0 | 294 of 2,990 (9.8 %) | yes |
+| `fci_jci` | `forbidden_paths` | 8 | 160 of 160 | 0 | 0 | 0 | -0.25 to +0.10 | 0 | 14 of 3,720 (0.4 %) | yes |
+| `fci_jci` | `confounded` | 8 | 160 of 160 | 0 | 0 | 4 | -1.55 to -0.15 | 0 | 0 of 544 (0.0 %) | yes |
+| `grasp_fci` | `required_paths` | 8 | 156 of 156 | 0 | 0 | 6 | -1.90 to +0.05 | 0 | 171 of 2,454 (7.0 %) | yes |
+| `grasp_fci` | `forbidden_paths` | 8 | 156 of 156 | 0 | 0 | 0 | -0.11 to +0.42 | 0 | 15 of 3,686 (0.4 %) | yes |
+| `grasp_fci` | `confounded` | 8 | 156 of 156 | 0 | 0 | 2 | -0.55 to -0.05 | 0 | 0 of 206 (0.0 %) | yes |
+| `multi_group_direct_lingam` | `required_paths` | 12 | 240 of 240 | 0 | 0 | 0 | 0 to 0 | 0 | 0 of 11,088 (0.0 %) | yes |
+| `multi_group_direct_lingam` | `forbidden_paths` | 12 | 240 of 240 | 1 | 0 | 0 | -1.20 to +0.90 | 0 | 72 of 23,280 (0.3 %) | yes |
+
+No method was farther from the true DAG with true claims than without in any row, and none was above
+the empty graph. `cdnod`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `grasp`, and `exact_search` were
+not farther from the class the claims leave either in any row that repeated: `grasp` was in one row
+with forbidden paths (50 variables, 500 samples, expected degree 2, 10 % of the pairs), which did
+not repeat. `iamb`, `inter_iamb`, and `mmpc` were, at 50 variables: with 2,000 samples, by up to
+4.2, 4.35, and 4.85 edges per graph, in rows that repeated on fresh seeds, and they fail this check
+in both parts. Their fits dropped 53 to 77 % of the claims. In `mmhc` and `rsmax2`, 18.2 % of the
+edges that required paths directed and 24.7 % of those that forbidden paths directed point against
+the true DAG, the most of any method, and the fits were still closer to the true DAG in 33 and 31 of
+their 36 rows. `fci_jci`, `grasp_fci`, and `multi_group_direct_lingam` pass every part:
+`multi_group_direct_lingam` was worse in one row with forbidden paths (50 variables, 500 samples per
+group, 10 % of the pairs), by 0.9 errors summed over the groups, and on fresh seeds the difference
+was 0.75 with an interval that reaches 0. Required paths changed no error count of
+`multi_group_direct_lingam`: its order search already placed those pairs.
+
+### All parts together, the other methods
+
+| Method | Part | Rows | Worse | Worse again | Better | D | Worse | Worse again | Better | D | Edges directed | Against the true DAG | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `cdnod` | all parts | 36 | 0 | 0 | 21 | -2.90 to +0.15 | 0 | 0 | 26 | -6.20 to -0.15 | 1,563 | 163 (10.4 %) | 0 | 45,013 of 90,070 (50.0 %) | yes |
+| `xges` | all parts | 18 | 0 | 0 | 1 | -0.50 to +0.05 | 0 | 0 | 18 | -12.75 to -1.25 | 2,238 | 3 (0.1 %) | 0 | 312 of 39,696 (0.8 %) | yes |
+| `hc` | all parts | 18 | 0 | 0 | 18 | -8.35 to -0.50 | 0 | 0 | 18 | -17.05 to -1.15 | 3,140 | 83 (2.6 %) | 0 | 3,469 of 39,696 (8.7 %) | yes |
+| `tabu` | all parts | 18 | 0 | 0 | 15 | -4.50 to -0.10 | 0 | 0 | 18 | -14.65 to -1.05 | 2,441 | 44 (1.8 %) | 0 | 2,843 of 39,696 (7.2 %) | yes |
+| `mmhc` | all parts | 36 | 0 | 0 | 32 | -8.40 to -0.25 | 0 | 0 | 35 | -13.05 to -0.20 | 6,039 | 1,096 (18.1 %) | 0 | 21,609 of 90,046 (24.0 %) | yes |
+| `rsmax2` | all parts | 36 | 0 | 0 | 32 | -8.40 to -0.25 | 0 | 0 | 35 | -13.05 to -0.20 | 6,039 | 1,096 (18.1 %) | 0 | 21,609 of 90,046 (24.0 %) | yes |
+| `grasp` | all parts | 36 | 0 | 0 | 18 | -1.60 to -0.10 | 0 | 0 | 36 | -13.45 to -0.50 | 3,665 | 65 (1.8 %) | 0 | 3,291 of 90,046 (3.7 %) | yes |
+| `exact_search` | all parts | 18 | 0 | 0 | 2 | -0.65 to +0.05 | 0 | 0 | 18 | -5.30 to -0.50 | 947 | 6 (0.6 %) | 0 | 160 of 9,096 (1.8 %) | yes |
+| `iamb` | all parts | 36 | 3 | 3 | 3 | -0.85 to +4.20 | 0 | 0 | 30 | -10.65 to +0.10 | 2,367 | 190 (8.0 %) | 0 | 54,571 of 90,046 (60.6 %) | no |
+| `inter_iamb` | all parts | 36 | 3 | 2 | 3 | -0.85 to +4.35 | 0 | 0 | 29 | -10.65 to +0.10 | 2,390 | 192 (8.0 %) | 0 | 54,399 of 90,046 (60.4 %) | no |
+| `mmpc` | all parts | 36 | 3 | 3 | 0 | -0.75 to +4.85 | 0 | 0 | 18 | -11.65 to +0.05 | 2,243 | 180 (8.0 %) | 0 | 61,527 of 90,046 (68.3 %) | no |
+
+| Method | Part | Rows | Datasets | Worse | Worse again | Better | D, least to most | Above floor | Claims dropped | Passes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `fci_jci` | all parts | 8 | 160 of 160 | 0 | 0 | 8 | -16.90 to -2.65 | 0 | 317 of 7,254 (4.4 %) | yes |
+| `grasp_fci` | all parts | 8 | 156 of 156 | 0 | 0 | 7 | -2.25 to -0.47 | 0 | 176 of 6,346 (2.8 %) | yes |
+| `multi_group_direct_lingam` | all parts | 12 | 240 of 240 | 1 | 0 | 0 | -1.20 to +0.90 | 0 | 72 of 34,368 (0.2 %) | yes |
+
+### Against reference packages, the other methods
+
+The columns are those of the table above, with one difference: the last column gives fewer, tied,
+and more on seeds 0 to 19 only. Its rows were not fit again on fresh seeds, as it does not decide a
+status. `hc` and `tabu` are judged in their setting, their 18 rows at expected degree 2. lingam
+raised `ValueError` on 152 of 240 datasets with forbidden paths and on 180 of 240 with all parts, on
+every dataset at 50 variables, and those datasets are left out of its rows.
+
+| Method | Reference | Part | Rows | Same knowledge | Path claims against the reference's edges |
+|---|---|---|---|---|---|
+| `cdnod` | causal-learn CD-NOD | `required_paths` | 36 | 32 / 4 / 0 / 0 | 0 / 15 / 21 |
+| `cdnod` | causal-learn CD-NOD | `forbidden_paths` | 36 | 18 / 18 / 0 / 0 | 11 / 23 / 2 |
+| `cdnod` | causal-learn CD-NOD | all parts | 36 | 33 / 3 / 0 / 0 | 0 / 14 / 22 |
+| `hc` | bnlearn `hc` | `required_paths` | 18 | 12 / 6 / 0 / 0 | 0 / 6 / 12 |
+| `hc` | bnlearn `hc` | `forbidden_paths` | 18 | 7 / 11 / 0 / 0 | 7 / 11 / 0 |
+| `hc` | bnlearn `hc` | all parts | 18 | 12 / 6 / 0 / 0 | 0 / 5 / 13 |
+| `hc`, `ebic_gamma=0` | bnlearn `hc` | `required_paths` | 18 | 0 / 17 / 1 / 0 | 0 / 3 / 15 |
+| `hc`, `ebic_gamma=0` | bnlearn `hc` | `forbidden_paths` | 18 | 0 / 17 / 1 / 0 | 1 / 15 / 2 |
+| `hc`, `ebic_gamma=0` | bnlearn `hc` | all parts | 18 | 0 / 16 / 2 / 0 | 0 / 3 / 15 |
+| `tabu` | bnlearn `tabu` | `required_paths` | 18 | 14 / 4 / 0 / 0 | 0 / 15 / 3 |
+| `tabu` | bnlearn `tabu` | `forbidden_paths` | 18 | 8 / 10 / 0 / 0 | 6 / 12 / 0 |
+| `tabu` | bnlearn `tabu` | all parts | 18 | 14 / 4 / 0 / 0 | 0 / 14 / 4 |
+| `tabu`, `ebic_gamma=0` | bnlearn `tabu` | `required_paths` | 18 | 0 / 17 / 1 / 1 | 0 / 4 / 14 |
+| `tabu`, `ebic_gamma=0` | bnlearn `tabu` | `forbidden_paths` | 18 | 1 / 16 / 1 / 0 | 0 / 15 / 3 |
+| `tabu`, `ebic_gamma=0` | bnlearn `tabu` | all parts | 18 | 0 / 16 / 2 / 0 | 0 / 3 / 15 |
+| `mmhc` | bnlearn `mmhc` | `required_paths` | 36 | 10 / 23 / 3 / 2 | 1 / 4 / 31 |
+| `mmhc` | bnlearn `mmhc` | `forbidden_paths` | 36 | 6 / 30 / 0 / 0 | 7 / 28 / 1 |
+| `mmhc` | bnlearn `mmhc` | all parts | 36 | 7 / 23 / 6 / 4 | 0 / 4 / 32 |
+| `rsmax2` | bnlearn `rsmax2` | `required_paths` | 36 | 10 / 23 / 3 / 2 | 1 / 4 / 31 |
+| `rsmax2` | bnlearn `rsmax2` | `forbidden_paths` | 36 | 6 / 30 / 0 / 0 | 7 / 28 / 1 |
+| `rsmax2` | bnlearn `rsmax2` | all parts | 36 | 7 / 23 / 6 / 4 | 0 / 4 / 32 |
+| `iamb` | bnlearn `iamb` | `required_paths` | 36 | 0 / 35 / 1 / 0 | 0 / 5 / 31 |
+| `iamb` | bnlearn `iamb` | `forbidden_paths` | 36 | 0 / 36 / 0 / 0 | 7 / 21 / 8 |
+| `iamb` | bnlearn `iamb` | all parts | 36 | 0 / 34 / 2 / 0 | 0 / 5 / 31 |
+| `inter_iamb` | bnlearn `inter.iamb` | `required_paths` | 36 | 0 / 34 / 2 / 0 | 0 / 4 / 32 |
+| `inter_iamb` | bnlearn `inter.iamb` | `forbidden_paths` | 36 | 0 / 36 / 0 / 0 | 7 / 20 / 9 |
+| `inter_iamb` | bnlearn `inter.iamb` | all parts | 36 | 0 / 33 / 3 / 0 | 0 / 5 / 31 |
+| `grasp_fci` | Tetrad GRaSP-FCI | `required_paths` | 8 | 8 / 0 / 0 / 0 | 2 / 6 / 0 |
+| `grasp_fci` | Tetrad GRaSP-FCI | `forbidden_paths` | 8 | 1 / 6 / 1 / 0 | 2 / 6 / 0 |
+| `grasp_fci` | Tetrad GRaSP-FCI | all parts | 8 | 7 / 1 / 0 / 0 | 6 / 2 / 0 |
+| `multi_group_direct_lingam` | lingam MultiGroupDirectLiNGAM | `required_paths` | 12 | 0 / 12 / 0 / 0 |  |
+| `multi_group_direct_lingam` | lingam MultiGroupDirectLiNGAM | `forbidden_paths` | 6 | 4 / 2 / 0 / 0 |  |
+| `multi_group_direct_lingam` | lingam MultiGroupDirectLiNGAM | all parts | 6 | 0 / 6 / 0 / 0 |  |
+
+Without knowledge, no method was worse than its reference in any row. Given the same knowledge,
+`cdnod` made fewer errors than causal-learn's CD-NOD in 33 of 36 rows with all parts and more in
+none, `grasp_fci` fewer than Tetrad's GRaSP-FCI in 7 of 8, and `multi_group_direct_lingam` tied or
+beat lingam in every row lingam fit. `iamb` and `inter_iamb` tied bnlearn in 33 or more of 36 rows
+and were worse in no row that repeated. With its default score `hc` made fewer errors than bnlearn's
+`hc` in 12 of 18 rows and `tabu` than bnlearn's `tabu` in 14, and neither more in any. With the
+plain BIC, the like-for-like arm, `hc` was worse in no row that repeated. `tabu` with the plain BIC
+was, in one row with the required edges alone (20 variables, 500 samples, 5 % of the pairs; 3.55
+more errors per graph on seeds 0 to 19 and 3.15 on fresh seeds), so `required_paths` fails this
+comparison in `tabu`. `mmhc` and `rsmax2` made more errors than bnlearn's given the same required
+edges at expected degree 4, in 2 of 36 rows with required paths alone and 4 of 36 with all parts
+that repeated, by 1.75 to 4.9 per graph, so `required_paths` fails it in both; with forbidden paths
+they were worse in no row.
+
+With the plain BIC, `hc` and `tabu` are not below the empty graph at 50 variables, 500 samples, and
+expected degree 2, with the claims or without, and neither is bnlearn there: in 2 rows of `hc` and 1
+of `tabu` with the forbidden edges. The floor is judged with a method's default settings, where
+every row is below it, so these rows are reported (`plain_bic_floor` in the published file) and do
+not decide a status. Outside their setting, at expected degree 4, `hc` and `tabu` with the same
+edges were worse than bnlearn in up to 3 rows per part, and in none on fresh seeds.
+
+Each reference's own change with the knowledge is under `reference_change_with_knowledge`. bnlearn's
+searches and causal-learn's CD-NOD made fewer errors with the edges in most rows and more in none.
+Tetrad's GRaSP-FCI made more errors with the forbidden edges than without in one row that repeated,
+and so did `grasp_fci` given the same forbidden edges, in another: both are about forbidden edges,
+not paths. lingam with forbidden paths made more errors than without in 4 of the 6 rows it fit.
+
+<!-- end of the other methods -->
+
 ### Status
 
-A part is supported in a method when it passes all three checks: the exactness lane, no worse
-than the same fit without the claims, and no worse than its references given the same knowledge in
-any row that repeats.
+A part is supported in a method when it passes all three checks: the exactness lane, no worse than
+the same fit without the claims, and no worse than its references given the same knowledge in any
+row that repeats. Where no reference takes the knowledge, the first two decide.
 
-| Part | Supported in |
-|---|---|
-| `required_paths` | `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, `direct_lingam` |
-| `forbidden_paths` | `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, `direct_lingam` |
-| `confounded` | `fci`, `gfci`, `boss_fci`, `lpcmci` |
+| Part | Supported in | Experimental in |
+|---|---|---|
+| `required_paths` | `pc`, `cdnod`, `ges`, `xges`, `hc`, `boss`, `grasp`, `exact_search`, `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci`, `direct_lingam`, `multi_group_direct_lingam` | `tabu`, `mmhc`, `rsmax2`, `iamb`, `inter_iamb`, `mmpc` |
+| `forbidden_paths` | the same, and `tabu`, `mmhc`, `rsmax2` | `iamb`, `inter_iamb`, `mmpc` |
+| `confounded` | `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci` | |
+
+Why a part is experimental: in `iamb`, `inter_iamb`, and `mmpc`, true claims left the CPDAG farther
+from the class the claims define at 50 variables, in rows that repeated; in `tabu` with the plain
+BIC, and in `mmhc` and `rsmax2` at expected degree 4, the reference given the required edges the
+paths imply made fewer errors in rows that repeated.
 
 The limits the measurements show:
 
 - A claim is read on the graph the search found. Where that graph has an edge missing or extra or
   a collider missed, a true claim can force a wrong direction: 5.8 and 10.9 % of the edges that
-  required and forbidden paths directed in `pc`, 1.7 and 4.1 % in `boss`, and 1.1 and 1.7 % in
-  `ges`.
+  required and forbidden paths directed in `pc`, 1.7 and 4.1 % in `boss`, 1.1 and 1.7 % in `ges`,
+  0.1 to 3.2 % in `xges`, `grasp`, and `exact_search`, 2.7 and 10.9 % in `hc`, 10.0 and 15.5 % in
+  `cdnod`, and 18.2 and 24.7 % in `mmhc`.
 - A required path says less than a required edge and cannot restore an edge the search left out. In
   `pc`, `ges` with the plain BIC, `fci`, and `gfci`, a reference given the required edges made
-  fewer errors than the method given the paths. When you know the edge itself, state it as
+  fewer errors than the method given the paths, and so it did on seeds 0 to 19 in `cdnod`, `hc`,
+  `mmhc`, `rsmax2`, `iamb`, and `inter_iamb`. When you know the edge itself, state it as
   `required`.
-- `ges` is judged in its setting, expected degree 2.
+- `ges`, `xges`, `hc`, and `tabu` are judged in their setting, expected degree 2, and `exact_search`
+  at 10 and 20 variables.
+- `iamb`, `inter_iamb`, and `mmpc` take the path parts only in their CPDAG output.
 
-The driver does not run `cdnod`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `grasp`, `exact_search`,
-`iamb`, `inter_iamb`, `mmpc`, `fci_jci`, `grasp_fci`, or `multi_group_direct_lingam`. The parts
-were not measured in these methods, and every part is experimental there.
-
-`published/0.16.0/knowledge-paths.json` holds each part's status under `references`, `status`, with
-the rows of the path-against-edge comparison that repeated in
-`path_claims_against_reference_edges`.
+`published/0.16.0/knowledge-paths.json` and `published/0.17.0/knowledge-paths.json` hold each part's
+status under `references`, `status`, the first with the rows of the path-against-edge comparison
+that repeated in `path_claims_against_reference_edges`.

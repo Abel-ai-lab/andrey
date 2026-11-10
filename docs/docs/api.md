@@ -200,12 +200,15 @@ These marks and checks assume no selection bias. `lpcmci` takes each claim with 
 `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the
 order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 
-These parts are supported in `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, and
-`direct_lingam`, where [true claims measured no
-worse](benchmarks/0.16.0.md#path-and-confounder-claims) than the same fit without them and than
-reference packages given the same knowledge. In every other method that honors them they are
-experimental, as we have not measured them there: a fit warns with
-{py:class}`~andrey.ExperimentalWarning`, and their meaning may change without deprecation. A CPDAG
+These parts are supported wherever [true claims measured no
+worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+than the same fit without them and than a reference package given the same knowledge: in every
+method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
+`rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
+and `required_paths` and `forbidden_paths` are experimental in `iamb`, `inter_iamb`, and `mmpc`,
+where true claims left the CPDAG farther from the class the claims define at 50 variables. An
+experimental part warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change
+without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
 says less than an edge and so directs less: when you know the edge itself, state it as `required`.

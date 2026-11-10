@@ -260,7 +260,18 @@ def mmhc(
     took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the
     MMPC phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC
     tests each candidate against every subset of the current members, so its cost grows
-    exponentially with the size of a variable's parents-and-children set. The numbers are a
+    exponentially with the size of a variable's parents-and-children set. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
+    no farther from the true DAG than without them in any setting. The claims direct edges of the
+    graph the search found, as their rules take the class as given: of the edges they directed,
+    18.2% with required paths and 24.7% with forbidden paths pointed against the true DAG.
+    ``required_paths`` is experimental: given the required edges those paths imply, it made more
+    errors than a reference implementation given the same edges at mean degree 4, in 2 of 36
+    settings with required paths alone and 4 of 36 with both parts, each on two sets of 20 datasets.
+    A required path says less than a required edge and directs less: it cannot restore an edge the
+    search left out, and on simulated data a required edge, which also states that the pair is
+    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -502,9 +513,19 @@ def rsmax2(
     never added, and the maximize phase stops at a local optimum. MMPC tests each candidate against
     every subset of the current members, so its cost grows exponentially with the size of a
     variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
-    so each of their tests needs more rows as the blankets grow. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    so each of their tests needs more rows as the blankets grow. With true ``required_paths`` or
+    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
+    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
+    DAG than without them in any setting. The claims direct edges of the graph the search found, as
+    their rules take the class as given: of the edges they directed, 18.2% with required paths and
+    24.7% with forbidden paths pointed against the true DAG. ``required_paths`` is experimental:
+    given the required edges those paths imply, it made more errors than a reference implementation
+    given the same edges at mean degree 4, in 2 of 36 settings with required paths alone and 4 of 36
+    with both parts, each on two sets of 20 datasets. A required path says less than a required edge
+    and directs less: it cannot restore an edge the search left out, and on simulated data a
+    required edge, which also states that the pair is adjacent, lowered the errors more. A known
+    edge belongs in ``required``. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
