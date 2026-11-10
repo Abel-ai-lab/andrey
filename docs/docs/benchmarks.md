@@ -36,10 +36,10 @@ width="190" height="40"></p>
 ::::{div} release-tldr
 
 0.16.0 is here. Simulate missing values with a known cause, and fit incomplete data with MVPC for
-PC and EM for the score searches, both experimental. State causal paths and hidden common causes in
-background knowledge. LOCI reads the direction of a pair whose noise changes with the cause, and
-made no more errors than its authors' code. Drawings mark intervened variables, and HSIC p-values
-stay precise far below 1e-16.
+PC and EM for the score searches. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
+Tabu search. State causal paths and hidden common causes in background knowledge. LOCI reads the
+direction of a pair whose noise changes with the cause, and made no more errors than its authors'
+code. Drawings mark intervened variables, and HSIC p-values stay precise far below 1e-16.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.16.0.md)
