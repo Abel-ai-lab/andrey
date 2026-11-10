@@ -58,9 +58,9 @@ prints; [Configuration](configuration.md#parallel-search) lists the variables.
 
 ### What is the quickest way to try it?
 
-Run the [quickstart](guides/getting-started.md#learn-a-graph), try a [demo](demos/index) in your
-browser, or open one of the [example notebooks](examples/index) in Colab. Each notebook installs
-Andrey in its first cell.
+Run the [quickstart](guides/getting-started.md#learn-a-graph), try a
+[demo](examples/index.md#interactive-demos) in your browser, or open one of the
+[example notebooks](examples/index) in Colab. Each notebook installs Andrey in its first cell.
 
 ## Methods
 
@@ -86,14 +86,6 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 
 No. We focus on speeding up statistical causal discovery methods, the ones built on independence
 tests and scores.
-
-### Are the classic methods accurate on very large graphs?
-
-Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
-FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
-causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
-[large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
-at 200 variables with the standard BIC (`ebic_gamma=0.0`).
 
 ### Why does a result differ from another package's?
 
@@ -145,8 +137,9 @@ each method at growing sizes against the packages that implement it. A few publi
 PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
 search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
 BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
-takes eight minutes. Finishing is not the same as being accurate: see [Are the classic methods
-accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+takes eight minutes. Finishing is not the same as being accurate: the 0.1.0 release card's
+[large graphs](benchmarks/0.1.0.md#large-graphs) section lists where a method's errors reach the
+empty graph's.
 
 ### Can it use more CPU cores?
 
@@ -272,9 +265,9 @@ in any release.
 
 ### What is planned next?
 
-The [roadmap](roadmap.md) lists the planned work in order, starting with every major causal
-discovery method, benchmarked. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1)
-on GitHub tracks the progress of each stage.
+The [roadmap](roadmap.md) lists the planned work in order, starting with the major methods of each
+family. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1) on GitHub tracks the
+progress of each stage.
 
 ### What is the license?
 
