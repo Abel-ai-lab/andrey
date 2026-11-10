@@ -41,13 +41,14 @@ python-utils==4.2.0
 requests==2.34.2
 scikit-learn==1.9.1
 scipy==1.12.0
+setuptools==84.2.1
 six==1.17.0
 skrebate==0.8.4
 statsmodels==0.15.0
-sympy==1.13.1
+sympy==1.13.3
 texttable==1.7.2
 threadpoolctl==3.8.0
-torch==2.5.1+cpu
+torch==2.13.0+cpu
 tqdm==4.70.1
 typing-extensions==4.16.0
 tzdata==2026.6
