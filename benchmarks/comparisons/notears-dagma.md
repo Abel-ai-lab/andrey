@@ -343,8 +343,10 @@ empty graph in more than half of the decision cells.
   authors' package is below the empty graph in none either, so the floor fails for the method on
   these data and not only for Andrey's implementation. On the rescaled cells it is below the empty
   graph in all 18. It stays experimental, with this reason in its docstring's Limitations.
-- In the package both are experimental at this build: a supported method also has its rows in a
-  release's summary and a section on that release's card.
+- In the package `notears` is supported from 0.17.0: its rows are in the release's summary,
+  [`published/0.17.0/summary.json`](../published/0.17.0/summary.json), and the
+  [0.17.0 release card](../../docs/docs/benchmarks/0.17.0.md#notears) has its
+  section. `dagma` is experimental.
 
 ## Limits
 
@@ -352,11 +354,25 @@ empty graph in more than half of the decision cells.
   empty graph's (18.4 against 20 at 10 variables with Gaussian noise, 157 against 200 at 100). On
   `SF4` it is within 5% of the empty graph in all 12 cells and meets the floor in 3, and on MEC
   SHD it is above the empty graph there from 20 variables on.
+- **One scale-free cell at the empty graph's level.** On `SF4` at 50 variables with exponential
+  noise, the reference's interval against the empty graph lies below 0 on the first seeds and
+  Andrey's does not, at the same mean (-2.65, [-5.25, -0.15] and [-5.3, +0.05]). The cell was
+  rerun on seeds 20 to 39, where neither is below the empty graph and Andrey is worse than the
+  reference (+0.65 [+0.1, +1.5], 185.55 against 184.9), and then on seeds 40 to 59, where the two
+  tie (+0.25 [-0.6, +1.1], 183.95 against 183.7). Over the 40 fresh datasets the difference is
+  +0.45 [-0.1, +1.0], a tie, with Andrey 0.75 above the empty graph ([-1.1, +2.75]) and the
+  reference 0.3 above it ([-1.6, +2.4]); over all 60 it is +0.3 [-0.1, +0.7]. The release summary
+  records the 40 fresh datasets as the row's replication, with each block of 20.
 - **Cycle repair in the NOTEARS comparison.** On the standardized cells the NOTEARS code's
   thresholded output is cyclic in 9 of 120 refits at 10 variables, 79 of 120 at 20, and 89 of 120
   at 50, and the repair drops a median of 12 of about 59 edges at 50. The comparison is of
   Andrey's NOTEARS, which includes that repair, with the authors' code followed by the same
   repair; the authors' code alone does not return a DAG there.
+- **Graphs that differ between machines.** The NOTEARS fit ends at a local solution that the last
+  bits of the input can change. On the standardized `ER2` cell with Gaussian noise at 50 variables,
+  changing every value by a relative 1e-12 gave another graph in 47 of 100 fits of Andrey's NOTEARS
+  (ten datasets, ten changes each), and the median SHD over the datasets moved by at most 1. So a
+  graph can differ between hosts where the errors do not; the quality gate checks the median.
 - **Units.** Both methods' accuracy on raw columns depends on the data's units: the same data
   standardized give 18.5 in place of 2.5 at 10 variables on `ER2` for NOTEARS, and 19.1 in place
   of 0.3 for DAGMA.

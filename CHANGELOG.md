@@ -43,12 +43,19 @@ names its pull request.
 
 ### Changed
 
-- `notears` and `dagma` are measured against their authors' code in the papers' setting, and
-  both docstrings' Limitations give the numbers. On standardized columns `notears` made no more
-  errors than the authors' code in any of 24 settings and fewer than the empty graph in 15, which
-  meets the bar for a supported method; `dagma` made fewer errors than the empty graph in none of
-  the 24, as its authors' package did, and stays experimental for that reason. The evidence is in
-  `benchmarks/comparisons/notears-dagma.md`. ([#871])
+- `notears` is supported. Against its authors' code on the paper's simulation with standardized
+  columns, Erdos-Renyi and scale-free graphs of 10 to 100 variables under Gaussian, exponential,
+  and Gumbel noise, it made no more errors (SHD) in any of the 24 settings, tied in 23 and with
+  fewer in 1 on the first datasets, and it made fewer errors than the empty graph in 15, where the
+  authors' code did in 16. Its Limitations give the numbers and where it is weak: the scale-free
+  graphs, where it was within 5% of the empty graph and below it in 3 of 12 settings; columns in
+  the data's own units, where most of its accuracy can be read from the columns' variances; the
+  cycle repair, which removed edges in 9 of its 20 fits on standardized columns at 20 variables and
+  which both sides of the comparison share; and graphs that can differ between machines while the
+  errors do not. `dagma` is measured the same way against its authors' package and stays
+  experimental: it made fewer errors than the empty graph in none of the 24 settings, as its
+  authors' package did, and its Limitations give the numbers. The evidence is on the
+  [comparison page][nd-page]. ([#871])
 - Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
   in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
   `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
@@ -2345,3 +2352,4 @@ First alpha release.
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
+[nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
