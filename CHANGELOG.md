@@ -17,10 +17,14 @@ names its pull request.
   `pc(missing="mvpc")` corrects PC where missingness depends on other variables (Tu et al., 2019),
   and `missing="em"` fits the BIC score searches, `notears`, `dagma`, and `calm` on incomplete data
   by structural EM. ([#826], [#828], [#832], [#842])
-- Background knowledge states causal paths and hidden common causes, experimentally:
+- Background knowledge states causal paths and hidden common causes:
   `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
-  DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three
-  parts, and `direct_lingam` narrows its causal order. ([#829], [#835])
+  DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three parts,
+  and `direct_lingam` narrows its causal order. The parts are supported in `pc`, `ges`, `boss`,
+  `fci`, `gfci`, `boss_fci`, `lpcmci`, and `direct_lingam`, where true claims measured no worse than
+  the same fit without them and than reference packages given the same knowledge, and experimental
+  in the other methods, which the benchmark does not run. A path claim says less than an edge and
+  directs less: a known edge belongs in `required`. ([#829], [#835], [#854])
 - `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
   et al. (2023), whose noise scale changes with the cause. ([#830])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
@@ -50,25 +54,32 @@ names its pull request.
   and without a directed path from `cause` to `effect`, and `confounded`, the pairs with a hidden
   common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
   `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` honor
-  `required_paths` and `forbidden_paths`, experimentally: the result is the MPDAG of the DAGs of
+  `required_paths` and `forbidden_paths`: the result is the MPDAG of the DAGs of
   the class found that meet them (Fang, Zhao, Liu, and He 2025), and
   `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. Knowledge that contradicts
   itself raises `ValueError` before the search. A claim that no DAG of the class meets is dropped:
   the fit warns with the new `KnowledgeWarning`, naming the claims, and lists them in
   `metadata["unmet_knowledge"]`; when only some claims hold together, they are kept in order,
   `required_paths` and then `forbidden_paths`. `bootstrap` drops them from the averaged graph alike.
-  ([#829], [#850])
+  The parts are supported in `pc`, `ges`, and `boss`, and experimental in the other CPDAG methods,
+  which the benchmark does not run. A claim directs edges of the graph the search found, so where
+  that graph is wrong, a true claim can direct an edge the wrong way: 1 to 11% of the edges true
+  claims directed in the benchmark. A required path cannot restore an edge the search left out,
+  which a required edge states. ([#829], [#850], [#854])
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
-  `forbidden_paths`, and `confounded`, experimentally: on a pair the tests keep, a required path
+  `forbidden_paths`, and `confounded`: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
   rules, no test removes a `confounded` pair, and a claim the PAG does not meet is dropped with a
   `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`; the marks and the checks assume
-  no selection bias. `lpcmci` takes each claim with its lag. ([#835], [#850])
-- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
-  experimentally, as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
+  no selection bias. `lpcmci` takes each claim with its lag. The three parts are supported in
+  `fci`, `gfci`, `boss_fci`, and `lpcmci`, and experimental in `fci_jci` and `grasp_fci`, which
+  the benchmark does not run. ([#835], [#850], [#854])
+- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`
+  as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
   the variables the causal order may place next, a forbidden path is no parent, and a claim the DAG
   does not meet is dropped with a `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`.
-  ([#835], [#850])
+  The parts are supported in `direct_lingam` and experimental in `multi_group_direct_lingam`,
+  which the benchmark does not run. ([#835], [#850], [#854])
 - Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
   another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
   `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
@@ -100,8 +111,11 @@ names its pull request.
   values, with a message that names `missing="em"` where EM would run. ([#842])
 - The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
   that listing every small graph gives, with d-separation in place of the tests, and on simulated
-  data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`,
-  `boss_fci`, `lpcmci`, and `direct_lingam` (`benchmarks/knowledge_paths.py`). ([#848])
+  data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`,
+  `lpcmci`, and `direct_lingam` (`benchmarks/knowledge_paths.py`). A CPDAG fit is scored against the
+  class the truth and its claims define, and by its distance to the true DAG. The same lanes run
+  Tetrad, pcalg, tigramite, and lingam under the same knowledge, and `ges` with the plain BIC beside
+  its default. ([#848], [#854])
 - A Quick start notebook, `examples/quick_start.ipynb`, loads the Sachs protein measurements, fits
   PC, GES, FCI, and DirectLiNGAM, reads each result, and draws each graph. It leads the examples
   gallery and replaces `examples/ges_quickstart.ipynb`, whose page on the website redirects to it.
@@ -889,14 +903,13 @@ names its pull request.
   in the other score searches; `gies` scores each variable on the rows without an intervention on
   it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
   data. ([#520])
-- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-  `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman,
-  Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform prior over each
-  variable's conditional distributions is worth. The default, `1.0`, is the weight the score used
-  before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
-  passes it with another score, named or picked from the declared column types, raises
-  `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
-  ([#553])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+  take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
+  Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
+  conditional distributions is worth. The default, `1.0`, is the weight the score used before, so
+  every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that passes it
+  with another score, named or picked from the declared column types, raises `ValueError`; the
+  result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`. ([#553])
 - `andrey.markov_check` tests whether the data contradict a DAG or a CPDAG, such as a method's
   result: it tests the independences the graph implies, each variable and every earlier non-parent
   given its parents, and rejects the graph when their p-values are not uniform on (0, 1) by the
@@ -907,13 +920,13 @@ names its pull request.
   (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
   docstring gives the rates measured for missing, extra, and reversed edges and for categorical
   data. ([#571])
-- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a rank-based
-  test for data whose columns are monotone transformations of Gaussian variables (a Gaussian
-  copula): its p-values do not change under a strictly increasing transformation of a column, and
-  it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
-  `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
-  and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
-  finds only monotone dependence. The default test is unchanged. ([#573])
+- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a
+  rank-based test for data whose columns are monotone transformations of Gaussian variables (a
+  Gaussian copula): its p-values do not change under a strictly increasing transformation of a
+  column, and it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals.
+  `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+  `pcmciplus`, and `lpcmci` take it; on data with missing values, each test ranks within the rows it
+  reads. It finds only monotone dependence. The default test is unchanged. ([#573])
 
 ### Changed
 
@@ -1056,7 +1069,7 @@ names its pull request.
   climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
   already leaves out most false edges; exact search's fell by 0.24 at 20 variables. GES's median
   errors fell from 87 to 25 over 299 datasets. `gfci` keeps `ebic_gamma=0.0`: its
-  errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
+  errors fell by only 0.06 per true edge, and rose on some graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
 - Every method checks its arguments in one shared step before it reads the data: a value of the
   wrong type raises `TypeError`, and a value outside its range or not one of its choices raises
@@ -1397,8 +1410,9 @@ names its pull request.
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
-  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
-  with the time of Tetrad's JVM reported apart from its search. ([#362])
+  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`,
+  `benchmarks/tetrad_fci_latent.py`), with the time of Tetrad's JVM reported apart from its search.
+  ([#362])
 
 ### Changed
 
@@ -2187,3 +2201,4 @@ First alpha release.
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
 [#853]: https://github.com/Abel-ai-lab/andrey/pull/853
+[#854]: https://github.com/Abel-ai-lab/andrey/pull/854

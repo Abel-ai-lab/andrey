@@ -88,6 +88,9 @@ presents, with the median errors and fit times from the runs behind the file. J-
 from [`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with
 tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors,
 fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
+The path and confounder claims are in no release summary:
+[`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds their rows,
+which their [comparison page](comparisons/knowledge-paths.md) presents.
 
 | Release | Release card | Summary |
 |---|---|---|

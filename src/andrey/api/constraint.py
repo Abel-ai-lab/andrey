@@ -375,10 +375,18 @@ def pc(
     fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
     descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
     ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
-    The density-ratio correction the paper gives for these cases is not implemented. Step 2 runs
-    one skeleton search per variable with missing values. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    The density-ratio correction the paper gives for these cases is not implemented. Step 2 runs one
+    skeleton search per variable with missing values. With true ``required_paths`` or
+    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
+    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
+    DAG than without them in any setting. The claims direct edges of the graph the search found, as
+    their rules take the class as given: of the edges they directed, 5.8% with required paths and
+    10.9% with forbidden paths pointed against the true DAG, each in a fit whose graph had an edge
+    missing or extra or a collider wrong. A required path says less than a required edge and directs
+    less: it cannot restore an edge the search left out, and on simulated data a required edge,
+    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -781,20 +789,22 @@ def fci(
     variable, it took 34 s against 23 to 29 s for ``"fast"`` over five column orders.
     ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES network with
     1,000 simulated rows, its median endpoint errors passed the empty graph's (696 against 676).
-    Test errors can give results that no MAG fits, and the ``pag`` it returns is then not the
-    PAG of any MAG. With the default settings, of 200 simulated datasets with 10 variables, mean
-    degree 3, and 2,000 rows, 36 fits with ``"fisherz"`` and 36 with ``"normal_scores"`` returned
-    one. On 28 and 29 of them, the MAG that Zhang's construction [3]_ builds from the ``pag`` is not
-    ancestral, and a graph query such as ``m_separated`` raised ``ValueError``; on the others, that
-    MAG's PAG differs from the ``pag``.
-    Rule R5 stops searching a pair after a fixed number of partial paths and leaves its circles, so
-    on graphs with many circle-circle edges it can miss an undirected cycle. With the mixed-data
-    tests, it is experimental and not benchmarked yet; its tests run it on 5 variables with 3,000
-    rows. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests
-    run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up
-    to 20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    Test errors can give results that no MAG fits, and the ``pag`` it returns is then not the PAG of
+    any MAG. With the default settings, of 200 simulated datasets with 10 variables, mean degree 3,
+    and 2,000 rows, 36 fits with ``"fisherz"`` and 36 with ``"normal_scores"`` returned one. On 28
+    and 29 of them, the MAG that Zhang's construction [3]_ builds from the ``pag`` is not ancestral,
+    and a graph query such as ``m_separated`` raised ``ValueError``; on the others, that MAG's PAG
+    differs from the ``pag``. Rule R5 stops searching a pair after a fixed number of partial paths
+    and leaves its circles, so on graphs with many circle-circle edges it can miss an undirected
+    cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its tests run it
+    on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
+    benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
+    yet; the tests run them on up to 20 variables with up to a fifth of the values missing
+    completely at random. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1262,9 +1272,12 @@ def gfci(
     and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466
     cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric
     ``env`` as a number, so with three or more environments a shift that does not follow the labels'
-    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. A
+    required path says less than a required edge and directs less: it cannot restore an edge the
+    search left out, and on simulated data a required edge, which also states that the pair is
+    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

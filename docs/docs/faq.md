@@ -201,9 +201,12 @@ points from a later tier into an earlier one, such as nothing causing a person's
 takes it except {{ no_knowledge_methods }}. It can also say that one variable causes another,
 directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
-honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths, all
-experimentally; a method given a part it does not honor raises an error naming the methods that
-do. [Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
+honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
+are supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM and experimental in
+the other methods, which we have not measured; a method given a part it does not honor raises an
+error naming the methods that do. A path claim says less than an edge, so when you know the edge
+itself, state it as `required`. [Background
+knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
 

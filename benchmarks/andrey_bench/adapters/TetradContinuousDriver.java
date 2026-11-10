@@ -76,10 +76,10 @@ import java.util.Set;
  * from {@code StarFci}, which in 7.6.10 has no setting for possible-d-separation, and
  * {@code GraspFci.setDepth} sets GRaSP's depth and the cap on the FCI steps' separating sets alike.
  *
- * <p>{@code --knowledge FILE}, which fci, bfci, and grasp-fci take, is Tetrad's knowledge file
+ * <p>{@code --knowledge FILE}, which every search but grasp takes, is Tetrad's knowledge file
  * ({@code addtemporal} tiers, {@code forbiddirect} and {@code requiredirect} edges), read by
  * Tetrad's own reader as causal-cmd reads it, before the clock; without it a search has no
- * background knowledge, and any other search stops on it.
+ * background knowledge, and grasp stops on it.
  *
  * <p>Tetrad 7.6.10 wraps the test of {@code Fci} in a cache that is a plain {@code HashMap}, and
  * runs its stable skeleton search in a parallel stream over that test, which on several threads
@@ -172,7 +172,7 @@ public class TetradContinuousDriver {
 
     static Graph run(String algorithm, DataSet data, Settings s, Knowledge knowledge)
             throws Exception {
-        if (knowledge != null && !List.of("fci", "bfci", "grasp-fci").contains(algorithm)) {
+        if (knowledge != null && algorithm.equals("grasp")) {
             throw new IllegalArgumentException(algorithm + " takes no knowledge here");
         }
         switch (algorithm) {
@@ -184,6 +184,7 @@ public class TetradContinuousDriver {
                         Pc.ColliderOrientationStyle.valueOf(upper(s.text("colliderOrientationStyle"))));
                 pc.setAllowBidirected(s.bool("allowBidirected") ? Pc.AllowBidirected.ALLOW
                         : Pc.AllowBidirected.DISALLOW);
+                if (knowledge != null) pc.setKnowledge(knowledge);
                 return pc.search();
             }
             case "fges": {
@@ -192,6 +193,7 @@ public class TetradContinuousDriver {
                 fges.setNumThreads(s.integer("numThreads"));
                 fges.setSymmetricFirstStep(s.bool("symmetricFirstStep"));
                 fges.setFaithfulnessAssumed(s.bool("faithfulnessAssumed"));
+                if (knowledge != null) fges.setKnowledge(knowledge);
                 fges.setVerbose(false);
                 return fges.search();
             }
@@ -205,6 +207,7 @@ public class TetradContinuousDriver {
                 boss.setResetAfterRS(s.bool("resetAfterRS"));
                 boss.setVerbose(false);
                 PermutationSearch search = new PermutationSearch(boss);
+                if (knowledge != null) search.setKnowledge(knowledge);
                 search.setSeed(s.integer("seed"));
                 return search.search(true);
             }

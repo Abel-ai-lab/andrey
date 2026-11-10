@@ -185,15 +185,25 @@ time `t`. Three more parts state causal paths and hidden common causes: `require
 `forbidden_paths` list the pairs `(cause, effect)` with and without a directed path from `cause` to
 `effect`, and `confounded` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`,
 `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
-`structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`, experimentally:
+`structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`:
 the result is the MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
 `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`,
-`boss_fci`, `grasp_fci`, and `lpcmci` honor all three, experimentally: on a pair the tests keep, a
+`boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a
 required path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before
 Zhang's rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair.
 These marks and checks assume no selection bias. `lpcmci` takes each claim with its lag.
-`direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`,
-experimentally, as the order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
+`direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the
+order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
+
+These parts are supported in `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, and
+`direct_lingam`, where [true claims measured no
+worse](benchmarks/0.16.0.md#path-and-confounder-claims) than the same fit without them and than
+reference packages given the same knowledge. In every other method that honors them they are
+experimental, as we have not measured them there: a fit warns with
+{py:class}`~andrey.ExperimentalWarning`, and their meaning may change without deprecation. A CPDAG
+method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
+an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
+says less than an edge and so directs less: when you know the edge itself, state it as `required`.
 
 Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
 raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
@@ -840,9 +850,9 @@ environment variables and the order in which the settings apply, and
 Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`, and each
 situation has one category, the one the table names, in every method. A warning never changes a
 result. Each distinct message warns once per process, at the line in your code that
-made the call; a `BoundaryWarning` warns once per method, and a `KnowledgeWarning` once per fit. A warning from a dependency keeps its own
-category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
-`SearchLimitWarning`.
+made the call; a `BoundaryWarning` warns once per method, and a `KnowledgeWarning` once per fit. A
+warning from a dependency keeps its own category, except scikit-learn's `ConvergenceWarning` from
+FastICA and LARS, raised again as a `SearchLimitWarning`.
 
 | Category | When |
 |---|---|

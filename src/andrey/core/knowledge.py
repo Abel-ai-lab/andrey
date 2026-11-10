@@ -264,7 +264,9 @@ class Knowledge:
     least one of ``c1, c2, ...``. The MPDAG and the clauses together pick out the DAGs that meet
     the claims. The step restricts the class the search found; it does not search again for the
     best class among those that meet the claims, and the search's own metadata, such as a score
-    or a DAG, describe what it found.
+    or a DAG, describe what it found. The rules take the class as given [3]_, [4]_: where the class
+    found does not hold the true DAG, with an edge missing or extra or a collider missed, a true
+    claim can direct an edge against the true DAG.
 
     A PAG method reads the claims in its search, as marks of a maximal ancestral graph [5]_: on a
     pair the tests keep adjacent, ``a`` an ancestor of ``b`` makes the edge ``a -> b``, and ``a`` no
