@@ -179,12 +179,15 @@ def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
     bench = importlib.import_module("andrey_bench.datasets")
     drivers = {"anm_pair": "anm_pairs", "pnl_pair": "pnl_pairs"}
-    assert set(drivers) == set(qg.PAIRS)
+    assert {*drivers, "lsnm_pair"} == set(qg.PAIRS)
     for regime, driver in drivers.items():
         module = importlib.import_module(driver)
         assert module.REGIME == regime
         for key in module.pair_keys([qg.PAIR_N], 3):
             assert qg.pair_kwargs(regime, qg.PAIR_N, key.seed) == bench.generation_kwargs(key)
+    loci = importlib.import_module("loci_pairs")
+    for key in loci.regime_keys("lsnm_pair", qg.PAIR_N, 3):
+        assert qg.pair_kwargs("lsnm_pair", qg.PAIR_N, key.seed) == bench.generation_kwargs(key)
 
 
 def test_time_series_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:

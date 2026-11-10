@@ -39,7 +39,7 @@ whose Reproduce table lists the driver.
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
 | Stein-score screen | `stein_cpu.py` | CAM as context; no Andrey SCORE or NoGAM | the authors' SCORE, NoGAM (dodiscover), CausalDisco (R2-SortnRegress) | |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
-| [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | |
+| [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em` | 0.16.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; lingam's DirectLiNGAM with `prior_knowledge` as context | |
@@ -62,8 +62,8 @@ build the separate environments some comparisons need ([setup](README.md#setup))
 
 ## Release cards
 
-Each release card publishes its numbers from a summary in `published/<release>/`; the 0.16.0 card
-cites the earlier cards and has none. Two more folders hold measurements no card of their own presents:
+Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
+hold measurements no card of their own presents:
 `published/0.2.0-small-fits/`, the faster small fits the 0.2.0 card links, and `published/0.4.1/`,
 DirectLiNGAM's causal-order search in the 0.4.1 fix. The 0.14.0 summary draws its rows from the lane
 files [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
@@ -88,15 +88,18 @@ presents, with the median errors and fit times from the runs behind the file. J-
 from [`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with
 tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors,
 fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
-The path and confounder claims are in no release summary:
-[`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds their rows,
-which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
-rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
+The 0.16.0 summary draws LOCI's rows from [`published/0.16.0/loci.json`](published/0.16.0/loci.json),
+LOCI with its authors' code, which its [comparison page](comparisons/loci.md) presents, with the
+size ladder and the other pairwise methods on the same pairs. The path and confounder claims are in
+no release summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json)
+holds their rows, which their [comparison page](comparisons/knowledge-paths.md) presents. The
+missing-data lanes' rows are in
+[`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
 [comparison page](comparisons/missing-data.md).
 
 | Release | Release card | Summary |
 |---|---|---|
-| 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | None: the earlier cards' numbers hold |
+| 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | [`published/0.16.0/summary.json`](published/0.16.0/summary.json) |
 | 0.15.0 | [Multi-domain data](../docs/docs/benchmarks/0.15.0.md) | [`published/0.15.0/summary.json`](published/0.15.0/summary.json) |
 | 0.14.0 | [Interventional data](../docs/docs/benchmarks/0.14.0.md) | [`published/0.14.0/summary.json`](published/0.14.0/summary.json) |
 | 0.13.0 | [Functional causal models](../docs/docs/benchmarks/0.13.0.md) | [`published/0.13.0/summary.json`](published/0.13.0/summary.json) |

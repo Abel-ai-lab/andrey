@@ -68,6 +68,7 @@ RELEASES = (
     "0.13.0",
     "0.14.0",
     "0.15.0",
+    "0.16.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -463,6 +464,27 @@ REGIMES |= {
         for n in (10, 15)
     },
 }
+# The 0.16.0 summary's cells: LOCI on cause-effect pairs whose noise scale changes with the cause,
+# under Gaussian, Gumbel, and Laplace noise, each also with the cause rescaled to unit variance
+# before the effect reads it, and on the five synthetic sets of Tagasovska et al. (2020).
+LSNM_PAIRS = "cause-effect pairs with location-scale noise"
+REGIMES |= {
+    **{
+        f"lsnm_{key}{tail}pair": f"{LSNM_PAIRS}, {noise}{scale}"
+        for key, noise in (("", "Gaussian"), ("gumbel_", "Gumbel"), ("laplace_", "Laplace"))
+        for tail, scale in (("", ""), ("rescaled_", ", the cause rescaled"))
+    },
+    **{
+        f"tagasovska_{key}_pair": f"the {name} cause-effect pairs of Tagasovska et al. (2020)"
+        for key, name in (
+            ("an", "AN"),
+            ("ans", "AN-s"),
+            ("ls", "LS"),
+            ("lss", "LS-s"),
+            ("mnu", "MN-U"),
+        )
+    },
+}
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other
@@ -519,7 +541,7 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # BOSS-FCI and GRaSP-FCI at their paper's penalty and level. J-PCMCI+ shows its claimed level, the
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
-# dummies.
+# dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -533,6 +555,7 @@ NOT_SHOWN_LANES = {
     "jpcmciplus.context_links",
     "jpcmciplus.assumption_3_broken",
     "jpcmciplus.gpdc",
+    "loci.likelihood",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
@@ -548,6 +571,10 @@ NOT_SHOWN_COMPARATORS = {
     "Tetrad 7.6.3",
     "lingam 1.13.0 at its default set size",
 }
+# Comparators left out of the homepage's accuracy claim and its error bars, which speak of other
+# packages: a method's authors' research code that is not a package. Its rows stay in the speed
+# panel and on its release card.
+NOT_IN_ACCURACY_CLAIM = {"LOCI authors' code, LOCI-H"}
 # The package each comparator names in the speed panel's legend, without the version or setting
 # its release card gives; every other comparator is a package's name already.
 PACKAGE_NAMES = {
@@ -560,6 +587,7 @@ PACKAGE_NAMES = {
     "tetrad-lib 7.6.10 BossFci": "Tetrad",
     "tetrad-lib 7.6.10 GraspFci": "Tetrad",
     "tigramite 5.2.10.1": "tigramite",
+    "LOCI authors' code, LOCI-H": "LOCI authors' code",
 }
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear", "boss_grasp_fci"}
@@ -1340,7 +1368,7 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
     left out against a package unless the card counts one of its rows there better and none
     worse, over every setting the homepage shows. So a comparison the card calls a tie, or worse
     anywhere, never reads as a win. Its ties stay in the sums, as every row does in the older
-    summaries.
+    summaries. A comparator in ``NOT_IN_ACCURACY_CLAIM`` has no row here.
     """
     groups = time_groups(summaries)
     verdicts: dict[tuple[str, str], set] = {}
@@ -1360,6 +1388,8 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
             if c["row"]["card_verdict"] is None or not counted(
                 (c["method"]["spec"], c["method"]["comparator"])
             ):
+                continue
+            if c["method"]["comparator"] in NOT_IN_ACCURACY_CLAIM:
                 continue
             row = by.setdefault(
                 c["method"]["comparator"],

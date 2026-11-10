@@ -14,7 +14,10 @@ direction over the weights away from the bound ``w_2 = 0``, a gradient step scal
 diagonal on the weights at or near it whose gradient is positive, so that the objective falls
 toward the bound, then a backtracking search along the direction's projection onto ``w_2 >= 0``.
 Both reach the same maximizer, Newton in far fewer steps, as the mean and the variance weights are
-strongly coupled. The fit stops once the mean objective changes by less than ``1e-6`` in a full
+strongly coupled. Where rounding leaves the Hessian without a Cholesky factor, as a row with a
+variance near zero can, the step adds a growing multiple of the Hessian's diagonal until it has one
+(Nocedal and Wright 2006, Section 3.4); the direction still descends, so the maximizer is the same.
+The fit stops once the mean objective changes by less than ``1e-6`` in a full
 step, or after 100 steps (Supplementary Material D).
 
 References
@@ -26,6 +29,8 @@ Eilers and Marx (1996). Flexible smoothing with B-splines and penalties. Statist
 
 Bertsekas (1982). Projected Newton methods for optimization problems with simple constraints.
 SIAM Journal on Control and Optimization 20(2).
+
+Nocedal and Wright (2006). Numerical Optimization, 2nd edition. Springer.
 """
 
 from __future__ import annotations
@@ -33,7 +38,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy.linalg import cho_factor, cho_solve
+from scipy.linalg import LinAlgError, cho_factor, cho_solve
 from sklearn.preprocessing import SplineTransformer
 
 #: The B-spline basis of Supplementary Material D: 25 knots and order 5, which the authors' code
@@ -54,6 +59,10 @@ _ACTIVE_DISTANCE = 1e-3
 #: The sufficient-decrease constant of the backtracking search, and the smallest step it tries.
 _ARMIJO = 1e-4
 _MIN_STEP = 1e-10
+#: The first multiple of the Hessian's diagonal added when the Hessian has no Cholesky factor, and
+#: the factor it grows by until it has one.
+_DAMPING = 1e-12
+_DAMPING_GROWTH = 10.0
 
 _HALF_LOG_TWO_PI = 0.5 * math.log(2 * math.pi)
 
@@ -112,6 +121,28 @@ def _gradient_hessian(
     return gradient / n, hessian / n
 
 
+def _newton_direction(hessian: np.ndarray, gradient: np.ndarray) -> np.ndarray:
+    """The Newton direction ``-hessian^-1 gradient`` of a positive definite ``hessian``.
+
+    A Hessian that rounding leaves without a Cholesky factor gets a multiple of its diagonal added,
+    ten times larger at each try, until it has one. Every such matrix is positive definite, so the
+    direction descends.
+    """
+    try:
+        return -cho_solve(cho_factor(hessian), gradient)
+    except LinAlgError:
+        pass
+    diagonal = np.diag(hessian).copy()
+    damping = _DAMPING
+    while True:
+        damped = hessian.copy()
+        damped[np.diag_indices_from(damped)] += damping * diagonal
+        try:
+            return -cho_solve(cho_factor(damped), gradient)
+        except LinAlgError:
+            damping *= _DAMPING_GROWTH
+
+
 def _maximize(features: np.ndarray, effect: np.ndarray) -> np.ndarray:
     """The weights ``(w_1, w_2)`` that minimize :func:`_objective`, by projected Newton steps.
 
@@ -130,7 +161,7 @@ def _maximize(features: np.ndarray, effect: np.ndarray) -> np.ndarray:
         distance = min(_ACTIVE_DISTANCE, float(np.linalg.norm(weights - projected)))
         free = ~(bounded & (weights <= distance) & (gradient > 0))
         direction = -gradient / np.diag(hessian)
-        direction[free] = -cho_solve(cho_factor(hessian[np.ix_(free, free)]), gradient[free])
+        direction[free] = _newton_direction(hessian[np.ix_(free, free)], gradient[free])
         step = 1.0
         while step >= _MIN_STEP:
             trial = weights + step * direction

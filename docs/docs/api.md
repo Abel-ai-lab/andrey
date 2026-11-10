@@ -451,6 +451,7 @@ variable.
    camuv
    anm
    pnl
+   loci
    rcd
    bottom_up_parce_lingam
    gin
@@ -482,6 +483,14 @@ finds most independent of the remaining variables, then removes each parent whos
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
 causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
 variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
+LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
+location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
+allow. It fits a Gaussian in each direction, its mean and variance smooth functions of the
+proposed cause, and decides either by an HSIC test of the scaled residual against the cause
+(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
+which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
+against the authors' code.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -613,19 +622,12 @@ its first call in a process.
 
    notears
    dagma
-   loci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
-location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
-allow. It fits a Gaussian in each direction, its mean and variance smooth functions of the
-proposed cause, and decides either by an HSIC test of the scaled residual against the cause
-(`criterion="independence"`) or by the larger likelihood (`criterion="likelihood"`).
 
 A method becomes supported once it has:
 

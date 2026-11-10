@@ -2590,7 +2590,7 @@ _add(
             "statistic, divided by its mean under independence, of each test.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Immer et al. 2023", "Gretton et al. 2008", "Mooij et al. 2016"),
     )
