@@ -19,6 +19,7 @@ import numpy as np
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from .measurement import NoisyChildren
     from .missingness import Mechanism
 
 import andrey
@@ -34,6 +35,7 @@ from .functional import (
     location_scale,
     nonmonotone,
     post_nonlinear,
+    random_features,
     var,
     varma,
 )
@@ -61,7 +63,16 @@ from .interventions import (
     record,
 )
 from .latent import latent_order
-from .noise import Noise, exponential, gaussian, gumbel, laplace, uniform
+from .noise import (
+    Noise,
+    exponential,
+    gaussian,
+    gaussian_mixture,
+    gumbel,
+    laplace,
+    student_t,
+    uniform,
+)
 from .qa import FaithfulnessScreen
 from .sortability import standardize
 from .temporal import relabel_truth
@@ -73,15 +84,19 @@ _TEMPORAL_SCALES = ("raw", "standardize")
 _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
-# selection, the temporal lag matrices, the column shuffle, the intervention draws, and the
-# missing values each get an independent stream, so a change to one component's draws never
-# shifts another's. Draw ``k`` of the missing values comes from ``(MISSING, k)``. Environment
+# selection, the temporal lag matrices, the column shuffle, the intervention draws, the missing
+# values, and the measurement columns each get an independent stream, so a change to one
+# component's draws never shifts another's. Draw ``k`` of the missing values comes from
+# ``(MISSING, k)``, the choice of the measured columns from ``(MEASUREMENT, 0)`` of the model, the
+# measurement noise from ``(MEASUREMENT, 1)``, and the column order of a sample with measurement
+# columns from ``(MEASUREMENT, 2)`` of the model. Environment
 # ``k >= 1`` draws its noise from ``(NOISE, k)`` and environment ``k`` its intervention values from
 # ``(INTERVENTION, k)`` and its redrawn weights from ``(WEIGHTS, k)``; environment 0 draws from
 # ``NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
 # latents, lags, columns) come off the model seed's root, the rows' streams off the seed's root;
 # without a model seed the two are one root.
 GRAPH, WEIGHTS, NOISE, _LATENT, _LAG, _COLUMNS, INTERVENTION, MISSING = 0, 1, 2, 3, 4, 5, 6, 7
+MEASUREMENT = 8
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
 
@@ -97,14 +112,21 @@ def component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Ge
     return np.random.default_rng(seq)
 
 
-def column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
+def column_order(
+    root: np.random.SeedSequence,
+    n_observed: int,
+    shuffle: bool,
+    *,
+    stream: tuple[int, ...] = (_COLUMNS,),
+) -> np.ndarray:
     """Return the drawn index of each output column; the identity unless ``shuffle``.
 
-    The permutation comes from the column stream of ``root``, so no other draw depends on it.
+    The permutation comes from the column stream of ``root``, or from ``stream`` of ``root`` when
+    given, so no other draw depends on it.
     """
     if not shuffle:
         return np.arange(n_observed)
-    return component_rng(root, _COLUMNS).permutation(n_observed)
+    return component_rng(root, *stream).permutation(n_observed)
 
 
 def dataset_provenance(
@@ -146,6 +168,8 @@ def _options(functional: Functional, noise: Noise) -> dict:
     Each option appears only when it is set, so a record of a model without them is unchanged.
     """
     return {
+        **({"functional_params": functional.options} if functional.options else {}),
+        **({"noise_params": noise.options} if noise.options else {}),
         **({"positive": True} if functional.positive else {}),
         **({"heteroscedastic": True} if noise.heteroscedastic else {}),
         **({} if noise.variance_range is None else {"variance_range": list(noise.variance_range)}),
@@ -244,6 +268,7 @@ class SCM:
         dtype: npt.DTypeLike = np.float64,
         shuffle: bool = True,
         missing: Mechanism | None = None,
+        measurements: NoisyChildren | None = None,
     ) -> CausalDataset:
         """Draw ``n`` rows; return a :class:`~andrey.data.dataset.CausalDataset`.
 
@@ -325,6 +350,21 @@ class SCM:
             observed values, the true graph, and ``params`` are those of the sample without
             ``missing``. Columns in its ``parents`` are columns of the returned data. ``None``
             gives complete data.
+        measurements : NoisyChildren or None, default=None
+            Measurement columns, from :func:`~andrey.data.measurement.noisy_children`: for each
+            selected column, a new column that is it plus independent noise, drawn over the
+            values of the sample without ``measurements``, after its scaling, from the seed's own
+            streams. With ``shuffle``, the measurement columns are then shuffled together with
+            every other column, by a permutation from a stream of their own, so no position marks
+            a measurement; without it they follow the other columns. The other columns hold the
+            values of the sample without ``measurements``, at the positions
+            ``provenance["column_order"]`` matches: a column has the same entry there in the two
+            samples, and a measurement column an entry of ``n_obs`` or more. In the true graph
+            each measurement column is a child of the column it measures and the latent nodes
+            stay last; ``measurements.parents``, ``targets``, the graph, and ``params`` name the
+            columns of the returned data, and ``params`` keeps the model's edges and gains each
+            measurement's noise scale. ``missing`` then draws over every column, the measurement
+            columns included. Temporal functionals take none. ``None`` adds nothing.
 
         Returns
         -------
@@ -334,6 +374,9 @@ class SCM:
             With ``missing``, ``data`` holds ``NaN`` where a value is missing, ``missing`` holds
             the mask and the parents of each missingness indicator, ``provenance["config"]
             ["missing"]`` records the mechanism, and ``report`` describes the complete values.
+            With ``measurements``, ``measurements`` holds the column each measurement column
+            measures, ``provenance["config"]["measurements"]`` records the measured columns and
+            the noise, and ``report`` describes the sample without the measurement columns.
 
         Raises
         ------
@@ -346,7 +389,9 @@ class SCM:
             not an observed column, ``hard()`` on a variable has no ``value``, or ``soft()``
             changes nothing. Also if ``"unitless"`` is given a positive-weight functional, noise
             with a ``variance_range``, or ``soft(weights="redraw")``, or ``screen`` is given with
-            ``model_seed``. Also as :func:`~andrey.data.missingness.draw` raises on ``missing``.
+            ``model_seed``. Also as :func:`~andrey.data.missingness.draw` raises on ``missing``,
+            and if ``measurements`` is given with a temporal functional, names a column the sample
+            lacks, or measures a column that is constant over the rows.
 
         References
         ----------
@@ -400,6 +445,8 @@ class SCM:
             raise ValueError("temporal functionals take no interventions")
         if envs is not None and screen is not None:
             raise ValueError("screen is not supported under interventions")
+        if measurements is not None and self.functional.is_temporal:
+            raise ValueError("temporal functionals take no measurements")
         rows, pooled = pooled_rows(envs, n)
         root = np.random.SeedSequence(seed)
         if screen is None:
@@ -409,6 +456,11 @@ class SCM:
             )
         else:  # the accepted attempt's root, whose streams cannot meet another attempt's
             ds, root = self._screened(rows, root, screen, scale=scale, dtype=dtype, shuffle=shuffle)
+            model = root
+        if measurements is not None:
+            from .measurement import append
+
+            ds = append(ds, measurements, root, model, scale=scale, shuffle=shuffle)
         return ds if missing is None else with_missing(ds, missing, root)
 
     def _screened(
@@ -625,7 +677,9 @@ class SCM:
                         env_scale_weights[into] = self.functional.draw_scale_weights(draw, redraws)[
                             into
                         ]
-                env_weights[into] *= intervention.weight_scale
+                env_weights[into] = self.functional.scale_effect(
+                    env_weights[into], intervention.weight_scale
+                )
                 if env_scale_weights.size:
                     env_scale_weights[into] *= intervention.weight_scale
                 noise_scale = intervention.noise_scale
@@ -767,6 +821,7 @@ def sample_scm(
     dtype: npt.DTypeLike = np.float64,
     shuffle: bool = True,
     missing: Mechanism | None = None,
+    measurements: NoisyChildren | None = None,
 ) -> CausalDataset:
     """One-shot convenience: build an :class:`SCM` from string axes and sample it.
 
@@ -774,6 +829,13 @@ def sample_scm(
     ----------
     graph, functional, noise : str
         Axis selectors; see ``graphs`` / ``functional`` / ``noise`` for the available names.
+        ``graph`` is one of ``"erdos_renyi"``, ``"scale_free"``, ``"small_world"``, and
+        ``"hub"``; ``functional`` one of ``"linear"``, ``"additive_noise"``,
+        ``"post_nonlinear"``, ``"nonmonotone"``, ``"location_scale"``, ``"random_features"``,
+        ``"var"``, and ``"varma"``; ``noise`` one of ``"gaussian"``, ``"uniform"``,
+        ``"laplace"``, ``"exponential"``, ``"gumbel"``, ``"student_t"``, and
+        ``"gaussian_mixture"``. Each name takes its family's defaults; build an :class:`SCM` to
+        set a family's parameters.
     d, n : int
         Node count and sample count.
     seed : int
@@ -799,10 +861,19 @@ def sample_scm(
     missing : Mechanism or None, default=None
         Missing values drawn over the sample, from :mod:`andrey.data.missingness`; forwarded to
         :meth:`SCM.sample`.
+    measurements : NoisyChildren or None, default=None
+        Measurement columns appended to the sample, from
+        :func:`andrey.data.measurement.noisy_children`; forwarded to :meth:`SCM.sample`.
 
     Returns
     -------
     CausalDataset
+
+    Raises
+    ------
+    ValueError
+        If ``graph``, ``functional``, or ``noise`` is not one of its names, and as
+        :meth:`SCM.sample` raises.
     """
     functional_specs = {
         "linear": linear,
@@ -810,6 +881,7 @@ def sample_scm(
         "post_nonlinear": post_nonlinear,
         "nonmonotone": nonmonotone,
         "location_scale": location_scale,
+        "random_features": random_features,
         "var": var,
         "varma": varma,
     }
@@ -819,6 +891,8 @@ def sample_scm(
         "laplace": laplace,
         "exponential": exponential,
         "gumbel": gumbel,
+        "student_t": student_t,
+        "gaussian_mixture": gaussian_mixture,
     }
     graph_spec = named_graph(graph, d, density)
     if functional not in functional_specs:
@@ -833,4 +907,12 @@ def sample_scm(
         noise=noise_specs[noise](),
         latents=latents,
     )
-    return scm.sample(n=n, seed=seed, scale=scale, dtype=dtype, shuffle=shuffle, missing=missing)
+    return scm.sample(
+        n=n,
+        seed=seed,
+        scale=scale,
+        dtype=dtype,
+        shuffle=shuffle,
+        missing=missing,
+        measurements=measurements,
+    )

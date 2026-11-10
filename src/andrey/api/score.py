@@ -1304,8 +1304,16 @@ def xges(
     random given observed values. It runs the search 10 times, so it takes about 10 times as long,
     and under values missing not at random it has no guarantee. Before EM, only a column that
     repeats another up to scale and shift where both are observed raises; a column that is a linear
-    function of several others, which raises on complete data, is not caught, and the fit runs. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    function of several others, which raises on complete data, is not caught, and the fit runs. With
+    true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
+    farther from the true DAG than without them in any setting, and closer in every one. The claims
+    direct edges of the graph the search found, as their rules take the class as given: of the edges
+    they directed, 0.1% with required paths and 0.4% with forbidden paths pointed against the true
+    DAG. No reference implementation takes these claims for this search, so they were compared with
+    the same fit without them. A required path says less than a required edge and directs less: it
+    cannot restore an edge the search left out. A known edge belongs in ``required``. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -1694,9 +1702,16 @@ def hc(
     settings and at the default in both, comparisons not rerun on fresh seeds. Under values missing
     not at random it has no guarantee. Before EM, only a column that repeats another up to scale and
     shift where both are observed raises; a column that is a linear function of several others,
-    which raises on complete data, is not caught, and the fit runs. The numbers are a reference, not
-    a hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    which raises on complete data, is not caught, and the fit runs. With true ``required_paths`` or
+    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
+    50 variables, mean degree 2, 500 or 2,000 rows), its result was no farther from the true DAG
+    than without them in any setting, and closer in every one. The claims direct edges of the graph
+    the search found, as their rules take the class as given: of the edges they directed, 2.7% with
+    required paths and 10.9% with forbidden paths pointed against the true DAG. A required path says
+    less than a required edge and directs less: it cannot restore an edge the search left out, and
+    on simulated data a required edge, which also states that the pair is adjacent, lowered the
+    errors more. A known edge belongs in ``required``. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2060,7 +2075,18 @@ def tabu(
     settings and tied in the others, and tied with it at the default, comparisons not rerun on fresh
     seeds. Under values missing not at random it has no guarantee. Before EM, only a column that
     repeats another up to scale and shift where both are observed raises; a column that is a linear
-    function of several others, which raises on complete data, is not caught, and the fit runs. The
+    function of several others, which raises on complete data, is not caught, and the fit runs. With
+    true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
+    farther from the true DAG than without them in any setting, and closer in every one. The claims
+    direct edges of the graph the search found, as their rules take the class as given: of the edges
+    they directed, 1.8% with required paths and 7.2% with forbidden paths pointed against the true
+    DAG. ``required_paths`` is experimental: given the required edges those paths imply and the
+    standard BIC (``ebic_gamma=0``), it made more errors than a reference implementation given the
+    same edges in one of 18 settings (20 variables, 500 rows, 5% of the pairs claimed), on two sets
+    of 20 datasets. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
     numbers are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
@@ -2334,9 +2360,17 @@ def exact_search(
     given observed values. It runs the search 10 times, so it takes about 10 times as long, and
     under values missing not at random it has no guarantee. Before EM, only a column that repeats
     another up to scale and shift where both are observed raises; a column that is a linear function
-    of several others, which raises on complete data, is not caught, and the fit runs. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    of several others, which raises on complete data, is not caught, and the fit runs. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 variables with mean degree 2 or 4 and 20 variables with mean degree 2,
+    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 0.7% with required paths and 1.4% with forbidden paths
+    pointed against the true DAG. No reference implementation takes these claims for this search, so
+    they were compared with the same fit without them. A required path says less than a required
+    edge and directs less: it cannot restore an edge the search left out. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

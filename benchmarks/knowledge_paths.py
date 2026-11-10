@@ -54,6 +54,18 @@ once as ``no_dataset`` and left out.
   ``prior_knowledge`` (context); linear with uniform noise, standardized; ``d`` 10, 20, 50; ``n``
   500, 2000; claims on 10 and 30 % of ordered pairs.
 
+The other methods that take the path parts run beside these (:data:`EXTRA_METHODS`, :data:`KIND`):
+on the ``cpdag`` cells with ``--methods`` (``hc``, ``tabu``, ``mmhc``, ``rsmax2``, ``grasp``,
+``xges``, ``exact_search``, ``iamb``, ``inter_iamb``, ``mmpc`` returning its CPDAG, and the plain
+BIC variants ``hc_bic`` and ``tabu_bic``) and in ``pag`` (``grasp_fci``), and in lanes of their own
+where the data differ. ``cdnod`` draws the domain-shift data of CD-NOD over four domains and scores
+a fit against the CPDAG the domain index identifies, which the claims restrict as they restrict a
+CPDAG, and against the true DAG. ``jci`` draws the simulation of Mooij et al. (2020) with one
+context variable and hidden confounders, the columns permuted, and scores ``fci_jci`` over the
+system variables against their true MAG, as ``pag`` does. ``multigroup`` draws three groups that
+share one DAG and scores ``multi_group_direct_lingam`` by the sum of its groups' errors. The default
+methods of the first lanes are unchanged, and ``--fractions`` keeps only some claim fractions.
+
 ``run --methods`` also fits the reference packages (:data:`REFERENCES`), each unmodified in its own
 environment, without knowledge and with the same true knowledge. tigramite's LPCMCI takes the
 claims as ``link_assumptions`` and lingam's DirectLiNGAM as ``prior_knowledge``. pcalg and Tetrad
@@ -67,7 +79,10 @@ counted. Tetrad's PC, FGES, BOSS, FCI, GFCI, and BOSS-FCI take the edges as ``Kn
 ``cpdag`` and ``pag`` lanes takes the same edges as ``required`` and ``forbidden`` in its ``edges``
 arm, the like-for-like comparison. The references need ``ANDREY_BENCH_JAVA``,
 ``ANDREY_BENCH_TETRAD_GIN_JAR`` (tetrad-lib 7.6.10), ``ANDREY_BENCH_TETRAD_JAR`` (causal-cmd, for
-GFCI), ``Rscript`` with pcalg on ``PATH``, and ``ANDREY_BENCH_TIGRAMITE_PYTHON``.
+GFCI), ``Rscript`` with pcalg on ``PATH``, and ``ANDREY_BENCH_TIGRAMITE_PYTHON``. bnlearn's searches take the edges as ``whitelist`` and
+``blacklist`` (``andrey_bench/knowledge_bnlearn.R``), causal-learn's CD-NOD as
+``background_knowledge``, Tetrad's GRaSP-FCI as ``Knowledge``, and lingam's MultiGroupDirectLiNGAM
+the path claims as ``prior_knowledge``.
 
 ``summarize`` also judges each method against each of its references on the same datasets
 (``reference_rows``, :func:`against_references`): the method's fit minus the reference's under the
@@ -161,6 +176,66 @@ LANES = {
             f"d{d}-n{n}": {"d": d, "n": n, "degree": 2} for d in (10, 20, 50) for n in (500, 2000)
         },
     },
+    # The lanes of the methods that need data of their own kind (see KIND).
+    "cdnod": {
+        "methods": ("cdnod",),
+        "fractions": (0.05, 0.1, 0.3),
+        "cells": {
+            f"d{d}-n{n}-deg{g}": {"d": d, "n": n, "degree": g}
+            for d in (10, 20, 50)
+            for n in (500, 2000)
+            for g in (2, 4)
+        },
+    },
+    "jci": {
+        "methods": ("fci_jci",),
+        "fractions": (0.1, 0.3),
+        "cells": {
+            f"p{p}-n{n}": {"p": p, "eps": 2.25 / (p - 1), "n_per": n}
+            for p in (10, 20)
+            for n in (500, 2000)
+        },
+    },
+    "multigroup": {
+        "methods": ("multi_group_direct_lingam",),
+        "fractions": (0.1, 0.3),
+        "cells": {
+            f"d{d}-n{n}": {"d": d, "n": n, "degree": 2} for d in (10, 20, 50) for n in (500, 2000)
+        },
+    },
+}
+#: What each lane's fits and scores are: ``cpdag`` (a CPDAG scored against the class the truth and
+#: the claims define and against the true DAG), ``pag`` and ``dag`` (marks against the true MAG or
+#: DAG), ``window`` (lagged marks). The new lanes are ``cdnod`` (the domain-shift data of CD-NOD,
+#: its class the CPDAG the domain index identifies), ``jci`` (the simulation of Mooij et al. 2020
+#: with hidden confounders and one context variable, over the system variables, columns permuted),
+#: and ``multigroup`` (three groups sharing one DAG; a fit's marks are the groups' graphs side by
+#: side, so its errors are the sum over the groups).
+KIND = {
+    "cpdag": "cpdag",
+    "pag": "pag",
+    "lpcmci": "window",
+    "lingam": "dag",
+    "cdnod": "cpdag",
+    "jci": "pag",
+    "multigroup": "dag",
+}
+#: Andrey methods a lane runs with ``--methods`` beside its default ones, on the lane's own data.
+#: The defaults of a published lane stay as they are, so its record is reproducible.
+EXTRA_METHODS = {
+    "cpdag": (
+        "hc",
+        "tabu",
+        "mmhc",
+        "rsmax2",
+        "grasp",
+        "xges",
+        "exact_search",
+        "iamb",
+        "inter_iamb",
+        "mmpc",
+    ),
+    "pag": ("grasp_fci",),
 }
 #: The reference packages each method is judged against under the same knowledge, each run
 #: unmodified in its own environment. pcalg's ``ges`` has no knowledge argument, so GES has one
@@ -175,20 +250,59 @@ REFERENCES = {
     "boss_fci": ("tetrad.boss_fci",),
     "lpcmci": ("tigramite.lpcmci",),
     "direct_lingam": ("lingam.direct_lingam",),
+    "hc": ("bnlearn.hc",),
+    "hc_bic": ("bnlearn.hc",),
+    "tabu": ("bnlearn.tabu",),
+    "tabu_bic": ("bnlearn.tabu",),
+    "mmhc": ("bnlearn.mmhc",),
+    "rsmax2": ("bnlearn.rsmax2",),
+    "iamb": ("bnlearn.iamb",),
+    "inter_iamb": ("bnlearn.inter_iamb",),
+    "grasp_fci": ("tetrad.grasp_fci",),
+    "cdnod": ("causal_learn.cdnod",),
+    "multi_group_direct_lingam": ("lingam.multi_group_direct_lingam",),
 }
 #: The references that take a path claim as it is; the others take the edges it implies
 #: (:func:`edge_claims`).
-TAKES_PATHS = ("tigramite.lpcmci", "lingam.direct_lingam")
+TAKES_PATHS = ("tigramite.lpcmci", "lingam.direct_lingam", "lingam.multi_group_direct_lingam")
 #: The references a lane runs with ``--methods``, beside the methods it runs by default.
 LANE_REFERENCES = {
     "cpdag": ("pcalg.pc", "tetrad.pc", "tetrad.ges", "tetrad.boss"),
     "pag": ("tetrad.fci", "tetrad.gfci", "tetrad.boss_fci"),
     "lpcmci": ("tigramite.lpcmci",),
     "lingam": (),
+    "cdnod": ("causal_learn.cdnod",),
+    "jci": (),
+    "multigroup": ("lingam.multi_group_direct_lingam",),
 }
+LANE_REFERENCES["cpdag"] += (
+    "bnlearn.hc",
+    "bnlearn.tabu",
+    "bnlearn.mmhc",
+    "bnlearn.rsmax2",
+    "bnlearn.iamb",
+    "bnlearn.inter_iamb",
+)
+LANE_REFERENCES["pag"] += ("tetrad.grasp_fci",)
 #: Andrey methods at settings other than their defaults, run with ``--methods``. ``ges_bic`` is
-#: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm.
-VARIANTS = {"ges_bic": ("ges", {"ebic_gamma": 0.0})}
+#: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm; ``hc_bic``
+#: and ``tabu_bic`` are the same score for the searches whose reference (bnlearn's ``bic-g``)
+#: scores with it. ``mmpc`` returns its skeleton by default, which takes no path claim; its variant
+#: returns the CPDAG, which does.
+VARIANTS = {
+    "ges_bic": ("ges", {"ebic_gamma": 0.0}),
+    "hc_bic": ("hc", {"ebic_gamma": 0.0}),
+    "tabu_bic": ("tabu", {"ebic_gamma": 0.0}),
+    "mmpc": ("mmpc", {"structure": "cpdag"}),
+}
+
+
+def own_methods(lane: str) -> tuple[str, ...]:
+    """Andrey's methods in ``lane``: its defaults, its extras, and their variants."""
+    base = (*LANES[lane]["methods"], *EXTRA_METHODS.get(lane, ()))
+    return (*base, *(v for v, (b, _) in VARIANTS.items() if b in base and v not in base))
+
+
 ARMS = ("bare", "true", "edges", "false")
 #: The interpreter of tigramite's environment (``benchmarks/start_tigramite.sh``).
 TIGRAMITE_PYTHON = "ANDREY_BENCH_TIGRAMITE_PYTHON"
@@ -200,6 +314,11 @@ FALSE_FRACTION = 0.1
 OUT_OF_SETTING = {
     ("cpdag", "ges"): lambda cell: cell["degree"] >= 4,
     ("cpdag", "ges_bic"): lambda cell: cell["degree"] >= 4,
+    # The score searches that suit the sparse graphs GES suits (their docstrings say so).
+    **{
+        ("cpdag", m): lambda cell: cell["degree"] >= 4
+        for m in ("hc", "hc_bic", "tabu", "tabu_bic", "xges")
+    },
 }
 
 
@@ -344,7 +463,9 @@ def static_errors(est: np.ndarray, truth: np.ndarray, *, undirected_open: bool) 
     }
 
 
-def class_errors(est: np.ndarray, dag: np.ndarray, claims: dict | None) -> dict[str, int]:
+def class_errors(
+    est: np.ndarray, dag: np.ndarray, claims: dict | None, base: np.ndarray | None = None
+) -> dict[str, int]:
     """The counts of a CPDAG fit ``est`` against the true ``dag`` and the true ``claims`` it took.
 
     ``errors`` is the structural Hamming distance (:func:`andrey.metrics.shd`) to the class the
@@ -356,6 +477,8 @@ def class_errors(est: np.ndarray, dag: np.ndarray, claims: dict | None) -> dict[
     on the claims: an edge directed as the DAG directs it costs 0, an undirected one 1, and a
     reversed, missing, or extra one 2. ``empty_errors`` and ``empty_dag_errors`` are the empty
     graph's counts. The other counts are those of :func:`static_errors` against the true DAG.
+    ``base`` is the class the truth defines when it is not the true DAG's CPDAG: the CPDAG the
+    domain index identifies in the ``cdnod`` lane, which the claims restrict as they do the CPDAG.
     """
     from andrey import GraphStructure, metrics
     from andrey.core.ancestral import restrict
@@ -366,7 +489,8 @@ def class_errors(est: np.ndarray, dag: np.ndarray, claims: dict | None) -> dict[
     for part, mask in masks.items():
         for a, b in (claims or {}).get(part, []):
             mask[a, b] = True
-    target, _, dropped = restrict(dag2cpdag(dag), masks["required_paths"], masks["forbidden_paths"])
+    base = dag2cpdag(dag) if base is None else base
+    target, _, dropped = restrict(base, masks["required_paths"], masks["forbidden_paths"])
     assert not dropped, "a claim drawn from the truth holds in a DAG of the true class"
 
     def graph(marks: np.ndarray, kind: str) -> GraphStructure:
@@ -452,13 +576,98 @@ def window_truth(truth, tau_max: int):
     raise RuntimeError("the window MAG did not settle")
 
 
+def _claims_for(out: dict, lane: str, seed: int, facts: dict, confounded: list) -> dict:
+    """``out`` with the true claims at every fraction of ``lane`` and the false claims."""
+    out["claims"] = {
+        f: draw_claims(np.random.default_rng([seed, 9124, round(f * 100)]), facts, f, confounded)
+        for f in LANES[lane]["fractions"]
+    }
+    rng = np.random.default_rng([seed, 9124])
+    out["false_claims"] = draw_claims(rng, facts, FALSE_FRACTION, confounded, true=False)
+    return out
+
+
+def _regime_key(name: str, cell: dict, seed: int):
+    """The key of a regime the harness defines (``datasets.REGIMES``) at the cell's size."""
+    from andrey_bench import datasets
+    from andrey_bench.datasets import DatasetKey
+
+    slice_ = dict(zip(("topology", "functional", "noise", "standardize"), datasets.REGIMES[name]))
+    return DatasetKey(**slice_, density=float(cell["degree"]), d=cell["d"], n=cell["n"], seed=seed)
+
+
+def problem_cdnod(cell: dict, seed: int) -> dict:
+    """CD-NOD's domain-shift data: ``truth`` is the true DAG, ``base`` the CPDAG the domain index
+    identifies (the harness's truth for this data), and ``env`` the domain of each row."""
+    from andrey_bench import datasets, regime_models
+
+    key = _regime_key("domain_shift_er", cell, seed)
+    data, base, _, _ = datasets.generate_one(key)
+    dag = regime_models.domain_shift_dag(
+        d=key.d, n=key.n, seed=seed, density=key.density, noise=key.noise, shuffle=key.shuffle
+    )
+    env = regime_models.domain_index(len(data), regime_models.N_DOMAINS)[:, 0]
+    reach = dag_reach(dag)
+    facts = {(a, b): bool(reach[a, b]) for a in range(key.d) for b in range(key.d) if a != b}
+    out = {"key": key, "data": data, "dataset_id": key.digest, "truth": dag, "base": base}
+    return _claims_for({**out, "env": env}, "cdnod", seed, facts, [])
+
+
+def problem_jci(cell: dict, seed: int) -> dict:
+    """The simulation of Mooij, Magliacane, and Claassen (2020) with one context variable: the
+    system variables in a column order drawn from the seed, ``env`` the context's regime, and
+    ``truth`` the MAG over the system variables, the hidden confounders marginalized."""
+    from andrey.core import LATENT, OBSERVED, GraphStructure
+    from andrey.data.latent import marginal
+    from andrey_bench import regime_models
+
+    p = cell["p"]
+    draw = regime_models.jci_diagonal(p, 1, cell["eps"], cell["eps"], cell["n_per"], seed)
+    h = draw.hidden
+    # System variables, then the confounders; the context variable (index p) points into one
+    # system variable and is dropped, which leaves the system variables' MAG as it is.
+    order = np.random.default_rng([seed, 4177]).permutation(p)
+    keep = [*order, *range(p + 1, p + 1 + h)]
+    adjacency = draw.adjacency[np.ix_(keep, keep)]
+    marks = np.zeros(adjacency.shape, dtype=np.int8)
+    marks[adjacency != 0], marks.T[adjacency != 0] = TAIL, ARROW
+    hidden = np.arange(p + h) >= p
+    types = np.where(hidden, LATENT, OBSERVED).astype(np.int8)
+    truth = marginal(GraphStructure.from_numpy(marks, kind="dag", node_types=types), "mag")
+    reach = dag_reach(marks)
+    facts = {(a, b): bool(reach[a, b]) for a in range(p) for b in range(p) if a != b}
+    out = {
+        "data": np.ascontiguousarray(draw.data[:, order]),
+        "dataset_id": f"jci-p{p}-n{cell['n_per']}-s{seed}",
+        "truth": truth.to_numpy(),
+        "env": draw.regime.astype(float),
+    }
+    return _claims_for(out, "jci", seed, facts, sorted(hidden_cause_pairs(marks, hidden)))
+
+
+def problem_multigroup(cell: dict, seed: int) -> dict:
+    """Three groups that share one DAG: ``truth`` is the groups' copies side by side, and the claims
+    name the variables the groups share."""
+    from andrey_bench import datasets
+
+    key = _regime_key("multi_group_er", cell, seed)
+    data, marks, _, _ = datasets.generate_one(key)
+    d = key.d
+    reach = dag_reach(marks[:d, :d])
+    facts = {(a, b): bool(reach[a, b]) for a in range(d) for b in range(d) if a != b}
+    out = {"key": key, "data": data, "dataset_id": key.digest, "truth": marks}
+    return _claims_for(out, "multigroup", seed, facts, [])
+
+
 def problem(lane: str, cell: dict, seed: int) -> dict:
     """The data, the truth the errors are counted against, and the claims of every arm."""
     from andrey_bench import datasets
 
+    if lane in ("cdnod", "jci", "multigroup"):
+        make = {"cdnod": problem_cdnod, "jci": problem_jci, "multigroup": problem_multigroup}
+        return make[lane](cell, seed)
     key = dataset_key(lane, cell, seed)
     data, marks, kind, _ = datasets.generate_one(key)
-    rng = np.random.default_rng([seed, 9124])
     out = {"key": key, "data": data, "dataset_id": key.digest}
     if lane == "lpcmci":
         from andrey_bench.window import WindowGraph
@@ -509,12 +718,7 @@ def problem(lane: str, cell: dict, seed: int) -> dict:
             out["truth"] = marks
         facts = {(a, b): bool(reach[a, b]) for a in range(d_obs) for b in range(d_obs) if a != b}
         confounded = sorted(hidden_cause_pairs(marks, hidden))
-    out["claims"] = {
-        f: draw_claims(np.random.default_rng([seed, 9124, round(f * 100)]), facts, f, confounded)
-        for f in LANES[lane]["fractions"]
-    }
-    out["false_claims"] = draw_claims(rng, facts, FALSE_FRACTION, confounded, true=False)
-    return out
+    return _claims_for(out, lane, seed, facts, confounded)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -537,11 +741,12 @@ def fit(
     cell: dict,
     seed: int,
     edges: dict | None = None,
+    env: np.ndarray | None = None,
 ) -> dict:
     """One fit: its status, its marks, and the clauses or unmet claims its metadata lists.
 
     With ``edges`` (:func:`edge_claims`), the fit takes those required and forbidden edges and not
-    the path ``claims``.
+    the path ``claims``. ``env`` is the domain of each row, for the methods that take one.
     """
     import andrey
     from andrey.core.knowledge import KnowledgeError
@@ -557,6 +762,15 @@ def fit(
                 meta = {}
             elif method == "tigramite.lpcmci":
                 marks = _tigramite_reference(data, claims, cell["tau_max"])
+                meta = {}
+            elif method == "lingam.multi_group_direct_lingam":
+                marks = _lingam_reference(data, claims, groups=True)
+                meta = {}
+            elif method == "causal_learn.cdnod":
+                marks = _causal_learn_cdnod(data, env, edges)
+                meta = {}
+            elif method.startswith("bnlearn."):
+                marks = _bnlearn_reference(method, data, edges)
                 meta = {}
             elif method == "pcalg.pc":
                 marks, unmet = _pcalg_reference(data, edges)
@@ -579,9 +793,18 @@ def fit(
                     kwargs["tau_max"] = cell["tau_max"]
                 if "seed" in inspect.signature(fn).parameters:
                     kwargs["seed"] = seed
-                out = fn(data, **kwargs)
-                meta = out.metadata
-                if method == "lpcmci":
+                if method in ("cdnod", "fci_jci"):
+                    out = fn(data, env, **kwargs)
+                elif method == "multi_group_direct_lingam":
+                    from andrey_bench.regime_models import N_GROUPS, split_groups
+
+                    out = fn(split_groups(data, N_GROUPS), **kwargs)
+                else:
+                    out = fn(data, **kwargs)
+                meta = out[0].metadata if isinstance(out, list) else out.metadata
+                if isinstance(out, list):
+                    marks = _side_by_side([o.structure.to_numpy() for o in out])
+                elif method == "lpcmci":
                     from andrey_bench.adapters.andrey_pcmci import lpcmci_link_strings
                     from andrey_bench.window import marks_from_link_strings
 
@@ -603,12 +826,29 @@ def fit(
     return result
 
 
-def _lingam_reference(data: np.ndarray, claims: dict | None) -> np.ndarray:
+def _side_by_side(graphs: list[np.ndarray]) -> np.ndarray:
+    """The groups' endpoint marks as one block-diagonal matrix."""
+    d = len(graphs[0])
+    out = np.zeros((d * len(graphs), d * len(graphs)), dtype=np.int8)
+    for g, marks in enumerate(graphs):
+        out[g * d : (g + 1) * d, g * d : (g + 1) * d] = marks
+    return out
+
+
+def _lingam_reference(data: np.ndarray, claims: dict | None, groups: bool = False) -> np.ndarray:
     """lingam's DirectLiNGAM with the claims as ``prior_knowledge``: entry ``[b, a]`` is 1 when
-    ``a`` is an ancestor of ``b``, 0 when it is not, and -1 when unknown."""
+    ``a`` is an ancestor of ``b``, 0 when it is not, and -1 when unknown. With ``groups``, the
+    columns hold the groups of a ``multigroup`` dataset side by side and the reference is
+    MultiGroupDirectLiNGAM, whose result is the groups' graphs side by side."""
     import lingam
 
-    d = data.shape[1]
+    if groups:
+        from andrey_bench.regime_models import N_GROUPS, split_groups
+
+        parts = split_groups(data, N_GROUPS)
+        d = parts[0].shape[1]
+    else:
+        d = data.shape[1]
     prior = None
     if claims:
         prior = -np.ones((d, d), dtype=int)
@@ -616,12 +856,77 @@ def _lingam_reference(data: np.ndarray, claims: dict | None) -> np.ndarray:
             prior[b, a] = 1
         for a, b in claims.get("forbidden_paths", []):
             prior[b, a] = 0
-    model = lingam.DirectLiNGAM(prior_knowledge=prior).fit(data)
-    weights = model.adjacency_matrix_  # weights[b, a] != 0: a -> b
-    marks = np.zeros((d, d), dtype=np.int8)
-    for b, a in np.argwhere(weights != 0):
-        marks[a, b], marks[b, a] = TAIL, ARROW
-    return marks
+    if groups:
+        model = lingam.MultiGroupDirectLiNGAM(prior_knowledge=prior).fit(parts)
+        stack = model.adjacency_matrices_
+    else:
+        model = lingam.DirectLiNGAM(prior_knowledge=prior).fit(data)
+        stack = [model.adjacency_matrix_]
+    graphs = []
+    for weights in stack:  # weights[b, a] != 0: a -> b
+        marks = np.zeros((d, d), dtype=np.int8)
+        for b, a in np.argwhere(weights != 0):
+            marks[a, b], marks[b, a] = TAIL, ARROW
+        graphs.append(marks)
+    return _side_by_side(graphs) if groups else graphs[0]
+
+
+def _causal_learn_cdnod(data: np.ndarray, env: np.ndarray, edges: dict | None) -> np.ndarray:
+    """causal-learn's CD-NOD (the harness adapter's settings), with the edges as its
+    ``background_knowledge``: the CPDAG over the data's variables."""
+    from causallearn.graph.GraphNode import GraphNode
+    from causallearn.search.ConstraintBased.CDNOD import cdnod
+    from causallearn.utils.PCUtils.BackgroundKnowledge import BackgroundKnowledge
+
+    from andrey_bench.adapters.causal_learn_convert import generalgraph_to_adjacency
+
+    knowledge = None
+    if edges and (edges["required"] or edges["forbidden"]):
+        knowledge = BackgroundKnowledge()
+        name = lambda j: GraphNode(f"X{j + 1}")  # noqa: E731 - causal-learn's default node names
+        for a, b in edges["required"]:
+            knowledge.add_required_by_node(name(a), name(b))
+        for a, b in edges["forbidden"]:
+            knowledge.add_forbidden_by_node(name(a), name(b))
+    X = np.asarray(data, dtype=np.float64)
+    cg = cdnod(
+        X,
+        np.asarray(env, dtype=np.float64).reshape(-1, 1),
+        alpha=0.05,
+        indep_test="fisherz",
+        stable=True,
+        uc_rule=0,
+        uc_priority=2,
+        background_knowledge=knowledge,
+        show_progress=False,
+    )
+    d = X.shape[1]
+    return _cpdag_marks(generalgraph_to_adjacency(np.asarray(cg.G.graph)[:d, :d]))
+
+
+def _bnlearn_reference(method: str, data: np.ndarray, edges: dict | None) -> np.ndarray:
+    """bnlearn's search (``andrey_bench/knowledge_bnlearn.R``) in a fresh R process, with the edges
+    as ``whitelist`` and ``blacklist``: the CPDAG of its result."""
+    script = Path(__file__).parent / "andrey_bench" / "knowledge_bnlearn.R"
+    with tempfile.TemporaryDirectory(prefix="andrey_bench_bnlearn_") as tmp:
+        work = Path(tmp)
+        header = ",".join(f"x{j}" for j in range(data.shape[1]))
+        np.savetxt(work / "data.csv", data, delimiter=",", fmt="%.17g", header=header, comments="")
+        for part in ("required", "forbidden"):
+            rows = (edges or {}).get(part, [])
+            (work / f"{part}.csv").write_text("".join(f"{a},{b}\n" for a, b in rows))
+        files = [str(work / f) for f in ("data.csv", "required.csv", "forbidden.csv", "out.csv")]
+        done = subprocess.run(
+            ["Rscript", "--vanilla", str(script), method.split(".", 1)[1], *files, "0.05"],
+            capture_output=True,
+            text=True,
+        )
+        if done.returncode != 0:
+            raise RuntimeError(
+                f"knowledge_bnlearn.R exited {done.returncode}: {done.stderr[-300:]}"
+            )
+        adjacency = np.loadtxt(work / "out.csv", delimiter=",", ndmin=2)
+    return _cpdag_marks(adjacency != 0)
 
 
 def _cpdag_marks(adjacency: np.ndarray) -> np.ndarray:
@@ -642,10 +947,11 @@ def _tetrad_reference(method: str, data: np.ndarray, edges: dict | None) -> np.n
         "tetrad.boss": tetrad_search.TetradBOSS,
         "tetrad.fci": tetrad_search.TetradFCI,
         "tetrad.boss_fci": tetrad_search.TetradBossFCI,
+        "tetrad.grasp_fci": tetrad_search.TetradGraspFCI,
         "tetrad.gfci": tetrad_gfci.TetradGFCI,
     }[method]()
     params = dict(adapter.params())
-    if method in ("tetrad.fci", "tetrad.boss_fci"):
+    if method in ("tetrad.fci", "tetrad.boss_fci", "tetrad.grasp_fci"):
         params["excludeSelectionBias"] = True
     if edges:
         params.update(required=edges["required"], forbidden=edges["forbidden"])
@@ -715,18 +1021,21 @@ def _tigramite_reference(data: np.ndarray, claims: dict | None, tau_max: int) ->
     return marks_from_link_strings(np.array(json.loads(done.stdout.splitlines()[-1])))
 
 
-def scored(lane: str, result: dict, truth: np.ndarray, claims: dict | None = None) -> dict:
+def scored(
+    lane: str, result: dict, truth: np.ndarray, claims: dict | None = None, base=None
+) -> dict:
     """``result`` with its marks replaced by its error counts against ``truth``; ``claims`` are the
-    true claims the fit took, which set the class a ``cpdag`` fit is scored against."""
+    true claims the fit took, which set the class a ``cpdag`` fit is scored against, and ``base``
+    the class the truth defines when it is not the true DAG's CPDAG (:func:`class_errors`)."""
     marks = result.pop("marks", None)
     if marks is None:
         return result
-    if lane == "lpcmci":
+    if KIND[lane] == "window":
         return {**result, **window_errors(marks, truth)}
     d = len(truth)
     marks = marks[:d, :d]
-    if lane == "cpdag":
-        return {**result, **class_errors(marks, truth, claims)}
+    if KIND[lane] == "cpdag":
+        return {**result, **class_errors(marks, truth, claims, base)}
     return {**result, **static_errors(marks, truth, undirected_open=False)}
 
 
@@ -740,7 +1049,8 @@ def run_unit(task: tuple) -> list[dict]:
     edges they imply otherwise (arm ``edges``). With a ``part``, the true claims are that part's
     alone and there is no ``false`` arm.
     """
-    lane, cell_name, seed, part, methods, wanted = task
+    lane, cell_name, seed, part, methods, wanted, *rest = task
+    only = rest[0] if rest else None  # the fractions to fit; all when absent
     cell = LANES[lane]["cells"][cell_name]
     try:
         prob = problem(lane, cell, seed)
@@ -754,16 +1064,16 @@ def run_unit(task: tuple) -> list[dict]:
     }
     rows = []
     for method in methods:
-        reference = method not in LANES[lane]["methods"] and method not in VARIANTS
+        reference = method not in own_methods(lane)
         arms = [("bare", None, None)]
         if not reference or method in TAKES_PATHS:
             arms += [("true", f, claims) for f, claims in true_claims.items()]
-        if lane in ("cpdag", "pag") and method not in TAKES_PATHS:
+        if KIND[lane] in ("cpdag", "pag") and method not in TAKES_PATHS:
             arms += [("edges", f, claims) for f, claims in true_claims.items()]
         if part is None and not reference:
             arms.append(("false", FALSE_FRACTION, prob["false_claims"]))
         for arm, fraction, claims in arms:
-            if arm not in wanted:
+            if arm not in wanted or (only and fraction not in only and arm != "bare"):
                 continue
             if method.startswith("lingam.") and claims is not None and claims.get("confounded"):
                 claims = {**claims, "confounded": []}
@@ -775,7 +1085,11 @@ def run_unit(task: tuple) -> list[dict]:
                 adjacent = [e for e in edges["forbidden"] if truth[e[0], e[1]] != NULL]
                 target = {"required_paths": edges["required"], "forbidden_paths": adjacent}
             result = scored(
-                lane, fit(method, prob["data"], claims, cell, seed, edges), truth, target
+                lane,
+                fit(method, prob["data"], claims, cell, seed, edges, prob.get("env")),
+                truth,
+                target,
+                prob.get("base"),
             )
             counts = {f"n_{p}": len((claims or {}).get(p, [])) for p in PARTS}
             if edges is not None:
@@ -818,8 +1132,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     import andrey
 
     methods = tuple(args.methods or LANES[lane]["methods"])
-    known = {*LANES[lane]["methods"], *LANE_REFERENCES[lane]}
-    known |= {v for v, (base, _) in VARIANTS.items() if base in LANES[lane]["methods"]}
+    known = {*own_methods(lane), *LANE_REFERENCES[lane]}
     unknown = set(methods) - known
     if unknown:
         raise SystemExit(f"{lane} runs no {sorted(unknown)}")
@@ -831,7 +1144,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "seeds": list(args.seeds),
         "methods": methods,
         "arms": arms,
-        "fractions": LANES[lane]["fractions"],
+        "fractions": args.fractions or LANES[lane]["fractions"],
         "false_fraction": FALSE_FRACTION,
         "fit_cap_s": FIT_CAP_S,
         "workers": args.workers,
@@ -840,7 +1153,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
     done = {(r["cell"], r["seed"]) for r in _read(out / RECORDS)}
     tasks = [
-        (lane, c, s, args.part, methods, arms) for c in cells for s in seeds if (c, s) not in done
+        (lane, c, s, args.part, methods, arms, args.fractions)
+        for c in cells
+        for s in seeds
+        if (c, s) not in done
     ]
     _log(f"=== {lane}: {len(tasks)} datasets -> {out} (git {prov['git_sha']})")
     start = time.monotonic()
@@ -1342,7 +1658,7 @@ def against_references(records: list[dict]) -> list[dict]:
     for (lane, method, reference, cell, part, arm, fraction), pairs in sorted(
         groups.items(), key=str
     ):
-        measure = "dag_errors" if lane == "cpdag" else "errors"
+        measure = "dag_errors" if KIND[lane] == "cpdag" else "errors"
         own = np.array([r[measure] for r, _ in pairs], dtype=float)
         ref = np.array([o[measure] for _, o in pairs], dtype=float)
         empty = np.array([r["empty_" + measure] for r, _ in pairs], dtype=float)
@@ -1440,6 +1756,9 @@ def main(argv: list[str] | None = None) -> int:
         "--methods", nargs="+", help="the lane's methods, variants, or references; default: methods"
     )
     r.add_argument("--arms", nargs="+", choices=ARMS, help="the arms to fit; default: all")
+    r.add_argument(
+        "--fractions", type=float, nargs="+", help="fit the claim arms at these fractions only"
+    )
     r.add_argument("--out", required=True)
     s = sub.add_parser("summarize", help="paired verdicts from finished runs")
     s.add_argument("--runs", nargs="+", required=True)
