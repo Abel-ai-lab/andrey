@@ -141,7 +141,7 @@ ALGORITHMS = {
     "LOCI": (_facade("loci"), "lsnm_pair"),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
-    "SCORE": (_facade("score_matching"), "rational_chain_4v"),
+    "ScoreMatching": (_facade("score_matching"), "rational_chain_4v"),
     "NoGAM": (_facade("nogam"), "rational_chain_4v"),
     "CAMUV": (_facade("camuv"), "nonlinear_fork_4v"),
     "PCMCI": (_facade("pcmci", tau_max=2, indep_test="student_t"), "var_3v_lag2"),

@@ -74,4 +74,4 @@ def test_a_graph_of_the_papers_simulation_is_recovered():
 
 def test_the_recorded_output_repeats():
     out = andrey.score_matching(datagen.generate("rational_chain_4v"))
-    assert_recorded_output(out, "SCORE", case="rational_chain_4v")
+    assert_recorded_output(out, "ScoreMatching", case="rational_chain_4v")

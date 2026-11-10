@@ -1,0 +1,4191 @@
+{
+ "release": "0.17.0",
+ "parity_rule": "paired bootstrap",
+ "generated": "2026-11-10",
+ "theme": "SCORE against its authors' code and NoGAM against dodiscover on the papers' simulation, z-scored, rescaled, and raw",
+ "build": "Andrey pre-release build of 10 November 2026 (version string 0.16.0, the 0.17.0 release branch with score_matching and nogam as merged); cam's records are from the 0.16.0 development build of the screen, on the same datasets",
+ "verdict_rule": "per cell (noise, scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; the order share (order) is judged the same way with the signs turned, more being better. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the references read the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on the first seeds (0-19) was rerun on fresh seeds (20-39, replication); result and order_result are the published verdicts, better or worse only where the fresh seeds agree and a tie otherwise, so a cell better on the first seeds, which was not rerun, is published as a tie. pooled is the difference over all 40 seeds of a rerun cell, for information. Floors: SHD against the empty graph's (floor) and the order share against R2-SortnRegress's (order_floor). Floor, in every row that records one (floor): andrey_minus_empty is the 95% interval of the mean of Andrey's error minus the empty estimate's (the empty graph, or for a cause-effect pair a coin flip, 0.5 wrong directions), and reference_minus_empty the same for the reference; the floor applies only where the reference's interval lies wholly below 0, where the reference itself beats the empty estimate, and there Andrey's interval must lie wholly below 0 too; elsewhere it is reported as not applied (applies false), with its numbers. The floor is judged on the first seeds; a replication's floor (the rerun on fresh seeds) only confirms a failure there",
+ "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim, and rows with fewer than 10 paired datasets). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored as a graph; no fit failed or timed out. Andrey's fits, the references' fits, and cam's ran in separate runs on shared nodes, so a time ratio is indicative; ratio is the median over the paired datasets of the reference's time over Andrey's",
+ "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+ "complete_definition": "true when every row has at least 10 paired datasets (both fitted)",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19; a replication holds 20 fresh datasets, seeds 20-39",
+ "regimes": {
+  "score_paper_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
+  "score_paper_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
+  "score_paper": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, the simulation's own units",
+  "score_paper_laplace_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Laplace noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
+  "score_paper_laplace_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Laplace noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
+  "score_paper_laplace": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Laplace noise of variance uniform on [0.4, 0.8], 1,000 rows, the simulation's own units",
+  "score_paper_gumbel_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gumbel noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
+  "score_paper_gumbel_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gumbel noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
+  "score_paper_gumbel": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gumbel noise of variance uniform on [0.4, 0.8], 1,000 rows, the simulation's own units"
+ },
+ "coverage": {},
+ "packages": {
+  "SCORE and NoGAM": {
+   "SCORE authors' code": "commit c2c2b8e0",
+   "torch (SCORE authors' code)": "2.13.0+cpu",
+   "mgcv (SCORE authors' code)": "1.9-4",
+   "dodiscover": "commit 6e644561",
+   "CausalDisco": "0.3.0",
+   "NumPy (Andrey)": "2.5.4"
+  }
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor",
+   "AMD EPYC 9534 64-Core Processor"
+  ],
+  "cores_per_fit": 1,
+  "lanes": {
+   "SCORE and NoGAM": {
+    "cpu_models": [
+     "AMD EPYC 7713 64-Core Processor",
+     "AMD EPYC 9534 64-Core Processor"
+    ],
+    "cores_per_fit": 1,
+    "blas_threads": 1
+   }
+  }
+ },
+ "complete": true,
+ "pending_fits": 0,
+ "incomplete": [],
+ "methods": [
+  {
+   "method": "SCORE",
+   "family": "functional",
+   "solution": "andrey.score_matching.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "SCORE authors' code",
+   "comparator_solution": "rolland.score",
+   "comparator_setting": "the SCORE authors' code, github.com/paulrolland1307/SCORE at commit c2c2b8e0, at its defaults (ridge term 0.001, no division of the entries by their mean), its pruning the CAM pruning of the R package with mgcv 1.9-4 at cutoff 0.001, refit with torch 2.13.0+cpu; its results move slightly with the torch version, and the records of the 0.16.0 screen were fit with torch 2.5.1",
+   "lane": "score_matching",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_standardized",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 0.9743,
+     "comparator_s": 4.0324,
+     "ratio": 4.11,
+     "ratio_quartiles": [
+      3.99,
+      4.25
+     ],
+     "same_graph": 10,
+     "andrey_shd": 3.0,
+     "comparator_shd": 3.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 2.8,
+     "comparator_shd_mean": 3.1,
+     "empty_shd_mean": 10.0,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.7,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.2,
+       "bootstrap_95": [
+        -7.8,
+        -6.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.9,
+       "bootstrap_95": [
+        -7.6,
+        -6.15
+       ]
+      }
+     },
+     "andrey_order_share": 0.805,
+     "comparator_order_share": 0.785,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       -0.01,
+       0.055
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_standardized|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 0.8682,
+     "comparator_s": 4.0342,
+     "ratio": 4.63,
+     "ratio_quartiles": [
+      4.42,
+      4.75
+     ],
+     "same_graph": 10,
+     "andrey_shd": 21.5,
+     "comparator_shd": 23.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 22.05,
+     "comparator_shd_mean": 22.4,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -0.85,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -17.95,
+       "bootstrap_95": [
+        -19.15,
+        -16.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -17.6,
+       "bootstrap_95": [
+        -18.75,
+        -16.35
+       ]
+      }
+     },
+     "andrey_order_share": 0.97,
+     "comparator_order_share": 0.9613,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0087,
+      "bootstrap_95": [
+       -0.0025,
+       0.02
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_standardized|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 2.9665,
+     "comparator_s": 14.3253,
+     "ratio": 4.9,
+     "ratio_quartiles": [
+      4.81,
+      5.03
+     ],
+     "same_graph": 6,
+     "andrey_shd": 8.0,
+     "comparator_shd": 8.5,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 7.8,
+     "comparator_shd_mean": 8.25,
+     "empty_shd_mean": 20.0,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.0,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -12.2,
+       "bootstrap_95": [
+        -13.2,
+        -11.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -11.75,
+       "bootstrap_95": [
+        -12.7,
+        -10.8
+       ]
+      }
+     },
+     "andrey_order_share": 0.7275,
+     "comparator_order_share": 0.71,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0175,
+      "bootstrap_95": [
+       -0.005,
+       0.04
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_standardized|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 2.7317,
+     "comparator_s": 14.1176,
+     "ratio": 4.99,
+     "ratio_quartiles": [
+      4.27,
+      5.42
+     ],
+     "same_graph": 2,
+     "andrey_shd": 51.0,
+     "comparator_shd": 50.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 51.85,
+     "comparator_shd_mean": 51.5,
+     "empty_shd_mean": 80.0,
+     "mean_D": 0.35,
+     "bootstrap_95": [
+      -0.3,
+      1.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -28.15,
+       "bootstrap_95": [
+        -30.35,
+        -25.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -28.5,
+       "bootstrap_95": [
+        -31.0,
+        -26.0
+       ]
+      }
+     },
+     "andrey_order_share": 0.9044,
+     "comparator_order_share": 0.905,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0006,
+      "bootstrap_95": [
+       -0.015,
+       0.0138
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_standardized|ER4|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 28.1964,
+     "comparator_s": 262.2872,
+     "ratio": 8.65,
+     "ratio_quartiles": [
+      7.02,
+      10.51
+     ],
+     "same_graph": 0,
+     "andrey_shd": 25.5,
+     "comparator_shd": 25.0,
+     "empty_shd": 50.0,
+     "andrey_shd_mean": 25.0,
+     "comparator_shd_mean": 24.4,
+     "empty_shd_mean": 50.0,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      -0.4,
+      1.6
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -25.0,
+       "bootstrap_95": [
+        -26.9,
+        -23.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -25.6,
+       "bootstrap_95": [
+        -27.9,
+        -23.1988
+       ]
+      }
+     },
+     "andrey_order_share": 0.649,
+     "comparator_order_share": 0.66,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.011,
+      "bootstrap_95": [
+       -0.026,
+       0.003
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_standardized|ER1|d=50",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 32.3876,
+     "comparator_s": 251.7579,
+     "ratio": 7.54,
+     "ratio_quartiles": [
+      6.28,
+      8.36
+     ],
+     "same_graph": 0,
+     "andrey_shd": 141.0,
+     "comparator_shd": 141.5,
+     "empty_shd": 200.0,
+     "andrey_shd_mean": 142.65,
+     "comparator_shd_mean": 141.2,
+     "empty_shd_mean": 200.0,
+     "mean_D": 1.45,
+     "bootstrap_95": [
+      -0.25,
+      3.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -57.35,
+       "bootstrap_95": [
+        -61.2,
+        -53.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -58.8,
+       "bootstrap_95": [
+        -62.7,
+        -54.8988
+       ]
+      }
+     },
+     "andrey_order_share": 0.8548,
+     "comparator_order_share": 0.8705,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0158,
+      "bootstrap_95": [
+       -0.0248,
+       -0.0073
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper_standardized|ER4|d=50",
+     "replication": {
+      "seeds": [
+       20,
+       21,
+       22,
+       23,
+       24,
+       25,
+       26,
+       27,
+       28,
+       29,
+       30,
+       31,
+       32,
+       33,
+       34,
+       35,
+       36,
+       37,
+       38,
+       39
+      ],
+      "paired": 20,
+      "andrey_shd_mean": 139.35,
+      "comparator_shd_mean": 138.35,
+      "mean_D": 1.0,
+      "bootstrap_95": [
+       -0.05,
+       2.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "order": {
+       "paired": 20,
+       "mean_D": -0.0042,
+       "bootstrap_95": [
+        -0.0103,
+        0.0018
+       ],
+       "verdict": "tie"
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SCORE",
+   "family": "functional",
+   "solution": "andrey.score_matching.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "SCORE authors' code",
+   "comparator_solution": "rolland.score",
+   "comparator_setting": "the SCORE authors' code, github.com/paulrolland1307/SCORE at commit c2c2b8e0, at its defaults (ridge term 0.001, no division of the entries by their mean), its pruning the CAM pruning of the R package with mgcv 1.9-4 at cutoff 0.001, refit with torch 2.13.0+cpu; its results move slightly with the torch version, and the records of the 0.16.0 screen were fit with torch 2.5.1",
+   "lane": "score_matching.rescaled",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_rescaled",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 1.0665,
+     "comparator_s": 4.2127,
+     "ratio": 3.96,
+     "ratio_quartiles": [
+      3.77,
+      4.51
+     ],
+     "same_graph": 9,
+     "andrey_shd": 2.0,
+     "comparator_shd": 2.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 2.3,
+     "comparator_shd_mean": 2.3,
+     "empty_shd_mean": 10.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.5,
+      0.55
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.7,
+       "bootstrap_95": [
+        -8.45,
+        -6.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.7,
+       "bootstrap_95": [
+        -8.3,
+        -7.0
+       ]
+      }
+     },
+     "andrey_order_share": 0.845,
+     "comparator_order_share": 0.835,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       -0.025,
+       0.045
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 0.8625,
+     "comparator_s": 3.9695,
+     "ratio": 4.6,
+     "ratio_quartiles": [
+      4.49,
+      5.24
+     ],
+     "same_graph": 15,
+     "andrey_shd": 21.0,
+     "comparator_shd": 21.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.7,
+     "comparator_shd_mean": 19.7,
+     "empty_shd_mean": 40.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.3,
+       "bootstrap_95": [
+        -21.6,
+        -19.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -20.3,
+       "bootstrap_95": [
+        -21.55,
+        -19.1
+       ]
+      }
+     },
+     "andrey_order_share": 0.98,
+     "comparator_order_share": 0.9763,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0037,
+      "bootstrap_95": [
+       -0.0038,
+       0.0113
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 3.1645,
+     "comparator_s": 17.5617,
+     "ratio": 5.61,
+     "ratio_quartiles": [
+      5.02,
+      6.11
+     ],
+     "same_graph": 7,
+     "andrey_shd": 7.0,
+     "comparator_shd": 7.5,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 6.9,
+     "comparator_shd_mean": 7.05,
+     "empty_shd_mean": 20.0,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.55,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -13.1,
+       "bootstrap_95": [
+        -14.15,
+        -12.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -12.95,
+       "bootstrap_95": [
+        -14.0,
+        -11.95
+       ]
+      }
+     },
+     "andrey_order_share": 0.7475,
+     "comparator_order_share": 0.73,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0175,
+      "bootstrap_95": [
+       0.0025,
+       0.0325
+      ],
+      "verdict": "better"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 2.8978,
+     "comparator_s": 17.1141,
+     "ratio": 6.12,
+     "ratio_quartiles": [
+      4.68,
+      6.57
+     ],
+     "same_graph": 1,
+     "andrey_shd": 49.0,
+     "comparator_shd": 49.0,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 49.9,
+     "comparator_shd_mean": 50.15,
+     "empty_shd_mean": 80.0,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.2,
+      0.7
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -30.1,
+       "bootstrap_95": [
+        -32.25,
+        -27.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -29.85,
+       "bootstrap_95": [
+        -32.15,
+        -27.4
+       ]
+      }
+     },
+     "andrey_order_share": 0.9081,
+     "comparator_order_share": 0.9031,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.005,
+      "bootstrap_95": [
+       -0.0056,
+       0.0175
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER4|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 31.6143,
+     "comparator_s": 269.3298,
+     "ratio": 7.75,
+     "ratio_quartiles": [
+      7.06,
+      10.31
+     ],
+     "same_graph": 0,
+     "andrey_shd": 22.0,
+     "comparator_shd": 22.5,
+     "empty_shd": 50.0,
+     "andrey_shd_mean": 22.6,
+     "comparator_shd_mean": 22.1,
+     "empty_shd_mean": 50.0,
+     "mean_D": 0.5,
+     "bootstrap_95": [
+      -0.45,
+      1.35
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -27.4,
+       "bootstrap_95": [
+        -29.7,
+        -25.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -27.9,
+       "bootstrap_95": [
+        -30.5,
+        -25.3
+       ]
+      }
+     },
+     "andrey_order_share": 0.688,
+     "comparator_order_share": 0.697,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.009,
+      "bootstrap_95": [
+       -0.025,
+       0.009
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER1|d=50",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 29.6702,
+     "comparator_s": 245.8398,
+     "ratio": 8.03,
+     "ratio_quartiles": [
+      6.77,
+      9.82
+     ],
+     "same_graph": 0,
+     "andrey_shd": 135.0,
+     "comparator_shd": 137.0,
+     "empty_shd": 200.0,
+     "andrey_shd_mean": 137.6,
+     "comparator_shd_mean": 137.0,
+     "empty_shd_mean": 200.0,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      -0.75,
+      2.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -62.4,
+       "bootstrap_95": [
+        -67.2,
+        -57.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -63.0,
+       "bootstrap_95": [
+        -67.3,
+        -58.8
+       ]
+      }
+     },
+     "andrey_order_share": 0.8565,
+     "comparator_order_share": 0.8645,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.008,
+      "bootstrap_95": [
+       -0.0148,
+       -0.0018
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper_rescaled|ER4|d=50",
+     "replication": {
+      "seeds": [
+       20,
+       21,
+       22,
+       23,
+       24,
+       25,
+       26,
+       27,
+       28,
+       29,
+       30,
+       31,
+       32,
+       33,
+       34,
+       35,
+       36,
+       37,
+       38,
+       39
+      ],
+      "paired": 20,
+      "andrey_shd_mean": 134.2,
+      "comparator_shd_mean": 133.95,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       -1.7,
+       2.35
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "order": {
+       "paired": 20,
+       "mean_D": -0.006,
+       "bootstrap_95": [
+        -0.0155,
+        0.0033
+       ],
+       "verdict": "tie"
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SCORE",
+   "family": "functional",
+   "solution": "andrey.score_matching.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "SCORE authors' code",
+   "comparator_solution": "rolland.score",
+   "comparator_setting": "the SCORE authors' code, github.com/paulrolland1307/SCORE at commit c2c2b8e0, at its defaults (ridge term 0.001, no division of the entries by their mean), its pruning the CAM pruning of the R package with mgcv 1.9-4 at cutoff 0.001, refit with torch 2.13.0+cpu; its results move slightly with the torch version, and the records of the 0.16.0 screen were fit with torch 2.5.1",
+   "lane": "score_matching.raw",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 1.0739,
+     "comparator_s": 4.1584,
+     "ratio": 4.05,
+     "ratio_quartiles": [
+      3.76,
+      4.31
+     ],
+     "same_graph": 1,
+     "andrey_shd": 3.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 2.8,
+     "comparator_shd_mean": 1.05,
+     "empty_shd_mean": 10.0,
+     "mean_D": 1.75,
+     "bootstrap_95": [
+      0.95,
+      2.55
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.2,
+       "bootstrap_95": [
+        -7.8,
+        -6.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -8.95,
+       "bootstrap_95": [
+        -9.45,
+        -8.4
+       ]
+      }
+     },
+     "andrey_order_share": 0.805,
+     "comparator_order_share": 0.955,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.2,
+       -0.1
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper|ER1|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 0.8119,
+     "comparator_s": 4.0659,
+     "ratio": 5.12,
+     "ratio_quartiles": [
+      4.89,
+      5.48
+     ],
+     "same_graph": 5,
+     "andrey_shd": 21.5,
+     "comparator_shd": 21.5,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 22.05,
+     "comparator_shd_mean": 21.8,
+     "empty_shd_mean": 40.0,
+     "mean_D": 0.25,
+     "bootstrap_95": [
+      -0.45,
+      1.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -17.95,
+       "bootstrap_95": [
+        -19.15,
+        -16.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -18.2,
+       "bootstrap_95": [
+        -19.15,
+        -17.2988
+       ]
+      }
+     },
+     "andrey_order_share": 0.97,
+     "comparator_order_share": 0.965,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.005,
+      "bootstrap_95": [
+       -0.01,
+       0.0225
+      ],
+      "verdict": "tie"
+     },
+     "cell": "SCORE|score_paper|ER4|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 2.9412,
+     "comparator_s": 17.6637,
+     "ratio": 6.23,
+     "ratio_quartiles": [
+      5.76,
+      6.54
+     ],
+     "same_graph": 0,
+     "andrey_shd": 8.0,
+     "comparator_shd": 4.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 7.8,
+     "comparator_shd_mean": 3.55,
+     "empty_shd_mean": 20.0,
+     "mean_D": 4.25,
+     "bootstrap_95": [
+      3.1,
+      5.35
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -12.2,
+       "bootstrap_95": [
+        -13.2,
+        -11.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -16.45,
+       "bootstrap_95": [
+        -17.25,
+        -15.7
+       ]
+      }
+     },
+     "andrey_order_share": 0.7275,
+     "comparator_order_share": 0.92,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.1925,
+      "bootstrap_95": [
+       -0.2375,
+       -0.1474
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper|ER1|d=20",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 2.9027,
+     "comparator_s": 17.3546,
+     "ratio": 5.96,
+     "ratio_quartiles": [
+      4.78,
+      6.67
+     ],
+     "same_graph": 0,
+     "andrey_shd": 51.0,
+     "comparator_shd": 47.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 51.85,
+     "comparator_shd_mean": 47.7,
+     "empty_shd_mean": 80.0,
+     "mean_D": 4.15,
+     "bootstrap_95": [
+      2.35,
+      6.25
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -28.15,
+       "bootstrap_95": [
+        -30.35,
+        -25.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -32.3,
+       "bootstrap_95": [
+        -33.75,
+        -30.7
+       ]
+      }
+     },
+     "andrey_order_share": 0.9044,
+     "comparator_order_share": 0.9456,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0412,
+      "bootstrap_95": [
+       -0.0681,
+       -0.0144
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper|ER4|d=20",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 28.1637,
+     "comparator_s": 269.9739,
+     "ratio": 8.94,
+     "ratio_quartiles": [
+      7.55,
+      12.01
+     ],
+     "same_graph": 0,
+     "andrey_shd": 25.5,
+     "comparator_shd": 12.0,
+     "empty_shd": 50.0,
+     "andrey_shd_mean": 25.0,
+     "comparator_shd_mean": 11.05,
+     "empty_shd_mean": 50.0,
+     "mean_D": 13.95,
+     "bootstrap_95": [
+      11.6,
+      16.35
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -25.0,
+       "bootstrap_95": [
+        -26.9,
+        -23.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -38.95,
+       "bootstrap_95": [
+        -40.4,
+        -37.6
+       ]
+      }
+     },
+     "andrey_order_share": 0.649,
+     "comparator_order_share": 0.905,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.256,
+      "bootstrap_95": [
+       -0.288,
+       -0.223
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper|ER1|d=50",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 32.376,
+     "comparator_s": 245.3419,
+     "ratio": 7.93,
+     "ratio_quartiles": [
+      5.63,
+      9.33
+     ],
+     "same_graph": 0,
+     "andrey_shd": 141.0,
+     "comparator_shd": 135.5,
+     "empty_shd": 200.0,
+     "andrey_shd_mean": 142.65,
+     "comparator_shd_mean": 134.3,
+     "empty_shd_mean": 200.0,
+     "mean_D": 8.35,
+     "bootstrap_95": [
+      5.45,
+      11.35
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -57.35,
+       "bootstrap_95": [
+        -61.2,
+        -53.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -65.7,
+       "bootstrap_95": [
+        -69.8,
+        -61.75
+       ]
+      }
+     },
+     "andrey_order_share": 0.8548,
+     "comparator_order_share": 0.9065,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0518,
+      "bootstrap_95": [
+       -0.069,
+       -0.035
+      ],
+      "verdict": "worse"
+     },
+     "cell": "SCORE|score_paper|ER4|d=50",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_standardized",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.5299,
+     "comparator_s": 20.0433,
+     "ratio": 2.66,
+     "ratio_quartiles": [
+      2.39,
+      2.86
+     ],
+     "same_graph": 5,
+     "andrey_shd": 1.5,
+     "comparator_shd": 3.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.7,
+     "comparator_shd_mean": 3.05,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.25,
+      -0.55
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.3,
+       "bootstrap_95": [
+        -8.9,
+        -7.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.95,
+       "bootstrap_95": [
+        -7.7,
+        -6.15
+       ]
+      }
+     },
+     "andrey_order_share": 0.895,
+     "comparator_order_share": 0.775,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.12,
+      "bootstrap_95": [
+       0.07,
+       0.18
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_standardized|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.643,
+     "comparator_s": 20.396,
+     "ratio": 2.67,
+     "ratio_quartiles": [
+      1.96,
+      3.44
+     ],
+     "same_graph": 1,
+     "andrey_shd": 21.0,
+     "comparator_shd": 22.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 21.1,
+     "comparator_shd_mean": 22.05,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.95,
+     "bootstrap_95": [
+      -2.05,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -18.9,
+       "bootstrap_95": [
+        -19.85,
+        -17.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -17.95,
+       "bootstrap_95": [
+        -19.2,
+        -16.6
+       ]
+      }
+     },
+     "andrey_order_share": 0.9838,
+     "comparator_order_share": 0.9587,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.025,
+      "bootstrap_95": [
+       0.005,
+       0.0475
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_standardized|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 29.5005,
+     "comparator_s": 83.471,
+     "ratio": 2.82,
+     "ratio_quartiles": [
+      2.68,
+      3.04
+     ],
+     "same_graph": 1,
+     "andrey_shd": 6.0,
+     "comparator_shd": 7.5,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 6.0,
+     "comparator_shd_mean": 7.65,
+     "empty_shd_mean": 20.0,
+     "mean_D": -1.65,
+     "bootstrap_95": [
+      -2.65,
+      -0.7
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -14.0,
+       "bootstrap_95": [
+        -14.9,
+        -13.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -12.35,
+       "bootstrap_95": [
+        -13.2,
+        -11.5
+       ]
+      }
+     },
+     "andrey_order_share": 0.805,
+     "comparator_order_share": 0.74,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.065,
+      "bootstrap_95": [
+       0.0275,
+       0.105
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_standardized|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 28.2905,
+     "comparator_s": 83.2675,
+     "ratio": 2.95,
+     "ratio_quartiles": [
+      2.74,
+      3.12
+     ],
+     "same_graph": 0,
+     "andrey_shd": 49.0,
+     "comparator_shd": 52.0,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 49.4,
+     "comparator_shd_mean": 52.8,
+     "empty_shd_mean": 80.0,
+     "mean_D": -3.4,
+     "bootstrap_95": [
+      -4.85,
+      -2.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -30.6,
+       "bootstrap_95": [
+        -32.7,
+        -28.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -27.2,
+       "bootstrap_95": [
+        -29.55,
+        -24.85
+       ]
+      }
+     },
+     "andrey_order_share": 0.9225,
+     "comparator_order_share": 0.895,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0275,
+      "bootstrap_95": [
+       0.0137,
+       0.0413
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_standardized|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_laplace_standardized",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.3843,
+     "comparator_s": 20.3536,
+     "ratio": 2.18,
+     "ratio_quartiles": [
+      1.96,
+      2.34
+     ],
+     "same_graph": 2,
+     "andrey_shd": 1.0,
+     "comparator_shd": 3.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.25,
+     "comparator_shd_mean": 2.85,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.6,
+     "bootstrap_95": [
+      -2.25,
+      -0.95
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.75,
+       "bootstrap_95": [
+        -9.25,
+        -8.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.15,
+       "bootstrap_95": [
+        -7.85,
+        -6.45
+       ]
+      }
+     },
+     "andrey_order_share": 0.9,
+     "comparator_order_share": 0.765,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.135,
+      "bootstrap_95": [
+       0.085,
+       0.19
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_standardized|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.7068,
+     "comparator_s": 23.68,
+     "ratio": 2.4,
+     "ratio_quartiles": [
+      1.96,
+      2.79
+     ],
+     "same_graph": 1,
+     "andrey_shd": 20.0,
+     "comparator_shd": 20.5,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.9,
+     "comparator_shd_mean": 20.4,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.55,
+      0.5
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.1,
+       "bootstrap_95": [
+        -21.25,
+        -18.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -19.6,
+       "bootstrap_95": [
+        -20.95,
+        -18.25
+       ]
+      }
+     },
+     "andrey_order_share": 0.9825,
+     "comparator_order_share": 0.9788,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0038,
+      "bootstrap_95": [
+       -0.0087,
+       0.0163
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_laplace_standardized|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 37.9111,
+     "comparator_s": 79.1511,
+     "ratio": 2.13,
+     "ratio_quartiles": [
+      2.01,
+      2.16
+     ],
+     "same_graph": 0,
+     "andrey_shd": 4.0,
+     "comparator_shd": 6.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.25,
+     "comparator_shd_mean": 5.85,
+     "empty_shd_mean": 20.0,
+     "mean_D": -1.6,
+     "bootstrap_95": [
+      -2.5,
+      -0.7
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -15.75,
+       "bootstrap_95": [
+        -16.55,
+        -14.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -14.15,
+       "bootstrap_95": [
+        -15.0,
+        -13.3488
+       ]
+      }
+     },
+     "andrey_order_share": 0.8625,
+     "comparator_order_share": 0.805,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0575,
+      "bootstrap_95": [
+       0.035,
+       0.0825
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_standardized|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 37.8136,
+     "comparator_s": 108.3289,
+     "ratio": 2.86,
+     "ratio_quartiles": [
+      2.6,
+      2.88
+     ],
+     "same_graph": 0,
+     "andrey_shd": 48.0,
+     "comparator_shd": 50.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 48.75,
+     "comparator_shd_mean": 51.1,
+     "empty_shd_mean": 80.0,
+     "mean_D": -2.35,
+     "bootstrap_95": [
+      -3.55,
+      -1.2
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -31.25,
+       "bootstrap_95": [
+        -32.95,
+        -29.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -28.9,
+       "bootstrap_95": [
+        -30.8,
+        -26.9
+       ]
+      }
+     },
+     "andrey_order_share": 0.9444,
+     "comparator_order_share": 0.9281,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0162,
+      "bootstrap_95": [
+       0.0056,
+       0.0263
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_standardized|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_gumbel_standardized",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 8.7976,
+     "comparator_s": 20.7099,
+     "ratio": 2.21,
+     "ratio_quartiles": [
+      1.75,
+      2.94
+     ],
+     "same_graph": 2,
+     "andrey_shd": 1.0,
+     "comparator_shd": 2.5,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.55,
+     "comparator_shd_mean": 2.6,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -1.65,
+      -0.35
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.45,
+       "bootstrap_95": [
+        -9.05,
+        -7.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.4,
+       "bootstrap_95": [
+        -7.85,
+        -6.9
+       ]
+      }
+     },
+     "andrey_order_share": 0.92,
+     "comparator_order_share": 0.815,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.105,
+      "bootstrap_95": [
+       0.055,
+       0.15
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_standardized|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.1586,
+     "comparator_s": 17.8171,
+     "ratio": 1.94,
+     "ratio_quartiles": [
+      1.63,
+      2.44
+     ],
+     "same_graph": 1,
+     "andrey_shd": 19.5,
+     "comparator_shd": 21.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.65,
+     "comparator_shd_mean": 21.0,
+     "empty_shd_mean": 40.0,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.5,
+      -0.35
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.35,
+       "bootstrap_95": [
+        -21.8,
+        -18.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -19.0,
+       "bootstrap_95": [
+        -20.35,
+        -17.75
+       ]
+      }
+     },
+     "andrey_order_share": 0.9913,
+     "comparator_order_share": 0.9688,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0225,
+      "bootstrap_95": [
+       0.0063,
+       0.04
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_standardized|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 39.8529,
+     "comparator_s": 82.4885,
+     "ratio": 2.06,
+     "ratio_quartiles": [
+      2.01,
+      2.26
+     ],
+     "same_graph": 0,
+     "andrey_shd": 4.0,
+     "comparator_shd": 6.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.75,
+     "comparator_shd_mean": 5.6,
+     "empty_shd_mean": 20.0,
+     "mean_D": -0.85,
+     "bootstrap_95": [
+      -1.9,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -15.25,
+       "bootstrap_95": [
+        -16.45,
+        -13.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -14.4,
+       "bootstrap_95": [
+        -15.4,
+        -13.4
+       ]
+      }
+     },
+     "andrey_order_share": 0.8475,
+     "comparator_order_share": 0.81,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0375,
+      "bootstrap_95": [
+       -0.0075,
+       0.075
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_gumbel_standardized|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 39.1342,
+     "comparator_s": 82.2425,
+     "ratio": 2.07,
+     "ratio_quartiles": [
+      1.98,
+      2.14
+     ],
+     "same_graph": 0,
+     "andrey_shd": 47.5,
+     "comparator_shd": 51.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 49.1,
+     "comparator_shd_mean": 52.15,
+     "empty_shd_mean": 80.0,
+     "mean_D": -3.05,
+     "bootstrap_95": [
+      -4.3012,
+      -1.8
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -30.9,
+       "bootstrap_95": [
+        -33.25,
+        -28.3488
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -27.85,
+       "bootstrap_95": [
+        -29.5512,
+        -25.95
+       ]
+      }
+     },
+     "andrey_order_share": 0.9537,
+     "comparator_order_share": 0.9338,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0106,
+       0.0294
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_standardized|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.rescaled",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_rescaled",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.5223,
+     "comparator_s": 20.0748,
+     "ratio": 2.66,
+     "ratio_quartiles": [
+      2.35,
+      2.69
+     ],
+     "same_graph": 5,
+     "andrey_shd": 0.5,
+     "comparator_shd": 2.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 0.85,
+     "comparator_shd_mean": 2.1,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.25,
+     "bootstrap_95": [
+      -1.85,
+      -0.7
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -9.15,
+       "bootstrap_95": [
+        -9.6,
+        -8.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.9,
+       "bootstrap_95": [
+        -8.45,
+        -7.3
+       ]
+      }
+     },
+     "andrey_order_share": 0.965,
+     "comparator_order_share": 0.865,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.055,
+       0.155
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_rescaled|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.6651,
+     "comparator_s": 17.5649,
+     "ratio": 2.29,
+     "ratio_quartiles": [
+      1.96,
+      2.61
+     ],
+     "same_graph": 1,
+     "andrey_shd": 20.0,
+     "comparator_shd": 20.5,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.4,
+     "comparator_shd_mean": 20.3,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.9,
+     "bootstrap_95": [
+      -1.65,
+      -0.15
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.6,
+       "bootstrap_95": [
+        -21.8,
+        -19.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -19.7,
+       "bootstrap_95": [
+        -21.1,
+        -18.3988
+       ]
+      }
+     },
+     "andrey_order_share": 0.9875,
+     "comparator_order_share": 0.9775,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.0213
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_rescaled|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 28.4338,
+     "comparator_s": 83.2695,
+     "ratio": 2.88,
+     "ratio_quartiles": [
+      2.73,
+      3.06
+     ],
+     "same_graph": 0,
+     "andrey_shd": 4.5,
+     "comparator_shd": 6.5,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.75,
+     "comparator_shd_mean": 6.75,
+     "empty_shd_mean": 20.0,
+     "mean_D": -2.0,
+     "bootstrap_95": [
+      -2.9,
+      -1.2
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -15.25,
+       "bootstrap_95": [
+        -16.05,
+        -14.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -13.25,
+       "bootstrap_95": [
+        -14.2,
+        -12.3
+       ]
+      }
+     },
+     "andrey_order_share": 0.8375,
+     "comparator_order_share": 0.76,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0775,
+      "bootstrap_95": [
+       0.05,
+       0.1075
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_rescaled|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 28.4182,
+     "comparator_s": 80.668,
+     "ratio": 2.74,
+     "ratio_quartiles": [
+      2.62,
+      2.91
+     ],
+     "same_graph": 0,
+     "andrey_shd": 47.0,
+     "comparator_shd": 51.0,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 47.45,
+     "comparator_shd_mean": 51.4,
+     "empty_shd_mean": 80.0,
+     "mean_D": -3.95,
+     "bootstrap_95": [
+      -4.8,
+      -3.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -32.55,
+       "bootstrap_95": [
+        -34.55,
+        -30.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -28.6,
+       "bootstrap_95": [
+        -30.65,
+        -26.45
+       ]
+      }
+     },
+     "andrey_order_share": 0.9381,
+     "comparator_order_share": 0.9081,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.03,
+      "bootstrap_95": [
+       0.0181,
+       0.0425
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_rescaled|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.rescaled",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_laplace_rescaled",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.3484,
+     "comparator_s": 14.9332,
+     "ratio": 1.6,
+     "ratio_quartiles": [
+      1.56,
+      1.63
+     ],
+     "same_graph": 4,
+     "andrey_shd": 1.0,
+     "comparator_shd": 2.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 0.85,
+     "comparator_shd_mean": 2.15,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.3,
+     "bootstrap_95": [
+      -1.95,
+      -0.65
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -9.15,
+       "bootstrap_95": [
+        -9.55,
+        -8.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.85,
+       "bootstrap_95": [
+        -8.6,
+        -7.05
+       ]
+      }
+     },
+     "andrey_order_share": 0.935,
+     "comparator_order_share": 0.845,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.09,
+      "bootstrap_95": [
+       0.04,
+       0.14
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_rescaled|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.7875,
+     "comparator_s": 15.1033,
+     "ratio": 1.56,
+     "ratio_quartiles": [
+      1.53,
+      1.67
+     ],
+     "same_graph": 1,
+     "andrey_shd": 19.5,
+     "comparator_shd": 19.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 18.25,
+     "comparator_shd_mean": 18.35,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.95,
+      0.7
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -21.75,
+       "bootstrap_95": [
+        -23.3,
+        -20.3
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -21.65,
+       "bootstrap_95": [
+        -23.2,
+        -20.2
+       ]
+      }
+     },
+     "andrey_order_share": 0.9813,
+     "comparator_order_share": 0.9788,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0025,
+      "bootstrap_95": [
+       -0.0087,
+       0.0125
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_laplace_rescaled|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 38.1796,
+     "comparator_s": 83.1054,
+     "ratio": 2.17,
+     "ratio_quartiles": [
+      2.08,
+      2.2
+     ],
+     "same_graph": 1,
+     "andrey_shd": 3.0,
+     "comparator_shd": 5.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 3.55,
+     "comparator_shd_mean": 5.05,
+     "empty_shd_mean": 20.0,
+     "mean_D": -1.5,
+     "bootstrap_95": [
+      -2.2,
+      -0.8
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.45,
+       "bootstrap_95": [
+        -17.3513,
+        -15.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -14.95,
+       "bootstrap_95": [
+        -16.0,
+        -13.85
+       ]
+      }
+     },
+     "andrey_order_share": 0.9025,
+     "comparator_order_share": 0.8525,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.03,
+       0.0725
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_rescaled|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 35.9725,
+     "comparator_s": 82.501,
+     "ratio": 2.28,
+     "ratio_quartiles": [
+      2.23,
+      2.32
+     ],
+     "same_graph": 0,
+     "andrey_shd": 45.5,
+     "comparator_shd": 48.0,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 46.4,
+     "comparator_shd_mean": 48.3,
+     "empty_shd_mean": 80.0,
+     "mean_D": -1.9,
+     "bootstrap_95": [
+      -3.25,
+      -0.6
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -33.6,
+       "bootstrap_95": [
+        -35.5012,
+        -31.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -31.7,
+       "bootstrap_95": [
+        -33.85,
+        -29.6
+       ]
+      }
+     },
+     "andrey_order_share": 0.9388,
+     "comparator_order_share": 0.9194,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0194,
+      "bootstrap_95": [
+       0.0056,
+       0.0331
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_laplace_rescaled|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.rescaled",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_gumbel_rescaled",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 8.86,
+     "comparator_s": 15.1727,
+     "ratio": 1.7,
+     "ratio_quartiles": [
+      1.67,
+      1.93
+     ],
+     "same_graph": 6,
+     "andrey_shd": 1.0,
+     "comparator_shd": 2.5,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 2.35,
+     "empty_shd_mean": 10.0,
+     "mean_D": -1.15,
+     "bootstrap_95": [
+      -1.65,
+      -0.7
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.8,
+       "bootstrap_95": [
+        -9.25,
+        -8.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.65,
+       "bootstrap_95": [
+        -8.2,
+        -7.1
+       ]
+      }
+     },
+     "andrey_order_share": 0.935,
+     "comparator_order_share": 0.86,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.075,
+      "bootstrap_95": [
+       0.035,
+       0.12
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_rescaled|ER1|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.0786,
+     "comparator_s": 18.1874,
+     "ratio": 2.03,
+     "ratio_quartiles": [
+      1.69,
+      2.22
+     ],
+     "same_graph": 2,
+     "andrey_shd": 19.0,
+     "comparator_shd": 20.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 18.6,
+     "comparator_shd_mean": 18.9,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.8,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -21.4,
+       "bootstrap_95": [
+        -23.2,
+        -19.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -21.1,
+       "bootstrap_95": [
+        -22.75,
+        -19.55
+       ]
+      }
+     },
+     "andrey_order_share": 0.9825,
+     "comparator_order_share": 0.985,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0025,
+      "bootstrap_95": [
+       -0.0138,
+       0.0075
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_gumbel_rescaled|ER4|d=10",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 39.0947,
+     "comparator_s": 80.0771,
+     "ratio": 2.09,
+     "ratio_quartiles": [
+      1.95,
+      2.15
+     ],
+     "same_graph": 2,
+     "andrey_shd": 3.5,
+     "comparator_shd": 6.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.0,
+     "comparator_shd_mean": 5.55,
+     "empty_shd_mean": 20.0,
+     "mean_D": -1.55,
+     "bootstrap_95": [
+      -2.45,
+      -0.7
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.0,
+       "bootstrap_95": [
+        -17.15,
+        -14.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -14.45,
+       "bootstrap_95": [
+        -15.65,
+        -13.25
+       ]
+      }
+     },
+     "andrey_order_share": 0.8825,
+     "comparator_order_share": 0.83,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0525,
+      "bootstrap_95": [
+       0.015,
+       0.0875
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_rescaled|ER1|d=20",
+     "card_verdict": "tie"
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 38.266,
+     "comparator_s": 92.7144,
+     "ratio": 2.35,
+     "ratio_quartiles": [
+      2.05,
+      2.77
+     ],
+     "same_graph": 0,
+     "andrey_shd": 45.5,
+     "comparator_shd": 48.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 46.05,
+     "comparator_shd_mean": 48.65,
+     "empty_shd_mean": 80.0,
+     "mean_D": -2.6,
+     "bootstrap_95": [
+      -3.95,
+      -1.25
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -33.95,
+       "bootstrap_95": [
+        -36.05,
+        -31.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -31.35,
+       "bootstrap_95": [
+        -33.6,
+        -29.0
+       ]
+      }
+     },
+     "andrey_order_share": 0.9444,
+     "comparator_order_share": 0.9263,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0181,
+      "bootstrap_95": [
+       0.0081,
+       0.0287
+      ],
+      "verdict": "better"
+     },
+     "cell": "NoGAM|score_paper_gumbel_rescaled|ER4|d=20",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.raw",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.5504,
+     "comparator_s": 14.7697,
+     "ratio": 1.95,
+     "ratio_quartiles": [
+      1.93,
+      2.0
+     ],
+     "same_graph": 4,
+     "andrey_shd": 1.5,
+     "comparator_shd": 1.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.7,
+     "comparator_shd_mean": 0.9,
+     "empty_shd_mean": 10.0,
+     "mean_D": 0.8,
+     "bootstrap_95": [
+      0.1,
+      1.45
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.3,
+       "bootstrap_95": [
+        -8.9,
+        -7.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -9.1,
+       "bootstrap_95": [
+        -9.5,
+        -8.65
+       ]
+      }
+     },
+     "andrey_order_share": 0.895,
+     "comparator_order_share": 0.96,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.065,
+      "bootstrap_95": [
+       -0.12,
+       -0.015
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper|ER1|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 7.6265,
+     "comparator_s": 15.032,
+     "ratio": 1.96,
+     "ratio_quartiles": [
+      1.94,
+      1.99
+     ],
+     "same_graph": 1,
+     "andrey_shd": 21.0,
+     "comparator_shd": 21.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 21.1,
+     "comparator_shd_mean": 21.05,
+     "empty_shd_mean": 40.0,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.65,
+      0.8
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -18.9,
+       "bootstrap_95": [
+        -19.85,
+        -17.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -18.95,
+       "bootstrap_95": [
+        -19.9,
+        -18.0
+       ]
+      }
+     },
+     "andrey_order_share": 0.9838,
+     "comparator_order_share": 0.9875,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0038,
+      "bootstrap_95": [
+       -0.0138,
+       0.0063
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper|ER4|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 29.5486,
+     "comparator_s": 82.3826,
+     "ratio": 2.77,
+     "ratio_quartiles": [
+      2.62,
+      2.8
+     ],
+     "same_graph": 0,
+     "andrey_shd": 6.0,
+     "comparator_shd": 3.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 6.0,
+     "comparator_shd_mean": 3.4,
+     "empty_shd_mean": 20.0,
+     "mean_D": 2.6,
+     "bootstrap_95": [
+      1.55,
+      3.65
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -14.0,
+       "bootstrap_95": [
+        -14.9,
+        -13.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -16.6,
+       "bootstrap_95": [
+        -17.4,
+        -15.8
+       ]
+      }
+     },
+     "andrey_order_share": 0.805,
+     "comparator_order_share": 0.9175,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.1125,
+      "bootstrap_95": [
+       -0.155,
+       -0.0725
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper|ER1|d=20",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 29.4157,
+     "comparator_s": 82.9295,
+     "ratio": 2.73,
+     "ratio_quartiles": [
+      2.66,
+      2.84
+     ],
+     "same_graph": 0,
+     "andrey_shd": 49.0,
+     "comparator_shd": 49.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 49.4,
+     "comparator_shd_mean": 48.5,
+     "empty_shd_mean": 80.0,
+     "mean_D": 0.9,
+     "bootstrap_95": [
+      -0.7012,
+      3.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -30.6,
+       "bootstrap_95": [
+        -32.7,
+        -28.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -31.5,
+       "bootstrap_95": [
+        -33.15,
+        -29.9
+       ]
+      }
+     },
+     "andrey_order_share": 0.9225,
+     "comparator_order_share": 0.9525,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.03,
+      "bootstrap_95": [
+       -0.0581,
+       -0.0088
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper|ER4|d=20",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.raw",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_laplace",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.824,
+     "comparator_s": 20.2854,
+     "ratio": 2.05,
+     "ratio_quartiles": [
+      1.81,
+      2.09
+     ],
+     "same_graph": 8,
+     "andrey_shd": 1.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.25,
+     "comparator_shd_mean": 0.75,
+     "empty_shd_mean": 10.0,
+     "mean_D": 0.5,
+     "bootstrap_95": [
+      0.05,
+      0.95
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.75,
+       "bootstrap_95": [
+        -9.25,
+        -8.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -9.25,
+       "bootstrap_95": [
+        -9.75,
+        -8.65
+       ]
+      }
+     },
+     "andrey_order_share": 0.9,
+     "comparator_order_share": 0.96,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.1,
+       -0.025
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper_laplace|ER1|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.762,
+     "comparator_s": 14.9709,
+     "ratio": 1.53,
+     "ratio_quartiles": [
+      1.51,
+      1.67
+     ],
+     "same_graph": 2,
+     "andrey_shd": 20.0,
+     "comparator_shd": 20.0,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.9,
+     "comparator_shd_mean": 19.5,
+     "empty_shd_mean": 40.0,
+     "mean_D": 0.4,
+     "bootstrap_95": [
+      -0.5,
+      1.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.1,
+       "bootstrap_95": [
+        -21.25,
+        -18.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -20.5,
+       "bootstrap_95": [
+        -21.8,
+        -19.3
+       ]
+      }
+     },
+     "andrey_order_share": 0.9825,
+     "comparator_order_share": 0.9925,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.01,
+      "bootstrap_95": [
+       -0.02,
+       -0.0013
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper_laplace|ER4|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 36.2281,
+     "comparator_s": 79.0136,
+     "ratio": 2.19,
+     "ratio_quartiles": [
+      2.1,
+      2.26
+     ],
+     "same_graph": 0,
+     "andrey_shd": 4.0,
+     "comparator_shd": 3.0,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.25,
+     "comparator_shd_mean": 2.9,
+     "empty_shd_mean": 20.0,
+     "mean_D": 1.35,
+     "bootstrap_95": [
+      0.45,
+      2.25
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -15.75,
+       "bootstrap_95": [
+        -16.55,
+        -14.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -17.1,
+       "bootstrap_95": [
+        -17.95,
+        -16.2
+       ]
+      }
+     },
+     "andrey_order_share": 0.8625,
+     "comparator_order_share": 0.945,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0825,
+      "bootstrap_95": [
+       -0.115,
+       -0.0475
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper_laplace|ER1|d=20",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 37.968,
+     "comparator_s": 94.9049,
+     "ratio": 2.46,
+     "ratio_quartiles": [
+      2.11,
+      2.84
+     ],
+     "same_graph": 0,
+     "andrey_shd": 48.0,
+     "comparator_shd": 48.5,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 48.75,
+     "comparator_shd_mean": 48.15,
+     "empty_shd_mean": 80.0,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      -0.7,
+      1.9012
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -31.25,
+       "bootstrap_95": [
+        -32.95,
+        -29.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -31.85,
+       "bootstrap_95": [
+        -33.7,
+        -29.8
+       ]
+      }
+     },
+     "andrey_order_share": 0.9444,
+     "comparator_order_share": 0.9613,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0169,
+      "bootstrap_95": [
+       -0.0294,
+       -0.0044
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper_laplace|ER4|d=20",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "NoGAM",
+   "family": "functional",
+   "solution": "andrey.nogam.numpy",
+   "setting": "alpha=0.001, the default",
+   "comparator": "dodiscover",
+   "comparator_solution": "dodiscover.nogam",
+   "comparator_setting": "NoGAM in dodiscover at commit 6e644561, the class defaults with the pruning cutoff set to 0.001, the paper's",
+   "lane": "nogam.raw",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor / AMD EPYC 9534 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the reference ran in separate runs on shared nodes, so the time ratio is indicative and absolute times do not compare across rows",
+   "cores": 1,
+   "build": "Andrey pre-release build of 10 November 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "regime": "score_paper_gumbel",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. The order share is the share of true edges the method's causal order puts in the true direction (the arrowhead recall of the full DAG of the order), 0.5 for a random order on average",
+   "mean_degrees": [
+    2.0,
+    8.0
+   ],
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.2134,
+     "comparator_s": 15.5116,
+     "ratio": 1.68,
+     "ratio_quartiles": [
+      1.65,
+      1.85
+     ],
+     "same_graph": 3,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 10.0,
+     "andrey_shd_mean": 1.55,
+     "comparator_shd_mean": 1.2,
+     "empty_shd_mean": 10.0,
+     "mean_D": 0.35,
+     "bootstrap_95": [
+      -0.3,
+      1.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.45,
+       "bootstrap_95": [
+        -9.05,
+        -7.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -8.8,
+       "bootstrap_95": [
+        -9.2,
+        -8.35
+       ]
+      }
+     },
+     "andrey_order_share": 0.92,
+     "comparator_order_share": 0.955,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.035,
+      "bootstrap_95": [
+       -0.075,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_gumbel|ER1|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 9.1727,
+     "comparator_s": 20.5523,
+     "ratio": 2.36,
+     "ratio_quartiles": [
+      1.62,
+      2.87
+     ],
+     "same_graph": 2,
+     "andrey_shd": 19.5,
+     "comparator_shd": 20.5,
+     "empty_shd": 40.0,
+     "andrey_shd_mean": 19.65,
+     "comparator_shd_mean": 19.9,
+     "empty_shd_mean": 40.0,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.0,
+      0.45
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.35,
+       "bootstrap_95": [
+        -21.8,
+        -18.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -20.1,
+       "bootstrap_95": [
+        -21.55,
+        -18.7
+       ]
+      }
+     },
+     "andrey_order_share": 0.9913,
+     "comparator_order_share": 0.99,
+     "order": {
+      "paired": 20,
+      "mean_D": 0.0013,
+      "bootstrap_95": [
+       -0.0063,
+       0.0075
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_gumbel|ER4|d=10",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 39.4698,
+     "comparator_s": 67.5809,
+     "ratio": 1.7,
+     "ratio_quartiles": [
+      1.45,
+      2.26
+     ],
+     "same_graph": 1,
+     "andrey_shd": 4.0,
+     "comparator_shd": 3.5,
+     "empty_shd": 20.0,
+     "andrey_shd_mean": 4.75,
+     "comparator_shd_mean": 3.25,
+     "empty_shd_mean": 20.0,
+     "mean_D": 1.5,
+     "bootstrap_95": [
+      0.35,
+      2.75
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -15.25,
+       "bootstrap_95": [
+        -16.45,
+        -13.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -16.75,
+       "bootstrap_95": [
+        -17.5,
+        -16.0
+       ]
+      }
+     },
+     "andrey_order_share": 0.8475,
+     "comparator_order_share": 0.9325,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.085,
+      "bootstrap_95": [
+       -0.1325,
+       -0.04
+      ],
+      "verdict": "worse"
+     },
+     "cell": "NoGAM|score_paper_gumbel|ER1|d=20",
+     "card_verdict": null
+    },
+    {
+     "mean_degree": 8.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "comparator_ok": 20,
+     "paired": 20,
+     "andrey_s": 39.231,
+     "comparator_s": 57.7681,
+     "ratio": 1.49,
+     "ratio_quartiles": [
+      1.42,
+      2.0
+     ],
+     "same_graph": 0,
+     "andrey_shd": 47.5,
+     "comparator_shd": 49.0,
+     "empty_shd": 80.0,
+     "andrey_shd_mean": 49.1,
+     "comparator_shd_mean": 49.3,
+     "empty_shd_mean": 80.0,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -1.8012,
+      1.65
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -30.9,
+       "bootstrap_95": [
+        -33.25,
+        -28.3488
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -30.7,
+       "bootstrap_95": [
+        -32.45,
+        -28.85
+       ]
+      }
+     },
+     "andrey_order_share": 0.9537,
+     "comparator_order_share": 0.9631,
+     "order": {
+      "paired": 20,
+      "mean_D": -0.0094,
+      "bootstrap_95": [
+       -0.0263,
+       0.0056
+      ],
+      "verdict": "tie"
+     },
+     "cell": "NoGAM|score_paper_gumbel|ER4|d=20",
+     "card_verdict": null
+    }
+   ]
+  }
+ ]
+}

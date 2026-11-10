@@ -180,6 +180,8 @@ FITS: dict[str, Fit] = {
     ),
     "CAM": Fit(andrey.cam),
     "RESIT": Fit(andrey.resit),
+    "ScoreMatching": Fit(andrey.score_matching),
+    "NoGAM": Fit(andrey.nogam),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
@@ -238,6 +240,12 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
+    "score_paper_standardized_d15_er1": functools.partial(
+        qg.order_draws, "score_paper_standardized", 15, "er1"
+    ),
+    "score_paper_laplace_standardized_d12_er1": functools.partial(
+        qg.order_draws, "score_paper_laplace_standardized", 12, "er1"
+    ),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
     "fci_jci_x100": functools.partial(qg.index_pag_draws, "X100"),
@@ -288,6 +296,8 @@ LARGER: dict[str, str] = {
     "ExactSearch": "linear_gauss_er_d16",
     "CAM": "anm_er_n1000_d30",
     "RESIT": "anm_er_n1000_d12",
+    "ScoreMatching": "score_paper_standardized_d15_er1",
+    "NoGAM": "score_paper_laplace_standardized_d12_er1",
     "CALM": "linear_gauss_er_d15",
     "CDNOD": "domain_shift_er_d70",
     "FCI-JCI": "fci_jci_x100",

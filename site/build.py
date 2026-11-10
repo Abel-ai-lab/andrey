@@ -69,6 +69,7 @@ RELEASES = (
     "0.14.0",
     "0.15.0",
     "0.16.0",
+    "0.17.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -485,6 +486,15 @@ REGIMES |= {
         )
     },
 }
+# The 0.17.0 summary's cells: SCORE and NoGAM on the simulation of their papers, with Gaussian,
+# Laplace, or Gumbel noise, every column z-scored, or each variable rescaled to unit variance
+# before its children read it.
+STEIN_PAPER = "nonlinear data from the SCORE and NoGAM papers' simulation"
+REGIMES |= {
+    f"score_paper{key}{tail}": f"{STEIN_PAPER}, {noise} noise, {scale}"
+    for key, noise in (("", "Gaussian"), ("_laplace", "Laplace"), ("_gumbel", "Gumbel"))
+    for tail, scale in (("_standardized", "z-scored"), ("_rescaled", "each variable rescaled"))
+}
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other
@@ -542,6 +552,8 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
+# SCORE and NoGAM show their z-scored and rescaled cells and omit the cells in the simulation's
+# own units, where the references read those units and Andrey standardizes.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -556,6 +568,8 @@ NOT_SHOWN_LANES = {
     "jpcmciplus.assumption_3_broken",
     "jpcmciplus.gpdc",
     "loci.likelihood",
+    "score_matching.raw",
+    "nogam.raw",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
@@ -574,7 +588,7 @@ NOT_SHOWN_COMPARATORS = {
 # Comparators left out of the homepage's accuracy claim and its error bars, which speak of other
 # packages: a method's authors' research code that is not a package. Its rows stay in the speed
 # panel and on its release card.
-NOT_IN_ACCURACY_CLAIM = {"LOCI authors' code, LOCI-H"}
+NOT_IN_ACCURACY_CLAIM = {"LOCI authors' code, LOCI-H", "SCORE authors' code"}
 # The package each comparator names in the speed panel's legend, without the version or setting
 # its release card gives; every other comparator is a package's name already.
 PACKAGE_NAMES = {
