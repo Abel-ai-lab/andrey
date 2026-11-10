@@ -3111,17 +3111,30 @@ for _name in EM_METHODS:
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
-#: and against the method's reference packages given the same knowledge. A part a method honors
-#: beyond the edge parts and does not list here is experimental.
+#: and, where a reference package takes the same knowledge, against it. A part a method honors
+#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc ended
+#: farther from the class the claims leave than without them, and tabu, mmhc, and rsmax2 made more
+#: errors than their reference given the required edges, each on repeated seeds.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
+    "cdnod": PATH_PARTS,
     "ges": PATH_PARTS,
+    "xges": PATH_PARTS,
+    "hc": PATH_PARTS,
+    "tabu": ("forbidden_paths",),
+    "mmhc": ("forbidden_paths",),
+    "rsmax2": ("forbidden_paths",),
     "boss": PATH_PARTS,
+    "grasp": PATH_PARTS,
+    "exact_search": PATH_PARTS,
     "fci": _PAG_PARTS,
+    "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,
     "boss_fci": _PAG_PARTS,
+    "grasp_fci": _PAG_PARTS,
     "lpcmci": _PAG_PARTS,
     "direct_lingam": PATH_PARTS,
+    "multi_group_direct_lingam": PATH_PARTS,
 }
 
 for _name, _how in _KNOWLEDGE_HOW.items():

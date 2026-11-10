@@ -26,9 +26,9 @@ on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM.
 one variable causes another by some path, that it does not, or that two variables share a hidden
 common cause. LOCI reads the direction of a pair whose noise changes with the cause, and made no
 more errors than its authors' code. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
-Tabu search. EM in the other searches is experimental, as are the new claims in the methods we have
-not measured. Drawings also mark intervened variables, and every HSIC p-value stays precise far
-below 1e-16.
+Tabu search. EM in the other searches is experimental, as are a few of the new claims where our
+measurements did not pass. Drawings also mark intervened variables, and every HSIC p-value stays
+precise far below 1e-16.
 
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
 **[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
