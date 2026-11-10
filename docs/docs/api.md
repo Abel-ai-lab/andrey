@@ -1066,10 +1066,6 @@ each context drives exactly one variable, so no hidden context is a common cause
    measurement.noisy_children
    measurement.NoisyChildren
    measurement.Measurements
-   functional.post_nonlinear
-   functional.random_features
-   noise.student_t
-   noise.gaussian_mixture
 ```
 
 #### Scale
