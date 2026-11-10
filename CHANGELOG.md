@@ -113,7 +113,7 @@ names its pull request.
   each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
   values, with a message that names `missing="em"` where EM would run. ([#842])
 - The benchmark harness measures missing data: `missing_cpu.py` fits `pc(missing="mvpc")` beside
-  the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and the score searches with
+  the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and `hc` and `tabu` with
   `missing="em"` beside bnlearn's `structural.em`, each with test-wise PC, listwise deletion, mean
   imputation, the complete data, and the empty graph, and `missing_summary.py` pairs the records
   into summary rows with a paired bootstrap. ([#843], [#856])

@@ -8,14 +8,10 @@ test-wise PC, listwise deletion, mean imputation), the empty graph as the floor,
 fit of the same method, and the fit times.
 
 A reference is another package's implementation of the same method, and its row is judged. In
-``m2-bnlearn`` it is bnlearn's ``structural.em`` with the same search inside:
-``bnlearn.structural_em.hc`` for ``hc`` and ``bnlearn.structural_em.tabu`` for ``tabu``, with the
-complete-data control ``bnlearn.hc`` or ``bnlearn.tabu`` against Andrey's plain search, and the
-``max_iter`` 10 arm of the reference as ``reference_iter10``. A method with no reference (``ges``,
-``boss``, ``grasp``, ``xges``, ``exact_search``) carries ``same_data`` instead: the comparison with
-another package's structural EM on the same datasets, with ``package`` naming it and ``control``
-its complete-data pair (plain search against ``bnlearn.hc``). It is not a reference and is never
-judged.
+``m2-bnlearn`` it is bnlearn's ``structural.em`` with the same search inside, at ``max.iter`` 10:
+``bnlearn.structural_em.hc.iter10`` for ``hc`` and ``bnlearn.structural_em.tabu.iter10`` for
+``tabu``, with the complete-data control ``bnlearn.hc`` or ``bnlearn.tabu`` against Andrey's plain
+search.
 
 The SHD of every pair is ``shd``, except in ``m2-bnlearn``: bnlearn returns a DAG, whose ``shd`` is
 the directed distance, and Andrey's searches return CPDAGs, whose ``shd`` is the distance between
@@ -62,7 +58,10 @@ PAPER_LANES = ("m1-paper", "m2-a", "m2-b", "m2-c")
 REFERENCES = {
     "m1-paper": {"pc": "mvpc-r.permc"},
     "m2-a": {"notears": "missdag.miss_dag_gaussian.notears"},
-    "m2-bnlearn": {"hc": "bnlearn.structural_em.hc", "tabu": "bnlearn.structural_em.tabu"},
+    "m2-bnlearn": {
+        "hc": "bnlearn.structural_em.hc.iter10",
+        "tabu": "bnlearn.structural_em.tabu.iter10",
+    },
 }
 REFERENCES["m2-c"] = REFERENCES["m2-a"]
 #: The reference's complete-data arm, the control against the method's plain search.
@@ -72,25 +71,12 @@ COMPLETE_REFERENCE = {
     "m2-bnlearn": {"hc": "bnlearn.hc", "tabu": "bnlearn.tabu"},
 }
 COMPLETE_REFERENCE["m2-c"] = COMPLETE_REFERENCE["m2-a"]
-#: The reference's arm with more EM iterations, reported beside it.
-MORE_ITERATIONS = {
-    "bnlearn.structural_em.hc": "bnlearn.structural_em.hc.iter10",
-    "bnlearn.structural_em.tabu": "bnlearn.structural_em.tabu.iter10",
-}
-#: For a method with no reference, another package's arm fitted on the same datasets: lane ->
-#: method -> arm, and the complete-data arm of each.
-SAME_DATA = {
-    "m2-bnlearn": dict.fromkeys(
-        ("ges", "boss", "grasp", "xges", "exact_search"), "bnlearn.structural_em.hc"
-    )
-}
-SAME_DATA_COMPLETE = {"bnlearn.structural_em.hc": "bnlearn.hc"}
 #: The lanes that score on ``class_shd``: they pair a DAG arm with CPDAG arms.
 CLASS_LANES = ("m2-bnlearn",)
 CELL = ["lane", "graph", "density", "d", "n", "mechanism", "form", "rate"]
 #: The arms every lane has beside the method: a worse verdict against one is checked on a rerun.
 BASELINES = ("testwise", "listwise", "mean")
-OTHERS = ("reference", "reference_iter10", "same_data", "testwise", "listwise", "mean")
+OTHERS = ("reference", "testwise", "listwise", "mean")
 
 
 def bootstrap(values: np.ndarray) -> list[float] | None:
@@ -204,10 +190,6 @@ def arms_of(lane: str, name: str) -> dict[str, str] | None:
         arms = {"method": name, "testwise": "andrey.pc.default", "complete": plain}
         if theirs := REFERENCES.get(lane, {}).get(m[1]):
             arms["reference"] = theirs
-            if more := MORE_ITERATIONS.get(theirs):
-                arms["reference_iter10"] = more
-        elif same := SAME_DATA.get(lane, {}).get(m[1]):
-            arms["same_data"] = same
     else:
         return None
     return arms | {"listwise": f"listwise.{plain}", "mean": f"impute_mean.{plain}"}
@@ -274,8 +256,6 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
         for role in (
             "method",
             "reference",
-            "reference_iter10",
-            "same_data",
             "testwise",
             "listwise",
             "mean",
@@ -292,8 +272,6 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
                 "mean_skeleton_f1": _round(records["skeleton_f1"].mean()),
                 "fit_s_median": _round(records["wall_s"].median(), 4),
             }
-            if role == "same_data":
-                row[role]["package"] = arms[role].split(".")[0]
             if role in OTHERS:
                 row[role] |= compare(mine, records[shd], records.index)
                 if role == "reference":
@@ -315,20 +293,14 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
         # (M2), both test-wise PC on the masked data (M1), both searches without EM (M2 bnlearn).
         source = by_arm if lane == "m1-paper" else whole
         plain = source.get(arms["complete"])
-        for role, theirs in (
-            ("reference", COMPLETE_REFERENCE.get(lane, {}).get(method)),
-            ("same_data", SAME_DATA_COMPLETE.get(arms.get("same_data", ""))),
-        ):
-            other = source.get(theirs)
-            if role not in row or plain is None or other is None:
-                continue
+        theirs = COMPLETE_REFERENCE.get(lane, {}).get(method)
+        other = source.get(theirs)
+        if "reference" in row and plain is not None and other is not None:
             a = plain[plain["status"] == "ok"][shd]
             b = other[other["status"] == "ok"]
-            control = {"arm": arms["complete"], "other": theirs} | compare(a, b[shd], b.index)
-            if role == "reference":
-                row["control"] = control
-            else:
-                row[role]["control"] = control
+            row["control"] = {"arm": arms["complete"], "other": theirs} | compare(
+                a, b[shd], b.index
+            )
         row["judged"] = claimed and "reference" in row and row["reference"]["verdict"] is not None
         if row["judged"]:
             ref = row["reference"]

@@ -21,8 +21,8 @@ The call, checked against the installed manual of bnlearn 5.2.1 (license `GPL (>
   of its Markov blanket, in closed form for the multivariate normal. It is deterministic, so no R
   seed is set. The default, `"bayes-lw"`, averages a random simulation and would make a fit depend
   on the generator.
-- `max.iter = 5` is bnlearn's default. The second arm, `max_iter=10`, matches the ten EM
-  iterations of Andrey's `missing="em"`, and its name carries `.iter10`.
+- `max.iter = 5` is bnlearn's default. `max_iter=10` matches the ten EM iterations of Andrey's
+  `missing="em"`, and the arm's name carries `.iter10`.
 
 With `start = NULL` the first E-step imputes from the empty network fitted to the observed values.
 The E-step differs from Andrey's: bnlearn replaces each missing value by a conditional mean and

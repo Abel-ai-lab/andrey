@@ -24,18 +24,16 @@ complete values of every mask drawn over it. Lanes:
   graphs at 100 to 2,000 rows.
 - ``m2-reduced``: ``hc``, ``tabu``, ``xges``, ``exact_search``, ``calm``, ``notears``, and
   ``dagma`` with ``missing="em"`` at 20 variables and 500 rows, MCAR and logistic MAR at 0.2.
-- ``m2-bnlearn``: the EM searches against bnlearn's ``structural.em`` (Friedman's structural EM,
-  with ``hc`` or ``tabu`` inside, and ``max.iter`` at its default 5 and at Andrey's 10), the
-  reference for ``hc`` and ``tabu`` and a same-data comparison for ``ges``, ``boss``, ``grasp``,
-  ``xges``, and ``exact_search`` (the last at 20 variables or fewer), which have no reference. The
-  cells are those of ``m2-b`` and the 15-variable cells of ``m2-c`` (raw), those of ``m2-reduced``,
-  and a larger-sample grid: ER2 and ER4, 10, 20, and 50 variables, 500 and 2,000 rows, MCAR and
-  logistic MAR at 0.1 to 0.3 (standardized). Each complete-data unit adds Andrey's and bnlearn's
-  plain ``hc`` and ``tabu``, which separate the two packages' searches from their EM layers. The
-  pairs follow ``tabu_cpu.py``: Andrey's ``hc`` and ``tabu`` run at ``ebic_gamma`` 0.0, the standard
-  BIC that bnlearn's ``bic-g`` scores, with no parent cap and the tabu list of 10 on both sides;
-  the other searches keep their defaults, as in ``m2-reduced``, so Andrey's ``ebic_gamma`` of 1.0
-  stands between them and bnlearn's score. Needs R (``benchmarks/start_r.sh``).
+- ``m2-bnlearn``: ``hc`` and ``tabu`` with ``missing="em"`` against bnlearn's ``structural.em``
+  (Friedman's structural EM, with ``hc`` or ``tabu`` inside), their reference. ``max.iter`` is 10,
+  the number of EM rounds Andrey's ``missing="em"`` runs. The cells are the paper-size cells (15
+  variables, 100 rows: MCAR at 0.1 to 0.5 and the Appendix F.2 logistic MAR and self-masking
+  cells, raw data, on MissDAG's three graphs) and ER2 with 20 variables, 500 and 2,000 rows,
+  MCAR and logistic MAR at 0.1 to 0.3 (standardized). Each masked dataset also fits test-wise PC,
+  and each complete dataset Andrey's and bnlearn's plain ``hc`` and ``tabu``, which separate the
+  two packages' searches from their EM layers. The pairs follow ``tabu_cpu.py``: Andrey's ``hc``
+  and ``tabu`` run at ``ebic_gamma`` 0.0, the standard BIC that bnlearn's ``bic-g`` scores, with
+  no parent cap and the tabu list of 10 on both sides. Needs R (``benchmarks/start_r.sh``).
 
 ``--part i --parts k`` runs every k-th unit of the lane from the i-th, so a lane splits into
 independent jobs; ``--first-seed`` moves the seeds, for a rerun on fresh ones; ``--budget-s`` stops
@@ -86,10 +84,8 @@ MVPC_ROWS = (100, 1000, 5000, 10000)
 
 M2_SEARCHES = ("ges", "boss", "grasp")
 M2_REDUCED = ("hc", "tabu", "xges", "exact_search", "calm", "notears", "dagma")
-#: ``m2-bnlearn``: the searches run beside bnlearn's with their EM arm only, and the largest
-#: ``exact_search`` runs on.
-M2_BNLEARN_SEARCHES = ("ges", "boss", "grasp", "xges", "exact_search")
-EXACT_MAX_D = 20
+#: ``m2-bnlearn``: the iterations of bnlearn's structural EM, the rounds Andrey's EM runs.
+BNLEARN_EM_ITERATIONS = 10
 
 
 @dataclass(frozen=True)
@@ -258,8 +254,14 @@ def _plan(lane: str, seeds: int) -> list[Unit]:
 
 
 def _bnlearn_units(seeds: int) -> list[Unit]:
-    """The ``m2-bnlearn`` units: the cells of ``m2-b``, ``m2-c`` (15 variables), ``m2-reduced``, and
-    the larger-sample grid, each dataset once, with bnlearn's arms beside Andrey's."""
+    """The ``m2-bnlearn`` units: ``hc`` and ``tabu`` with EM beside bnlearn's structural EM on the
+    paper-size cells and ER2 with 20 variables, 500 and 2,000 rows, each dataset once.
+
+    ``max.iter`` is :data:`BNLEARN_EM_ITERATIONS`, the number of rounds Andrey's EM runs. A masked
+    dataset fits the two structural EM arms, Andrey's ``hc`` and ``tabu`` with EM at ``ebic_gamma``
+    0.0 (the standard BIC bnlearn's ``bic-g`` scores), and test-wise PC; the complete dataset fits
+    both packages' plain ``hc`` and ``tabu``.
+    """
     from andrey_bench.adapters.bnlearn_hc import BnlearnHC
     from andrey_bench.adapters.bnlearn_structural_em import BnlearnStructuralEM
     from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
@@ -270,35 +272,24 @@ def _bnlearn_units(seeds: int) -> list[Unit]:
     pairs = [
         *_cells(PAPER_GRAPHS, paper, mcar, PAPER_RATES, seeds, "raw"),
         *_cells(PAPER_GRAPHS, paper, f2, F2_RATES, seeds, "raw"),
-        *_cells([("er", 2.0)], [(20, 500)], [*mcar, *mar], [0.2], seeds, "standardized"),
+        # The cells of m2-reduced (500 rows, rate 0.2) lie inside this grid, on the same datasets.
         *_cells(
-            [("er", 2.0), ("er", 4.0)],
-            itertools.product((10, 20, 50), (500, 2000)),
+            [("er", 2.0)],
+            [(20, 500), (20, 2000)],
             [*mcar, *mar],
             GENERIC_RATES,
             seeds,
             "standardized",
         ),
     ]
-    # The cells of m2-reduced lie inside the grid: one unit per dataset.
-    pairs = list(dict.fromkeys(pairs))
-    structural_em = [BnlearnStructuralEM(m, i) for i in (5, 10) for m in ("hc", "tabu")]
-    masked = [*structural_em, AndreyMissing("pc", None)]
-    complete = [BnlearnHC(), BnlearnTabu()]
-    for method in ("hc", "tabu"):
-        em, plain = _em_arms(method, ebic_gamma=0.0)
-        masked += em
-        complete += plain
-    exact = AndreyMissing("exact_search", "em"), AndreyMissing("exact_search", None)
-    others = [m for m in M2_BNLEARN_SEARCHES if m != "exact_search"]
-    em = [AndreyMissing(m, "em") for m in others]
-    plain = [AndreyMissing(m, None) for m in others]
-    small = [p for p in pairs if p[0].d <= EXACT_MAX_D]
-    large = [p for p in pairs if p[0].d > EXACT_MAX_D]
-    return [
-        *_units(small, [*masked, *em, exact[0]], [*complete, *plain, exact[1]]),
-        *_units(large, [*masked, *em], [*complete, *plain]),
+    masked: list[Any] = [BnlearnStructuralEM(m, BNLEARN_EM_ITERATIONS) for m in ("hc", "tabu")] + [
+        AndreyMissing("pc", None)
     ]
+    complete: list[Any] = [BnlearnHC(), BnlearnTabu()]
+    for method in ("hc", "tabu"):
+        masked.append(AndreyMissing(method, "em", ebic_gamma=0.0))
+        complete.append(AndreyMissing(method, None, ebic_gamma=0.0))
+    return _units(pairs, masked, complete)
 
 
 LANES = ("m1-generic", "m1-paper", "m2-a", "m2-b", "m2-c", "m2-generic", "m2-reduced", "m2-bnlearn")

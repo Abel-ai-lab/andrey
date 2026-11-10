@@ -154,10 +154,11 @@ def test_the_parts_of_a_lane_cover_its_units_once():
     assert sorted(u.key.label for p in parts for u in p) == sorted(u.key.label for u in units)
 
 
-def _bnlearn_cells(seeds: int = 1) -> set[tuple]:
-    """The masked cells of ``m2-bnlearn``, written out: m2-b, the 15-variable cells of m2-c, the
-    cells of m2-reduced, and the larger-sample grid. A cell is ``(topology, density, d, n,
-    standardize, mechanism, form, rate)``."""
+def _bnlearn_cells() -> set[tuple]:
+    """The masked cells of ``m2-bnlearn``, written out: the paper-size cells (MissDAG's three
+    graphs, 15 variables, 100 rows: MCAR at 0.1 to 0.5, logistic MAR and self-masking at 0.1,
+    0.3, 0.5) and ER2 with 20 variables, 500 and 2,000 rows (MCAR and logistic MAR at 0.1 to 0.3).
+    A cell is ``(topology, density, d, n, standardize, mechanism, form, rate)``."""
     paper = [("er", 1.0), ("er", 2.0), ("scale_free", 2.0)]
     cells = {
         (g, dens, 15, 100, "raw", "mcar", "", r)
@@ -171,17 +172,9 @@ def _bnlearn_cells(seeds: int = 1) -> set[tuple]:
         for r in (0.1, 0.3, 0.5)
     }
     cells |= {
-        ("er", 2.0, 20, 500, "standardized", m, f, 0.2)
-        for m, f in (("mcar", ""), ("mar", "logistic"))
-    }
-    cells |= {
-        ("er", dens, d, n, "standardized", m, f, r)
-        for dens, d, n, (m, f), r in itertools.product(
-            (2.0, 4.0),
-            (10, 20, 50),
-            (500, 2000),
-            (("mcar", ""), ("mar", "logistic")),
-            (0.1, 0.2, 0.3),
+        ("er", 2.0, 20, n, "standardized", m, f, r)
+        for n, (m, f), r in itertools.product(
+            (500, 2000), (("mcar", ""), ("mar", "logistic")), (0.1, 0.2, 0.3)
         )
     }
     return cells
@@ -210,6 +203,17 @@ def test_the_bnlearn_lane_runs_each_cell_once_on_the_datasets_of_the_lanes_it_ex
     assert {u.key for u in missing_cpu.plan("m2-c", seeds=2) if u.key.d == 15} <= set(keys)
 
 
+def test_the_bnlearn_lane_has_20_seeds_per_cell_and_its_arms_on_every_unit():
+    units = missing_cpu.plan("m2-bnlearn", seeds=20)
+    masked = [u for u in units if u.key.missing]
+    assert len(masked) == 20 * len(_bnlearn_cells())
+    # The complete data of the cells: three graphs at 15 variables, two sizes at 20.
+    assert len(units) - len(masked) == 20 * 5
+    assert {len(u.arms) for u in masked} == {6} and {
+        len(u.arms) for u in units if not u.key.missing
+    } == {5}
+
+
 def test_the_bnlearn_lane_fits_bnlearn_beside_andrey_on_every_unit():
     units = missing_cpu.plan("m2-bnlearn", seeds=1)
 
@@ -221,47 +225,28 @@ def test_the_bnlearn_lane_fits_bnlearn_beside_andrey_on_every_unit():
         }
         return list(arms)
 
-    structural_em = [
-        "bnlearn.structural_em.hc",
-        "bnlearn.structural_em.tabu",
+    # bnlearn's structural EM runs the ten rounds Andrey's EM runs. Andrey's hc and tabu run at the
+    # standard BIC bnlearn scores, as tabu_cpu.py pairs them.
+    masked = [
         "bnlearn.structural_em.hc.iter10",
         "bnlearn.structural_em.tabu.iter10",
-    ]
-    masked = names(15, True)
-    # Andrey's hc and tabu run at the standard BIC bnlearn scores, as tabu_cpu.py pairs them.
-    expected = [
-        *structural_em,
         "andrey.pc.default",
         "andrey.hc.em.ebic_gamma0",
-        "listwise.andrey.hc.default.ebic_gamma0",
-        "impute_mean.andrey.hc.default.ebic_gamma0",
         "andrey.tabu.em.ebic_gamma0",
-        "listwise.andrey.tabu.default.ebic_gamma0",
-        "impute_mean.andrey.tabu.default.ebic_gamma0",
-        "andrey.ges.em",
-        "andrey.boss.em",
-        "andrey.grasp.em",
-        "andrey.xges.em",
-        "andrey.exact_search.em",
         "baseline.empty",
     ]
-    assert masked == expected
-    assert names(10, True) == masked and names(20, True) == masked
-    assert names(50, True) == [n for n in masked if n != "andrey.exact_search.em"]
-    complete = names(15, False)
-    assert complete == [
+    complete = [
         "bnlearn.hc",
         "bnlearn.tabu",
         "andrey.hc.default.ebic_gamma0",
         "andrey.tabu.default.ebic_gamma0",
-        "andrey.ges.default",
-        "andrey.boss.default",
-        "andrey.grasp.default",
-        "andrey.xges.default",
-        "andrey.exact_search.default",
         "baseline.empty",
     ]
-    assert names(50, False) == [n for n in complete if n != "andrey.exact_search.default"]
+    for d in (15, 20):
+        assert names(d, True) == masked
+        assert names(d, False) == complete
+    [em] = {a.max_iter for u in units for a in u.arms if isinstance(a, BnlearnStructuralEM)}
+    assert em == missing_cpu.BNLEARN_EM_ITERATIONS == 10
 
 
 def test_the_structural_em_arms_are_named_for_their_search_and_iterations():
@@ -303,7 +288,7 @@ def test_structural_em_recovers_a_chain_from_data_with_missing_values(arm):
     assert arm.to_structure(adjacency).kind == "dag"
 
 
-def test_the_summary_pairs_hc_and_tabu_with_bnlearn_and_the_other_searches_with_its_hc():
+def test_the_summary_pairs_hc_and_tabu_with_bnlearns_structural_em():
     arms = missing_summary.arms_of
     em = "andrey.{}.em.ebic_gamma0"
     plain = "andrey.{}.default.ebic_gamma0"
@@ -313,20 +298,15 @@ def test_the_summary_pairs_hc_and_tabu_with_bnlearn_and_the_other_searches_with_
             "method": em.format(method),
             "testwise": "andrey.pc.default",
             "complete": plain.format(method),
-            "reference": f"bnlearn.structural_em.{method}",
-            "reference_iter10": f"bnlearn.structural_em.{method}.iter10",
+            "reference": f"bnlearn.structural_em.{method}.iter10",
             "listwise": f"listwise.{plain.format(method)}",
             "mean": f"impute_mean.{plain.format(method)}",
         }
-    for method in ("ges", "boss", "grasp", "xges", "exact_search"):
-        got = arms("m2-bnlearn", f"andrey.{method}.em")
-        assert got["same_data"] == "bnlearn.structural_em.hc"
-        assert "reference" not in got
     # Other lanes keep their references, and a bnlearn arm is no method arm.
     assert arms("m2-a", "andrey.notears.em")["reference"] == "missdag.miss_dag_gaussian.notears"
     assert "reference" not in arms("m2-b", "andrey.ges.em.ebic_gamma1")
     assert arms("m1-paper", "andrey.pc.mvpc.alpha0.01.seed0")["reference"] == "mvpc-r.permc"
-    assert arms("m2-bnlearn", "bnlearn.structural_em.hc") is None
+    assert arms("m2-bnlearn", "bnlearn.structural_em.hc.iter10") is None
 
 
 def _records(arm: str, seeds: int, output_type: str, shd: float, mec: float | None) -> pd.DataFrame:
@@ -354,16 +334,13 @@ def test_the_bnlearn_lane_compares_the_distance_between_equivalence_classes():
     masked = pd.concat(
         [
             _records("andrey.hc.em.ebic_gamma0", seeds, "cpdag", 3.0, None),
-            _records("andrey.ges.em", seeds, "cpdag", 4.0, None),
-            _records("bnlearn.structural_em.hc", seeds, "dag", 10.0, 2.0),
-            _records("bnlearn.structural_em.hc.iter10", seeds, "dag", 10.0, 3.0),
+            _records("bnlearn.structural_em.hc.iter10", seeds, "dag", 10.0, 2.0),
             _records("baseline.empty", seeds, "cpdag", 20.0, None),
         ]
     )
     whole = pd.concat(
         [
             _records("andrey.hc.default.ebic_gamma0", seeds, "cpdag", 2.0, None),
-            _records("andrey.ges.default", seeds, "cpdag", 2.0, None),
             _records("bnlearn.hc", seeds, "dag", 9.0, 1.0),
         ]
     )
@@ -381,23 +358,13 @@ def test_the_bnlearn_lane_compares_the_distance_between_equivalence_classes():
         "form": "",
         "rate": 0.2,
     }
-    rows = {r["arm"]: r for r in missing_summary.cell_rows(cell, masked, whole)}
-    assert set(rows) == {"andrey.hc.em.ebic_gamma0", "andrey.ges.em"}
-    hc = rows["andrey.hc.em.ebic_gamma0"]
-    assert hc["shd_column"] == "class_shd"
-    assert hc["reference"]["arm"] == "bnlearn.structural_em.hc"
+    [hc] = missing_summary.cell_rows(cell, masked, whole)
+    assert hc["arm"] == "andrey.hc.em.ebic_gamma0" and hc["shd_column"] == "class_shd"
+    assert hc["reference"]["arm"] == "bnlearn.structural_em.hc.iter10"
     assert hc["reference"]["mean_shd"] == 2.0 and hc["reference"]["mean_D"] == 1.0
     assert hc["reference"]["verdict"] == "worse" and hc["judged"]
-    assert hc["reference_iter10"]["mean_D"] == 0.0 and hc["reference_iter10"]["verdict"] == "tie"
     # The control: both plain searches on the complete data, 2 against bnlearn's 1.
     assert hc["control"]["other"] == "bnlearn.hc" and hc["control"]["mean_D"] == 1.0
-    assert "same_data" not in hc
-    ges = rows["andrey.ges.em"]
-    same = ges["same_data"]
-    assert same["package"] == "bnlearn" and same["arm"] == "bnlearn.structural_em.hc"
-    assert same["mean_D"] == 2.0 and same["verdict"] == "worse"
-    assert same["control"]["other"] == "bnlearn.hc" and same["control"]["mean_D"] == 1.0
-    assert "reference" not in ges and not ges["judged"] and ges["result"] == "not judged"
 
 
 def test_the_class_distance_is_the_cpdag_distance_of_every_arm():
