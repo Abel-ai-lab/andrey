@@ -2862,9 +2862,16 @@ _MOVE_RULE = (
     "edges. "
 )
 _CANDIDATE_RULE = (
-    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
-    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
-    "alone. "
+    "The restrict phase keeps the pair of each required edge without a test and conditions the "
+    "tests of the other pairs on it, and never keeps a pair the knowledge makes non-adjacent; the "
+    "score search considers the pairs it keeps. "
+)
+_RESTRICT_RULE = (
+    "With restrict=mmpc or pc, the restrict phase keeps the pair of each required edge without a "
+    "test and conditions the tests of the other pairs on it, and never keeps a pair the knowledge "
+    "makes non-adjacent; with restrict=iamb or inter_iamb it reads the data alone. The score "
+    "search considers the pairs the restrict phase keeps and the pairs of the required edges, "
+    "less the pairs the knowledge makes non-adjacent. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
@@ -2921,7 +2928,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
-    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _RESTRICT_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     **dict.fromkeys(
@@ -3112,9 +3119,10 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc ended
-#: farther from the class the claims leave than without them, and tabu, mmhc, and rsmax2 made more
-#: errors than their reference given the required edges, each on repeated seeds.
+#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc mostly
+#: did not apply the claims, since the graph they found often had no consistent extension, and tabu,
+#: mmhc, and rsmax2 made more errors than their reference given the required edges, each on repeated
+#: seeds.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
