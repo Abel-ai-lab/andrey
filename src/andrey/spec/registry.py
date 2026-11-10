@@ -1917,6 +1917,41 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="nogam",
+        family="functional",
+        summary="NoGAM for nonlinear effects with additive noise of any distribution: a causal "
+        "order from the leaf up, each leaf the variable whose entry of the score, estimated by a "
+        "Stein kernel estimator, is best predicted from the variable's kernel-ridge residual on "
+        "the others, on the standardized columns, then the complete DAG of the order pruned by "
+        "smooth-term tests. Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is the causal order of the leaf search.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the value of the paper's experiments.",
+            ),
+        ),
+        references=(
+            "Montagna et al. 2023",
+            "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
 
 # --- temporal family ------------------------------------------------------------------------------
 
@@ -2918,6 +2953,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "tier, and pairs outside the allowed set are in no pruning fit and never in the result; the "
     "score estimate still reads every remaining variable. The pruning never removes a required "
     "edge.",
+    "nogam": "A variable is the next leaf only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no pruning fit and never in the result; the score "
+    "estimate and the residual regressions still read every remaining variable. The pruning never "
+    "removes a required edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

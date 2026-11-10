@@ -1,7 +1,8 @@
 """Stein estimators of a density's score and of the diagonal of the score's Jacobian.
 
 The score of a density ``p`` on ``R^d`` is ``grad log p``. Both estimators read ``n`` rows drawn
-from ``p`` and return their estimate at those rows.
+from ``p`` and return their estimate at those rows. NoGAM (:mod:`andrey.fcm.nogam`) reads the
+score, and SCORE (:mod:`andrey.fcm.score_matching`) the diagonal of its Jacobian.
 
 **The score.** Stein's identity, ``E[h(x) grad log p(x)^T + grad h(x)] = 0`` for a test function
 ``h`` that vanishes at infinity, becomes a ridge regression once its expectation is the mean over

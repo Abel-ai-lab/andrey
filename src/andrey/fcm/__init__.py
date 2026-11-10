@@ -7,10 +7,10 @@ Zhang, and Spirtes 2019). The family's methods take one of two classes. Linear e
 non-Gaussian noise identify the DAG: :mod:`andrey.lingam` holds the LiNGAM methods. Nonlinear
 effects with additive noise, ``x_j = f_j(parents) + e_j``, identify it too (Hoyer et al. 2009;
 Peters et al. 2014): :mod:`andrey.fcm.cam` holds CAM, :mod:`andrey.fcm.resit` RESIT, and
-:mod:`andrey.fcm.score_matching` SCORE, whose order search reads the score of the density. Methods
-for time series, hidden variables, and a single pair of variables keep families of their own;
-:mod:`andrey.fcm.camuv` holds CAM-UV, the additive model with hidden variables, a method of the
-latent-variable family.
+:mod:`andrey.fcm.score_matching` and :mod:`andrey.fcm.nogam` SCORE and NoGAM, whose order searches
+read the score of the density. Methods for time series, hidden variables, and a single pair of
+variables keep families of their own; :mod:`andrey.fcm.camuv` holds CAM-UV, the additive model
+with hidden variables, a method of the latent-variable family.
 
 The shared pieces of the nonlinear fits: :mod:`andrey.fcm.gam` fits additive models of penalized
 thin plate regression splines, and :mod:`andrey.fcm.pruning` removes the edges of a candidate DAG
@@ -32,4 +32,7 @@ Maeda, Shimizu. "Causal additive models with unobserved variables." UAI, PMLR 16
 
 Rolland, Cevher, Kleindessner, Russell, Janzing, Scholkopf, Locatello. "Score matching enables
 causal discovery of nonlinear additive noise models." ICML, PMLR 162:18741-18753, 2022.
+
+Montagna, Noceti, Rosasco, Zhang, Locatello. "Causal discovery with score matching on additive
+models with arbitrary noise." CLeaR, PMLR 213:726-751, 2023.
 """

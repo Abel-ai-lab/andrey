@@ -80,6 +80,7 @@ SINGLE = {
     "cam": andrey.cam,
     "resit": andrey.resit,
     "score_matching": andrey.score_matching,
+    "nogam": andrey.nogam,
     "camuv": andrey.camuv,
     "boss": andrey.boss,
     "grasp": andrey.grasp,
@@ -220,8 +221,8 @@ def _two_groups_of_copies():
 
 
 # The searches that reject copies before the fit: the BIC searches, the partial-correlation
-# constraint searches, the lagged partial-correlation searches, CAM, RESIT, SCORE, CAM-UV, and
-# ICP.
+# constraint searches, the lagged partial-correlation searches, CAM, RESIT, SCORE, NoGAM, CAM-UV,
+# and ICP.
 COPY_CHECKED = [
     *BIC,
     "pc",
@@ -238,6 +239,7 @@ COPY_CHECKED = [
     "cam",
     "resit",
     "score_matching",
+    "nogam",
     "camuv",
     "icp",
 ]
