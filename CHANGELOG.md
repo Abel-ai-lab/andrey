@@ -49,8 +49,8 @@ names its pull request.
   none was less accurate than Tetrad's in any setting: `ges` had fewer errors in 107 and tied in 25,
   `boss` in 95 and 37, and `grasp` in 89 and 43. The 100-variable settings and the default
   `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it stays
-  experimental, with no reference implementation to compare with. The [missing-data
-  comparison](benchmarks/comparisons/missing-data.md) has the results. ([#873])
+  experimental, with no reference implementation to compare with. The
+  [comparison page][em-tetrad] has the results. ([#873])
 
 ### Fixed
 
@@ -2306,4 +2306,5 @@ First alpha release.
 [#873]: https://github.com/Abel-ai-lab/andrey/pull/873
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
+[em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
