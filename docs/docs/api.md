@@ -147,9 +147,11 @@ finds the parents of each missingness indicator and tests again the edges they c
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
-refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records the rounds
-and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
-takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
+graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
+the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
+round changed it logs a warning. A row that observes no value is dropped first. It takes
+`score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
 `hc`, `tabu`, and `ges`: in the
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),

@@ -212,14 +212,24 @@ def notears(
     fit on its expected covariance. ``standardize`` scales the expected covariance to unit
     variances. A row that observes no value is dropped first: it holds no information on the model.
     It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
-    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
-    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
-    fall in a round that changes the graph. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    its observed values, and it alternates as Friedman [7]_ describes: before each fit after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
+    open. The first fit reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each fit after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's fit returned another graph than
+    the round before. When the last round changed the graph, EM has not settled on one, which is
+    more common with few rows, and the fit logs a warning. EM holds when values are missing
+    completely at random or at random given observed values; when whether a value is missing depends
+    on the missing values themselves, the expected covariance is biased, and the data cannot show
+    it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
@@ -505,14 +515,24 @@ def dagma(
     round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
     variances. A row that observes no value is dropped first: it holds no information on the model.
     It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
-    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
-    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
-    fall in a round that changes the graph. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    its observed values, and it alternates as Friedman [7]_ describes: before each fit after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
+    open. The first fit reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each fit after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's fit returned another graph than
+    the round before. When the last round changed the graph, EM has not settled on one, which is
+    more common with few rows, and the fit logs a warning. EM holds when values are missing
+    completely at random or at random given observed values; when whether a value is missing depends
+    on the missing values themselves, the expected covariance is biased, and the data cannot show
+    it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100

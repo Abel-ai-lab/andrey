@@ -677,8 +677,11 @@ They take `missing="em"` instead: structural EM (Friedman, 1997; [Gao et al., 20
 alternates two steps. Under a linear-Gaussian model of the current graph, it replaces each row's
 missing values by their expected values given the row's observed ones and adds their uncertainty.
 This gives the expected covariance of the data. The search then runs on that covariance over every
-row, and the model is fit again to the graph it returns. It runs 10 rounds, and `metadata["em"]`
-records the observed-data log-likelihood after each:
+row, and the model is fit again to the graph it returns. It runs 10 rounds. Before each search after
+the first, 5 more steps refit the model on the graph it has, so the search reads a covariance that
+graph's fit has settled on (Friedman's alternating scheme). `metadata["em"]` records whether each
+round changed the graph (`graph_changed`; when the last round still did, the fit logs a warning) and
+the observed-data log-likelihood after each round:
 
 ```{code-cell} ipython3
 em = andrey.ges(gappy, missing="em")

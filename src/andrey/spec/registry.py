@@ -3102,9 +3102,10 @@ _MISSING_EM = {
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
-        "the search on the expected covariance of the data with a linear-Gaussian fit of the "
-        "graph it returns, 10 times; it assumes values missing completely at random or at random "
-        "given observed values. null refuses missing values.",
+        "the search on the expected covariance of the data with linear-Gaussian fits of the "
+        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
+        "before each after the first; it assumes values missing completely at random or at "
+        "random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
