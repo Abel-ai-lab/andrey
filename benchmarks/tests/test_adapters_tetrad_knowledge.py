@@ -288,11 +288,14 @@ def test_tetrad_lib_stops_on_knowledge_for_a_search_without_it() -> None:
         csv, file = Path(tmp, "data.csv"), Path(tmp, "knowledge.txt")
         np.savetxt(csv, _context_data(200), delimiter=",", header="x0,x1,x2,x3,x4", comments="")
         file.write_text(tetrad_cmd.knowledge_text(5, [CONTEXT]))
-        pc = tetrad_search.TetradPC()
-        flags = [p for k, v in pc.settings({}).items() for p in (f"--{k}", tetrad_search._flag(v))]
+        grasp = tetrad_search.TetradGRaSP()
+        flags = [
+            p for k, v in grasp.settings({}).items() for p in (f"--{k}", tetrad_search._flag(v))
+        ]
         java = os.environ.get(tetrad_cmd.JAVA_ENV) or shutil.which("java")
         command = [java, f"-Djava.util.prefs.userRoot={tmp}", "--class-path"]
-        command += [os.environ[tetrad_gin.JAR_ENV], str(tetrad_search.DRIVER), "search", "pc"]
+        command += [os.environ[tetrad_gin.JAR_ENV], str(tetrad_search.DRIVER), "search"]
+        command += [grasp.command]
         command += [str(csv), "0", str(Path(tmp, "out.txt"))]
         assert subprocess.run([*command, *flags], capture_output=True).returncode == 0
         knowing = [*command, "--knowledge", str(file), *flags]
