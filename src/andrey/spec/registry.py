@@ -3036,6 +3036,13 @@ _PATH_RULE = (
     "forbidden_paths, each claim is kept when some DAG meets it with those kept before it. "
     "metadata unmet_knowledge lists the dropped claims, and the fit warns with KnowledgeWarning."
 )
+#: The searches that direct edges by tests can return a graph with no consistent extension.
+_NO_EXTENSION_RULE = (
+    " A graph found with no consistent extension stands for no DAG: there a claim on a pair joined "
+    "by an undirected edge directs that edge (Fang and He 2020), Meek's rules follow (Meek 1995), "
+    "a claim on a pair that is not adjacent, against a directed edge, or in conflict with other "
+    "claims is dropped, and metadata edge_claims lists the claims applied to an edge."
+)
 _PAG_PATHS = (
     " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
     "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
@@ -3149,6 +3156,8 @@ for _name, _how in _KNOWLEDGE_HOW.items():
     _extra, _rule = (
         (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
     )
+    if _name in _PATH_METHODS and REGISTRY[_name].family == "constraint":
+        _rule += _NO_EXTENSION_RULE
     _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
@@ -3258,7 +3267,7 @@ for _name, _spec in REGISTRY.items():
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
-        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})

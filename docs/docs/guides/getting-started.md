@@ -476,12 +476,12 @@ worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/kn
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Both path
-parts are experimental in IAMB, Inter-IAMB, and MMPC, where the claims are mostly not applied at 50
-variables: the graph found often has no consistent extension, and the fit then drops every claim,
-lists them in `metadata["unmet_knowledge"]`, and returns the graph it finds without them. A path
-claim says less than an edge and so directs less:
-a required path cannot restore an edge the search left out. When you know the edge itself, state it
-as `required`.
+parts are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
+has no consistent extension: the fits we measured then dropped every claim and returned the graph
+they found without them, so the claims were mostly not applied, and the rule that now applies claims
+to the edges of such a graph is not measured yet. A path claim says less than an edge and so directs
+less: a required path cannot restore an edge the search left out. When you know the edge itself,
+state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -495,6 +495,15 @@ result.metadata["unmet_knowledge"]  # [] when every claim is met
 
 When only some claims hold together, a CPDAG method keeps them in order, `required_paths` and then
 `forbidden_paths`, each by column position.
+
+On finite data the tests of PC, CD-NOD, IAMB, Inter-IAMB, and MMPC can contradict each other and
+leave a graph with no consistent extension, one that stands for no DAG. A claim then acts on one
+edge: between two variables joined by an edge, `smoking` causes `tar` exactly when the edge is
+`smoking -> tar` (Fang and He, 2020). A claim on a pair joined by an undirected edge directs it,
+Meek's rules follow, and `metadata["edge_claims"]` lists the claims applied this way. A claim on a
+pair that is not adjacent, a claim against an edge the data directed, and claims that conflict with
+each other are dropped and listed in `metadata["unmet_knowledge"]`. The result is not guaranteed to
+stand for a DAG, as the graph found did not.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
@@ -779,6 +788,8 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
 - Fang, Zhao, Liu, and He (2025), On the Representation of Pairwise Causal Background Knowledge
   and Its Applications in Causal Inference, Journal of Machine Learning Research 26(229): path
   claims in a CPDAG.
+- Fang and He (2020), IDA with Background Knowledge, Proceedings of the 36th Conference on
+  Uncertainty in Artificial Intelligence, PMLR 124: a path claim on an adjacent pair.
 - Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
   Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
 - [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous

@@ -167,7 +167,10 @@ def iamb(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -288,19 +291,21 @@ def iamb(
     separated about one true pair per graph at 50 variables that the fit without them kept, and 0.4
     averaged over 10, 20, and 50 variables, on 240 datasets. Missing values are not benchmarked yet;
     the tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. ``required_paths`` and ``forbidden_paths`` are experimental, because the claims are
-    mostly not applied. A graph with no consistent extension stands for no DAG, so the fit drops
-    every path claim, lists them in ``metadata["unmet_knowledge"]``, and returns the graph it finds
-    without them. On simulated linear-Gaussian data with 50 variables and 2,000 rows, with true
-    claims on 5 to 30% of the variable pairs, that happened in 40 of 40 fits at mean degree 4 and 12
-    of 40 at mean degree 2. In those fits the graph is the same and the class of graphs that the
-    truth and the claims define is more directed, so the distance to that class grew, by up to 4.2
-    edges per graph. In the fits at mean degree 2 whose graph has a consistent extension, the claims
-    were applied, 3 to 5% of them dropped, and the CPDAG was 0.2 to 0.5 edges closer to that class.
-    Over every setting measured (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows) the
-    CPDAG was no farther from the true DAG than without the claims, and the fits dropped 71% of the
-    required and 53% of the forbidden paths. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    random. ``required_paths`` and ``forbidden_paths`` are experimental. They were measured when a
+    fit whose graph has no consistent extension, a graph that stands for no DAG, dropped every path
+    claim and returned the graph it found without them, so the claims were mostly not applied; such
+    a fit now directs the undirected edges its claims name, as :class:`~andrey.Knowledge` describes,
+    which is not measured yet. On simulated linear-Gaussian data with 50 variables and 2,000 rows,
+    with true claims on 5 to 30% of the variable pairs, every path claim was dropped in 40 of 40
+    fits at mean degree 4 and 12 of 40 at mean degree 2. In those fits the graph was the same and
+    the class of graphs that the truth and the claims define is more directed, so the distance to
+    that class grew, by up to 4.2 edges per graph. In the fits at mean degree 2 whose graph has a
+    consistent extension, the claims were applied, 3 to 5% of them dropped, and the CPDAG was 0.2 to
+    0.5 edges closer to that class. Over every setting measured (10 to 50 variables, mean degree 2
+    or 4, 500 or 2,000 rows) the CPDAG was no farther from the true DAG than without the claims, and
+    the fits dropped 71% of the required and 53% of the forbidden paths. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -431,7 +436,10 @@ def inter_iamb(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -549,19 +557,20 @@ def inter_iamb(
     that the fit without them kept, and 0.3 to 0.4 averaged over 10, 20, and 50 variables, on 240
     datasets. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
     up to a fifth of the values missing completely at random. ``required_paths`` and
-    ``forbidden_paths`` are experimental, because the claims are mostly not applied. A graph with no
-    consistent extension stands for no DAG, so the fit drops every path claim, lists them in
-    ``metadata["unmet_knowledge"]``, and returns the graph it finds without them. On simulated
-    linear-Gaussian data with 50 variables and 2,000 rows, with true claims on 5 to 30% of the
-    variable pairs, that happened in 40 of 40 fits at mean degree 4 and 12 of 40 at mean degree 2.
-    In those fits the graph is the same and the class of graphs that the truth and the claims define
-    is more directed, so the distance to that class grew, by up to 4.4 edges per graph. In the fits
-    at mean degree 2 whose graph has a consistent extension, the claims were applied, 3 to 5% of
-    them dropped, and the CPDAG was 0.2 to 0.5 edges closer to that class. Over every setting
-    measured (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows) the CPDAG was no farther
-    from the true DAG than without the claims, and the fits dropped 71% of the required and 53% of
-    the forbidden paths. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    ``forbidden_paths`` are experimental. They were measured when a fit whose graph has no
+    consistent extension, a graph that stands for no DAG, dropped every path claim and returned the
+    graph it found without them, so the claims were mostly not applied; such a fit now directs the
+    undirected edges its claims name, as :class:`~andrey.Knowledge` describes, which is not measured
+    yet. On simulated linear-Gaussian data with 50 variables and 2,000 rows, with true claims on 5
+    to 30% of the variable pairs, every path claim was dropped in 40 of 40 fits at mean degree 4 and
+    12 of 40 at mean degree 2. In those fits the graph was the same and the class of graphs that the
+    truth and the claims define is more directed, so the distance to that class grew, by up to 4.4
+    edges per graph. In the fits at mean degree 2 whose graph has a consistent extension, the claims
+    were applied, 3 to 5% of them dropped, and the CPDAG was 0.2 to 0.5 edges closer to that class.
+    Over every setting measured (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows) the
+    CPDAG was no farther from the true DAG than without the claims, and the fits dropped 71% of the
+    required and 53% of the forbidden paths. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -687,7 +696,10 @@ def mmpc(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -812,20 +824,21 @@ def mmpc(
     smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
     Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
     fifth of the values missing completely at random. ``required_paths`` and ``forbidden_paths`` are
-    experimental, because the claims are mostly not applied. A graph with no consistent extension
-    stands for no DAG, so the fit drops every path claim, lists them in
-    ``metadata["unmet_knowledge"]``, and returns the graph it finds without them. On simulated
+    experimental. They were measured when a fit whose graph has no consistent extension, a graph
+    that stands for no DAG, dropped every path claim and returned the graph it found without them,
+    so the claims were mostly not applied; such a fit now directs the undirected edges its claims
+    name, as :class:`~andrey.Knowledge` describes, which is not measured yet. On simulated
     linear-Gaussian data with 50 variables and 2,000 rows, with true claims on 5 to 30% of the
-    variable pairs, that happened in 38 of 40 fits at mean degree 4 and 18 of 40 at mean degree 2.
-    In those fits the graph is the same and the class of graphs that the truth and the claims define
-    is more directed, so the distance to that class grew: by 6.5 to 9.7 edges per graph in those
-    fits at mean degree 2, which left the mean over all the fits there up to 4.9 edges farther. In
-    the fits at mean degree 2 whose graph has a consistent extension, the claims were applied, 4 to
-    6% of them dropped, and the CPDAG was 0.4 to 0.6 edges closer to that class. Over every setting
-    measured (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows) the CPDAG was no farther
-    from the true DAG than without the claims, and the fits dropped 77% of the required and 62% of
-    the forbidden paths. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    variable pairs, every path claim was dropped in 38 of 40 fits at mean degree 4 and 18 of 40 at
+    mean degree 2. In those fits the graph was the same and the class of graphs that the truth and
+    the claims define is more directed, so the distance to that class grew: by 6.5 to 9.7 edges per
+    graph in those fits at mean degree 2, which left the mean over all the fits there up to 4.9
+    edges farther. In the fits at mean degree 2 whose graph has a consistent extension, the claims
+    were applied, 4 to 6% of them dropped, and the CPDAG was 0.4 to 0.6 edges closer to that class.
+    Over every setting measured (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows) the
+    CPDAG was no farther from the true DAG than without the claims, and the fits dropped 77% of the
+    required and 62% of the forbidden paths. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
