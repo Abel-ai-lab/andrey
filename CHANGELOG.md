@@ -8,7 +8,7 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
-## [0.16.0] - 2026-11-09
+## [0.16.0] - 2026-11-10
 
 ### Highlights
 
