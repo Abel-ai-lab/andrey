@@ -182,6 +182,7 @@ _CONCEPTS = (
             "cam",
             "resit",
             "score_matching",
+            "nogam",
             "camuv",
             "icp",
             "igsp",
@@ -248,6 +249,13 @@ _CONCEPTS = (
                 "experiments (Rolland et al. 2022, Section 4.1).",
             ),
             Deviation(
+                method="nogam",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the method's published "
+                "experiments (Montagna et al. 2023, Section 6).",
+            ),
+            Deviation(
                 method="camuv",
                 name="alpha",
                 default=0.01,
@@ -307,6 +315,7 @@ _CONCEPTS = (
                 "Its pruning tests the smooth terms of its own additive model.",
                 "cam",
                 "score_matching",
+                "nogam",
             ),
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
@@ -546,6 +555,7 @@ _CONCEPTS = (
                 "cam",
                 "resit",
                 "score_matching",
+                "nogam",
                 *CONTINUOUS,
                 *LINGAM,
                 "granger",
@@ -663,6 +673,7 @@ _CONCEPTS = (
                 "An order search with no search over parent sets: the pruning starts from every "
                 "variable before a node in the order.",
                 "score_matching",
+                "nogam",
             ),
             *_exempt(
                 "The paper's search sets no cap on a variable's parents; max_depth caps the "
@@ -736,6 +747,7 @@ _CONCEPTS = (
                 "cam",
                 "resit",
                 "score_matching",
+                "nogam",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -1025,6 +1037,7 @@ _CONCEPTS = (
                 "cam",
                 "resit",
                 "score_matching",
+                "nogam",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1183,7 +1196,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "score_matching", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),

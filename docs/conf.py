@@ -515,6 +515,7 @@ PROSE_NAMES = {
     "cam": "CAM",
     "resit": "RESIT",
     "score_matching": "SCORE",
+    "nogam": "NoGAM",
     "varma_lingam": "VARMA-LiNGAM",
     "longitudinal_lingam": "Longitudinal LiNGAM",
     "pcmci": "PCMCI",
