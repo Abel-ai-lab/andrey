@@ -15,7 +15,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 from .blanket import iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc
 from .continuous import dagma, notears
-from .fcm import cam, camuv, resit
+from .fcm import cam, camuv, nogam, resit, score_matching
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd
 from .latent import gin
@@ -72,6 +72,8 @@ __all__ = [
     "multi_group_direct_lingam",
     "cam",
     "resit",
+    "score_matching",
+    "nogam",
     # temporal family
     "varma_lingam",
     "longitudinal_lingam",

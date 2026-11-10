@@ -53,6 +53,7 @@ from .api import (
     mmhc,
     mmpc,
     multi_group_direct_lingam,
+    nogam,
     notears,
     pc,
     pcmci,
@@ -61,6 +62,7 @@ from .api import (
     rcd,
     resit,
     rsmax2,
+    score_matching,
     tabu,
     ut_igsp,
     varma_lingam,
@@ -150,6 +152,8 @@ __all__ = [
     "ica_lingam",
     "cam",
     "resit",
+    "score_matching",
+    "nogam",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

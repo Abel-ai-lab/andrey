@@ -127,11 +127,12 @@ you. Every method that takes `indep_test`, with a partial-correlation test, `"fi
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, and `camuv` reject copies the same way, and a column of fewer than 3 distinct values, such
-as a binary one, on which no smooth term can be fit; `resit` and `camuv` also need at least twice as
-many rows as columns, and `camuv` rejects a column that is a linear function of other columns, such
-as a total, as the BIC methods do. Other data raises a `ValueError` that names the argument and, for
-a bad cell, its row and column. A single column gives a one-node graph.
+`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
+than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
+rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
+single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
@@ -179,11 +180,12 @@ reports only p-values is ordered by its p-value, smallest first.
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`,
-`jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
-`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
-be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. Every
 required edge is in the result, whatever its weight, test, or score says. For the time-series
 methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
 time `t`. Three more parts state causal paths and hidden common causes: `required_paths` and
@@ -626,12 +628,29 @@ its first call in a process.
 
    notears
    dagma
+   score_matching
+   nogam
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
+effects with additive Gaussian noise, without a regression in its order search: under that model a
+variable is a leaf exactly when the second derivative of the log density in that variable is the
+same at every point. It estimates those derivatives at the rows with a Stein kernel estimator on
+the standardized columns, takes the variable whose derivative varies least as the next leaf, and
+prunes the complete DAG of the order with CAM's smooth-term tests at `alpha=0.001`. It returns a DAG
+and a causal order.
+
+NoGAM (Montagna et al. 2023), {py:func}`~andrey.nogam`, drops SCORE's Gaussian noise: with additive
+noise of any distribution, a leaf's entry of the score is a function of the leaf's noise alone. It
+estimates the score with the same Stein estimator and each variable's residual by kernel ridge
+regression on all the others, takes as the next leaf the variable whose score entry its residual
+predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
+order.
 
 A method becomes supported once it has:
 

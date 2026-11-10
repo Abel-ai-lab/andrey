@@ -12,6 +12,17 @@ names its pull request.
 
 ### Added
 
+- `score_matching`, experimental, is SCORE (Rolland et al., 2022) for nonlinear effects with
+  additive Gaussian noise. It finds a causal order from the leaf up, each leaf the variable whose
+  second derivative of the log density varies least over the rows, estimated by a Stein kernel
+  estimator on the standardized columns, and prunes the complete DAG of the order with the
+  smooth-term tests of `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not
+  depend on the columns' units or order. ([#872])
+- `nogam`, experimental, is NoGAM (Montagna et al., 2023) for nonlinear effects with additive noise
+  of any distribution. It finds a causal order from the leaf up, each leaf the variable whose entry
+  of the Stein score estimate is best predicted from the variable's kernel-ridge residual on the
+  others, and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a
+  causal order, takes `knowledge`, and does not depend on the columns' units or order. ([#874])
 - `andrey.data` draws more kinds of data: Student-t and two-component Gaussian-mixture noise
   (`noise.student_t(df=)`, `noise.gaussian_mixture(weight=, means=, sds=)`), each of mean 0 and
   variance 1 like the other families; `functional.random_features(n_features=, length_scale=)`, an
@@ -2297,6 +2308,8 @@ First alpha release.
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
+[#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#874]: https://github.com/Abel-ai-lab/andrey/pull/874
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
