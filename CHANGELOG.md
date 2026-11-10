@@ -21,8 +21,8 @@ names its pull request.
   knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
   given the required edges those paths imply made fewer errors, and both path parts stay
   experimental in `iamb`, `inter_iamb`, and `mmpc`, where true claims left the CPDAG farther from
-  the class they define at 50 variables. The evidence is on the
-  [comparison page](benchmarks/comparisons/knowledge-paths.md). ([#870])
+  the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
+  ([#870])
 
 ## [0.16.0] - 2026-11-10
 
@@ -2257,3 +2257,4 @@ First alpha release.
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
+[kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
