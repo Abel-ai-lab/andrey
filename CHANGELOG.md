@@ -78,6 +78,18 @@ names its pull request.
   `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
   blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
   graph at 50 variables and mean degree 4. ([#882])
+- `required_paths` and `forbidden_paths` act on a graph with no consistent extension, which `pc`,
+  `cdnod`, `iamb`, `inter_iamb`, and `mmpc` can return when their tests contradict each other on
+  finite data. Such a graph stands for no DAG, and a fit dropped every path claim on it. A claim on
+  a pair joined by an undirected edge now directs that edge, `a -> b` for a required path and
+  `b -> a` for a forbidden one (Fang and He, 2020; Fang et al., 2025), and Meek's rules follow
+  (Meek, 1995). A claim on a pair that is not adjacent, a claim against an edge the data directed,
+  and claims that conflict with each other, by asking for both directions of one edge or by closing
+  a directed cycle, are dropped and listed in `metadata["unmet_knowledge"]` as before, whatever the
+  order of the claims or the columns. `metadata["edge_claims"]` is new and lists the claims applied
+  to an edge. The result is not guaranteed to stand for a DAG, as the graph found did not. A fit
+  without path claims, and a fit whose graph has a consistent extension, return what they returned.
+  ([#892])
 
 ### Fixed
 
@@ -2336,5 +2348,6 @@ First alpha release.
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
