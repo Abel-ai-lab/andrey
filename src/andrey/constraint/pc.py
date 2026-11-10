@@ -190,8 +190,9 @@ def correct_skeleton(
     deletion test ``deletion``, at ``alpha`` and ``max_depth``; ``trace`` records its tests. A
     removed candidate gets its separating set and, with ``record_pvalues``, its p-value; the pairs
     the first search removed keep theirs. The ``sink`` receives ``parents``, the parents of each
-    indicator that has any, ``retested``, the candidates, and ``removed``, those Step 4 removed, as
-    ``(x, y)`` pairs with ``x < y`` in ascending order. Returns the skeleton, the separating sets,
+    indicator that has any, ``retested``, the candidates, ``removed``, those Step 4 removed, and
+    ``uncorrected``, those with a test too short of rows to correct, as ``(x, y)`` pairs with
+    ``x < y`` in ascending order. Returns the skeleton, the separating sets,
     and the p-values.
     """
     d = X.shape[1]
@@ -201,8 +202,9 @@ def correct_skeleton(
     # to the test-wise test, and takes a common neighbor alone as a candidate.
     candidates = candidate_edges(adjacent, parents)
     kept = adjacent & ~candidates if keep is None else (adjacent & ~candidates) | keep
+    correction = PermutationCorrection(X, indep_test, parents, candidates, deletion, seed)
     corrected, more_sepsets, more_pvalues = adjacency_search(
-        PermutationCorrection(X, indep_test, parents, candidates, deletion, seed),
+        correction,
         d,
         alpha,
         support=adjacent,
@@ -216,6 +218,7 @@ def correct_skeleton(
         sink["parents"] = parents
         sink["retested"] = adjacent_pairs(retested)
         sink["removed"] = adjacent_pairs(retested & (corrected == NULL))
+        sink["uncorrected"] = sorted(correction.uncorrected)
     return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}
 
 

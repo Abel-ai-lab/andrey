@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
-    FIT_BY_EM,
     bic_cov,
     categorical_metadata,
     check_em,
@@ -31,6 +30,7 @@ from andrey.api._adapt import (
     cpdag_search,
     data_matrix,
     declared_columns,
+    fit_by_em,
     fit_inputs,
     fit_missing,
     json_safe,
@@ -1483,11 +1483,11 @@ def hc(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1630,7 +1630,7 @@ def hc(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score adds one term per variable, each over every row, and terms over different rows do not add
     up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [7]_
+    conditional-independence searches do. ``missing="em"`` runs structural EM [7]_
     [8]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
     linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
     observed ones, and their conditional means and covariances give the expected covariance of the
@@ -1677,14 +1677,26 @@ def hc(
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
     result. ``max_parents`` counts the index as a parent of each variable it points into. At the
     default ``n_starts=1``, ``changing_variables`` often lists variables the environments change
-    only through their causes (see **Several environments.**). ``missing="em"`` is experimental and
-    not benchmarked yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the
-    values missing, completely at random or at random given observed values. It runs the search 10
-    times, so it takes about 10 times as long, and under values missing not at random it has no
-    guarantee. Before EM, only a column that repeats another up to scale and shift where both are
-    observed raises; a column that is a linear function of several others, which raises on complete
-    data, is not caught, and the fit runs. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    only through their causes (see **Several environments.**). With ``missing="em"``, measured on
+    simulated linear-Gaussian data with values missing completely at random or at random given
+    observed values, 20 datasets per setting, on one core, with errors as the SHD between
+    equivalence classes. On Erdos-Renyi graphs of mean degree 2 with 20 variables, 500 or 2,000
+    rows, and 10 to 30% missing, its mean errors stayed below the empty graph's in all 12 settings.
+    With 15 variables and 100 rows (Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs
+    of mean degree 2, 10 to 50% missing), the result is often no better than the empty graph: its
+    mean errors stayed below the empty graph's in 11 of 24 settings (6, 5, and 0 of 8 on the three
+    graphs), with misses at every missing rate. The plain search at that sample size is the cause:
+    on the complete data its mean errors were 8.8, 13.3, and 13.05, against 8, 15, and 14 for the
+    empty graph. It runs the search 10 times, and the median fit took 0.7 to 3.1 s. At the default
+    ``ebic_gamma=1.0``, with 20 variables, 500 rows, and 20% missing, its mean errors were 11.1 and
+    11.3, against 10.75 on the complete data and 20 for the empty graph. :func:`~andrey.pc`, whose
+    tests delete rows per test, had fewer errors than it at the standard BIC in 34 of the 36
+    settings and at the default in both, comparisons not rerun on fresh seeds. Under values missing
+    not at random it has no guarantee. Before EM, only a column that repeats another up to scale and
+    shift where both are observed raises; a column that is a linear function of several others,
+    which raises on complete data, is not caught, and the fit runs. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1851,11 +1863,11 @@ def tabu(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1990,7 +2002,7 @@ def tabu(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score adds one term per variable, each over every row, and terms over different rows do not add
     up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [9]_
+    conditional-independence searches do. ``missing="em"`` runs structural EM [9]_
     [10]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
     linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
     observed ones, and their conditional means and covariances give the expected covariance of the
@@ -2031,14 +2043,26 @@ def tabu(
     reads a numeric ``env`` as a number, so with three or more environments a shift that does not
     follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
     go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
-    a parent of each variable it points into. ``missing="em"`` is experimental and not benchmarked
-    yet; its tests run it on up to 10 variables with 500 rows and up to 30% of the values missing,
-    completely at random or at random given observed values. It runs the search 10 times, so it
-    takes about 10 times as long, and under values missing not at random it has no guarantee. Before
-    EM, only a column that repeats another up to scale and shift where both are observed raises; a
-    column that is a linear function of several others, which raises on complete data, is not
-    caught, and the fit runs. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    a parent of each variable it points into. With ``missing="em"``, measured on simulated
+    linear-Gaussian data with values missing completely at random or at random given observed
+    values, 20 datasets per setting, on one core, with errors as the SHD between equivalence
+    classes. On Erdos-Renyi graphs of mean degree 2 with 20 variables, 500 or 2,000 rows, and 10 to
+    30% missing, its mean errors stayed below the empty graph's in all 12 settings. With 15
+    variables and 100 rows (Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs of mean
+    degree 2, 10 to 50% missing), the result is often no better than the empty graph: its mean
+    errors stayed below the empty graph's in 15 of 24 settings (7, 6, and 2 of 8 on the three
+    graphs), with misses from 10% missing on. The plain search at that sample size is the cause: on
+    the complete data its mean errors were 8.45, 12.95, and 12.75, against 8, 15, and 14 for the
+    empty graph. It runs the search 10 times, and the median fit took 0.8 to 3.1 s. At the default
+    ``ebic_gamma=1.0``, with 20 variables, 500 rows, and 20% missing, its mean errors were 6.4 and
+    5.85, against 5.7 on the complete data and 20 for the empty graph. :func:`~andrey.pc`, whose
+    tests delete rows per test, had fewer errors than it at the standard BIC in 18 of the 36
+    settings and tied in the others, and tied with it at the default, comparisons not rerun on fresh
+    seeds. Under values missing not at random it has no guarantee. Before EM, only a column that
+    repeats another up to scale and shift where both are observed raises; a column that is a linear
+    function of several others, which raises on complete data, is not caught, and the fit runs. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -2659,7 +2683,7 @@ def calm(
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data, method="calm", missing=missing == EM, fix=FIT_BY_EM)
+    X = data_matrix(data, method="calm", missing=missing == EM, fix=fit_by_em("calm"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="calm")
 

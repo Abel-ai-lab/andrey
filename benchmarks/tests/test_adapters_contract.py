@@ -41,6 +41,7 @@ from andrey_bench.adapters.andrey_xges import AndreyXGES
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
+from andrey_bench.adapters.bnlearn_structural_em import BnlearnStructuralEM
 from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
 from andrey_bench.adapters.causal_learn_boss import CausalLearnBOSS
 from andrey_bench.adapters.causal_learn_calm import CausalLearnCALM
@@ -112,6 +113,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     tetrad_pag.TetradCmdGraspFCI(),
     BnlearnHC(),
     BnlearnTabu(),
+    *[BnlearnStructuralEM(m, i) for m in ("hc", "tabu") for i in (5, 10)],
     BnlearnPCStable(),
     TigramitePC("cmiknn"),
     TigramitePC("gpdc"),

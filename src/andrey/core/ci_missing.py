@@ -88,6 +88,11 @@ EM_METHODS = (
     "dagma",
     "calm",
 )
+#: The methods in which ``missing="em"`` is supported: in the published comparison
+#: (benchmarks/comparisons/missing-data.md) none was less accurate than its reference
+#: implementation in any setting. In the other :data:`EM_METHODS` it is experimental, as no
+#: reference implementation exists to compare them with.
+EM_SUPPORTED = ("hc", "tabu", "notears")
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"

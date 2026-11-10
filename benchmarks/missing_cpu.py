@@ -24,11 +24,22 @@ complete values of every mask drawn over it. Lanes:
   graphs at 100 to 2,000 rows.
 - ``m2-reduced``: ``hc``, ``tabu``, ``xges``, ``exact_search``, ``calm``, ``notears``, and
   ``dagma`` with ``missing="em"`` at 20 variables and 500 rows, MCAR and logistic MAR at 0.2.
+- ``m2-bnlearn``: ``hc`` and ``tabu`` with ``missing="em"`` against bnlearn's ``structural.em``
+  (Friedman's structural EM, with ``hc`` or ``tabu`` inside), their reference. ``max.iter`` is 10,
+  the number of EM rounds Andrey's ``missing="em"`` runs. The cells are the paper-size cells (15
+  variables, 100 rows: MCAR at 0.1 to 0.5 and the Appendix F.2 logistic MAR and self-masking
+  cells, raw data, on MissDAG's three graphs) and ER2 with 20 variables, 500 and 2,000 rows,
+  MCAR and logistic MAR at 0.1 to 0.3 (standardized). Each masked dataset also fits test-wise PC,
+  and each complete dataset Andrey's and bnlearn's plain ``hc`` and ``tabu``, which separate the
+  two packages' searches from their EM layers. The pairs follow ``tabu_cpu.py``: Andrey's ``hc``
+  and ``tabu`` run at ``ebic_gamma`` 0.0, the standard BIC that bnlearn's ``bic-g`` scores, with
+  no parent cap and the tabu list of 10 on both sides. Needs R (``benchmarks/start_r.sh``).
 
 ``--part i --parts k`` runs every k-th unit of the lane from the i-th, so a lane splits into
-independent jobs; ``--budget-s`` stops between units once the budget is spent, and ``--resume``
-continues from the records on disk. ``done.json`` appears when every unit of the part has its
-records, and ``summary.json`` after every sitting.
+independent jobs; ``--first-seed`` moves the seeds, for a rerun on fresh ones; ``--budget-s`` stops
+between units once the budget is spent, and ``--resume`` continues from the records on disk.
+``done.json`` appears when every unit of the part has its records, and ``summary.json`` after every
+sitting. ``missing_summary.py`` pairs the records into the rows of the published summary.
 
     $ANDREY_BENCH_PYTHON benchmarks/missing_cpu.py --lane m2-b --out outputs/m2-b-0 --resume
 """
@@ -73,6 +84,8 @@ MVPC_ROWS = (100, 1000, 5000, 10000)
 
 M2_SEARCHES = ("ges", "boss", "grasp")
 M2_REDUCED = ("hc", "tabu", "xges", "exact_search", "calm", "notears", "dagma")
+#: ``m2-bnlearn``: the iterations of bnlearn's structural EM, the rounds Andrey's EM runs.
+BNLEARN_EM_ITERATIONS = 10
 
 
 @dataclass(frozen=True)
@@ -132,8 +145,13 @@ def _units(pairs: list[tuple[DatasetKey, DatasetKey]], masked: list, complete: l
     return out
 
 
-def plan(lane: str, seeds: int) -> list[Unit]:
-    """Every unit of `lane` with `seeds` seeds per cell."""
+def plan(lane: str, seeds: int, first: int = 0) -> list[Unit]:
+    """Every unit of `lane` with `seeds` seeds per cell, from seed `first`."""
+    return [u for u in _plan(lane, first + seeds) if u.key.seed >= first]
+
+
+def _plan(lane: str, seeds: int) -> list[Unit]:
+    """Every unit of `lane` over the seeds below `seeds`."""
     if lane == "m1-generic":
         pairs = _cells(
             [("er", 2.0), ("er", 4.0)],
@@ -230,10 +248,51 @@ def plan(lane: str, seeds: int) -> list[Unit]:
             masked += em
             complete += plain
         return _units(pairs, masked, complete)
+    if lane == "m2-bnlearn":
+        return _bnlearn_units(seeds)
     raise SystemExit(f"unknown lane {lane!r}; one of {', '.join(LANES)}")
 
 
-LANES = ("m1-generic", "m1-paper", "m2-a", "m2-b", "m2-c", "m2-generic", "m2-reduced")
+def _bnlearn_units(seeds: int) -> list[Unit]:
+    """The ``m2-bnlearn`` units: ``hc`` and ``tabu`` with EM beside bnlearn's structural EM on the
+    paper-size cells and ER2 with 20 variables, 500 and 2,000 rows, each dataset once.
+
+    ``max.iter`` is :data:`BNLEARN_EM_ITERATIONS`, the number of rounds Andrey's EM runs. A masked
+    dataset fits the two structural EM arms, Andrey's ``hc`` and ``tabu`` with EM at ``ebic_gamma``
+    0.0 (the standard BIC bnlearn's ``bic-g`` scores), and test-wise PC; the complete dataset fits
+    both packages' plain ``hc`` and ``tabu``.
+    """
+    from andrey_bench.adapters.bnlearn_hc import BnlearnHC
+    from andrey_bench.adapters.bnlearn_structural_em import BnlearnStructuralEM
+    from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
+
+    mcar, mar = [("mcar", "")], [("mar", "logistic")]
+    f2 = [*mar, ("self_masking", "logistic")]
+    paper = [(15, 100)]
+    pairs = [
+        *_cells(PAPER_GRAPHS, paper, mcar, PAPER_RATES, seeds, "raw"),
+        *_cells(PAPER_GRAPHS, paper, f2, F2_RATES, seeds, "raw"),
+        # The cells of m2-reduced (500 rows, rate 0.2) lie inside this grid, on the same datasets.
+        *_cells(
+            [("er", 2.0)],
+            [(20, 500), (20, 2000)],
+            [*mcar, *mar],
+            GENERIC_RATES,
+            seeds,
+            "standardized",
+        ),
+    ]
+    masked: list[Any] = [BnlearnStructuralEM(m, BNLEARN_EM_ITERATIONS) for m in ("hc", "tabu")] + [
+        AndreyMissing("pc", None)
+    ]
+    complete: list[Any] = [BnlearnHC(), BnlearnTabu()]
+    for method in ("hc", "tabu"):
+        masked.append(AndreyMissing(method, "em", ebic_gamma=0.0))
+        complete.append(AndreyMissing(method, None, ebic_gamma=0.0))
+    return _units(pairs, masked, complete)
+
+
+LANES = ("m1-generic", "m1-paper", "m2-a", "m2-b", "m2-c", "m2-generic", "m2-reduced", "m2-bnlearn")
 #: Seeds per cell: 50 in the MVPC paper's setting, 20 elsewhere.
 DEFAULT_SEEDS = {"m1-paper": 50}
 
@@ -249,6 +308,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True, help="output directory, created if absent")
     p.add_argument(
         "--seeds", type=int, default=None, help="seeds per cell (default: 20; 50 m1-paper)"
+    )
+    p.add_argument(
+        "--first-seed", type=int, default=0, help="first seed; fresh seeds for a rerun (default: 0)"
     )
     p.add_argument("--part", type=int, default=0, help="this job's part, 0-based (default: 0)")
     p.add_argument("--parts", type=int, default=1, help="parts the lane splits into (default: 1)")
@@ -269,12 +331,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--part must lie in [0, --parts)")
 
     seeds = args.seeds or DEFAULT_SEEDS.get(args.lane, 20)
-    units = plan(args.lane, seeds)[args.part :: args.parts]
+    units = plan(args.lane, seeds, args.first_seed)[args.part :: args.parts]
     out = Path(args.out)
     run_meta = {
         "driver": Path(__file__).name,
         "lane": args.lane,
         "seeds": seeds,
+        "first_seed": args.first_seed,
         "part": args.part,
         "parts": args.parts,
         "units": len(units),

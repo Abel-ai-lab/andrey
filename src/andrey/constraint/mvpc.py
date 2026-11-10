@@ -58,6 +58,12 @@ class PermutationCorrection:
     value is its regression's prediction at the drawn ``W`` plus its own residual. The query's
     partial-correlation test runs on those virtual rows (Tu et al. 2019, Algorithm 2).
 
+    The regressions and the test need ``max(|S| + 3, |W| + 2)`` rows in that block. A query with
+    fewer is answered by ``deletion``, as a query with an empty ``W`` is, and its pair joins
+    ``uncorrected``: the paper leaves the case open, the correction can only remove an edge the
+    deletion tests kept, and without the rows to compute it the pair keeps the deletion test's
+    answer for that conditioning set.
+
     The draw comes from a generator seeded by ``seed`` and by the fingerprints of the queried
     columns, a digest of where each one's values are missing: a p-value then depends on neither the
     order of the queries, nor the number of workers, nor the order of the columns, and, as the
@@ -84,6 +90,8 @@ class PermutationCorrection:
         self._candidates = candidates
         self._deletion = deletion
         self._seed = seed
+        #: The pairs ``(x, y)``, ``x < y``, with a query too short of rows to correct.
+        self.uncorrected: set[tuple[int, int]] = set()
         gaps = np.packbits(~self._observed, axis=0).T
         self._fingerprints = [
             int.from_bytes(hashlib.blake2b(g.tobytes(), digest_size=8).digest(), "big")
@@ -116,11 +124,8 @@ class PermutationCorrection:
         m = int(rows.sum())
         least = max(len(given) + 3, len(parents) + 2)
         if m < least:
-            raise ValueError(
-                f"the corrected test of columns {x} and {y} given {given} reads {m} rows where "
-                f"they and the parents {parents} of their missingness indicators are observed; it "
-                f"needs {least}"
-            )
+            self.uncorrected.add((x, y))
+            return self._deletion(x, y, given)
         block = self._data[rows]
         design = np.column_stack([np.ones(m), block[:, parents]])
         values = block[:, tested]

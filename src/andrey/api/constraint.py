@@ -117,7 +117,7 @@ def pc(
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"testwise", "mvpc"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
-        reads only the rows where all of its variables are observed. ``"mvpc"``, experimental, is
+        reads only the rows where all of its variables are observed. ``"mvpc"`` is
         Missing-Value PC [13]_: after the test-wise skeleton, it finds the parents of each
         variable's missingness indicator and tests again, on virtual data that correct for them,
         the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
@@ -163,9 +163,10 @@ def pc(
         which orientation each keeps. With ``missing="mvpc"`` on data with missing values,
         ``metadata["missingness_parents"]`` maps each column whose missingness indicator has
         parents to them, and ``metadata["corrected_edges"]`` lists the edges tested again
-        (``"retested"``) and those removed (``"removed"``), as ``[x, y]`` pairs in ascending order;
-        both name a DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is
-        the seed of the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        (``"retested"``), those removed (``"removed"``), and those with a test that had too few
+        rows to correct (``"uncorrected"``), as ``[x, y]`` pairs in ascending order; both name a
+        DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is the seed of
+        the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
         seed used.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
@@ -188,8 +189,7 @@ def pc(
         if a column repeats another up to scale and shift, before any test runs; one message names
         every group of copies and says to keep one column per group. Also if ``knowledge`` names a
         column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
-        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``, or a
-        corrected test reads fewer rows than it needs.
+        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``.
 
     Warns
     -----
@@ -326,11 +326,15 @@ def pc(
     observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
     drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
     virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
-    ``W`` is observed (their Eq. (4)), and the test runs on them. A test
-    with an empty ``W`` is the test-wise one. The colliders follow the corrected separating sets;
-    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
-    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
-    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an empty ``W`` is the
+    test-wise one. So is a test with fewer than ``max(|S| + 3, |W| + 2)`` rows where ``x``, ``y``,
+    ``S``, and ``W`` are all observed, too few for the regressions on ``W`` or for the test: the
+    paper leaves that case open, and as the correction can only remove an edge the test-wise tests
+    kept, the pair keeps its test-wise answer for that ``S`` and is listed in
+    ``metadata["corrected_edges"]["uncorrected"]``. The colliders follow the corrected separating
+    sets; ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction
+    applies to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's
+    rules. Each regression has an intercept, where their Eq. (2) has none and so assumes that every
     variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
     p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
     where the queried columns' values are missing, so a result depends on neither the column order,
@@ -361,13 +365,35 @@ def pc(
     variables. The median fit at 40 variables took 0.38 s with ``"degen_gauss"``, 0.42 s with
     ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. ``missing="mvpc"``
-    is experimental and not benchmarked yet; its tests run it on up to 10 variables with indicators
-    placed at colliders. Its correction holds when no missingness indicator causes a variable, every
-    independence in the observed rows also holds in the missing ones, no indicator is a
-    deterministic function of others, and no value causes its own missingness (self-masking) [13]_;
-    the data cannot check these, and a violation voids the correction. PermC also needs
+    them on up to 8 variables. With missing values, measured on simulated linear-Gaussian data on
+    one core with a cap of 30 minutes per fit, at ``alpha=0.01`` unless another level is named. In
+    the setting of Tu et al. [13]_ (random DAGs with 20 variables, 10 of them with missing values,
+    or with 50 and 16; 100 to 10,000 rows; one parent per indicator, always observed or with missing
+    values itself), the mean errors of ``missing="mvpc"`` stayed below the empty graph's in all 32
+    settings. They were below those of ``"testwise"`` in 10 of the 16 settings with such a mask and
+    tied in 6, and tied in the 16 controls with as many values missing completely at random: at 50
+    variables and 10,000 rows, 5.1 against 14.3 with observed parents and 7.4 against 14.9 with
+    parents that have missing values, in a median of 2.5 s. At 100 rows, 7 of 1,600 fits raised
+    because a test had fewer rows than it needs, as with ``"testwise"``. On Erdos-Renyi graphs of 10
+    to 100 variables (mean degree 2 or 4; 500, 2,000, or 10,000 rows; 10 to 30% of the values
+    missing), with one observed parent per indicator, ``"mvpc"`` had fewer errors than
+    ``"testwise"`` in 14 of 72 settings, and in 28 at ``alpha=0.05``, and more in none. The
+    correction does not help where there is nothing to correct or where an indicator has many weak
+    parents. With values missing completely at random it tied in 136 of 144 settings over both
+    levels, and no setting where it was behind repeated on fresh seeds. Under a logistic mask that
+    gives an indicator many weak parents, up to 30 at 100 variables, it tied in 125 of the 141
+    settings judged and was behind ``"testwise"`` in 12, in 3 of them on fresh seeds too, all with
+    100 variables and 30% missing: at mean degree 2 and 10,000 rows by 3.1 errors on the 11 of 20
+    datasets that finished, both times, and at mean degree 4 with 2,000 and 10,000 rows by 1.8 and
+    2.65 errors and then by 3.5. With one parent per indicator that has missing values itself, it
+    had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
+    ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
+    by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
+    ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
+    is the better choice. The correction holds when no missingness indicator causes a
+    variable, every independence in the observed rows also holds in the missing ones, no indicator
+    is a deterministic function of others, and no value causes its own missingness (self-masking)
+    [13]_; the data cannot check these, and a violation voids the correction. PermC also needs
     linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
     ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
     on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
@@ -375,18 +401,25 @@ def pc(
     fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
     descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
     ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
-    The density-ratio correction the paper gives for these cases is not implemented. Step 2 runs one
-    skeleton search per variable with missing values. With true ``required_paths`` or
-    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
-    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
-    DAG than without them in any setting. The claims direct edges of the graph the search found, as
-    their rules take the class as given: of the edges they directed, 5.8% with required paths and
-    10.9% with forbidden paths pointed against the true DAG, each in a fit whose graph had an edge
-    missing or extra or a collider wrong. A required path says less than a required edge and directs
-    less: it cannot restore an edge the search left out, and on simulated data a required edge,
-    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    The density-ratio correction the paper gives for these cases is not implemented. A corrected
+    test with too few rows is answered by the test-wise test (see **Missing-Value PC.**), so its
+    pair is not corrected: of the 14,323 fits that returned on the Erdos-Renyi graphs, 962 held such
+    a test, nearly all under masks where most columns have missing values, and
+    ``metadata["corrected_edges"]["uncorrected"]`` lists the pairs. Step 2 runs one skeleton search
+    per variable with missing values, and its cost grows with the parents an indicator has: under
+    the logistic mask at mean degree 2 with 100 variables and 10,000 rows, 77 of 120 fits ran past
+    the 30 minute cap in that search, on data where the fit with ``"testwise"`` took 3.3 s (median).
+    ``max_depth`` bounds the search. With true ``required_paths`` or ``forbidden_paths`` on 5 to 30%
+    of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree 2 or 4,
+    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 5.8% with required paths and 10.9% with forbidden paths
+    pointed against the true DAG, each in a fit whose graph had an edge missing or extra or a
+    collider wrong. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -511,7 +544,8 @@ def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict
             name(c): [name(p) for p in pa] for c, pa in sorted(found["parents"].items())
         },
         "corrected_edges": {
-            key: [[name(x), name(y)] for x, y in found[key]] for key in ("retested", "removed")
+            key: [[name(x), name(y)] for x, y in found[key]]
+            for key in ("retested", "removed", "uncorrected")
         },
         "seed": seed,
     }

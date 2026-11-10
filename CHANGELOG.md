@@ -12,11 +12,14 @@ names its pull request.
 
 ### Highlights
 
-- Missing data: `andrey.data.missingness` simulates missing values whose missingness graph is
-  known, and one argument, `missing`, names how each method handles them. Experimental,
-  `pc(missing="mvpc")` corrects PC where missingness depends on other variables (Tu et al., 2019),
-  and `missing="em"` fits the BIC score searches, `notears`, `dagma`, and `calm` on incomplete data
-  by structural EM. ([#826], [#828], [#832], [#842])
+- Missing data: `andrey.data.missingness` simulates missing values whose missingness graph is known,
+  and one argument, `missing`, names how each method handles them. `pc(missing="mvpc")` corrects PC
+  where missingness depends on other variables (Tu et al., 2019), and `missing="em"` fits the BIC
+  score searches, `notears`, `dagma`, and `calm` on incomplete data by structural EM.
+  `missing="mvpc"` is supported, and so is `missing="em"` in `notears`, `hc`, and `tabu`: against
+  the MVPC authors' code, MissDAG, and bnlearn's structural EM, none measured less accurate in any
+  setting. In the other searches `missing="em"` is experimental, as no reference implementation
+  exists to compare them with. ([#826], [#828], [#832], [#842], [#856])
 - Background knowledge states causal paths and hidden common causes:
   `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
   DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three parts,
@@ -101,19 +104,41 @@ names its pull request.
   method's default handling, `"testwise"`, so no result changes; a value a method does not list
   raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
   values. ([#828])
-- `pc(missing="mvpc")`, experimental, runs Missing-Value PC (Tu et al., 2019) with the
-  permutation-based correction: after the test-wise skeleton, it finds the parents of each
-  missingness indicator and tests again, on virtual data that correct for them, the edges such an
-  indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
-  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
-- `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
-  `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
-  by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a
-  linear-Gaussian model of the current graph, the E-step gives the expected covariance of the data,
-  the method's own search runs on it over every row, and the model is fit again to the graph it
-  returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
-  each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
-  values, with a message that names `missing="em"` where EM would run. ([#842])
+- `pc(missing="mvpc")` runs Missing-Value PC (Tu et al., 2019) with the permutation-based
+  correction: after the test-wise skeleton, it finds the parents of each missingness indicator and
+  tests again, on virtual data that correct for them, the edges such an indicator could have kept.
+  It takes `"fisherz"` or `"student_t"`, and `metadata["missingness_parents"]` and
+  `metadata["corrected_edges"]` record what it found. A corrected test with too few rows where its
+  variables and the parents of their missingness indicators are all observed is answered by the
+  test-wise test, and `metadata["corrected_edges"]["uncorrected"]` lists its pair. It is supported:
+  beside the MVPC authors' R code in the paper's setting, it was better in 28 of 32 cells, tied in
+  4, and worse in none, and below the empty graph in all 32. It does not improve on test-wise
+  deletion where each indicator has many weak parents, and there, at 100 variables and 10,000 rows,
+  77 fits ran past 30 minutes in the search for the indicators' parents, which `max_depth` bounds.
+  On a wider grid, with 50 or 100 variables and 20 or 30% of the values missing, it made 0.7 to 3.6
+  more errors than test-wise deletion in 12 settings, on the first datasets and again on fresh ones.
+  ([#832], [#856])
+- `missing="em"` fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and `grasp` with
+  `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values by structural
+  EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a linear-Gaussian model
+  of the current graph, the E-step gives the expected covariance of the data, the method's own
+  search runs on it over every row, and the model is fit again to the graph it returns, 10 times.
+  `metadata["em"]` records the rounds and the observed-data log-likelihood after each, and a row
+  that observes no value is dropped first. `missing=None` keeps refusing missing values, with a
+  message that names `missing="em"` where EM would run. It is supported in `notears`, `hc`, and
+  `tabu`: `notears` was better than MissDAG in 19 of 24 cells and tied in 5, and `hc` and `tabu`
+  were better than bnlearn's `structural.em` in 29 and 32 of 36 cells and tied in 7 and 4. With 15
+  variables and 100 rows, `hc` and `tabu` are often no better than the empty graph, below it in 11
+  and 15 of 24 cells, as the plain search is on complete data of that size; with 20 variables and
+  500 or 2,000 rows they are below it in 12 of 12 cells. In `ges`, `xges`, `exact_search`, `boss`,
+  `grasp`, `dagma`, and `calm` it is experimental, as no reference implementation exists to compare
+  them with. ([#842], [#856])
+- The benchmark harness measures missing data: `missing_cpu.py` fits `pc(missing="mvpc")` beside
+  the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and `hc` and `tabu` with
+  `missing="em"` beside bnlearn's `structural.em`, each with test-wise PC, listwise deletion, mean
+  imputation, the complete data, and the empty graph, and `missing_summary.py` pairs the records
+  into summary rows with a paired bootstrap. `benchmarks/comparisons/missing-data.md` presents the
+  results, and `benchmarks/published/0.16.0/missing-data.json` holds the rows. ([#843], [#856])
 - The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
   that listing every small graph gives, with d-separation in place of the tests, and on simulated
   data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`,
@@ -2208,8 +2233,10 @@ First alpha release.
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
+[#843]: https://github.com/Abel-ai-lab/andrey/pull/843
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
 [#853]: https://github.com/Abel-ai-lab/andrey/pull/853
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
+[#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857

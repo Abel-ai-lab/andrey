@@ -10,10 +10,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
-    FIT_BY_EM,
     column_labels,
     copies_named,
     data_matrix,
+    fit_by_em,
     fit_missing,
     json_safe,
     structure_output,
@@ -109,11 +109,11 @@ def notears(
         the weights are then those of the scaled columns. Limitations gives the fit's errors on
         standardized columns.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -201,15 +201,15 @@ def notears(
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
     fits every variable over the same rows, so a row with a missing value has no place in it. The
-    loss reads the data only through their covariance, so ``missing="em"``, experimental, runs
-    structural EM [7]_ [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model
-    of the current graph, each row's missing values are Gaussian given its observed ones, and their
-    conditional means and covariances give the expected covariance of the data (the E-step); the fit
-    runs on it, with all of its settings, and the model's coefficients and noise variances are fit
-    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
-    M-step, the weights the fit returns and one noise variance shared by every variable; here the
-    weights and each variable's noise variance are fit again. The weights it returns are the last
-    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    loss reads the data only through their covariance, so ``missing="em"`` runs structural EM [7]_
+    [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model of the current
+    graph, each row's missing values are Gaussian given its observed ones, and their conditional
+    means and covariances give the expected covariance of the data (the E-step); the fit runs on it,
+    with all of its settings, and the model's coefficients and noise variances are fit again by
+    least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the M-step,
+    the weights the fit returns and one noise variance shared by every variable; here the weights
+    and each variable's noise variance are fit again. The weights it returns are the last round's
+    fit on its expected covariance. ``standardize`` scales the expected covariance to unit
     variances. A row that observes no value is dropped first: it holds no information on the model.
     It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
     its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
@@ -247,12 +247,26 @@ def notears(
     69 s on unitless data), because each Adam iteration of a path step computes a matrix
     exponential. A fit can stop at a local optimum, and only weights that reach ``w_threshold``
     become edges. Nothing was measured beyond 100 variables, at other densities, row counts or noise
-    types, or on non-linear data. ``missing="em"`` is experimental and not benchmarked yet; its
-    tests run it on up to 10 variables with 500 rows and up to 30% of the values missing, completely
-    at random or at random given observed values. It runs the fit 10 times, so it takes about 10
-    times as long, and under values missing not at random it has no guarantee. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    types, or on non-linear data. With ``missing="em"``, measured in the setting of Gao et al. [8]_:
+    linear-Gaussian data with unit noise variances on raw columns, from Erdos-Renyi graphs of mean
+    degree 1 and 2 and scale-free graphs of mean degree 2, with 20 variables and 100 rows, 20
+    datasets per setting, at the default settings on one core. With 10 to 50% of the values missing
+    completely at random or at random given observed values, its mean errors (SHD) stayed below the
+    empty graph's in 22 of the 24 settings. With 10% missing completely at random they were 0.6,
+    1.8, and 3.25 on the three graphs, against 10, 20, and 19 for the empty graph and 0.2, 1.25, and
+    1.55 on the complete data; with 50% they were 8.65, 19.5, and 18.7, not below the empty graph's
+    on the two graphs of mean degree 2. It had fewer errors than :func:`~andrey.pc`, whose tests
+    delete rows per test, in 16 of the 24 settings and tied in 8, and fewer than the default fit on
+    data with column means filled in in 22, with 2 ties; dropping the incomplete rows left enough
+    rows to compare in 6 settings, and it had fewer errors in each. It runs the fit 10 times: the
+    median fit took 8 to 42 s, against 1.9 to 3.8 s on the complete data. On standardized columns
+    (Erdos-Renyi, mean degree 2, 20 variables, 500 rows, 20% missing), where the least-squares fit
+    is weaker, its mean errors were 15.35 completely at random and 16.0 at random, against 15.25 on
+    the complete data and 20 for the empty graph; ``pc`` had 7.5 there, and the default fit on
+    mean-filled data 13.55 with values missing completely at random, a difference not rerun on fresh
+    seeds. Under values missing not at random it has no guarantee. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -290,7 +304,7 @@ def notears(
     """
     from andrey.search.continuous import notears as _notears
 
-    X = data_matrix(data, method="notears", missing=missing == EM, fix=FIT_BY_EM)
+    X = data_matrix(data, method="notears", missing=missing == EM, fix=fit_by_em("notears"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
 
@@ -570,7 +584,7 @@ def dagma(
     """
     from andrey.search.continuous import dagma as _dagma
 
-    X = data_matrix(data, method="dagma", missing=missing == EM, fix=FIT_BY_EM)
+    X = data_matrix(data, method="dagma", missing=missing == EM, fix=fit_by_em("dagma"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
 
