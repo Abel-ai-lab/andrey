@@ -1176,8 +1176,8 @@ observed values.
 
 #### Measurement columns
 
-`measurements=` on `SCM.sample` and `sample_scm` appends measurement columns: for each variable you
-select, a new last column that is the variable plus independent noise, the random measurement error
+`measurements=` on `SCM.sample` and `sample_scm` adds measurement columns: for each variable you
+select, a new column that is the variable plus independent noise, the random measurement error
 model (Scheines and Ramsey, 2016). `andrey.data.measurement.noisy_children` selects the variables,
 by `columns` or by a `share` drawn from the seed, and sets the noise: `noise_scale` is its standard
 deviation as a multiple of the measured column's, so a measurement keeps `1 / (1 + noise_scale**2)`
@@ -1190,17 +1190,21 @@ from andrey.data import measurement
 
 ds = data.sample_scm(d=20, n=2000, seed=0, density=2,
                      measurements=measurement.noisy_children([3, 7], noise_scale=0.5))
-ds.data.shape            # (2000, 22): columns 20 and 21 measure columns 3 and 7
-ds.measurements.parents  # {20: 3, 21: 7}
-ds.graph                 # the true graph, with the edges 3 -> 20 and 7 -> 21
+ds.data.shape            # (2000, 22): the 20 variables and 2 measurement columns
+ds.measurements.parents  # each measurement column: the column it measures
+ds.graph                 # the true graph, with an edge from each measured column to its measurement
 ```
 
-The measurement columns are drawn after the scaling and the column shuffle, from the seed's own
-streams, so the other columns are those of the same seed without `measurements`; each measurement
-is then scaled as `scale` scales a variable. They always come last, so their position marks them,
-unlike the other columns. To give a method a variable only through its measurement, drop the
-variable's column and its node; the variable is then a hidden parent of the measurement. `missing=`
-draws its mask over the measurement columns too.
+The measurement columns are drawn over the values of the same seed without `measurements`, from the
+seed's own streams, and each is scaled as `scale` scales a variable. The columns are then shuffled
+once more, the measurement columns with all the others, so no position marks a measurement:
+`measurements.parents`, `targets`, and the graph name the columns of the returned data. The other
+columns hold the values of the sample without `measurements`, and `provenance["column_order"]`
+matches them: a column has the same entry there in the two samples, and a measurement column an
+entry of 20 or more here. With `shuffle=False` the measurement columns follow the others. To give a
+method a variable only through its measurement, drop the variable's column and its node; the
+variable is then a hidden parent of the measurement. `missing=` draws its mask over the measurement
+columns too.
 
 ## Metrics
 

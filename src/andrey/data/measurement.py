@@ -1,7 +1,7 @@
 """Measurement columns on simulated data: noisy children whose measured column is known.
 
 :func:`noisy_children` describes measurement columns, and ``measurements=`` on
-:meth:`~andrey.data.SCM.sample` and :func:`~andrey.data.sample_scm` appends them to the sampled
+:meth:`~andrey.data.SCM.sample` and :func:`~andrey.data.sample_scm` adds them to the sampled
 data: each is a selected variable plus independent noise, the random measurement error model
 [1]_ [2]_, and a child of that variable in the true graph. The returned
 :class:`~andrey.data.dataset.Measurements` records which column each one measures:
@@ -10,8 +10,16 @@ data: each is a selected variable plus independent noise, the random measurement
 >>> from andrey.data import measurement
 >>> ds = data.sample_scm(d=5, n=500, seed=0, density=2,
 ...                      measurements=measurement.noisy_children([0, 3]))
->>> ds.data.shape, ds.measurements.parents
-((500, 7), {5: 0, 6: 3})
+>>> ds.data.shape, len(ds.measurements.parents)
+((500, 7), 2)
+
+A measurement column has no position of its own. When the sample shuffles its columns, the
+measurement columns are shuffled with all the others, so ``measurements.parents`` is the only
+record of which columns they are; with ``shuffle=False`` they follow the other columns, in the
+order of the columns they measure. The other columns hold the values of the same sample without
+measurements, and ``provenance["column_order"]`` matches them: a column has the same entry there
+in the two samples, and a measurement column has an entry of ``n_obs`` or more, ``n_obs`` being
+the number of columns without measurements.
 
 A measurement of column ``i`` is ``X_i + noise_scale * sd(X_i) * e`` with ``e`` of mean 0 and
 variance 1, independent of every variable and of the other measurement noises, and ``sd(X_i)`` the
@@ -46,14 +54,14 @@ from andrey.core.structure import OBSERVED
 from .dataset import CausalDataset, Measurements
 from .graphs import dag_truth
 from .noise import Noise, gaussian
-from .scm import MEASUREMENT, component_rng
+from .scm import MEASUREMENT, column_order, component_rng
 from .sortability import standardize
 
 __all__ = ["Measurements", "NoisyChildren", "noisy_children"]
 
-# The streams under MEASUREMENT: the choice of the measured columns, part of the model, and the
-# measurement noise, part of the rows.
-_CHOICE, _NOISE = 0, 1
+# The streams under MEASUREMENT: the choice of the measured columns and the column order, parts
+# of the model, and the measurement noise, part of the rows.
+_CHOICE, _NOISE, _ORDER = 0, 1, 2
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,8 +91,9 @@ def noisy_children(
     ----------
     columns : sequence of int or None, default=None
         The measured columns, as columns of the sample without measurements, after its column
-        shuffle. ``None`` measures the ``share`` of the columns, or every column when ``share``
-        is ``None`` too.
+        shuffle. A sample that shuffles its columns moves them again with the measurement
+        columns, and ``measurements.parents`` names where each one is. ``None`` measures the
+        ``share`` of the columns, or every column when ``share`` is ``None`` too.
     share : float or None, default=None
         The share of the columns to measure, in ``(0, 1]``, rounded to a whole number of at least
         one column; which ones is drawn from the model's seed. Given without ``columns``.
@@ -153,12 +162,15 @@ def append(
     model: np.random.SeedSequence,
     *,
     scale: str,
+    shuffle: bool,
 ) -> CausalDataset:
-    """Return ``ds`` with the measurement columns of ``spec`` appended.
+    """Return ``ds`` with the measurement columns of ``spec`` among its columns.
 
-    The measured columns come from the measurement stream of ``model`` and the noise from that of
-    ``root``, so no other draw depends on them. The measurement nodes follow the observed nodes
-    in the true graph and precede the latent ones.
+    The measured columns and the column order come from the measurement streams of ``model`` and
+    the noise from that of ``root``, so no other draw depends on them. The measurement columns
+    are first placed after the columns of ``ds``; under ``shuffle`` one permutation then orders
+    all of them, and the graph, ``params``, ``targets``, and the record are relabeled by it. The
+    latent nodes stay last.
     """
     n, n_obs = ds.data.shape
     measured = _measured(spec, n_obs, component_rng(model, MEASUREMENT, _CHOICE))
@@ -180,29 +192,40 @@ def append(
         children /= np.sqrt(1.0 + spec.noise_scale**2)
     data = np.concatenate([ds.data, children.astype(ds.data.dtype)], axis=1)
 
-    # The measurement nodes take the labels n_obs .. n_obs + k - 1, and the latent nodes move up.
+    # Before the column order, the measurement nodes take the labels n_obs .. n_obs + k - 1 and
+    # the latent nodes move up. ``order[j]`` is that label of final node ``j``: the columns in
+    # their drawn order, then the latents, as in ``SCM.sample``.
+    d = ds.graph.n_nodes + k
     edges = np.where(ds.params.edges >= n_obs, ds.params.edges + k, ds.params.edges)
     nodes = n_obs + np.arange(k)
+    columns = column_order(model, n_obs + k, shuffle, stream=(MEASUREMENT, _ORDER))
+    order = np.concatenate([columns, np.arange(n_obs + k, d)])
+    final = np.argsort(order)
+    data = np.take(data, columns, axis=1)  # C order
     types = ds.graph.node_types
     if types is not None:
         types = np.concatenate([types[:n_obs], np.full(k, OBSERVED, types.dtype), types[n_obs:]])
     graph = dag_truth(
-        np.concatenate([edges[:, 0], measured]),
-        np.concatenate([edges[:, 1], nodes]),
-        ds.graph.n_nodes + k,
+        final[np.concatenate([edges[:, 0], measured])],
+        final[np.concatenate([edges[:, 1], nodes])],
+        d,
         node_types=types,
     )
     scales = ds.params.noise_scales
     params = replace(
         ds.params,
-        edges=edges,
-        noise_scales=np.concatenate([scales[:n_obs], noise_sd, scales[n_obs:]]),
+        edges=final[edges],
+        noise_scales=np.concatenate([scales[:n_obs], noise_sd, scales[n_obs:]])[order],
     )
     record = Measurements(
-        parents={int(node): int(column) for node, column in zip(nodes, measured)},
+        parents=dict(sorted((int(final[v]), int(final[c])) for v, c in zip(nodes, measured))),
         noise=spec.noise.name,
         noise_scale=spec.noise_scale,
     )
+    targets = ds.targets
+    if targets is not None:
+        targets = {env: sorted(int(final[c]) for c in cols) for env, cols in targets.items()}
+    drawn = np.concatenate([np.asarray(ds.provenance["column_order"], dtype=np.int64), nodes])
     options = spec.noise.options
     config = {
         **ds.provenance["config"],
@@ -219,7 +242,8 @@ def append(
         graph=graph,
         params=params,
         measurements=record,
-        provenance={**ds.provenance, "config": config},
+        targets=targets,
+        provenance={**ds.provenance, "column_order": drawn[columns].tolist(), "config": config},
     )
 
 

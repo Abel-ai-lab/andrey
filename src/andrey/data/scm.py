@@ -87,8 +87,9 @@ _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 # selection, the temporal lag matrices, the column shuffle, the intervention draws, the missing
 # values, and the measurement columns each get an independent stream, so a change to one
 # component's draws never shifts another's. Draw ``k`` of the missing values comes from
-# ``(MISSING, k)``, the choice of the measured columns from ``(MEASUREMENT, 0)`` of the model, and
-# the measurement noise from ``(MEASUREMENT, 1)``. Environment
+# ``(MISSING, k)``, the choice of the measured columns from ``(MEASUREMENT, 0)`` of the model, the
+# measurement noise from ``(MEASUREMENT, 1)``, and the column order of a sample with measurement
+# columns from ``(MEASUREMENT, 2)`` of the model. Environment
 # ``k >= 1`` draws its noise from ``(NOISE, k)`` and environment ``k`` its intervention values from
 # ``(INTERVENTION, k)`` and its redrawn weights from ``(WEIGHTS, k)``; environment 0 draws from
 # ``NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
@@ -111,14 +112,21 @@ def component_rng(root: np.random.SeedSequence, *component: int) -> np.random.Ge
     return np.random.default_rng(seq)
 
 
-def column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) -> np.ndarray:
+def column_order(
+    root: np.random.SeedSequence,
+    n_observed: int,
+    shuffle: bool,
+    *,
+    stream: tuple[int, ...] = (_COLUMNS,),
+) -> np.ndarray:
     """Return the drawn index of each output column; the identity unless ``shuffle``.
 
-    The permutation comes from the column stream of ``root``, so no other draw depends on it.
+    The permutation comes from the column stream of ``root``, or from ``stream`` of ``root`` when
+    given, so no other draw depends on it.
     """
     if not shuffle:
         return np.arange(n_observed)
-    return component_rng(root, _COLUMNS).permutation(n_observed)
+    return component_rng(root, *stream).permutation(n_observed)
 
 
 def dataset_provenance(
@@ -344,14 +352,19 @@ class SCM:
             gives complete data.
         measurements : NoisyChildren or None, default=None
             Measurement columns, from :func:`~andrey.data.measurement.noisy_children`: for each
-            selected column, a new last column that is it plus independent noise, drawn over the
-            returned values, after the scaling and the column shuffle, from the seed's own
-            streams, so the other columns are those of the sample without ``measurements``. In
-            the true graph each measurement column is a child of the column it measures, placed
-            after the observed nodes and before the latent ones; ``params`` keeps the model's
-            edges and gains each measurement's noise scale. ``missing`` then draws over every
-            column, the measurement columns included. Temporal functionals take none. ``None``
-            appends nothing.
+            selected column, a new column that is it plus independent noise, drawn over the
+            values of the sample without ``measurements``, after its scaling, from the seed's own
+            streams. With ``shuffle``, the measurement columns are then shuffled together with
+            every other column, by a permutation from a stream of their own, so no position marks
+            a measurement; without it they follow the other columns. The other columns hold the
+            values of the sample without ``measurements``, at the positions
+            ``provenance["column_order"]`` matches: a column has the same entry there in the two
+            samples, and a measurement column an entry of ``n_obs`` or more. In the true graph
+            each measurement column is a child of the column it measures and the latent nodes
+            stay last; ``measurements.parents``, ``targets``, the graph, and ``params`` name the
+            columns of the returned data, and ``params`` keeps the model's edges and gains each
+            measurement's noise scale. ``missing`` then draws over every column, the measurement
+            columns included. Temporal functionals take none. ``None`` adds nothing.
 
         Returns
         -------
@@ -447,7 +460,7 @@ class SCM:
         if measurements is not None:
             from .measurement import append
 
-            ds = append(ds, measurements, root, model, scale=scale)
+            ds = append(ds, measurements, root, model, scale=scale, shuffle=shuffle)
         return ds if missing is None else with_missing(ds, missing, root)
 
     def _screened(

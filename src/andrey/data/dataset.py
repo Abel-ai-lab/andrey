@@ -125,7 +125,7 @@ class Missingness:
 
 @dataclass(frozen=True, kw_only=True)
 class Measurements:
-    """The measurement columns appended to a dataset, each a variable plus independent noise.
+    """The measurement columns added to a dataset, each a variable plus independent noise.
 
     :func:`andrey.data.measurement.noisy_children` describes them and ``measurements=`` on
     :meth:`~andrey.data.SCM.sample` draws them.
@@ -133,9 +133,9 @@ class Measurements:
     Parameters
     ----------
     parents : dict of int to int
-        Each measurement column mapped to the column it measures, in ascending order of the
-        measurement columns. In the true graph the measured column is the measurement column's
-        only parent.
+        Each measurement column mapped to the column it measures, both as columns of the
+        returned data, in ascending order of the measurement columns. In the true graph the
+        measured column is the measurement column's only parent.
     noise : str
         The family of the measurement noise (for example, ``"gaussian"``).
     noise_scale : float
@@ -182,10 +182,10 @@ class CausalDataset:
         The missing values drawn by ``missing=`` on :meth:`~andrey.data.SCM.sample`, their mask
         and the parents of each missingness indicator; ``None`` when the data are complete.
     measurements : Measurements or None, default=None
-        The measurement columns appended by ``measurements=`` on
+        The measurement columns added by ``measurements=`` on
         :meth:`~andrey.data.SCM.sample`, each with the column it measures; ``None`` without them.
-        They are the last columns of ``data`` and nodes of ``graph``, each a child of the column
-        it measures.
+        They are columns of ``data``, shuffled with the others when the sample shuffles its
+        columns, and nodes of ``graph``, each a child of the column it measures.
 
     Notes
     -----
