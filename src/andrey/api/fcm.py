@@ -670,27 +670,30 @@ def score_matching(
     tables are on data as simulated, and the order search reads standardized columns, where it
     orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
     variables with as many edges, the same search put 99% of the true edges in the true direction
-    when it read the columns as simulated and 80% on standardized columns. The method does not carry
-    over to every additive-noise model: on standardized data whose links are ``w (z + sin z)`` of
-    each parent, with as many edges as variables, 10 and 20 variables, 1,000 rows, and Gaussian,
-    Laplace, or Gumbel noise, 20 graphs per setting, the order put 41% to 53% of the true edges in
-    the true direction, where a random order puts 50%, and its DAG was closer to the true one than
-    the empty graph in none of the six settings and farther from it in all three at 20 variables;
-    :func:`~andrey.cam` put 76% to 94% there. One kernel bandwidth serves every variable, and links
-    it does not resolve leave a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 ->
-    x3`` with ``x2 = 2 x0 / (1 + x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard
-    deviation 0.7 or 1, over 400 and 800 rows, the search took ``x0`` and ``x1`` for the leaves in
-    24 of 24 fits. The leaf rule is exact only for Gaussian noise: under other noise a leaf's entry
-    changes with its residual, and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that
-    assumption. A fit took 1.0 s at 10 variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB.
-    Each step factors a matrix with one row and one column per sample, so the order search's time
-    grows with the cube of ``n_samples`` and its memory with the square. The pruning starts from the
-    complete DAG of the order, so its last fits have nearly ``n_variables`` smooth terms each: it
-    needs at least twice as many rows as columns, and it takes most of a fit's time as the variables
-    grow. Binary columns, and any column with fewer than 3 distinct values, are not supported: the
-    pruning fits a smooth term of each parent, and such a column raises ``ValueError`` before the
-    fit. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    when it read the columns as simulated and 80% on standardized columns. The order search reads
+    standardized columns, and the error of its estimate for a variable grows with about the square
+    of that variable's variance-to-noise ratio (its variance over the variance of its noise term).
+    Where links have a strong linear part, variance builds up along the causal order, the sinks have
+    the largest ratios, and the search ranks them last: on additive-noise data with links ``z + sin
+    z`` (1,000 rows, 10 and 20 variables, as many edges as variables), where a sink's ratio had a
+    median of 10 to 13 against 1.6 to 1.7 in the paper's simulation, the order put 41% to 53% of the
+    true edges in the true direction, a random order's share, and 16,000 rows (52%), another ridge
+    term, or another bandwidth did not change that. Use :func:`~andrey.cam` on such data (76% to 94%
+    on the same datasets). One kernel bandwidth serves every variable, and links it does not resolve
+    leave a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 -> x3`` with ``x2 = 2 x0
+    / (1 + x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard deviation 0.7 or 1,
+    over 400 and 800 rows, the search took ``x0`` and ``x1`` for the leaves in 24 of 24 fits. The
+    leaf rule is exact only for Gaussian noise: under other noise a leaf's entry changes with its
+    residual, and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. A fit took
+    1.0 s at 10 variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB. Each step factors a
+    matrix with one row and one column per sample, so the order search's time grows with the cube of
+    ``n_samples`` and its memory with the square. The pruning starts from the complete DAG of the
+    order, so its last fits have nearly ``n_variables`` smooth terms each: it needs at least twice
+    as many rows as columns, and it takes most of a fit's time as the variables grow. Binary
+    columns, and any column with fewer than 3 distinct values, are not supported: the pruning fits a
+    smooth term of each parent, and such a column raises ``ValueError`` before the fit. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -885,22 +888,24 @@ def nogam(
     orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
     variables with as many edges, the same search put 99% of the true edges in the true direction
     under Gaussian noise and 98% under Laplace noise when it read the columns as simulated, and 87%
-    and 91% on standardized columns. The method does not carry over to every additive-noise model:
-    on standardized data whose links are ``w (z + sin z)`` of each parent, with as many edges as
-    variables, 10 and 20 variables, 1,000 rows, and Gaussian, Laplace, or Gumbel noise, 20 graphs
-    per setting, the order put 47% to 62% of the true edges in the true direction, where a random
-    order puts 50%, and its DAG was closer to the true one than the empty graph in 1 of the six
-    settings and farther from it in all three at 20 variables; :func:`~andrey.cam` put 76% to 94%
-    there. A fit took 7.5 to 9.7 s at 10 variables and 28 to 40 s at 20, within 0.16 GB; it was not
-    measured in graphs of 50 variables, where a single fit took 194 s. Each step fits ten kernel
-    ridge regressions per remaining variable, each on four fifths of the rows, so the order search's
-    time grows with the square of ``n_variables`` and the cube of ``n_samples``, and its memory with
-    the square of ``n_samples``. The pruning starts from the complete DAG of the order, so its last
-    fits have nearly ``n_variables`` smooth terms each, and it needs at least twice as many rows as
-    columns. Binary columns, and any column with fewer than 3 distinct values, are not supported:
-    the pruning fits a smooth term of each parent, and such a column raises ``ValueError`` before
-    the fit. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    and 91% on standardized columns. The search compares the variables' prediction errors in
+    absolute terms on standardized columns, and a sink's error grows with its variance-to-noise
+    ratio (its variance over the variance of its noise term), since the same error in its residual
+    costs more where the noise is a small part of the variable. Where links have a strong linear
+    part that ratio is largest at the sinks: on additive-noise data with links ``z + sin z`` (10 and
+    20 variables, as many edges as variables; Gaussian, Laplace, and Gumbel noise) the order put 47%
+    to 62% of the true edges in the true direction at 1,000 rows, and 4,000 rows raised it only from
+    56% to 62% under Gaussian noise at 10 variables. Use :func:`~andrey.cam` on such data (76% to
+    94% on the same datasets). A fit took 7.5 to 9.7 s at 10 variables and 28 to 40 s at 20, within
+    0.16 GB; it was not measured in graphs of 50 variables, where a single fit took 194 s. Each step
+    fits ten kernel ridge regressions per remaining variable, each on four fifths of the rows, so
+    the order search's time grows with the square of ``n_variables`` and the cube of ``n_samples``,
+    and its memory with the square of ``n_samples``. The pruning starts from the complete DAG of the
+    order, so its last fits have nearly ``n_variables`` smooth terms each, and it needs at least
+    twice as many rows as columns. Binary columns, and any column with fewer than 3 distinct values,
+    are not supported: the pruning fits a smooth term of each parent, and such a column raises
+    ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

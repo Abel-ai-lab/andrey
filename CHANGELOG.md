@@ -27,8 +27,9 @@ names its pull request.
   and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a causal
   order, takes `knowledge`, and does not depend on the columns' units or order. It is supported:
   against dodiscover on the paper's simulation at 10 and 20 variables under Gaussian, Laplace, and
-  Gumbel noise, z-scored and rescaled, its SHD was lower in 19 of 24 settings on the first datasets
-  and higher in none, and its median fit was 1.6 to 3 times faster. ([#874], [#879])
+  Gumbel noise, z-scored and rescaled, its SHD was lower in 16 of 24 settings, on the first datasets
+  and again on fresh ones, and higher in none, and its median fit was 1.6 to 3 times faster.
+  ([#874], [#879])
 - `andrey.data` draws more kinds of data: Student-t and two-component Gaussian-mixture noise
   (`noise.student_t(df=)`, `noise.gaussian_mixture(weight=, means=, sds=)`), each of mean 0 and
   variance 1 like the other families; `functional.random_features(n_features=, length_scale=)`, an

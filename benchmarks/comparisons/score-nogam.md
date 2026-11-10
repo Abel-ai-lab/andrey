@@ -58,24 +58,34 @@ interval of the mean D over its paired datasets (10,000 resamples): on SHD the c
 the interval lies above 0 and better when below, and on the order share the reverse.
 
 A method is no less accurate than its reference when no decision cell is worse on the first seeds
-and again on 20 fresh datasets, seeds 20 to 39; only cells worse on the first seeds were rerun.
-Cells better on the first seeds were not rerun, so the published summary records them as ties. A
-method also has to clear two floors in its decision cells: the interval of its SHD minus the empty
-graph's lies below 0, and the interval of its order share minus R2-SortnRegress's lies above 0. A
-fit past its 1,800 s cap would be a timeout and never scored as a graph; none occurred.
+and again on 20 fresh datasets, seeds 20 to 39. Every cell worse on the first seeds on either
+measure was rerun, and so was every NoGAM cell better on either measure. A cell counts as better
+only where the fresh datasets agree (better again); the published summary records every other cell
+as a tie. SCORE's one cell better on the first seeds, on order share, was not rerun and counts as a
+tie. A method also has to clear two floors in its decision cells: the interval of its SHD minus the
+empty graph's lies below 0, and the interval of its order share minus R2-SortnRegress's lies above
+0. A fit past its 1,800 s cap would be a timeout and never scored as a graph; none occurred.
 
 ## Results
 
 Andrey's pre-release build of 10 November 2026 on NumPy 2.5.4, one fit at a time on one core with
 one BLAS thread, on AMD EPYC 7713 64-Core Processor and AMD EPYC 9534 64-Core Processor processors.
 Every number below is in
-[`published/0.17.0/stein-score.json`](../published/0.17.0/stein-score.json). All 3,040 fits of the
+[`published/0.17.0/stein-score.json`](../published/0.17.0/stein-score.json). All 4,640 fits of the
 comparison finished.
 
-| Method | Decision cells | SHD, first seeds | Order share, first seeds | Worse again on fresh seeds | Floors passed |
-|---|---:|---|---|---:|---:|
-| SCORE | 12 | 0 better, 12 tied, 0 worse | 1 better, 9 tied, 2 worse | 0 | 12 of 12 |
-| NoGAM | 24 | 19 better, 5 tied, 0 worse | 19 better, 5 tied, 0 worse | 0 | 24 of 24 |
+| Method | Measure | Decision cells | First seeds: better / tied / worse | Better again | Better, not repeated | Tied | Worse again | Floors passed |
+|---|---|---:|---|---:|---:|---:|---:|---:|
+| SCORE | SHD | 12 | 0 / 12 / 0 | 0 | 0 | 12 | 0 | 12 of 12 |
+| SCORE | Order share | 12 | 1 / 9 / 2 | 0 | 0 | 12 | 0 | 12 of 12 |
+| NoGAM | SHD | 24 | 19 / 5 / 0 | 16 | 3 | 5 | 0 | 24 of 24 |
+| NoGAM | Order share | 24 | 19 / 5 / 0 | 18 | 1 | 5 | 0 | 24 of 24 |
+
+Better again is better than the reference on the first seeds and on the fresh ones; better, not
+repeated is better on the first seeds and a tie on the fresh ones. Tied holds every other cell that
+is not worse in both blocks: the ties on the first seeds, SCORE's one cell better on order share on
+the first seeds, which was not rerun, and SCORE's two cells worse on order share on the first seeds,
+which were not worse again.
 
 ### SCORE
 
@@ -139,7 +149,7 @@ Rescaled variables.
 
 ### Fresh seeds
 
-2 decision cells were worse on the first seeds, both SCORE's at 50 variables on ER4 graphs and both
+SCORE. Two decision cells were worse on the first seeds, both at 50 variables on ER4 graphs and both
 on the order share alone. Neither was worse again on 20 fresh datasets. The estimate stays below 0
 in both blocks, and over all 40 datasets the interval excludes 0, so a deficit of about 0.007 to
 0.010 in order share against the authors' code is plausible there. SHD ties in every block.
@@ -150,6 +160,38 @@ in both blocks, and over all 40 datasets the interval excludes 0, so a deficit o
 | z-scored | Order share | -0.016 [-0.025, -0.007] worse | -0.004 [-0.010, +0.002] tie | -0.010 [-0.016, -0.005] |
 | rescaled | SHD | +0.60 [-0.75, +2.05] tie | +0.25 [-1.70, +2.35] tie | +0.42 [-0.80, +1.70] |
 | rescaled | Order share | -0.008 [-0.015, -0.002] worse | -0.006 [-0.015, +0.003] tie | -0.007 [-0.013, -0.001] |
+
+NoGAM. The 20 decision cells better than dodiscover on SHD or on order share on the first seeds were
+each rerun on 20 fresh datasets; the 4 cells tied on both measures were not. On SHD, 16 of the 19
+cells better on the first seeds were better again and 3 were not; on order share, 18 of 19 were
+better again and 1 was not. A cell that did not repeat is a tie on the fresh datasets with its
+estimate still on the better side, and over all 40 datasets its interval excludes 0. 18 of the 20
+cells were better again on at least one measure, and no cell was worse than dodiscover in either
+block. One cell, z-scored Gaussian at 10 variables on ER4 graphs, tied on SHD on the first seeds and
+was better on the fresh ones; it counts as a tie.
+
+| Scale | Noise | Variables | Graph | SHD: seeds 0-19 | Seeds 20-39 | All 40 | Result | Order share: seeds 0-19 | Seeds 20-39 | All 40 | Result |
+|---|---|---:|---|---|---|---|---|---|---|---|---|
+| z-scored | Gaussian | 10 | ER1 | -1.35 [-2.25, -0.55] better | -1.40 [-2.20, -0.75] better | -1.38 [-1.98, -0.82] | better again | +0.120 [+0.070, +0.180] better | +0.105 [+0.065, +0.145] better | +0.113 [+0.080, +0.147] | better again |
+| z-scored | Gaussian | 10 | ER4 | -0.95 [-2.05, +0.10] tie | -1.30 [-2.25, -0.40] better | -1.12 [-1.85, -0.45] | tie | +0.025 [+0.005, +0.048] better | +0.022 [+0.005, +0.041] better | +0.024 [+0.010, +0.038] | better again |
+| z-scored | Gaussian | 20 | ER1 | -1.65 [-2.65, -0.70] better | -1.35 [-2.10, -0.60] better | -1.50 [-2.12, -0.93] | better again | +0.065 [+0.028, +0.105] better | +0.050 [+0.030, +0.070] better | +0.058 [+0.036, +0.080] | better again |
+| z-scored | Gaussian | 20 | ER4 | -3.40 [-4.85, -2.05] better | -4.10 [-5.80, -2.65] better | -3.75 [-4.88, -2.75] | better again | +0.028 [+0.014, +0.041] better | +0.031 [+0.014, +0.050] better | +0.029 [+0.018, +0.041] | better again |
+| z-scored | Laplace | 10 | ER1 | -1.60 [-2.25, -0.95] better | -1.25 [-2.00, -0.65] better | -1.43 [-1.93, -0.97] | better again | +0.135 [+0.085, +0.190] better | +0.090 [+0.050, +0.135] better | +0.113 [+0.077, +0.147] | better again |
+| z-scored | Laplace | 20 | ER1 | -1.60 [-2.50, -0.70] better | -2.30 [-3.50, -1.20] better | -1.95 [-2.73, -1.25] | better again | +0.058 [+0.035, +0.083] better | +0.077 [+0.045, +0.113] better | +0.068 [+0.046, +0.090] | better again |
+| z-scored | Laplace | 20 | ER4 | -2.35 [-3.55, -1.20] better | -1.05 [-2.25, +0.30] tie | -1.70 [-2.58, -0.80] | better, not repeated | +0.016 [+0.006, +0.026] better | +0.012 [-0.006, +0.028] tie | +0.014 [+0.004, +0.023] | better, not repeated |
+| z-scored | Gumbel | 10 | ER1 | -1.05 [-1.65, -0.35] better | -1.45 [-2.10, -0.85] better | -1.25 [-1.70, -0.78] | better again | +0.105 [+0.055, +0.150] better | +0.095 [+0.060, +0.130] better | +0.100 [+0.070, +0.130] | better again |
+| z-scored | Gumbel | 10 | ER4 | -1.35 [-2.50, -0.35] better | -0.40 [-1.10, +0.30] tie | -0.88 [-1.55, -0.25] | better, not repeated | +0.022 [+0.006, +0.040] better | +0.014 [+0.001, +0.026] better | +0.018 [+0.008, +0.029] | better again |
+| z-scored | Gumbel | 20 | ER4 | -3.05 [-4.30, -1.80] better | -2.40 [-4.00, -0.85] better | -2.73 [-3.75, -1.73] | better again | +0.020 [+0.011, +0.029] better | +0.018 [+0.005, +0.029] better | +0.019 [+0.011, +0.027] | better again |
+| rescaled | Gaussian | 10 | ER1 | -1.25 [-1.85, -0.70] better | -0.80 [-1.45, -0.10] better | -1.02 [-1.48, -0.57] | better again | +0.100 [+0.055, +0.155] better | +0.090 [+0.055, +0.125] better | +0.095 [+0.068, +0.128] | better again |
+| rescaled | Gaussian | 10 | ER4 | -0.90 [-1.65, -0.15] better | -0.70 [-1.50, +0.10] tie | -0.80 [-1.35, -0.25] | better, not repeated | +0.010 [+0.000, +0.021] tie | +0.006 [-0.003, +0.016] tie | +0.008 [+0.001, +0.016] | tie |
+| rescaled | Gaussian | 20 | ER1 | -2.00 [-2.90, -1.20] better | -2.35 [-2.95, -1.75] better | -2.17 [-2.73, -1.68] | better again | +0.077 [+0.050, +0.107] better | +0.083 [+0.058, +0.107] better | +0.080 [+0.061, +0.099] | better again |
+| rescaled | Gaussian | 20 | ER4 | -3.95 [-4.80, -3.05] better | -3.65 [-4.95, -2.40] better | -3.80 [-4.55, -3.05] | better again | +0.030 [+0.018, +0.043] better | +0.021 [+0.013, +0.030] better | +0.026 [+0.018, +0.033] | better again |
+| rescaled | Laplace | 10 | ER1 | -1.30 [-1.95, -0.65] better | -1.20 [-1.70, -0.70] better | -1.25 [-1.68, -0.85] | better again | +0.090 [+0.040, +0.140] better | +0.105 [+0.070, +0.145] better | +0.098 [+0.068, +0.130] | better again |
+| rescaled | Laplace | 20 | ER1 | -1.50 [-2.20, -0.80] better | -2.25 [-3.30, -1.10] better | -1.88 [-2.52, -1.20] | better again | +0.050 [+0.030, +0.072] better | +0.072 [+0.035, +0.110] better | +0.061 [+0.040, +0.083] | better again |
+| rescaled | Laplace | 20 | ER4 | -1.90 [-3.25, -0.60] better | -2.25 [-3.60, -0.85] better | -2.08 [-3.05, -1.12] | better again | +0.019 [+0.006, +0.033] better | +0.019 [+0.010, +0.028] better | +0.019 [+0.011, +0.028] | better again |
+| rescaled | Gumbel | 10 | ER1 | -1.15 [-1.65, -0.70] better | -1.75 [-2.50, -1.05] better | -1.45 [-1.90, -1.02] | better again | +0.075 [+0.035, +0.120] better | +0.140 [+0.105, +0.175] better | +0.107 [+0.080, +0.138] | better again |
+| rescaled | Gumbel | 20 | ER1 | -1.55 [-2.45, -0.70] better | -2.50 [-3.40, -1.60] better | -2.02 [-2.67, -1.38] | better again | +0.052 [+0.015, +0.087] better | +0.070 [+0.040, +0.102] better | +0.061 [+0.039, +0.085] | better again |
+| rescaled | Gumbel | 20 | ER4 | -2.60 [-3.95, -1.25] better | -2.50 [-3.55, -1.50] better | -2.55 [-3.38, -1.73] | better again | +0.018 [+0.008, +0.029] better | +0.014 [+0.006, +0.024] better | +0.016 [+0.010, +0.023] | better again |
 
 ### Floors
 
@@ -319,8 +361,7 @@ screen's records, SCORE's fit with torch 2.5.1. Andrey's SCORE has an SHD interv
 graph's in 0 of 6 cells and an order-share interval above R2-SortnRegress's in 0 of 6; NoGAM in 1
 and 0 of 6. Their orders put 0.41 to 0.53 (SCORE) and 0.47 to 0.62 (NoGAM) of the true edges in the
 true direction, where `cam` puts 0.76 to 0.94. Neither clears the floors there, as neither reference
-did: the methods' rules do not carry over to this generator, and `cam` does. It is a stated limit of
-both methods, outside the setting their papers claim.
+did, and `cam` does. It is a stated limit of both methods, outside the setting their papers claim.
 
 | Method | Noise | Variables | SHD: Andrey | Reference | `cam` | Empty graph | Andrey - empty [95%] | Order share: Andrey | Reference | `cam` | R2-SortnRegress | Andrey - R2 [95%] |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -336,6 +377,49 @@ both methods, outside the setting their papers claim.
 | NoGAM | Laplace | 20 | 23.5 | 23.6 | 5.5 | 20 | +3.50 [+1.30, +5.85] | 0.527 | 0.583 | 0.910 | 0.665 | -0.138 [-0.217, -0.060] |
 | NoGAM | Gumbel | 10 | 9.2 | 10.1 | 4.7 | 10 | -0.75 [-2.60, +0.95] | 0.575 | 0.545 | 0.755 | 0.635 | -0.060 [-0.175, +0.050] |
 | NoGAM | Gumbel | 20 | 23.4 | 26.1 | 8.7 | 20 | +3.35 [+1.25, +5.65] | 0.555 | 0.550 | 0.795 | 0.670 | -0.115 [-0.193, -0.040] |
+
+The cause is the error of the two estimators, traced on these datasets with the exact derivatives of
+the log density beside the estimates. A leaf is a variable with no children among those that remain,
+and its variance-to-noise ratio is its variance over the variance of its noise term. Measured:
+SCORE's estimate of a leaf's criterion, whose exact value is 0 under Gaussian noise, grows with
+about the square of the leaf's ratio (slope 1.5 to 2.0 of log estimate on log ratio, correlation
+0.96 to 0.98, under the three noises and at 1,000, 4,000, and 8,000 rows), and NoGAM's criterion of
+a leaf grows about linearly with it (slope 0.8, correlation 0.91 to 0.93). Over the leaves of four
+simulations with Gaussian noise and 10 variables, the median estimate of a leaf was 5.4 where its
+ratio was below 3 and 2,350 where it was 30 or above, against an exact criterion of about 2.4 for
+the closest variable that is not a leaf. The links `z + sin z` have a strong linear part, which
+passes variance down the causal order, so the sinks have the largest ratios: a leaf's ratio had a
+median of 9.7 at 10 variables and 13.3 at 20, where a redraw of the papers' simulation, with links
+whose derivatives are closed forms, gives 1.6 and 1.7. On z-scored columns both searches then rank
+the sinks last.
+
+Order share with one setting changed at a time, the mean of 20 datasets (standard error 0.02 to
+0.04; a random order gives 0.5), from a copy of each order search that returns the package's orders
+on these datasets. A longer dataset is the same model's longer draw, and a dash is a setting that
+was not run.
+
+| Setting | SCORE: Gaussian, 10 variables | Gaussian, 20 | Laplace, 10 | Laplace, 20 | NoGAM: Gaussian, 10 variables |
+|---|---:|---:|---:|---:|---:|
+| As shipped: 1,000 rows, ridge term 0.001, median bandwidth | 0.465 | 0.410 | 0.510 | 0.460 | 0.555 |
+| 4,000 rows | 0.480 | 0.430 | 0.570 | 0.485 | 0.625 |
+| 16,000 rows | 0.515 | - | - | - | - |
+| Half the bandwidth | 0.440 | 0.425 | 0.475 | 0.453 | 0.480 |
+| Twice the bandwidth | 0.495 | 0.443 | 0.580 | 0.495 | 0.550 |
+| Ridge term 0.0001 | 0.445 | 0.400 | 0.445 | 0.445 | 0.470 |
+| Ridge term 0.01 | 0.470 | 0.440 | 0.585 | 0.487 | 0.615 |
+| Links `sin z` alone, as shipped | 0.665 | - | - | - | 0.755 |
+| A redraw of the papers' simulation, as shipped | 0.740 | - | - | - | 0.885 |
+
+Measured: more rows, another ridge term, or another bandwidth leave both orders near a random one;
+an order search at 16,000 rows took 420 s and 4.1 GB. Without the linear part of the links (`sin z`
+alone, a median ratio of 1.9) the order share is 0.665 for SCORE and 0.755 for NoGAM, more than half
+of the way to the redraw of the papers' simulation. No argument of `score_matching` or `nogam`
+changes this. Inferred, not measured: the estimators' errors act as relative errors, a fixed share
+of the quantity they estimate, so the variable with the largest entry carries the largest spurious
+variation; from the trend between 4,000 and 8,000 rows, a leaf would need rows of the order of
+100,000 to win, beyond one fit's memory, which grows with the square of the rows; and large, uneven
+diagonal entries of the inverse correlation matrix, which mean some variables are almost determined
+by the others, are a sign of such data that needs no graph. That sign was not tested as a rule.
 
 ## Run
 
@@ -404,7 +488,12 @@ regimes `anm_er`, `anm_laplace_er`, and `anm_gumbel_er` are the additive-noise s
 - **Other additive-noise data.** On Andrey's additive-noise simulation with links `z + sin z`,
   z-scored, SCORE's order puts 41% to 53% of the true edges in the true direction and NoGAM's 47% to
   62%, near a random order's 50%, and at 20 variables both return a graph farther from the truth
-  than the empty graph; `cam` orders 76% to 94%. Use `cam` on such data.
+  than the empty graph; `cam` orders 76% to 94%. The estimators' error on a leaf grows with the
+  leaf's variance-to-noise ratio, about its square for SCORE and about linearly for NoGAM, and links
+  with a strong linear part give the sinks the largest ratios (a median of 10 to 13 there against
+  1.6 to 1.7 in a redraw of the papers' simulation), so both searches rank the sinks last; 16,000
+  rows, another ridge term, or another bandwidth do not change it, as the additive-noise section
+  above measures. Use `cam` on such data.
 - **Time and memory.** Each step of either order search factors a matrix with one row and one column
   per sample, so time grows with the cube of the rows and memory with their square; every number
   here is at 1,000 rows.
