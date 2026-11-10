@@ -168,6 +168,7 @@ LANES = {
 REFERENCES = {
     "pc": ("pcalg.pc", "tetrad.pc"),
     "ges": ("tetrad.ges",),
+    "ges_bic": ("tetrad.ges",),
     "boss": ("tetrad.boss",),
     "fci": ("tetrad.fci",),
     "gfci": ("tetrad.gfci",),
@@ -185,6 +186,9 @@ LANE_REFERENCES = {
     "lpcmci": ("tigramite.lpcmci",),
     "lingam": (),
 }
+#: Andrey methods at settings other than their defaults, run with ``--methods``. ``ges_bic`` is
+#: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm.
+VARIANTS = {"ges_bic": ("ges", {"ebic_gamma": 0.0})}
 ARMS = ("bare", "true", "edges", "false")
 #: The interpreter of tigramite's environment (``benchmarks/start_tigramite.sh``).
 TIGRAMITE_PYTHON = "ANDREY_BENCH_TIGRAMITE_PYTHON"
@@ -193,7 +197,10 @@ FALSE_FRACTION = 0.1
 #: The cells outside a method's stated setting, by lane and method. GES suits sparse graphs: its
 #: release checks run at expected degree 2, and at degree 4 its fit with the default settings does
 #: not beat the empty graph with or without claims, so those cells say nothing about the claims.
-OUT_OF_SETTING = {("cpdag", "ges"): lambda cell: cell["degree"] >= 4}
+OUT_OF_SETTING = {
+    ("cpdag", "ges"): lambda cell: cell["degree"] >= 4,
+    ("cpdag", "ges_bic"): lambda cell: cell["degree"] >= 4,
+}
 
 
 def _log(msg: str) -> None:
@@ -558,8 +565,11 @@ def fit(
                 marks = _tetrad_reference(method, data, edges)
                 meta = {}
             else:
-                fn = getattr(andrey, method)
-                kwargs = {"knowledge": knowledge_of(claims)} if claims else {}
+                name, settings = VARIANTS.get(method, (method, {}))
+                fn = getattr(andrey, name)
+                kwargs = dict(settings)
+                if claims:
+                    kwargs["knowledge"] = knowledge_of(claims)
                 if edges is not None:
                     kwargs["knowledge"] = andrey.Knowledge(
                         required=[tuple(e) for e in edges["required"]],
@@ -744,7 +754,7 @@ def run_unit(task: tuple) -> list[dict]:
     }
     rows = []
     for method in methods:
-        reference = method not in LANES[lane]["methods"]
+        reference = method not in LANES[lane]["methods"] and method not in VARIANTS
         arms = [("bare", None, None)]
         if not reference or method in TAKES_PATHS:
             arms += [("true", f, claims) for f, claims in true_claims.items()]
@@ -808,7 +818,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     import andrey
 
     methods = tuple(args.methods or LANES[lane]["methods"])
-    unknown = set(methods) - {*LANES[lane]["methods"], *LANE_REFERENCES[lane]}
+    known = {*LANES[lane]["methods"], *LANE_REFERENCES[lane]}
+    known |= {v for v, (base, _) in VARIANTS.items() if base in LANES[lane]["methods"]}
+    unknown = set(methods) - known
     if unknown:
         raise SystemExit(f"{lane} runs no {sorted(unknown)}")
     arms = tuple(args.arms or ARMS)
@@ -1425,7 +1437,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--workers", type=int, default=max(1, len(os.sched_getaffinity(0))))
     r.add_argument("--part", choices=PARTS, help="true claims of this part alone")
     r.add_argument(
-        "--methods", nargs="+", help="the lane's methods or references; default: methods"
+        "--methods", nargs="+", help="the lane's methods, variants, or references; default: methods"
     )
     r.add_argument("--arms", nargs="+", choices=ARMS, help="the arms to fit; default: all")
     r.add_argument("--out", required=True)

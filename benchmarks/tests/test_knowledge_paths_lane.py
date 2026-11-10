@@ -233,3 +233,10 @@ def test_summarize_judges_a_method_against_its_reference_under_the_same_knowledg
     # The reference's own change with knowledge is a row of its own.
     own = [r for r in summary["rows"] if r["method"] == "tetrad.ges"]
     assert [(r["arm"], r["dag_mean_D"]) for r in own] == [("edges", -1)]
+
+
+def test_a_variant_is_an_andrey_method_at_its_settings_with_every_arm():
+    rows = kp.run_unit(("cpdag", "d10-n500-deg2", 0, None, ("ges_bic",), ("bare", "true", "edges")))
+    assert {row["status"] for row in rows} == {"ok"}
+    assert {row["arm"] for row in rows} == {"bare", "true", "edges"}
+    assert kp.REFERENCES["ges_bic"] == kp.REFERENCES["ges"]
