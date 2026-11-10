@@ -137,13 +137,30 @@ a bad cell, its row and column. A single column gives a one-node graph.
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
 accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file:
 each conditional-independence test reads only the rows where all of its variables are observed
-(test-wise deletion), and so do the pair tests `anm` and `pnl`, which read the rows where both
-columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test
-read. A column with no observed value, or a constant one over its observed values, raises a
-`ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
-`"student_t"` and 2 for the other tests, raises one during it. `cdnod` and `fci_jci` need a complete
-`env`. Every other method raises a `ValueError` that names it and says what to do instead, as
-[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
+(test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where
+both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
+test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
+records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
+finds the parents of each missingness indicator and tests again the edges they could have kept.
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
+fits read the data only through their covariance, refuse missing values under `None` and take
+`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
+refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records the rounds
+and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
+takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
+`hc`, and `tabu`: in the
+[missing-data benchmark](benchmarks/0.16.0.md#what-we-measured-on-missing-data), none was less
+accurate than its reference implementation in any setting. In the other methods `missing="em"` is
+experimental, as no reference implementation exists to compare them with; the benchmark reports
+their results beside the baselines. A value a method does not list raises a `ValueError` that
+names the values it takes. A column with no observed value, or a constant one over its observed
+values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
+for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
+`fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
+what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
+method's Notes say why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -169,7 +186,44 @@ reports only p-values is ordered by its p-value, smallest first.
 be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
 required edge is in the result, whatever its weight, test, or score says. For the time-series
 methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
-time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+time `t`. Three more parts state causal paths and hidden common causes: `required_paths` and
+`forbidden_paths` list the pairs `(cause, effect)` with and without a directed path from `cause` to
+`effect`, and `confounded` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
+`structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`:
+the result is the MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
+`metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`,
+`boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a
+required path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before
+Zhang's rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair.
+These marks and checks assume no selection bias. `lpcmci` takes each claim with its lag.
+`direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the
+order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
+
+These parts are supported in `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, and
+`direct_lingam`, where [true claims measured no
+worse](benchmarks/0.16.0.md#path-and-confounder-claims) than the same fit without them and than
+reference packages given the same knowledge. In every other method that honors them they are
+experimental, as we have not measured them there: a fit warns with
+{py:class}`~andrey.ExperimentalWarning`, and their meaning may change without deprecation. A CPDAG
+method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
+an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
+says less than an edge and so directs less: when you know the edge itself, state it as `required`.
+
+Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
+raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
+graph a fit finds does not meet: the tests remove an edge on the only path a required path needs,
+or the class found has no DAG without a path a forbidden path denies. The fit then keeps its graph,
+drops each such claim, warns once with `KnowledgeWarning`, naming the claims, and lists them in
+`metadata["unmet_knowledge"]`, each `[part, a, b]`, or `[part, a, b, lag]` for `lpcmci`; the list
+is empty when every claim is met. A CPDAG method takes the claims in order, `required_paths` and
+then `forbidden_paths`, each by column position, and keeps a claim when some DAG of the class meets
+it together with those kept before it. A PAG method drops a required path that `forbidden` or the
+tiers deny on an adjacent pair before the rules, and then each claim the final PAG does not meet.
+A method given a part it does not honor raises `NotImplementedError`, naming the methods that
+honor it, and so do `iamb`, `inter_iamb`, and `mmpc` given the paths with a `target` or an
+undirected `structure`.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take
@@ -274,10 +328,11 @@ tests then orient can put more arrowheads at a node.
 their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
 unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
 whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
-independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and
-`ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise
-`seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend
-on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
+independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
+with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
+1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
+other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -396,6 +451,7 @@ variable.
    camuv
    anm
    pnl
+   loci
    rcd
    bottom_up_parce_lingam
    gin
@@ -427,6 +483,14 @@ finds most independent of the remaining variables, then removes each parent whos
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
 causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
 variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
+LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
+location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
+allow. It fits a Gaussian in each direction, its mean and variance smooth functions of the
+proposed cause, and decides either by an HSIC test of the scaled residual against the cause
+(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
+which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
+against the authors' code.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -793,9 +857,9 @@ environment variables and the order in which the settings apply, and
 Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`, and each
 situation has one category, the one the table names, in every method. A warning never changes a
 result. Each distinct message warns once per process, at the line in your code that
-made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
-category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
-`SearchLimitWarning`.
+made the call; a `BoundaryWarning` warns once per method, and a `KnowledgeWarning` once per fit. A
+warning from a dependency keeps its own category, except scikit-learn's `ConvergenceWarning` from
+FastICA and LARS, raised again as a `SearchLimitWarning`.
 
 | Category | When |
 |---|---|
@@ -806,6 +870,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function or class, which also works for one more release. |
+| {py:class}`~andrey.KnowledgeWarning` | A fit dropped `required_paths`, `forbidden_paths`, or `confounded` claims the graph it found does not meet, and lists them in `metadata["unmet_knowledge"]`. |
 | {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
@@ -852,6 +917,7 @@ name.
    SearchLimitWarning
    SampleSizeWarning
    DataTypeWarning
+   KnowledgeWarning
    BoundaryWarning
    DeprecatedArgumentWarning
 ```
@@ -950,6 +1016,13 @@ each context drives exactly one variable, so no hidden context is a common cause
    interventions.soft
    interventions.HardIntervention
    interventions.SoftIntervention
+   missingness.mcar
+   missingness.mar
+   missingness.mnar
+   missingness.self_masking
+   missingness.draw
+   missingness.Mechanism
+   missingness.Missingness
 ```
 
 #### Scale
@@ -1028,6 +1101,36 @@ datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(we
             for s in range(10)]
 ```
 
+#### Missing values
+
+`missing=` on `SCM.sample` and `sample_scm` draws missing values whose missingness graph you know.
+The missingness indicator of a column is 1 where its value is missing, and the m-graph adds each
+indicator to the causal graph with its parents (Mohan, Pearl, and Tian, 2013). Four mechanisms in
+`andrey.data.missingness` set what an indicator may depend on: `mcar` on nothing, `mar` on columns
+that are always observed, `mnar` on other columns that can go missing, and `self_masking` on its
+own column. `observed` is the share of columns that are always observed, and the others lose about
+`rate` of their values. With `form="logistic"`, the default, an indicator is a logistic function of
+its parents, as in the masks of Muzellec et al. (2020); with `form="quantile"`, a value goes missing
+with probability 0.9 when its one parent is below a quantile and 0.01 otherwise, as in the
+simulations of Tu et al. (2019). `parents=` places the indicators yourself, for example at a common
+effect of two variables:
+
+```python
+import andrey.data as data
+from andrey.data import missingness
+
+ds = data.sample_scm(d=20, n=2000, seed=0, density=2, missing=missingness.mar(0.2))
+ds.data                # NaN where a value is missing
+ds.missing.mask        # True where a value is missing
+ds.missing.parents     # each column that can go missing: the parents of its indicator
+ds.missing.mechanism   # "mar"
+```
+
+The mask is drawn after the scaling and the column shuffle, from the seed's own stream, so the same
+seed without `missing` gives the complete data, and, for a sample drawn without `screen`,
+`missingness.draw(ds.data, mechanism, seed=)` draws its mask again. Every column keeps at least 2
+observed values.
+
 ## Metrics
 
 `andrey.metrics` scores a result against a known graph. `score(output, truth)` chooses the metrics
@@ -1080,8 +1183,10 @@ matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of 
 temporal result, draw one lag's graph or its `summary_graph()`. Graphviz places
 the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout otherwise. Latent
 variables are hollow, dashed circles. `draw(structure, targets=["x"])` marks the variables an
-experiment set: each is a square, and a bar crosses each edge into it. A hard intervention cuts
-those edges, and a soft one keeps them; the marks are the same.
+experiment set: each is a square, and a cross marks the middle of each edge into it. A hard
+intervention cuts those edges, and a soft one keeps them; the marks are the same.
+`to_graphviz(structure, targets=["x"])` draws the squares. [How to read a causal
+graph](guides/graph-types.md#how-to-read-a-causal-graph) lists every mark.
 
 ```{eval-rst}
 .. currentmodule:: andrey.viz

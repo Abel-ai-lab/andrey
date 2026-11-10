@@ -41,6 +41,7 @@ from andrey_bench.adapters.andrey_xges import AndreyXGES
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
+from andrey_bench.adapters.bnlearn_structural_em import BnlearnStructuralEM
 from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
 from andrey_bench.adapters.causal_learn_boss import CausalLearnBOSS
 from andrey_bench.adapters.causal_learn_calm import CausalLearnCALM
@@ -112,6 +113,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     tetrad_pag.TetradCmdGraspFCI(),
     BnlearnHC(),
     BnlearnTabu(),
+    *[BnlearnStructuralEM(m, i) for m in ("hc", "tabu") for i in (5, 10)],
     BnlearnPCStable(),
     TigramitePC("cmiknn"),
     TigramitePC("gpdc"),
@@ -208,12 +210,12 @@ def _skip_without_package(adapter: SolutionAdapter) -> None:
     [a for a in ALL_ADAPTERS if a.package == "andrey" or a.name in DEFERRED_MODULES],
     ids=lambda a: a.name,
 )
-def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
+def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter, unimport) -> None:
     import sys
 
     _skip_without_package(adapter)
     module = DEFERRED_MODULES[adapter.name]
-    sys.modules.pop(module, None)
+    unimport(module)
     adapter.setup()
     assert module in sys.modules, (
         f"{adapter.name}: setup() left {module} for the first fit to import"

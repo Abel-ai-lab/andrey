@@ -13,22 +13,28 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     data_matrix,
+    fit_by_em,
+    fit_missing,
     json_safe,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
+from andrey.core.ci_missing import EM
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
+    import numpy as np
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
     from andrey.search.continuous import ContinuousResult
 
 
-def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> StructureOutput:
-    """Wrap a fit as a weighted DAG with its bookkeeping."""
+def _output(
+    result: ContinuousResult, labels: tuple[str, ...] | None, em: dict[str, object]
+) -> StructureOutput:
+    """Wrap a fit as a weighted DAG with its bookkeeping and the record of its EM, if any."""
     return structure_output(
         result.dag,
         labels=labels,
@@ -37,6 +43,7 @@ def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> Structu
             "h_final": json_safe(result.h_final),
             "edges_removed": result.edges_removed,
             "path_steps": result.path_steps,
+            **em,
         },
     )
 
@@ -56,6 +63,7 @@ def notears(
     mcp_decay: float = 0.8,
     max_path: int = 50,
     standardize: bool = False,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with NOTEARS, a continuous-optimization structure learner.
@@ -100,6 +108,12 @@ def notears(
         Scale each column to unit variance first, so the fit does not read the columns' units;
         the weights are then those of the scaled columns. Limitations gives the fit's errors on
         standardized columns.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -148,11 +162,12 @@ def notears(
     unmeasured common causes [1]_. Its default least-squares fit reads the columns in their given
     units, so its graph can depend on how each column is scaled [4]_ [5]_; ``robust=True`` follows
     it with the Gaussian-likelihood path of [2]_. Its ``l1`` penalty favors sparse graphs, and its
-    acyclicity function takes a matrix exponential of the full weight matrix, so it suits a
-    moderate number of variables; it returns a DAG with the coefficient of each edge. With
-    nonlinear effects, use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge
-    should be oriented, use :func:`~andrey.direct_lingam`; when a CPDAG is enough on
-    linear-Gaussian data, use :func:`~andrey.ges`.
+    acyclicity function takes a matrix exponential of the full weight matrix, so it suits a moderate
+    number of variables; it returns a DAG with the coefficient of each edge. With nonlinear effects,
+    use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`; when a CPDAG is enough on linear-Gaussian data, use
+    :func:`~andrey.ges`. With values missing completely at random or at random given observed
+    values, ``missing="em"`` fits it on every row by structural EM [7]_ [8]_.
 
     The first fit writes the weights as ``W = W+ - W-`` with both parts non-negative and solves the
     augmented Lagrangian ``loss + 0.5 * rho * h**2 + alpha * h + lambda1 * sum(W+ + W-)`` with
@@ -184,10 +199,27 @@ def notears(
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
     thread, so the host's thread count does not change it.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
-    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
+    fits every variable over the same rows, so a row with a missing value has no place in it. The
+    loss reads the data only through their covariance, so ``missing="em"`` runs structural EM [7]_
+    [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model of the current
+    graph, each row's missing values are Gaussian given its observed ones, and their conditional
+    means and covariances give the expected covariance of the data (the E-step); the fit runs on it,
+    with all of its settings, and the model's coefficients and noise variances are fit again by
+    least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the M-step,
+    the weights the fit returns and one noise variance shared by every variable; here the weights
+    and each variable's noise variance are fit again. The weights it returns are the last round's
+    fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    variances. A row that observes no value is dropped first: it holds no information on the model.
+    It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
+    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
+    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
+    fall in a round that changes the graph. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
@@ -215,8 +247,26 @@ def notears(
     69 s on unitless data), because each Adam iteration of a path step computes a matrix
     exponential. A fit can stop at a local optimum, and only weights that reach ``w_threshold``
     become edges. Nothing was measured beyond 100 variables, at other densities, row counts or noise
-    types, or on non-linear data. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    types, or on non-linear data. With ``missing="em"``, measured in the setting of Gao et al. [8]_:
+    linear-Gaussian data with unit noise variances on raw columns, from Erdos-Renyi graphs of mean
+    degree 1 and 2 and scale-free graphs of mean degree 2, with 20 variables and 100 rows, 20
+    datasets per setting, at the default settings on one core. With 10 to 50% of the values missing
+    completely at random or at random given observed values, its mean errors (SHD) stayed below the
+    empty graph's in 22 of the 24 settings. With 10% missing completely at random they were 0.6,
+    1.8, and 3.25 on the three graphs, against 10, 20, and 19 for the empty graph and 0.2, 1.25, and
+    1.55 on the complete data; with 50% they were 8.65, 19.5, and 18.7, not below the empty graph's
+    on the two graphs of mean degree 2. It had fewer errors than :func:`~andrey.pc`, whose tests
+    delete rows per test, in 16 of the 24 settings and tied in 8, and fewer than the default fit on
+    data with column means filled in in 22, with 2 ties; dropping the incomplete rows left enough
+    rows to compare in 6 settings, and it had fewer errors in each. It runs the fit 10 times: the
+    median fit took 8 to 42 s, against 1.9 to 3.8 s on the complete data. On standardized columns
+    (Erdos-Renyi, mean degree 2, 20 variables, 500 rows, 20% missing), where the least-squares fit
+    is weaker, its mean errors were 15.35 completely at random and 16.0 at random, against 15.25 on
+    the complete data and 20 for the empty graph; ``pc`` had 7.5 there, and the default fit on
+    mean-filled data 13.55 with values missing completely at random, a difference not rerun on fresh
+    seeds. Under values missing not at random it has no guarantee. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -231,6 +281,12 @@ def notears(
        Causal discovery benchmarks may be easy to game. NeurIPS 34.
     .. [6] Ng, I., Huang, B., and Zhang, K. (2024). Structure learning with continuous
        optimization: A sober look and beyond. CLeaR 2024, PMLR 236, 71-105.
+    .. [7] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [8] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -248,11 +304,12 @@ def notears(
     """
     from andrey.search.continuous import notears as _notears
 
-    X = data_matrix(data, method="notears")
+    X = data_matrix(data, method="notears", missing=missing == EM, fix=fit_by_em("notears"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
-    with copies_named(labels), one_blas_thread():
-        result = _notears(
+
+    def fit(cov: np.ndarray | None) -> tuple[ContinuousResult, GraphStructure]:
+        found = _notears(
             X,
             lambda1=lambda1,
             w_threshold=w_threshold,
@@ -267,8 +324,13 @@ def notears(
             standardize=standardize,
             labels=labels,
             constraints=constraints,
+            cov=cov,
         )
-    return _output(result, labels)
+        return found, found.dag
+
+    with copies_named(labels), one_blas_thread():
+        result, em = fit_missing(X, missing, fit)
+    return _output(result, labels, em)
 
 
 @method_spec("dagma")
@@ -287,6 +349,7 @@ def dagma(
     mcp_decay: float = 0.8,
     max_path: int = 50,
     standardize: bool = False,
+    missing: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with DAGMA, a continuous-optimization structure learner.
@@ -335,6 +398,12 @@ def dagma(
         Scale each column to unit variance first, so the fit does not read the columns' units;
         the weights are then those of the scaled columns. Limitations gives the fit's errors on
         standardized columns.
+    missing : {"em"} or None, default=None
+        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
+        structural expectation-maximization (EM) over the expected covariance of the data, which
+        assumes values missing completely at random or at random given observed values. ``None``
+        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
+        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -384,10 +453,11 @@ def dagma(
     units, so its graph can depend on how each column is scaled [4]_ [5]_; ``robust=True`` follows
     it with the Gaussian-likelihood path of [2]_. Its ``l1`` penalty favors sparse graphs, and its
     acyclicity function takes a log-determinant of the full weight matrix, so it suits a moderate
-    number of variables; it returns a DAG with the coefficient of each edge. With nonlinear
-    effects, use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge should be
-    oriented, use :func:`~andrey.direct_lingam`; when a CPDAG is enough on linear-Gaussian data,
-    use :func:`~andrey.ges`.
+    number of variables; it returns a DAG with the coefficient of each edge. With nonlinear effects,
+    use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`; when a CPDAG is enough on linear-Gaussian data, use
+    :func:`~andrey.ges`. With values missing completely at random or at random given observed
+    values, ``missing="em"`` fits it on every row by structural EM [7]_ [8]_.
 
     The first fit starts from the zero matrix. Stage ``t`` of the central path runs Adam [3]_
     (betas ``0.99`` and ``0.999``) on ``mu * (loss + lambda1 * |W|_1) + h(W)`` with
@@ -422,10 +492,27 @@ def dagma(
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
     thread, so the host's thread count does not change it.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
-    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
+    fits every variable over the same rows, so a row with a missing value has no place in it. The
+    loss reads the data only through their covariance, so ``missing="em"``, experimental, runs
+    structural EM [7]_ [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model
+    of the current graph, each row's missing values are Gaussian given its observed ones, and their
+    conditional means and covariances give the expected covariance of the data (the E-step); the fit
+    runs on it, with all of its settings, and the model's coefficients and noise variances are fit
+    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
+    M-step, the weights the fit returns and one noise variance shared by every variable; here the
+    weights and each variable's noise variance are fit again. The weights it returns are the last
+    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
+    variances. A row that observes no value is dropped first: it holds no information on the model.
+    It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
+    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
+    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
+    fall in a round that changes the graph. EM holds when values are missing completely at random or
+    at random given observed values; when whether a value is missing depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
+    whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
@@ -451,8 +538,15 @@ def dagma(
     212 s at 100 on standardized columns (27 s and 310 s on unitless data), because each path step
     repeats the whole central path. A fit can stop at a local optimum, and only weights that reach
     ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other densities, row
-    counts or noise types, or on non-linear data. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    counts or noise types, or on non-linear data. ``missing="em"`` is experimental and not
+    benchmarked yet; its tests run it on a collider of 3 variables with 1,000 rows and 30% of one
+    variable's values missing at random, which it learns, and on 8 variables with 500 rows and
+    values missing at random, 30% of each column that can go missing, where over 4 graphs it made no
+    more errors in total than the fit on the complete rows, fewer than the fit with each missing
+    value replaced by its column's mean, and fewer than the empty graph. It runs the fit 10 times,
+    so it takes about 10 times as long, and under values missing not at random it has no guarantee.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -467,6 +561,12 @@ def dagma(
        Causal discovery benchmarks may be easy to game. NeurIPS 34.
     .. [6] Ng, I., Huang, B., and Zhang, K. (2024). Structure learning with continuous
        optimization: A sober look and beyond. CLeaR 2024, PMLR 236, 71-105.
+    .. [7] Friedman, N. (1997). Learning belief networks in the presence of missing values and
+       hidden variables. Proceedings of the 14th International Conference on Machine Learning,
+       125-133.
+    .. [8] Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H.
+       (2022). MissDAG: Causal discovery in the presence of missing data with continuous additive
+       noise models. Advances in Neural Information Processing Systems 35.
 
     Examples
     --------
@@ -484,11 +584,12 @@ def dagma(
     """
     from andrey.search.continuous import dagma as _dagma
 
-    X = data_matrix(data, method="dagma")
+    X = data_matrix(data, method="dagma", missing=missing == EM, fix=fit_by_em("dagma"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
-    with copies_named(labels), one_blas_thread():
-        result = _dagma(
+
+    def fit(cov: np.ndarray | None) -> tuple[ContinuousResult, GraphStructure]:
+        found = _dagma(
             X,
             lambda1=lambda1,
             w_threshold=w_threshold,
@@ -504,5 +605,10 @@ def dagma(
             standardize=standardize,
             labels=labels,
             constraints=constraints,
+            cov=cov,
         )
-    return _output(result, labels)
+        return found, found.dag
+
+    with copies_named(labels), one_blas_thread():
+        result, em = fit_missing(X, missing, fit)
+    return _output(result, labels, em)

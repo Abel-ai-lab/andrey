@@ -299,6 +299,7 @@ def exact_search(
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    cov: np.ndarray | None = None,
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
@@ -342,6 +343,11 @@ def exact_search(
     constraints : Constraints or None
         Background knowledge: each variable's parent sets hold its required parents and no
         forbidden one, so the DAG is the score-optimal one among those that satisfy the knowledge.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
 
     Returns
     -------
@@ -365,6 +371,7 @@ def exact_search(
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
+        cov=cov,
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [

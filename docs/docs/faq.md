@@ -58,9 +58,9 @@ prints; [Configuration](configuration.md#parallel-search) lists the variables.
 
 ### What is the quickest way to try it?
 
-Run the [quickstart](guides/getting-started.md#learn-a-graph), try a [demo](demos/index) in your
-browser, or open one of the [example notebooks](examples/index) in Colab. Each notebook installs
-Andrey in its first cell.
+Run the [quickstart](guides/getting-started.md#learn-a-graph), try a
+[demo](examples/index.md#interactive-demos) in your browser, or open one of the
+[example notebooks](examples/index) in Colab. Each notebook installs Andrey in its first cell.
 
 ## Methods
 
@@ -86,14 +86,6 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 
 No. We focus on speeding up statistical causal discovery methods, the ones built on independence
 tests and scores.
-
-### Are the classic methods accurate on very large graphs?
-
-Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
-FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
-causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
-[large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
-at 200 variables with the standard BIC (`ebic_gamma=0.0`).
 
 ### Why does a result differ from another package's?
 
@@ -145,8 +137,9 @@ each method at growing sizes against the packages that implement it. A few publi
 PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
 search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
 BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
-takes eight minutes. Finishing is not the same as being accurate: see [Are the classic methods
-accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+takes eight minutes. Finishing is not the same as being accurate: the 0.1.0 release card's
+[large graphs](benchmarks/0.1.0.md#large-graphs) section lists where a method's errors reach the
+empty graph's.
 
 ### Can it use more CPU cores?
 
@@ -191,17 +184,32 @@ continuous non-Gaussian noise.
 Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
 empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
-incomplete one would lose. The other methods refuse missing values with an error that says what to
-do instead. Test-wise deletion is sound when values are missing completely at random; when whether a
-value is missing depends on the variables, a test can be biased. The [release cards](benchmarks.md)
-measure it against dropping incomplete samples, and
-[Missing values](guides/getting-started.md#missing-values) explains it.
+incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
+`missing="mvpc"`, a correction for values whose missingness depends on the variables.
+Test-wise deletion is sound when values are missing completely at random; when whether a value is
+missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
+it against dropping incomplete samples. The searches whose fit reads the data only through their
+covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
+the data, sound when values are missing completely at random or at random given observed values. It
+is supported in NOTEARS, hill climbing, and Tabu search, and experimental in the others, which have
+no reference implementation to compare with; the
+[0.16.0 release card](benchmarks/0.16.0.md#what-we-measured-on-missing-data) has what we measured.
+The other methods refuse missing values with an error that says what to do
+instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
 
 ### Can I tell it what I already know?
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except {{ no_knowledge_methods }}.
+takes it except {{ no_knowledge_methods }}. It can also say that one variable causes another,
+directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
+share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
+honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
+are supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM and experimental in
+the other methods, which we have not measured; a method given a part it does not honor raises an
+error naming the methods that do. A path claim says less than an edge, so when you know the edge
+itself, state it as `required`. [Background
+knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
 
@@ -263,9 +271,9 @@ in any release.
 
 ### What is planned next?
 
-The [roadmap](roadmap.md) lists the planned work in order, starting with every major causal
-discovery method, benchmarked. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1)
-on GitHub tracks the progress of each stage.
+The [roadmap](roadmap.md) lists the planned work in order, starting with the major methods of each
+family. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1) on GitHub tracks the
+progress of each stage.
 
 ### What is the license?
 
@@ -306,7 +314,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.15.0},
+  version = {0.16.0},
   url = {https://andrey.abel.ai},
 }
 ```

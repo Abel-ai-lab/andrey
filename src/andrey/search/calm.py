@@ -67,17 +67,24 @@ class CalmResult:
 # --------------------------------------------------------------------------------------------
 
 
-def moral_graph(data: np.ndarray, *, alpha: float = 0.01) -> np.ndarray:
+def moral_graph(
+    data: np.ndarray, *, alpha: float = 0.01, cov: np.ndarray | None = None
+) -> np.ndarray:
     """Estimate the undirected moral graph (symmetric ``0/1`` mask) by an IAMB Markov network.
 
     Runs IAMB with a Fisher-Z test for every variable and keeps edge ``(i, j)`` only when each lies
     in the other's estimated Markov blanket (the AND rule,
     :func:`~andrey.constraint.blanket.blanket_graph`), yielding a symmetric adjacency with a zero
-    diagonal.
+    diagonal. A ``cov`` gives the test its correlations in place of the data's, over the rows of
+    ``data``, which then may hold ``NaN``.
     """
     arr = np.asarray(data, dtype=np.float64)
     d = arr.shape[1]
-    test = FisherZ(arr)
+    if cov is None:
+        test = FisherZ(arr)
+    else:
+        scale = np.sqrt(np.diagonal(cov))
+        test = FisherZ.from_corr(cov / np.outer(scale, scale), arr.shape[0])
     ranks = tie_ranks(arr).tolist()
     mask = blanket_graph(test, d, alpha, ranks).astype(np.float64)
     np.fill_diagonal(mask, 0.0)
@@ -212,6 +219,7 @@ def calm(
     seed: int = 0,
     labels: tuple[str, ...] | None = None,
     constraints: Constraints | None = None,
+    cov: np.ndarray | None = None,
 ) -> CalmResult:
     """Recover a linear-Gaussian DAG by continuous acyclicity-constrained optimization.
 
@@ -226,17 +234,32 @@ def calm(
     ``seed`` makes the run reproducible. The fit runs on the columns in order of their
     :func:`~andrey.core.ties.tie_ranks`, so each column keeps its initial weights and gate noise
     when the columns are reordered. ``constraints``, in the data's column order, edit the
-    candidate edges and hold the required gates on, as the module describes. Returns a
-    :class:`CalmResult`.
+    candidate edges and hold the required gates on, as the module describes. A ``cov``, divided by
+    the number of rows, replaces the data's covariance in the screen and the loss, such as the
+    expected covariance of data with missing values (:mod:`andrey.search.em`); ``data`` then sets
+    only the rows and the ranks, and ``standardize`` scales ``cov`` to the correlation matrix.
+    Returns a :class:`CalmResult`.
     """
     samples = np.asarray(data, dtype=np.float64)
     n, d = samples.shape
     order = np.argsort(tie_ranks(samples))  # the fit's column k is the data's column order[k]
     back = np.argsort(order)
-    centered = center(samples[:, order], standardize=standardize)
-    cov = centered.T @ centered / n
+    given = cov is not None
+    if cov is None:
+        centered = center(samples[:, order], standardize=standardize)
+        cov = centered.T @ centered / n
+    else:
+        centered = samples[:, order]
+        cov = cov[np.ix_(order, order)]
+        if standardize:
+            scale = np.sqrt(np.diagonal(cov))
+            scale[scale == 0.0] = 1.0
+            cov = cov / np.outer(scale, scale)
 
-    mask = moral_graph(centered, alpha=alpha) if use_moral_graph else (1.0 - np.eye(d))
+    if use_moral_graph:
+        mask = moral_graph(centered, alpha=alpha, cov=cov if given else None)
+    else:
+        mask = 1.0 - np.eye(d)
     required = None
     if constraints is not None:
         fit = constraints.permuted(order)

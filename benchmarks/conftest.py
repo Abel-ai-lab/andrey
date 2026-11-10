@@ -38,3 +38,22 @@ def needs_r() -> pytest.MarkDecorator:
     """
     skip = not r_available() and not os.environ.get(REQUIRE_R_ENV)
     return pytest.mark.skipif(skip, reason="no R / rpy2 in this environment")
+
+
+@pytest.fixture
+def unimport(monkeypatch: pytest.MonkeyPatch):
+    """Drop a module from ``sys.modules`` for one test, so the next import runs it again.
+
+    The module and its package's attribute come back after the test. A copy left behind would split
+    later tests between two module objects: a function patched on the copy in ``sys.modules`` would
+    miss the calls of code that imported the other.
+    """
+
+    def drop(name: str) -> None:
+        parent, _, child = name.rpartition(".")
+        package = sys.modules.get(parent)
+        if package is not None and hasattr(package, child):
+            monkeypatch.setattr(package, child, getattr(package, child))
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    return drop

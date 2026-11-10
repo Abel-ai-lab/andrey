@@ -12,12 +12,12 @@ sees only the fit's cores (``-XX:ActiveProcessorCount``), and FGES's and BOSS's 
 all of them; PC's and FCI's skeleton search runs on the JVM's common pool, which has as many
 threads as the JVM sees processors.
 
-FCI, BOSS-FCI, and GRaSP-FCI take background knowledge from the ``params`` keys
+Every search but GRaSP takes background knowledge from the ``params`` keys
 :data:`~andrey_bench.adapters.tetrad_cmd.KNOWLEDGE` (``context_vars`` in the first tier, then
 ``forbidden`` and ``required`` edges): ``fit`` writes Tetrad's knowledge file
 (:func:`~andrey_bench.adapters.tetrad_cmd.knowledge_text`) beside the CSV, and the driver reads it
 with Tetrad's own reader before the clock. Tetrad 7.6.10's FCI steps orient by knowledge only when
-they leave out the rules for selection bias (``excludeSelectionBias``), so these solutions refuse
+they leave out the rules for selection bias (``excludeSelectionBias``), so the FCI solutions refuse
 knowledge without it, and :class:`TetradFCIJCI` sets it, as pcalg's FCI-JCI runs.
 
 A solution's ``params`` use Andrey's names for the settings it shares with Andrey's adapter, and

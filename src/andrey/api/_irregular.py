@@ -2,9 +2,10 @@
 
 Fitted models are read by attribute name.
 
-* **ANM, PNL** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
+* **ANM, PNL, LOCI** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
   ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics go in
-  metadata as ``float``.
+  metadata as ``float``. LOCI's likelihood criterion picks the edge from two log-likelihoods
+  (:func:`likelihood_output`).
 * **RCD** (``adjacency_matrix_``): a finite nonzero ``B[i, j]`` is ``j -> i`` and a ``NaN`` cell
   is ``<->``, in a ``pag``; ``weighted_adjacency`` holds ``B`` with ``NaN`` as ``0``.
 * **BottomUpParceLiNGAM** (``adjacency_matrix_``, ``causal_order_``): a ``NaN`` pair is
@@ -69,10 +70,10 @@ def _direction(
 ) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
-    With ``alpha=None``, choose the direction with the larger p-value. Equal p-values, given both
-    test statistics, choose the direction with the smaller statistic, the weaker dependence; equal
-    or missing statistics give no edge. Otherwise, choose a direction only when its p-value exceeds
-    ``alpha`` and the other does not.
+    With ``alpha=None``, choose the direction with the larger p-value, which ``pval_*`` may give as
+    its logarithm. Equal p-values, given both test statistics, choose the direction with the
+    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Otherwise,
+    choose a direction only when its p-value exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
         forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
@@ -83,12 +84,39 @@ def _direction(
     return 1 if forward and not backward else -1 if backward and not forward else 0
 
 
+def _pair_dag(direction: int) -> GraphStructure:
+    """Return the two-node ``dag``: ``x -> y`` for 1, ``y -> x`` for -1, and no edge for 0."""
+    M = np.zeros((2, 2), dtype=np.int8)
+    if direction:
+        source, target = (0, 1) if direction > 0 else (1, 0)
+        M[source, target], M[target, source] = TAIL, ARROW
+    return GraphStructure.from_numpy(M, kind="dag")
+
+
+def likelihood_output(
+    forward: float,
+    backward: float,
+    *,
+    labels: tuple[str, ...] | None = None,
+    extra: Mapping[str, Any] | None = None,
+) -> StructureOutput:
+    """Return LOCI's two-node ``dag`` with the edge in the direction of the larger log-likelihood.
+
+    ``forward`` and ``backward`` are the mean log-likelihoods of the ``x -> y`` and ``y -> x``
+    models; equal ones give no edge. ``extra`` is the metadata.
+    """
+    return structure_output(
+        _pair_dag(_direction(forward, backward, None)), labels=labels, metadata=dict(extra or {})
+    )
+
+
 def pairwise_output(
     pval_forward: Any,
     pval_backward: Any,
     *,
     stat_forward: Any = None,
     stat_backward: Any = None,
+    log_p: tuple[float, float] | None = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
     extra: Mapping[str, Any] | None = None,
@@ -96,11 +124,13 @@ def pairwise_output(
     """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    Each test statistic, when given, is an HSIC statistic divided by its mean under independence:
-    with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without
-    them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the
-    same keys. A p-value or statistic may be a shape-``(1,)`` array (:func:`_coerce_float`).
-    ``extra`` adds metadata entries after them, such as ``rows_tested``.
+    ``log_p``, when given, holds the two p-values' natural logarithms, which keep their order where
+    both p-values underflow to ``0``; with ``alpha=None`` they are compared in place of the
+    p-values. Each test statistic, when given, is an HSIC statistic divided by its mean under
+    independence: with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning,
+    and without them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]``
+    under the same keys. A p-value or statistic may be a shape-``(1,)`` array
+    (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -109,13 +139,9 @@ def pairwise_output(
             "stat_forward": _coerce_float(stat_forward),
             "stat_backward": _coerce_float(stat_backward),
         }
-    M = np.zeros((2, 2), dtype=np.int8)
-    direction = _direction(forward, backward, alpha, **stats)
-    if direction:
-        source, target = (0, 1) if direction > 0 else (1, 0)
-        M[source, target], M[target, source] = TAIL, ARROW
+    compared = (forward, backward) if log_p is None or alpha is not None else log_p
     return structure_output(
-        GraphStructure.from_numpy(M, kind="dag"),
+        _pair_dag(_direction(*compared, alpha, **stats)),
         labels=labels,
         metadata={
             "p_values": {"forward": forward, "backward": backward},

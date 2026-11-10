@@ -275,6 +275,7 @@ def grasp(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by GRaSP over a linear-Gaussian or mixed-data BIC score.
 
@@ -329,6 +330,11 @@ def grasp(
         order, a tuck that puts a column before them is not taken
         (:func:`~andrey.search.boss.sources_ahead`), and their edges are then directed out of them,
         as for :func:`~andrey.search.boss.boss`. Empty, the default, leaves every variable free.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
 
     Returns
     -------
@@ -356,4 +362,5 @@ def grasp(
         n_starts=n_starts,
         seed=seed,
         sources=sources,
+        cov=cov,
     )

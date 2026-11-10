@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from andrey.api._method import method_spec
+from andrey.api._method import drop_unmet, method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
@@ -442,6 +442,7 @@ def pcmci(
     fdr_method: str = "fdr_bh",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -504,6 +505,11 @@ def pcmci(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -736,6 +742,7 @@ def pcmciplus(
     collider_rule: str = "majority",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
@@ -805,6 +812,11 @@ def pcmciplus(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1178,10 +1190,11 @@ def jpcmciplus(
         scale and shift, as any two do over two datasets; or if ``data`` holds ``NaN``. With
         ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, also if a variable repeats another
         up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, or a test
-        finds a system variable in the span of its conditions, as with one that sums others. Also if
-        ``knowledge`` names a column that is not a system variable, such as a context, contradicts
-        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links into
-        a directed cycle over the links the fit kept.
+        finds a system variable in the span of its conditions, as with one that sums others or a
+        pulse every dataset shares that is not a time context. Also if ``knowledge`` names a column
+        that is not a system variable, such as a context, contradicts itself, requires a link
+        without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle over
+        the links the fit kept.
 
     Warns
     -----
@@ -1341,6 +1354,7 @@ def lpcmci(
     n_preliminary_iterations: int = 1,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
@@ -1393,6 +1407,11 @@ def lpcmci(
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. Every lagged value of a column has its type.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1420,7 +1439,13 @@ def lpcmci(
         effect. A required link is ``-->`` from the start and no test or rule removes it. No rule
         changes a mark the knowledge sets. Tiers forbid every link from a later tier into an
         earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's links
-        to its own past stay allowed.
+        to its own past stay allowed. ``required_paths``, ``forbidden_paths``, and ``confounded``
+        also name each link with its lag: on a link the search keeps, a required path makes it
+        ``-->`` from the cause and a forbidden path puts an arrowhead at the cause, while the tests
+        can still remove it; no test removes a ``confounded`` link. A claim the PAG over the time
+        window does not meet is dropped, as for :func:`~andrey.fci`: the fit warns with
+        :class:`~andrey.KnowledgeWarning`, and ``metadata["unmet_knowledge"]`` lists each dropped
+        claim as ``[part, a, b, lag]``.
 
     Returns
     -------
@@ -1593,6 +1618,7 @@ def lpcmci(
     [(0, 0, 'directed'), (1, 1, 'directed')]
     """
     from andrey.temporal.lpcmci import lpcmci as _native
+    from andrey.temporal.lpcmci import unmet_claims
     from andrey.temporal.pcmci import design_column_name
 
     assert indep_test is not None  # method_spec picks it from the column types
@@ -1623,7 +1649,10 @@ def lpcmci(
             seed=seed,
         )
     metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
-    return with_labels(adapt_lpcmci(result, metadata), labels)
+    out = with_labels(adapt_lpcmci(result, metadata), labels)
+    if constraints is None or constraints.required_paths is None:
+        return out
+    return drop_unmet(out, unmet_claims(result, constraints), "lpcmci")
 
 
 @method_spec("granger")

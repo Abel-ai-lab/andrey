@@ -1,0 +1,36 @@
+Additive pair
+
+anm  dag  |  2 nodes  |  1 edges (1 directed)
+
+  x -> y
+
+  p_values: forward 0.02926, backward 3.968e-31
+  statistics: forward 1.725, backward 11.33
+
+pnl  dag  |  2 nodes  |  1 edges (1 directed)
+
+  x -> y
+
+  p_values: forward 0.07243, backward 2.379e-09
+  statistics: forward 1.525, backward 4.287
+
+Saturating pair
+
+anm  dag  |  2 nodes  |  1 edges (1 directed)
+
+  y -> x
+
+  p_values: forward 2.637e-75, backward 1.695e-07
+  statistics: forward 21.66, backward 4.322
+
+pnl  dag  |  2 nodes  |  1 edges (1 directed)
+
+  x -> y
+
+  p_values: forward 0.5863, backward 2.091e-06
+  statistics: forward 0.8921, backward 3.344
+
+anm  dag  |  2 nodes  |  0 edges (no edges)
+
+  p_values: forward 2.637e-75, backward 1.695e-07
+  statistics: forward 21.66, backward 4.322

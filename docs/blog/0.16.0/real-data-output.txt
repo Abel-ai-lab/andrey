@@ -13,20 +13,14 @@ edges in at least half the fits:
   sex -> diastolic: 1.00
   sex -> pulse: 1.00
   sex -> hdl: 1.00
-  age -> hdl: 0.95
-  waist -> hdl: 0.86
-  sex -> cholesterol: 0.71
-  cholesterol -> hdl: 0.71
-  hba1c -> hdl: 0.70
-  age -> income: 0.66
-  sex -> waist: 0.63
-  hdl -> income: 0.58
-  sex -> hba1c: 0.57
-  bmi -> systolic: 0.56
-  waist -> hba1c: 0.54
-  systolic -> diastolic: 0.54
-  age -> waist: 0.53
-  bmi -> waist: 0.52
-  hba1c -> pulse: 0.51
-  pulse -> diastolic: 0.50
+  age -> hdl: 0.83
+  waist -> hdl: 0.77
+  cholesterol -> hdl: 0.77
+  hba1c -> hdl: 0.74
+  income -> hdl: 0.66
+  cholesterol -> diastolic: 0.58
+  waist -> bmi: 0.55
+  hba1c -> pulse: 0.53
+  waist -> hba1c: 0.52
+  diastolic -> systolic: 0.52
 digraph {

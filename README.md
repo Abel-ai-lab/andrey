@@ -18,20 +18,21 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.15.0
+## ⭐ What's new in 0.16.0
 
-Multi-domain data come from several environments, such as sites, batches, or the conditions of an
-experiment, that share one causal structure and differ in the mechanisms of some variables. With
-each row's environment recorded as an environment index, a method can tell a dependence that
-changing mechanisms create from a causal edge, and it can orient edges that one environment leaves
-undirected. FCI-JCI learns from these data while allowing hidden common causes, BOSS-FCI and
-GRaSP-FCI allow them too, and J-PCMCI+ learns from time series of several datasets. In our
-comparisons with their authors' code, in the settings their papers study, none of the four made
-significantly more errors, and each was faster. GES, hill climbing, Tabu search, GFCI, BOSS, GRaSP,
-BOSS-FCI, and GRaSP-FCI take the environment too, as an experimental option.
+0.16.0 takes missing data, background knowledge, and pair direction further. Simulate missing values
+whose cause you know. Then fit incomplete data with MVPC, which corrects PC when missingness depends
+on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM. Tell a method that
+one variable causes another by some path, that it does not, or that two variables share a hidden
+common cause. LOCI reads the direction of a pair whose noise changes with the cause, and made no
+more errors than its authors' code. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
+Tabu search. EM in the other searches is experimental, as are the new claims in the methods we have
+not measured. Drawings also mark intervened variables, and every HSIC p-value stays precise far
+below 1e-16.
 
-**[Read the post](https://andrey.abel.ai/blog/20261108-andrey-0-15-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.15.0.html)**
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
+**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
+**[Pairwise direction](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)**
 
 ---
 
@@ -42,7 +43,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 44 supported methods, each one function call.
+- **One API**: 45 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -72,7 +73,7 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 44 supported methods. Data types: continuous,
+    <img alt="Andrey: accelerated, accurate, agentic. 45 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
       confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
@@ -98,7 +99,7 @@ You install andrey-core and then `import andrey`.
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html) | DAG |
 | Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html), [`camuv`](https://andrey.abel.ai/docs/api/andrey.camuv.html) | DAG, PAG |
-| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html) | Two-node DAG |
+| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html) | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/api.html#experimental-methods):
 no published benchmark yet, and the API may change.
@@ -167,9 +168,8 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 ## Learn more
 
 - [Documentation](https://andrey.abel.ai/docs/): guides and the API reference.
-- [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
-- [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
-  browser.
+- [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each, and demos
+  that run in your browser.
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
   release.
 - [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)
@@ -191,7 +191,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.15.0},
+  version = {0.16.0},
   url = {https://andrey.abel.ai},
 }
 ```

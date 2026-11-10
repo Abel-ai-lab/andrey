@@ -183,6 +183,7 @@ def test_every_category_is_a_user_warning_under_the_base():
         andrey.SampleSizeWarning,
         andrey.DataTypeWarning,
         andrey.BoundaryWarning,
+        andrey.KnowledgeWarning,
     ):
         assert issubclass(category, andrey.AndreyWarning)
     assert issubclass(andrey.AndreyWarning, UserWarning)

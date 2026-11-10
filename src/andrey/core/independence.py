@@ -2,19 +2,25 @@
 
 Both tests map the two variables through Gaussian kernels, center the kernel matrices, and match
 the HSIC statistic to a gamma distribution for a closed-form p-value; a larger p-value means more
-independent.
+independent. The p-value is the gamma law's upper tail, computed through its logarithm
+(:func:`_log_upper_gamma`): the logarithm keeps the tail's relative precision far below ``1e-16``,
+and stays finite and keeps the order of two tails below the ``1e-308`` where the p-value itself
+underflows to ``0``.
 
 - :func:`hsic_test` z-scores each variable (``ddof=1``; a constant column becomes zero) and sets
-  the bandwidth by the empirical rule. :func:`hsic_statistic_test`, used by ANM, runs the same test
-  and returns the statistic, divided by its mean under independence, with the p-value. PNL computes
-  the same numbers from kernels it shares across pairs.
-- :func:`hsic_gamma_from_grams`, used by RCD, ParceLiNGAM, and GIN with the grams of
-  :func:`gamma_gram`, sets the bandwidth by the median distance over the first rows without
-  z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT and
-  CAM-UV run the same test through :func:`hsic_log_p`, which returns the logarithm of a p-value
-  that keeps its precision below ``1e-16`` (:func:`hsic_gamma_log_p`), on each side's joint
-  distances with two settings of their own: the bandwidth's median over every row
-  (:func:`hsic_gram`) and the variance's product form.
+  the bandwidth by the empirical rule. :func:`hsic_statistic_log_p`, used by ANM and by KCI without
+  conditions, runs the same test and returns the statistic, divided by its mean under
+  independence, with the p-value's logarithm. PNL computes the same numbers from kernels it shares
+  across pairs.
+- :func:`hsic_gamma_from_grams` and :func:`hsic_gamma_log_p`, used by RCD, ParceLiNGAM, and GIN
+  with the grams of :func:`gamma_gram`, set the bandwidth by the median distance over the first
+  rows without z-scoring and correct the variance for bias; the first returns the statistic with
+  the p-value, the second the p-value's logarithm. RESIT and CAM-UV run the same test through
+  :func:`hsic_log_p` on each side's joint distances with two settings of their own: the
+  bandwidth's median over every row (:func:`hsic_gram`) and the variance's product form.
+  :func:`hsic_median_statistic_log_p`, used by LOCI, reads the median over every row with the
+  bias-corrected variance, and returns the statistic, divided by its null mean, with the p-value's
+  logarithm.
 
 References
 ----------
@@ -31,7 +37,7 @@ import math
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammainc, gammaincc, gammaln
+from scipy.special import gammaincc, gammaln
 from scipy.stats import zscore
 
 
@@ -127,16 +133,17 @@ def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray
 def _gamma_test(
     statistic: float, trace_x: float, sumsq_x: float, trace_y: float, sumsq_y: float, n: int
 ) -> tuple[float, float]:
-    """Return ``(statistic / mean, p_value)`` of the HSIC test from its two kernels' sums.
+    """Return ``(statistic / mean, log_p)`` of the HSIC test from its two kernels' sums.
 
     ``trace_*`` and ``sumsq_*`` are each centered kernel's trace and sum of squared entries; the
-    gamma null's mean and variance are those of :func:`hsic_statistic_test`.
+    gamma null's mean and variance, and the p-value's logarithm ``log_p``, are those of
+    :func:`hsic_statistic_log_p`.
     """
     mean_appr = trace_x * trace_y / n
     var_appr = 2 * sumsq_x * sumsq_y / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+    return float(statistic / mean_appr), _log_upper_gamma(float(shape), float(statistic / scale))
 
 
 def _centered_kernel(raw: np.ndarray) -> np.ndarray:
@@ -152,13 +159,14 @@ def _centered_kernel(raw: np.ndarray) -> np.ndarray:
 def hsic_test(x: np.ndarray, y: np.ndarray) -> float:
     """Return the gamma-approximation p-value of the HSIC independence test between ``x`` and ``y``.
 
-    The p-value of :func:`hsic_statistic_test`, which describes the test.
+    The exponential of the logarithm :func:`hsic_statistic_log_p` returns, which describes the
+    test; it underflows to ``0`` below about ``1e-308``.
     """
-    return hsic_statistic_test(x, y)[1]
+    return math.exp(hsic_statistic_log_p(x, y)[1])
 
 
-def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    """Return ``(T / mean, p_value)`` of the HSIC independence test between ``x`` and ``y``.
+def hsic_statistic_log_p(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Return ``(T / mean, log_p)`` of the HSIC independence test between ``x`` and ``y``.
 
     Each variable is z-scored (``ddof=1``), mapped through a Gaussian kernel whose bandwidth follows
     the empirical rule, and centered. The HSIC V-statistic ``T = sum(Kxc * Kyc)`` is compared
@@ -167,12 +175,13 @@ def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
         mean = tr(Kxc) tr(Kyc) / n,   var = 2 sum(Kxc^2) sum(Kyc^2) / n^2,
         shape = mean^2 / var,         scale = var / mean,
 
-    and the p-value is the gamma upper tail ``1 - P(shape, T / scale)`` with ``P`` the regularized
-    lower incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``).
-    A larger p-value means more independent. ``T / mean`` is the statistic relative to its mean
-    under independence, the gamma null's ``shape * scale``: near 1 for independent variables and
-    larger the more dependent they are. It still orders two tests whose p-values are both zero.
-    Accepts 1-D vectors or ``(n, d)`` matrices.
+    and ``log_p`` is the natural logarithm of the p-value, the gamma upper tail
+    ``Q(shape, T / scale)`` with ``Q`` the regularized upper incomplete gamma function
+    (:func:`_log_upper_gamma`). It keeps its precision far below ``1e-16``, and stays finite and
+    keeps the order of two tests below the ``1e-308`` where the p-value underflows to ``0``. A
+    larger p-value means more independent. ``T / mean`` is the statistic relative to its mean under
+    independence, the gamma null's ``shape * scale``: near 1 for independent variables and larger
+    the more dependent they are. Accepts 1-D vectors or ``(n, d)`` matrices.
     """
     n = _as_columns(x).shape[0]
     kxc = _centered_kernel(_as_columns(x))
@@ -306,8 +315,9 @@ def hsic_gamma_from_grams(
 
     ``n`` is the sample size. The biased HSIC V-statistic ``T = sum(Kxc.T * Kyc) / n`` is matched to
     a gamma law through the finite-sample null mean ``(1 + mu_x mu_y - mu_x - mu_y) / n`` and a null
-    variance; the p-value is the gamma upper tail ``1 - P``, ``P`` the regularized lower incomplete
-    gamma function, whose resolution ends near ``1e-16``. A larger p-value means more independent.
+    variance; the p-value is the exponential of :func:`hsic_gamma_log_p`'s logarithm of the gamma
+    upper tail, precise far below ``1e-16`` and ``0`` below about ``1e-308``. A larger p-value
+    means more independent.
 
     ``variance="bias_corrected"`` estimates the variance from the joint products
     ``(Kxc * Kyc / 6)^2``, less their diagonal; ``"product"`` uses the variance's product form in
@@ -315,8 +325,8 @@ def hsic_gamma_from_grams(
     ``sum(Kc^2) / (n - 1)^2``, the RESIT paper's; a gram that carries its sum of squares as a third
     element has it read rather than summed again.
     """
-    statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
-    return float(statistic), float(1.0 - gammainc(shape, x))
+    statistic, log_p = _statistic_log_p(gram_x, gram_y, n, variance)
+    return statistic, math.exp(log_p)
 
 
 def hsic_gamma_log_p(
@@ -328,20 +338,25 @@ def hsic_gamma_log_p(
 ) -> float:
     """Return the natural logarithm of the p-value of :func:`hsic_gamma_from_grams`'s test.
 
-    The tail here is the regularized upper incomplete gamma function rather than ``1 - P``, so it
-    keeps its relative precision far below ``1e-16``. Below about ``1e-308`` the tail underflows to
-    ``0``, as a strongly dependent pair's does once there are a few thousand rows; its logarithm
-    stays finite there and keeps the order of two such tails (:func:`_log_upper_gamma`).
+    The tail is the regularized upper incomplete gamma function, which keeps its relative precision
+    far below ``1e-16``. Below about ``1e-308`` the tail underflows to ``0``, as a strongly
+    dependent pair's does once there are a few thousand rows; its logarithm stays finite there and
+    keeps the order of two such tails (:func:`_log_upper_gamma`).
 
     The statistic, ``tr(Kxc Kyc) / n`` of two positive semidefinite centered grams, is never
     negative in exact arithmetic. A negative value within :func:`_rounding_bound` of ``0`` is
     rounding of an exact ``0``, as on a balanced grid of independent values, and gives ``0``, the
     logarithm of ``p = 1``; one further below ``0``, or a non-finite argument, gives ``nan``.
     """
+    return _statistic_log_p(gram_x, gram_y, n, variance)[1]
+
+
+def _statistic_log_p(gram_x: Gram, gram_y: Gram, n: int, variance: str) -> tuple[float, float]:
+    """The gamma HSIC's statistic and its p-value's logarithm (:func:`hsic_gamma_log_p`)."""
     statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
     if 0.0 > statistic >= -_rounding_bound(gram_x, gram_y, n):
         x = 0.0
-    return _log_upper_gamma(float(shape), float(x))
+    return float(statistic), _log_upper_gamma(float(shape), float(x))
 
 
 def hsic_gram(side: np.ndarray) -> tuple[np.ndarray, float, float]:
@@ -372,6 +387,40 @@ def hsic_log_p(gram_x: Gram, gram_y: Gram, method: str) -> float:
             "from these data"
         )
     return log_p
+
+
+def hsic_median_statistic_log_p(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Return ``(T / mean, log_p)`` of the gamma HSIC between ``x`` and ``y``, its bandwidths the
+    median distance over every row.
+
+    Each variable is centered and passed to :func:`gamma_gram` with ``median_rows=None``; the test
+    is :func:`hsic_gamma_log_p`'s with the bias-corrected variance. ``T / mean`` is the statistic
+    ``T = sum(Kxc * Kyc) / n`` divided by its mean under independence, the gamma law's
+    ``shape * scale = 1 + mu_x mu_y - mu_x - mu_y``: near 1 for independent variables and larger
+    the more dependent they are.
+
+    Raises
+    ------
+    FloatingPointError
+        If the test's value is not finite, so that no choice rests on it.
+    """
+    # The LOCI paper decides by the p-values of HSIC tests but leaves three of the test's settings
+    # open. The bandwidth, sqrt(0.5 * median squared distance) over every row, is the one the LOCI
+    # authors' code computes; that code compares the statistics alone and has no null law. The
+    # null's gamma approximation is that of Gretton et al. (2007), and its variance is the
+    # bias-corrected estimate from the joint products of the centered grams, as Gretton et al.'s
+    # reference code of their test computes it.
+    sides = (_as_columns(x), _as_columns(y))
+    grams = [gamma_gram(side - side.mean(axis=0), median_rows=None) for side in sides]
+    n = grams[0][0].shape[0]
+    statistic, log_p = _statistic_log_p(grams[0], grams[1], n, "bias_corrected")
+    if not math.isfinite(log_p):
+        raise FloatingPointError(
+            "an HSIC test gave a non-finite p-value; the kernels could not be computed from these "
+            "data"
+        )
+    (_, mu_x), (_, mu_y) = grams
+    return statistic / (1 + mu_x * mu_y - mu_x - mu_y), log_p
 
 
 def _sum_of_squares(gram: Gram) -> float:

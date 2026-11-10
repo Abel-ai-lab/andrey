@@ -11,7 +11,7 @@ meta:
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
 configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
 pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
-Demos, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
+Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
 the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
 the brand are in [`DESIGN.md`](../DESIGN.md).
 
@@ -145,14 +145,21 @@ leaves out; a dated post is published in every build, even before its date.
 The blog's front page lists the dated posts from their front matter (the `blog-index` directive in
 `blog/index.md`, filled by `_blog_index` in `conf.py`): the newest post with its cover, title,
 date, tags, and description, then the earlier ones, newest first, each with a small copy of its art
-(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie. A
-new post needs no change to the page.
+(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie,
+and then the later file name, which starts with the date the post first appeared: of the posts a
+release updates, the one first published last leads. A new post needs no change to the page.
 
 A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
 shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
 wordmark, title, and release over its left side (`preview_jpeg`). A post belongs to the release in
 its `version` front matter, and later builds leave it as that release rendered it: its numbers are
 typed text, and every file it includes is stored under `blog/<version>/`.
+
+When a later release makes a feature post wrong or incomplete, the post is rewritten to describe
+that release, and its `version` and `date` move to it (the release PR sets the final date). Its
+file name and address stay. Its files move to the new release's folder, named apart from any other
+post's files there, and an example is run again on the new release. A number the new release did
+not measure names the release that did, such as "in the 0.4.0 benchmarks".
 
 ## The release cards
 
@@ -177,7 +184,31 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    `release_art` in `site/cards.py`, and add a `release-art-<release>` rule (dots as dashes) to
    `_static/benchmarks.css`. The card's cover and the Release cards page's featured cover take both
    classes, `release-art release-art-<release>`; the release's tile keeps the second when it moves
-   to the earlier releases. A cover without art shows the stipple ground (`release_ground_jpeg`).
+   to the earlier releases. A release without art takes the default cover instead, the class
+   `release-default` in place of both, with the wordmark's image in the title's place. The image
+   sits in a `sd-card-text` paragraph, so the version stays the cover's third line; its path is
+   `../_static/` on the Release cards page, as here, and `../../_static/` on the card:
+
+   ```markdown
+   :::{card}
+   :link: benchmarks/0.16.0
+   :link-type: doc
+   :link-alt: The 0.16.0 release card
+   :class-card: release-cover release-default
+   :shadow: none
+   :margin: 0
+
+   Release card
+
+   <p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
+   width="190" height="40"></p>
+
+   0.16.0
+   :::
+   ```
+
+   The tile, `release-tile release-default`, shows the version alone. A post without art (no
+   `cover` in its front matter) gets the default link preview, the wordmark and its line on navy.
 5. Open the card with the same cover, without its link, beside the opening paragraphs in a
    `release-opening` block.
 6. Add the summary's folder to `RELEASES` in `site/build.py`, so the homepage and the README count
@@ -186,12 +217,22 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    [`benchmarks/CATALOG.md`](../benchmarks/CATALOG.md), and the release to the cards column of each
    comparison its Reproduce table names.
 
+A release that measures nothing new, such as 0.16.0, has a card with no summary: the card describes
+what the release adds and says which earlier numbers still hold, its title is the version alone
+(`0.16.0 release card`, and `0.16.0` in the toctree), its TL;DR has no numbers, and it skips step 6.
+A feature post it updates carries its version (see "The blog"), so the navbar's dot on Release cards
+dates its week from that post; with no such post, from the newest post with a version. The latest
+block links each post the release updates after the card's button.
+
 ## The documentation sidebars
 
 The left sidebar ([`_templates/docs-nav.html`](_templates/docs-nav.html)) groups the docs index's
 toctree: each section in `NAV_SECTIONS` heads a group under its icon
 ([`_templates/nav-icons.html`](_templates/nav-icons.html)), folding pages past `NAV_SHOWN`, and the
 other entries make the Reference group; `_docs_sidebar` in `conf.py` builds it from the toctrees.
+A page whose toctrees each carry a caption, as the Examples gallery's do, lists its pages under
+those captions: each caption is a row that folds its pages, open on that page and on every page
+under it, and a caption with one page is that page's row.
 The right sidebar holds the page's outline ([`_templates/page-toc.html`](_templates/page-toc.html),
 marked by [`_static/page-outline.js`](_static/page-outline.js)), then links to edit the page and
 report a problem ([`_templates/page-links.html`](_templates/page-links.html)); Edit this page opens
@@ -200,15 +241,18 @@ page's section sits over its title ([`_templates/page-kicker.html`](_templates/p
 On a phone the outline moves into the menu
 ([`_templates/page-outline.html`](_templates/page-outline.html)).
 
-## The Examples and Demos galleries
+## The Examples gallery
 
-[`docs/examples/index.md`](docs/examples/index.md) is a gallery of notebook cards, and
-[`docs/demos/index.md`](docs/demos/index.md) of demos that run in the browser, plus a live demo
-whose card appears once `DEMO_URL` in `site/build.py` names a public Space. Each demo is a page with
-a title, a paragraph, and the demo in a frame, generated into `_static/examples/` at build time: the
-comparison on one dataset from [`apps/compare.py`](../apps/compare.py), and the PC replay, Meek's
-rules, and the d-separation explorer from [`apps/build_assets.py`](../apps/build_assets.py). The
-comparison reads causal-learn's graphs from `apps/compare-causal-learn.json`, recorded once (see
+[`docs/examples/index.md`](docs/examples/index.md) is a gallery in sections, each a heading over its
+own grid of cards with a toctree of the same pages in the same order, captioned with the heading:
+Quick start, Methods (the README's method table gives the families' order), Advanced, Interactive
+demos, and Misc. A notebook's card says "Notebook · Colab" and a demo's "In your browser". The
+Interactive demos section also holds a live demo, whose card appears once `DEMO_URL` in
+`site/build.py` names a public Space. Each demo is a page beside the gallery with a title, a
+paragraph, and the demo in a frame, generated into `_static/examples/` at build time: the comparison
+on one dataset from [`apps/compare.py`](../apps/compare.py), and the PC replay, Meek's rules, and
+the d-separation explorer from [`apps/build_assets.py`](../apps/build_assets.py). The comparison
+reads causal-learn's graphs from `apps/compare-causal-learn.json`, recorded once (see
 [`apps/README.md`](../apps/README.md)); the build refuses a recording made on different data.
 
 Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose chosen
@@ -313,11 +357,10 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/api.md` |
 | Guides | `docs/docs/guides/` |
-| Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
+| Examples gallery, and the demos' pages | `docs/docs/examples/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
 | Notebook outputs | `scripts/execute_notebooks.py` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
-| The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
-| The API reference's old addresses under `docs/code/`, redirected | `docs/_templates/moved-redirect.html` |
+| A moved page's old address, redirected to the page (`MOVED` and `_moved_pages` in `conf.py`): the demos' under `demo/` and `docs/demos/`, the API reference's under `docs/code/`. A released post that links a moved page keeps its link, to the old address (`_moved_links`) | `docs/_templates/moved-redirect.html` |
 | The retired benchmark explorer's address, redirected to the release cards | `docs/_templates/benchmark-explorer-redirect.html` |

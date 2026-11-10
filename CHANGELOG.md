@@ -8,7 +8,199 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
-## [Unreleased]
+## [0.16.0] - 2026-11-10
+
+### Highlights
+
+- Missing data: `andrey.data.missingness` simulates missing values whose missingness graph is known,
+  and one argument, `missing`, names how each method handles them. `pc(missing="mvpc")` corrects PC
+  where missingness depends on other variables (Tu et al., 2019), and `missing="em"` fits the BIC
+  score searches, `notears`, `dagma`, and `calm` on incomplete data by structural EM.
+  `missing="mvpc"` is supported, and so is `missing="em"` in `notears`, `hc`, and `tabu`: against
+  the MVPC authors' code, MissDAG, and bnlearn's structural EM, none measured less accurate in any
+  setting. In the other searches `missing="em"` is experimental, as no reference implementation
+  exists to compare them with. ([#826], [#828], [#832], [#842], [#856])
+- Background knowledge states causal paths and hidden common causes:
+  `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
+  DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three parts,
+  and `direct_lingam` narrows its causal order. The parts are supported in `pc`, `ges`, `boss`,
+  `fci`, `gfci`, `boss_fci`, `lpcmci`, and `direct_lingam`, where true claims measured no worse than
+  the same fit without them and than reference packages given the same knowledge, and experimental
+  in the other methods, which the benchmark does not run. A path claim says less than an edge and
+  directs less: a known edge belongs in `required`. ([#829], [#835], [#854])
+- `loci` decides a pair's direction under the location-scale noise model of Immer et al. (2023),
+  whose noise scale changes with the cause, and is supported. Against its authors' code on 100 pairs
+  in each of 26 settings, neither criterion made significantly more errors in any of the 39 judged
+  comparisons, and fewer in 8 that repeated on fresh pairs, and the median fit was 40 to 912 times
+  faster with the default criterion. The [0.16.0 release
+  card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html#loci) gives the numbers. ([#830], [#857])
+- Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
+  in the middle of each edge into a target, and `to_graphviz(structure, targets=)` draws the
+  targets as squares. The graph types guide has a legend of every mark. ([#806])
+- Every gamma-HSIC p-value stays precise far below 1e-16, so `anm` and `pnl` follow the larger
+  p-value even where both used to round to 0; on 970 benchmark pairs no direction changed.
+  ([#808])
+
+### Added
+
+- `loci` decides the direction of a variable pair under the location-scale noise model of Immer et
+  al. (2023), whose noise scale changes with the cause. It fits a Gaussian whose mean and variance
+  are spline functions of the proposed cause in each direction, and decides by an HSIC test of the
+  scaled residual against the cause (`criterion="independence"`, the default) or by the larger
+  likelihood (`criterion="likelihood"`). Like `anm` and `pnl`, it reads the rows where both columns
+  are observed and takes `missing`. It joins the quality gate, and its docstring gives its measured
+  accuracy, times, and memory. ([#830], [#857])
+- `andrey.viz.to_graphviz(structure, targets=)` draws the intervened variables, named by label or
+  by position, as `square` nodes, as `draw` does. ([#806])
+- The graph types guide has a section, "How to read a causal graph", with a legend of every mark
+  `draw` uses. ([#806])
+- A release without its own art has a default release-card cover: the navy ground, the "Release
+  card" masthead, the Andrey wordmark in place of a title, and the version, with no amber dot. Its
+  tile among the earlier releases shows the version on navy, and a post without art has the same
+  link preview, the wordmark and its release on navy. ([#809])
+- `andrey.Knowledge` takes `required_paths` and `forbidden_paths`, the pairs `(cause, effect)` with
+  and without a directed path from `cause` to `effect`, and `confounded`, the pairs with a hidden
+  common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+  `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` honor
+  `required_paths` and `forbidden_paths`: the result is the MPDAG of the DAGs of
+  the class found that meet them (Fang, Zhao, Liu, and He 2025), and
+  `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. Knowledge that contradicts
+  itself raises `ValueError` before the search. A claim that no DAG of the class meets is dropped:
+  the fit warns with the new `KnowledgeWarning`, naming the claims, and lists them in
+  `metadata["unmet_knowledge"]`; when only some claims hold together, they are kept in order,
+  `required_paths` and then `forbidden_paths`. `bootstrap` drops them from the averaged graph alike.
+  The parts are supported in `pc`, `ges`, and `boss`, and experimental in the other CPDAG methods,
+  which the benchmark does not run. A claim directs edges of the graph the search found, so where
+  that graph is wrong, a true claim can direct an edge the wrong way: 1 to 11% of the edges true
+  claims directed in the benchmark. A required path cannot restore an edge the search left out,
+  which a required edge states. ([#829], [#850], [#854])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
+  `forbidden_paths`, and `confounded`: on a pair the tests keep, a required path
+  makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's
+  rules, no test removes a `confounded` pair, and a claim the PAG does not meet is dropped with a
+  `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`; the marks and the checks assume
+  no selection bias. `lpcmci` takes each claim with its lag. The three parts are supported in
+  `fci`, `gfci`, `boss_fci`, and `lpcmci`, and experimental in `fci_jci` and `grasp_fci`, which
+  the benchmark does not run. ([#835], [#850], [#854])
+- `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths`
+  as the prior knowledge of Shimizu et al. (2011, Section 3.4): the claims narrow
+  the variables the causal order may place next, a forbidden path is no parent, and a claim the DAG
+  does not meet is dropped with a `KnowledgeWarning` and listed in `metadata["unmet_knowledge"]`.
+  The parts are supported in `direct_lingam` and experimental in `multi_group_direct_lingam`,
+  which the benchmark does not run. ([#835], [#850], [#854])
+- Each method's schema and `--help --json` list the knowledge parts it honors, and a method given
+  another part raises `NotImplementedError`, naming the methods that honor it; so do `iamb`,
+  `inter_iamb`, and `mmpc` given `required_paths` or `forbidden_paths` with a `target` or an
+  undirected `structure`. ([#829])
+- `andrey.data.missingness` draws missing values whose missingness graph is known: `mcar`, `mar`,
+  `mnar`, and `self_masking` masks, in a logistic form (Muzellec et al., 2020) or the quantile form
+  of the MVPC simulations (Tu et al., 2019), with `parents=` to place each indicator. `missing=` on
+  `SCM.sample` and `sample_scm` draws the mask from the seed's own stream, so the same seed without
+  it gives the complete data, and `CausalDataset.missing` holds the mask and the parents of each
+  indicator; `missingness.draw` masks any complete data. ([#826])
+- One package-wide argument, `missing`, on the thirteen methods that accept missing values: `pc`,
+  `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`,
+  `pnl`, and `loci`. `missing="testwise"` is test-wise deletion, and `None`, the default, picks the
+  method's default handling, `"testwise"`, so no result changes; a value a method does not list
+  raises `ValueError`, and `metadata["missing"]` records the handling when the tests met missing
+  values. ([#828])
+- `pc(missing="mvpc")` runs Missing-Value PC (Tu et al., 2019) with the permutation-based
+  correction: after the test-wise skeleton, it finds the parents of each missingness indicator and
+  tests again, on virtual data that correct for them, the edges such an indicator could have kept.
+  It takes `"fisherz"` or `"student_t"`, and `metadata["missingness_parents"]` and
+  `metadata["corrected_edges"]` record what it found. A corrected test with too few rows where its
+  variables and the parents of their missingness indicators are all observed is answered by the
+  test-wise test, and `metadata["corrected_edges"]["uncorrected"]` lists its pair. It is supported:
+  beside the MVPC authors' R code in the paper's setting, it was better in 28 of 32 cells, tied in
+  4, and worse in none, and below the empty graph in all 32. It does not improve on test-wise
+  deletion where each indicator has many weak parents, and there, at 100 variables and 10,000 rows,
+  77 fits ran past 30 minutes in the search for the indicators' parents, which `max_depth` bounds.
+  On a wider grid, with 50 or 100 variables and 20 or 30% of the values missing, it made 0.7 to 3.6
+  more errors than test-wise deletion in 12 settings, on the first datasets and again on fresh ones.
+  ([#832], [#856])
+- `missing="em"` fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and `grasp` with
+  `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values by structural
+  EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a linear-Gaussian model
+  of the current graph, the E-step gives the expected covariance of the data, the method's own
+  search runs on it over every row, and the model is fit again to the graph it returns, 10 times.
+  `metadata["em"]` records the rounds and the observed-data log-likelihood after each, and a row
+  that observes no value is dropped first. `missing=None` keeps refusing missing values, with a
+  message that names `missing="em"` where EM would run. It is supported in `notears`, `hc`, and
+  `tabu`: `notears` was better than MissDAG in 19 of 24 cells and tied in 5, and `hc` and `tabu`
+  were better than bnlearn's `structural.em` in 29 and 32 of 36 cells and tied in 7 and 4. With 15
+  variables and 100 rows, `hc` and `tabu` are often no better than the empty graph, below it in 11
+  and 15 of 24 cells, as the plain search is on complete data of that size; with 20 variables and
+  500 or 2,000 rows they are below it in 12 of 12 cells. In `ges`, `xges`, `exact_search`, `boss`,
+  `grasp`, `dagma`, and `calm` it is experimental, as no reference implementation exists to compare
+  them with. ([#842], [#856])
+- The benchmark harness measures missing data: `missing_cpu.py` fits `pc(missing="mvpc")` beside
+  the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and `hc` and `tabu` with
+  `missing="em"` beside bnlearn's `structural.em`, each with test-wise PC, listwise deletion, mean
+  imputation, the complete data, and the empty graph, and `missing_summary.py` pairs the records
+  into summary rows with a paired bootstrap. `benchmarks/comparisons/missing-data.md` presents the
+  results, and `benchmarks/published/0.16.0/missing-data.json` holds the rows. ([#843], [#856])
+- The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
+  that listing every small graph gives, with d-separation in place of the tests, and on simulated
+  data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`,
+  `lpcmci`, and `direct_lingam` (`benchmarks/knowledge_paths.py`). A CPDAG fit is scored against the
+  class the truth and its claims define, and by its distance to the true DAG. The same lanes run
+  Tetrad, pcalg, tigramite, and lingam under the same knowledge, and `ges` with the plain BIC beside
+  its default. ([#848], [#854])
+- A Quick start notebook, `examples/quick_start.ipynb`, loads the Sachs protein measurements, fits
+  PC, GES, FCI, and DirectLiNGAM, reads each result, and draws each graph. It leads the examples
+  gallery and replaces `examples/ges_quickstart.ipynb`, whose page on the website redirects to it.
+  ([#853])
+- The roadmap lists the methods planned for its local causal discovery and very large causal
+  discovery stages, each with its paper, an existing implementation and its license, and what the
+  method adds; the local methods are grouped by what they learn. Stage 1 is "Major methods", very
+  large causal discovery means more than 1,000 variables, and it comes before agentic causal
+  discovery. ([#853])
+
+### Changed
+
+- `andrey.viz.draw` marks each edge with an arrowhead into an intervened variable by a cross in
+  its middle, where it put a bar by the arrowhead, and marks a target that no arrowhead points
+  into by its square alone, where it drew a short barred arrow from outside into it. ([#806])
+- `fci`'s **Limitations** paragraph says that test errors can give results that no MAG fits,
+  and the `pag` it returns is then not the PAG of any MAG: of 200 simulated datasets with 10
+  variables, mean degree 3, and 2,000 rows, 36 fits with `"fisherz"` and 36 with `"normal_scores"`
+  returned one. On 28 and 29 of them, the MAG that Zhang's construction builds from the `pag` is
+  not ancestral, and a graph query such as `m_separated` raised `ValueError`. `bootstrap`'s Notes
+  name a `pag` from which Zhang's construction builds no MAG among the fits its averaged graph
+  passes over for the nearest valid resample. ([#807])
+- `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, and `indep_test="kci"` without conditions
+  compute their HSIC p-values from the gamma law's upper tail through its logarithm, as `resit` and
+  `camuv` do, instead of as one minus the lower tail, which rounded every p-value below about 1e-16
+  to 0. `anm` and `pnl` compare the logarithms of their two p-values, which keep their order where
+  both p-values fall below about 1e-308 and read 0, and `bottom_up_parce_lingam` and `gin` pool a
+  finite logarithm by Fisher's method where they pooled infinity or the smallest double. A result
+  can therefore change where both p-values were below 1e-16 and the HSIC statistics decided; on
+  970 pairs drawn as the ANM and PNL benchmarks draw theirs, from 200 to 16,000 rows, no direction
+  changed. A statistic that rounding puts just below 0 gives a p-value of 1 in `rcd`,
+  `bottom_up_parce_lingam`, and `gin`, where it gave `nan`. ([#808])
+- The website's Examples page holds the notebooks and the demos that run in your browser, in
+  sections: Quick start, Methods, Advanced, Interactive demos, and Misc. The sidebar groups the
+  pages the same way, each group open on the Examples pages. The demos' pages moved from
+  `/docs/demos/` to `/docs/examples/`, the navbar no longer has a Demos entry, and every old
+  address redirects to its new one. ([#853])
+- Each example notebook's title names its topic only, and "Drawing a recovered structure" is
+  "Visualize a causal graph". ([#853])
+
+### Fixed
+
+- `jpcmciplus` raises `SingularCorrelationError` when a system variable has a copy among a
+  test's conditions, such as a pulse every dataset shares that is not listed as a time
+  context, with the note to list it as one; it dropped that variable's links without an
+  error. ([#841])
+- The J-PCMCI+ comparison's same-graph counts for 0.15.0 are recounted after a fix to the
+  benchmark harness, which recorded each conflict of Andrey's arm as `o-o` where tigramite marks it
+  `x-x`. On the comparison page, 7 of the 21 counts in the claim go up, and no claim changes.
+  ([#821])
+- `loci` keeps fitting when the Hessian of a Newton step is too ill-conditioned for a Cholesky
+  factorization, as a fitted variance near zero can leave it: the step adds a growing multiple of
+  the Hessian's diagonal (Nocedal and Wright 2006), where it raised `LinAlgError`. Both criteria
+  raised on 11 of 2,600 benchmark pairs, all with Gumbel or Laplace noise; no other fit changes.
+  ([#857])
 
 ## [0.15.0] - 2026-11-08
 
@@ -746,14 +938,13 @@ names its pull request.
   in the other score searches; `gies` scores each variable on the rows without an intervention on
   it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
   data. ([#520])
-- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-  `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman,
-  Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform prior over each
-  variable's conditional distributions is worth. The default, `1.0`, is the weight the score used
-  before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
-  passes it with another score, named or picked from the declared column types, raises
-  `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
-  ([#553])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+  take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
+  Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
+  conditional distributions is worth. The default, `1.0`, is the weight the score used before, so
+  every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that passes it
+  with another score, named or picked from the declared column types, raises `ValueError`; the
+  result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`. ([#553])
 - `andrey.markov_check` tests whether the data contradict a DAG or a CPDAG, such as a method's
   result: it tests the independences the graph implies, each variable and every earlier non-parent
   given its parents, and rejects the graph when their p-values are not uniform on (0, 1) by the
@@ -764,13 +955,13 @@ names its pull request.
   (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
   docstring gives the rates measured for missing, extra, and reversed edges and for categorical
   data. ([#571])
-- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a rank-based
-  test for data whose columns are monotone transformations of Gaussian variables (a Gaussian
-  copula): its p-values do not change under a strictly increasing transformation of a column, and
-  it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
-  `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
-  and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
-  finds only monotone dependence. The default test is unchanged. ([#573])
+- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a
+  rank-based test for data whose columns are monotone transformations of Gaussian variables (a
+  Gaussian copula): its p-values do not change under a strictly increasing transformation of a
+  column, and it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals.
+  `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+  `pcmciplus`, and `lpcmci` take it; on data with missing values, each test ranks within the rows it
+  reads. It finds only monotone dependence. The default test is unchanged. ([#573])
 
 ### Changed
 
@@ -913,7 +1104,7 @@ names its pull request.
   climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
   already leaves out most false edges; exact search's fell by 0.24 at 20 variables. GES's median
   errors fell from 87 to 25 over 299 datasets. `gfci` keeps `ebic_gamma=0.0`: its
-  errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
+  errors fell by only 0.06 per true edge, and rose on some graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
 - Every method checks its arguments in one shared step before it reads the data: a value of the
   wrong type raises `TypeError`, and a value outside its range or not one of its choices raises
@@ -1254,8 +1445,9 @@ names its pull request.
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
-  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
-  with the time of Tetrad's JVM reported apart from its search. ([#362])
+  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`,
+  `benchmarks/tetrad_fci_latent.py`), with the time of Tetrad's JVM reported apart from its search.
+  ([#362])
 
 ### Changed
 
@@ -1789,7 +1981,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...HEAD
+[0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
@@ -2028,3 +2220,23 @@ First alpha release.
 [#797]: https://github.com/Abel-ai-lab/andrey/pull/797
 [#798]: https://github.com/Abel-ai-lab/andrey/pull/798
 [#803]: https://github.com/Abel-ai-lab/andrey/pull/803
+[#806]: https://github.com/Abel-ai-lab/andrey/pull/806
+[#807]: https://github.com/Abel-ai-lab/andrey/pull/807
+[#808]: https://github.com/Abel-ai-lab/andrey/pull/808
+[#809]: https://github.com/Abel-ai-lab/andrey/pull/809
+[#821]: https://github.com/Abel-ai-lab/andrey/pull/821
+[#826]: https://github.com/Abel-ai-lab/andrey/pull/826
+[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
+[#829]: https://github.com/Abel-ai-lab/andrey/pull/829
+[#830]: https://github.com/Abel-ai-lab/andrey/pull/830
+[#832]: https://github.com/Abel-ai-lab/andrey/pull/832
+[#835]: https://github.com/Abel-ai-lab/andrey/pull/835
+[#841]: https://github.com/Abel-ai-lab/andrey/pull/841
+[#842]: https://github.com/Abel-ai-lab/andrey/pull/842
+[#843]: https://github.com/Abel-ai-lab/andrey/pull/843
+[#848]: https://github.com/Abel-ai-lab/andrey/pull/848
+[#850]: https://github.com/Abel-ai-lab/andrey/pull/850
+[#853]: https://github.com/Abel-ai-lab/andrey/pull/853
+[#854]: https://github.com/Abel-ai-lab/andrey/pull/854
+[#856]: https://github.com/Abel-ai-lab/andrey/pull/856
+[#857]: https://github.com/Abel-ai-lab/andrey/pull/857

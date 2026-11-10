@@ -13,7 +13,7 @@ from typing import Any, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
+from andrey.core.knowledge import EDGE_PARTS, KnowledgePart
 
 Family = Literal[
     "constraint", "score", "permutation", "functional", "temporal", "latent", "pairwise"
@@ -249,6 +249,13 @@ class MethodSpec(Spec):
     # release.
     dropped_args: tuple[str, ...] = ()
     references: tuple[str, ...] = ()
+    # The parts of andrey.Knowledge the method honors beyond the edge parts every method with
+    # knowledge honors, and the parts it honors experimentally (ExperimentalWarning on use).
+    knowledge_extra: tuple[KnowledgePart, ...] = ()
+    knowledge_experimental: tuple[KnowledgePart, ...] = ()
+    # Whether required_paths and forbidden_paths restrict the CPDAG the method returns, after the
+    # fit, rather than reaching the method's search.
+    restricts_paths: bool = False
 
     @property
     def seeded(self) -> bool:
@@ -262,9 +269,11 @@ class MethodSpec(Spec):
 
     @property
     def knowledge(self) -> tuple[KnowledgePart, ...]:
-        """The parts of an ``andrey.Knowledge`` the method honors: every part when it takes
-        ``knowledge``, else none."""
-        return KNOWLEDGE_PARTS if any(p.type == "knowledge" for p in self.params) else ()
+        """The parts of an ``andrey.Knowledge`` the method honors: the edge parts and
+        ``knowledge_extra`` when it takes ``knowledge``, else none."""
+        if not any(p.type == "knowledge" for p in self.params):
+            return ()
+        return (*EDGE_PARTS, *self.knowledge_extra)
 
 
 class EnvVarSpec(Spec):

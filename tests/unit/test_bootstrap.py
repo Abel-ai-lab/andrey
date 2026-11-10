@@ -13,6 +13,7 @@ from andrey import BootstrapOutput, bootstrap, resample
 from andrey.constraint.fci import fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
+from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
 from andrey.data.latent import DSepOracle, _AncestorSepsets, observed_ancestors
 from andrey.resample import EDGES, Job, _default_block_length, _draw
@@ -228,10 +229,13 @@ def shd(a, b):
 
 
 def is_valid(structure):
-    """Whether a cpdag has a consistent DAG extension, or a pag the MAG of Zhang's construction."""
+    """Whether a cpdag has a consistent DAG extension, or a pag a MAG by Zhang's construction."""
     marks = structure.to_numpy()
     try:
-        (pdag2dag if structure.kind == "cpdag" else mag_of_pag)(marks)
+        if structure.kind == "cpdag":
+            pdag2dag(marks)
+        else:
+            GraphStructure.from_numpy(mag_of_pag(marks), kind="mag").to_pag()  # raises for no MAG
     except ValueError:
         return False
     return True
@@ -291,6 +295,16 @@ def test_pc_resamples_that_no_dag_extends_do_not_become_the_averaged_graph():
     assert out.metadata["averaged_graph"] == "nearest_resample"  # the vote has no valid cpdag
     assert is_valid(out.structure)
     assert out.structure.markov_blanket("x0")
+
+
+def test_fci_resamples_that_are_not_pags_do_not_become_the_averaged_graph():
+    data = andrey.data.sample_scm(d=8, n=1000, seed=16, density=3.0).data
+    with andrey.config(n_jobs=1), pytest.warns(andrey.AndreyWarning, match="no valid pag"):
+        out = bootstrap("fci", data, n_resamples=30, seed=16, keep_fits=True)
+    assert sum(not is_valid(fit.structure) for fit in out.fits) > 15  # most fits are not PAGs
+    assert out.metadata["averaged_graph"] == "nearest_resample"
+    assert is_valid(out.structure)
+    out.structure.m_separated(0, 4, [])  # a graph query runs on the averaged graph
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -856,6 +870,41 @@ def test_an_edge_the_knowledge_directs_stays_directed_in_the_averaged_graph(meth
     out = bootstrap(method, lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
     assert out.metadata["averaged_graph"] == "vote"
     assert out.structure.endpoints(2, 3) == (TAIL, ARROW)
+
+
+def test_a_path_claim_restricts_the_averaged_graph():
+    # a - b - c is undirected in a CPDAG; b is not an ancestor of a, so a -> b, and then b -> c.
+    knowledge = andrey.Knowledge(forbidden_paths=[("b", "a")])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.ExperimentalWarning)  # the part is supported in pc
+        out = bootstrap("pc", lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
+    assert out.metadata["averaged_graph"] == "vote"
+    assert out.structure.endpoints(0, 1) == (TAIL, ARROW)
+    assert out.structure.endpoints(1, 2) == (TAIL, ARROW)
+
+
+def test_the_averaged_graph_drops_the_claims_it_does_not_meet():
+    # a - b - c: c is an ancestor of a only through b, so the claim that b is not one, taken
+    # after the required path, is dropped, and the averaged graph is c -> b -> a.
+    knowledge = andrey.Knowledge(required_paths=[("c", "a")], forbidden_paths=[("b", "a")])
+    with pytest.warns(andrey.KnowledgeWarning, match=r"andrey.bootstrap: .*\('b', 'a'\)"):
+        out = bootstrap("pc", lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
+    assert out.metadata["unmet_knowledge"] == [["forbidden_paths", "b", "a"]]
+    assert out.structure.endpoints(1, 0) == (TAIL, ARROW)
+    assert out.structure.endpoints(2, 1) == (TAIL, ARROW)
+
+
+def test_a_vote_the_path_claims_deny_drops_them():
+    # The vote a -> c <- b, in whose DAGs c is never an ancestor of a.
+    vote = np.zeros((3, 3), dtype=np.int8)
+    vote[0, 2] = vote[1, 2] = TAIL
+    vote[2, 0] = vote[2, 1] = ARROW
+    knowledge = Knowledge(required_paths=[("c", "a"), ("b", "c")])
+    constraints = resolve(knowledge, 3, list("abc"), method="pc")
+    unmet: list = []
+    graph = resample._valid_graph(vote, "cpdag", ("a", "b", "c"), constraints, None, unmet)
+    assert unmet == [("required_paths", 2, 0)]
+    assert np.array_equal(graph.to_numpy(), vote)
 
 
 def linear_data(n, parents, seed=0):

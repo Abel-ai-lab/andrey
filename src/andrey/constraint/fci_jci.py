@@ -60,12 +60,12 @@ def fci_jci(
     ``data`` is an ``(n_samples, n_features)`` array; ``env`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` environment index (one number per row). ``alpha``, ``indep_test``,
     ``collider_rule``, ``possible_dsep``, ``max_depth``, ``in_column_order``, ``workers``, ``seed``,
-    and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the data with the index
-    appended as a last column; ``categorical``, a boolean mask of the data's categorical columns,
-    reaches a mixed-data test, which also takes the index as categorical. ``constraints``, over the
-    data's columns, act as for FCI, with the index unconstrained. ``confounded_index=False`` assumes
-    no hidden variable causes both the index and a data variable. With a single domain the index is
-    left out and the search is FCI on ``data`` alone.
+    and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the data with
+    the index appended as a last column; ``categorical``, a boolean mask of the data's categorical
+    columns, reaches a mixed-data test, which also takes the index as categorical. ``constraints``,
+    over the data's columns, act as for FCI, with the index unconstrained.
+    ``confounded_index=False`` assumes no hidden variable causes both the index and a data variable.
+    With a single domain the index is left out and the search is FCI on ``data`` alone.
 
     Returns the PAG over the ``n_features`` data variables as a ``GraphStructure`` of kind
     ``"pag"``, and the index's edges as ``(variable, kind)`` pairs in variable order: ``kind`` is

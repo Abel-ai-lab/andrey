@@ -26,7 +26,12 @@ from andrey.constraint._skeleton import (
     unseparated_triples,
     vote_triples,
 )
-from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
+from andrey.constraint.pc import (
+    adjacency_search,
+    check_knowledge_cycle,
+    knowledge_cycle,
+    knowledge_masks,
+)
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
@@ -76,15 +81,15 @@ def fci(
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
-    endpoints before the orientation rules, which change circles only. A triple over a non-adjacent
-    pair with no separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An arrowhead the knowledge puts at
-    ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
-    ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes share the adjacency
-    search's larger conditioning-size passes (:func:`~andrey.constraint.pc.adjacency_search`) and
-    the larger possible-d-sep searches (:func:`possible_dsep_step`); ``None`` reads
-    ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic
-    ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
+    endpoints before the orientation rules, which change circles only. A triple over a
+    non-adjacent pair with no separating set is neither a collider nor a non-collider to any rule
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
+    arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
+    ``x`` to ``y`` raises ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
+    share the adjacency search's larger conditioning-size passes
+    (:func:`~andrey.constraint.pc.adjacency_search`) and the larger possible-d-sep searches
+    (:func:`possible_dsep_step`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes the draws
+    of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
     ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and
     all). The private ``_ambiguous`` sink receives the triples no orientation rule reads as a
     collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
@@ -155,13 +160,84 @@ def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
     ``i -> j``), and a required ``i -> j`` is ``i -> j``: a tail at ``i`` and, as its reverse is
-    forbidden, an arrowhead at ``j``. ``None`` leaves ``marks`` as they are.
+    forbidden, an arrowhead at ``j``. A pair ``(i, j)`` of ``forbidden_paths`` puts an arrowhead at
+    ``i``, and a pair of ``required_paths`` makes the edge ``i -> j``: in a maximal ancestral graph
+    an edge whose end ``i`` is an ancestor of ``j`` has a tail at ``i`` and an arrowhead at ``j``
+    (Richardson and Spirtes 2002). The ``required_paths`` pairs come last, one at a time in column
+    order, and a pair is left unset when the marks set so far deny it: an arrowhead at ``i`` or a
+    tail at ``j`` on its edge, which ``forbidden`` and the tiers set on a pair the tests kept
+    adjacent, or an edge ``i -> j`` that would close a directed path of the edges set so far with
+    an arrowhead that denies it (:func:`~andrey.constraint.pc.knowledge_cycle`). Such a claim is one
+    the PAG does not meet (:func:`unmet_path_claims`). When the other parts alone close such a
+    path, no pair is set, and :func:`~andrey.constraint.pc.check_knowledge_cycle` raises for them.
+    ``None`` leaves ``marks`` as they are.
     """
     if constraints is None:
         return
     adjacent = marks != NULL
     marks[adjacent & constraints.forbidden & ~constraints.forbidden.T] = ARROW
+    if constraints.forbidden_paths is not None:
+        marks[adjacent & constraints.forbidden_paths] = ARROW
     marks[adjacent & constraints.required] = TAIL
+    if constraints.required_paths is None or _closes_cycle(marks):
+        return
+    for i, j in np.argwhere(adjacent & constraints.required_paths).tolist():
+        if marks[i, j] == ARROW or marks[j, i] == TAIL:
+            continue
+        before = marks[i, j], marks[j, i]
+        marks[i, j], marks[j, i] = TAIL, ARROW
+        if _closes_cycle(marks):
+            marks[i, j], marks[j, i] = before
+
+
+def _closes_cycle(marks: np.ndarray) -> bool:
+    """Whether a directed path of ``marks`` and an arrowhead that denies it close a cycle."""
+    return knowledge_cycle((marks == TAIL) & (marks.T == ARROW), (marks == ARROW).T) is not None
+
+
+def unmet_path_claims(
+    marks: np.ndarray, required_paths: np.ndarray | None, forbidden_paths: np.ndarray | None
+) -> list[tuple[str, int, int]]:
+    """The path claims the PAG ``marks`` does not meet, each ``(part, a, b)``, in column order.
+
+    ``required_paths[a, b]`` claims that ``a`` is an ancestor of ``b``. On an adjacent pair it
+    needs the edge ``a -> b``, the edge of a maximal ancestral graph whose end ``a`` is an ancestor
+    of the other (Richardson and Spirtes 2002); on a non-adjacent pair, a possibly directed path
+    from ``a`` to ``b``: one whose every edge ``u *-* v`` is not into ``u`` and not out of ``v``
+    (Zhang 2008). Without one, ``a`` is an ancestor of ``b`` in no maximal ancestral graph the PAG
+    stands for. ``forbidden_paths[a, b]`` claims the opposite: on an adjacent pair it needs an
+    arrowhead at ``a``, and a directed path ``a -> ... -> b`` denies it in every such graph.
+    """
+    adjacent = marks != NULL
+    directed = (marks == TAIL) & (marks.T == ARROW)
+    possible = adjacent & (marks != ARROW) & (marks.T != TAIL)
+    unmet = []
+    for part, claims in (("required_paths", required_paths), ("forbidden_paths", forbidden_paths)):
+        if claims is None:
+            continue
+        for a, b in np.argwhere(claims).tolist():
+            if part == "required_paths":
+                met = bool(directed[a, b] if adjacent[a, b] else reach(possible, a)[b])
+            else:
+                met = not (adjacent[a, b] and marks[a, b] != ARROW) and not reach(directed, a)[b]
+            if not met:
+                unmet.append((part, a, b))
+    return unmet
+
+
+def reach(steps: np.ndarray, source: int) -> np.ndarray:
+    """The nodes a path of one or more ``steps[u, v]`` leads to from ``source``, as a mask."""
+    reached = np.zeros(len(steps), dtype=bool)
+    frontier = steps[source].copy()
+    while frontier.any():
+        reached |= frontier
+        frontier = steps[frontier].any(axis=0) & ~reached
+    return reached
+
+
+def _pattern_decides(pattern: np.ndarray, a: int, b: int, c: int) -> bool:
+    """Whether ``pattern`` holds the triple ``a - b - c`` with ``a`` and ``c`` non-adjacent."""
+    return not _adjacent(pattern, a, c) and _adjacent(pattern, a, b) and _adjacent(pattern, c, b)
 
 
 def _adjacent(marks: np.ndarray, a: int, b: int) -> bool:
@@ -236,8 +312,10 @@ def orient_colliders(
     ascending order), ``b`` is a collider iff a separating set for ``a`` and ``c`` is recorded and
     does not contain ``b``, and the triple is not ``ambiguous``. With ``pattern``, the CPDAG of a
     score search, a pair the pattern leaves non-adjacent is decided by the pattern instead: ``b``
-    is a collider iff the pattern has ``a -> b <- c``. The endpoint at ``b`` on both edges is then
-    set to an arrowhead; an already-directed tail at ``b`` blocks the orientation.
+    is a collider iff the pattern has ``a -> b <- c``, when the pattern also joins ``b`` to both:
+    a triple over an edge the pattern lacks, such as a ``confounded`` pair the knowledge adds, is
+    decided by the separating sets. The endpoint at ``b`` on both edges is then set to an
+    arrowhead; an already-directed tail at ``b`` blocks the orientation.
     """
     for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
@@ -245,7 +323,7 @@ def orient_colliders(
                 a, c = adj[i], adj[k]
                 if _adjacent(marks, a, c) or _is_def_collider(marks, a, b, c):
                     continue
-                if pattern is not None and not _adjacent(pattern, a, c):
+                if pattern is not None and _pattern_decides(pattern, a, b, c):
                     collider = pattern[b, a] == ARROW and pattern[b, c] == ARROW
                 else:
                     sep = separating_set(sepsets, a, c)

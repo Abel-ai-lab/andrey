@@ -150,23 +150,37 @@ def center(samples: np.ndarray, *, standardize: bool = False) -> np.ndarray:
 
 
 def canonicalize(
-    data: np.ndarray, constraints: Constraints | None = None, *, standardize: bool = False
+    data: np.ndarray,
+    constraints: Constraints | None = None,
+    *,
+    standardize: bool = False,
+    cov: np.ndarray | None = None,
 ) -> Canonical:
     """Order the columns of ``data`` by their ranks, :func:`center` them, and form their covariance.
 
     ``constraints`` (background knowledge in the data's column order) is carried into the fit's
     column order; ``None`` forbids and requires nothing. ``standardize`` scales each column to unit
-    variance first.
+    variance first. A ``cov``, divided by the number of rows, replaces the data's covariance, such
+    as the expected covariance of data with missing values (:mod:`andrey.search.em`); ``data``
+    then sets only the ranks and may hold ``NaN``, and ``standardize`` scales ``cov`` to the
+    correlation matrix.
     """
     samples = np.asarray(data, dtype=np.float64)
     d = samples.shape[1]
     order = np.argsort(tie_ranks(samples))
-    centered = center(samples[:, order], standardize=standardize)
     if constraints is None:
         forbidden = required = np.zeros((d, d), dtype=bool)
     else:
         forbidden = constraints.forbidden[np.ix_(order, order)]
         required = constraints.required[np.ix_(order, order)]
+    if cov is not None:
+        ordered = cov[np.ix_(order, order)]
+        if standardize:
+            scale = np.sqrt(np.diagonal(ordered))
+            scale[scale == 0.0] = 1.0
+            ordered = ordered / np.outer(scale, scale)
+        return Canonical(ordered, order, np.argsort(order), forbidden, required)
+    centered = center(samples[:, order], standardize=standardize)
     return Canonical(
         centered.T @ centered / samples.shape[0], order, np.argsort(order), forbidden, required
     )
@@ -581,15 +595,17 @@ def notears(
     standardize: bool = False,
     labels: tuple[str, ...] | None = None,
     constraints: Constraints | None = None,
+    cov: np.ndarray | None = None,
 ) -> ContinuousResult:
     """NOTEARS (Zheng et al. 2018), and with ``robust`` the likelihood path of Deng et al. (2024).
 
-    ``standardize`` scales each column to unit variance first (:func:`canonicalize`). The first fit
+    ``standardize`` scales each column to unit variance first, and a ``cov`` replaces the data's
+    covariance (:func:`canonicalize`). The first fit
     is the least-squares loss with an ``l1`` penalty by :func:`augmented_lagrangian`. With
     ``robust`` its weights start :func:`likelihood_path`, whose steps solve
     :func:`adam_augmented_lagrangian` with :func:`gaussian_likelihood` and the quasi-MCP.
     """
-    canonical = canonicalize(data, constraints, standardize=standardize)
+    canonical = canonicalize(data, constraints, standardize=standardize, cov=cov)
     weights = augmented_lagrangian(
         canonical.cov,
         canonical.forbidden,
@@ -649,15 +665,17 @@ def dagma(
     standardize: bool = False,
     labels: tuple[str, ...] | None = None,
     constraints: Constraints | None = None,
+    cov: np.ndarray | None = None,
 ) -> ContinuousResult:
     """DAGMA (Bello et al. 2022), and with ``robust`` the likelihood path of Deng et al. (2024).
 
-    ``standardize`` scales each column to unit variance first (:func:`canonicalize`). The first fit
+    ``standardize`` scales each column to unit variance first, and a ``cov`` replaces the data's
+    covariance (:func:`canonicalize`). The first fit
     is the least-squares loss with an ``l1`` penalty along :func:`central_path`. With ``robust``
     its weights start :func:`likelihood_path`, whose steps run the central path again with
     :func:`gaussian_likelihood` and the quasi-MCP.
     """
-    canonical = canonicalize(data, constraints, standardize=standardize)
+    canonical = canonicalize(data, constraints, standardize=standardize, cov=cov)
 
     def solve(initial: np.ndarray, loss: Loss, penalty: Penalty) -> np.ndarray:
         return central_path(

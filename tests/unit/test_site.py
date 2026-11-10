@@ -911,9 +911,8 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("docs/index") == (["Docs"], ["Docs"])
     assert marks("docs/guides/getting-started") == (["Docs"], [])
     assert marks("docs/examples/index") == (["Examples"], ["Examples"])
-    assert marks("docs/examples/ges_quickstart") == (["Examples"], [])
-    assert marks("docs/demos/index") == (["Demos"], ["Demos"])
-    assert marks("docs/demos/pc-replay") == (["Demos"], [])
+    assert marks("docs/examples/quick_start") == (["Examples"], [])
+    assert marks("docs/examples/pc-replay") == (["Examples"], [])
     assert marks("blog/index") == (["Blog"], ["Blog"])
     assert marks("blog/20261008-introducing-andrey") == (["Blog"], [])
     assert marks("docs/faq") == (["FAQ"], ["FAQ"])
@@ -1633,10 +1632,12 @@ def test_the_newest_release_post_is_the_latest_version(conf):
         ("blog/20261012-andrey-0-2-0", "2026-10-12", "0.2.0"),
     ]
     assert newest(posts) == ("blog/20261012-andrey-0-2-0", "0.2.0")
-    # A later version breaks a tie in date; a tie in both names the posts.
+    # A later version breaks a tie in date, and the later file name a tie in both.
     assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
-    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
-        newest(posts[:2])
+    assert newest(posts[:2]) == ("blog/20261008-why-andrey-is-fast", "0.1.0")
+    moved = [("blog/20261029-andrey-0-11-0", "2026-11-10", "0.16.0"), *posts]
+    moved.append(("blog/20261015-andrey-0-4-0", "2026-11-10", "0.16.0"))
+    assert newest(moved)[0] == "blog/20261029-andrey-0-11-0"
 
 
 def test_the_blog_lists_the_newest_post_first(conf):
@@ -1648,7 +1649,7 @@ def test_the_blog_lists_the_newest_post_first(conf):
         ("blog/a-note", "2026-10-10", ""),
         ("blog/20261012-andrey-0-3-0", "2026-10-12", "0.3.0"),
     ]
-    # By date, then version; posts that tie in both keep their order.
+    # By date, then version, then file name.
     assert newest_first(posts) == [
         "blog/20261012-andrey-0-3-0",
         "blog/20261012-andrey-0-2-0",
@@ -1660,8 +1661,7 @@ def test_the_blog_lists_the_newest_post_first(conf):
     # same day.
     assert newest_first([*posts, ("blog/later", "2026-10-13", "")])[0] == "blog/later"
     assert newest_first([*posts, ("blog/same-day", "2026-10-12", "")])[2] == "blog/same-day"
-    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
-        newest_first(posts[:2])
+    assert newest_first(posts[1::-1]) == newest_first(posts[:2])
 
 
 def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
@@ -1843,6 +1843,96 @@ def test_every_published_art_is_stored_in_the_brand_tones(cards):
 def test_a_cover_that_is_not_in_the_brand_kit_fails(cards):
     with pytest.raises(ValueError, match="unknown cover"):
         cards.cover_jpeg("photo")
+
+
+def _release_covers():
+    """Each release cover and tile in the Release cards page, the cards, and the example in
+    ``docs/DEVELOPMENT.md``: how many folders deep its page is built, its classes, and its body's
+    paragraphs. The example is the Release cards page's cover."""
+    docs = ROOT / "docs"
+    pages = [docs / "docs" / "benchmarks.md", *sorted((docs / "docs" / "benchmarks").glob("*.md"))]
+    for page in [*pages, docs / "DEVELOPMENT.md"]:
+        depth = max(len(page.relative_to(docs).parts) - 1, 1)
+        text = page.read_text(encoding="utf-8")
+        for indent, block in re.findall(
+            r"^( *):::\{card\}\n(.*?)\n\1:::$", text, flags=re.S | re.M
+        ):
+            lines = [line.removeprefix(indent) for line in block.split("\n")]
+            options = dict(re.findall(r"^:([\w-]+): *(.*)$", "\n".join(lines), flags=re.M))
+            classes = options.get("class-card", "").split()
+            body = "\n".join(line for line in lines if not re.match(r":[\w-]+:", line)).strip()
+            if {"release-cover", "release-tile"} & set(classes):
+                yield depth, classes, re.split(r"\n\s*\n", body)
+
+
+def test_a_release_without_art_takes_the_default_cover_and_one_with_art_keeps_it():
+    css = re.sub(
+        r"/\*.*?\*/", "", (ROOT / "docs" / "_static" / "benchmarks.css").read_text(), flags=re.S
+    )
+    art_dir = ROOT / "docs" / "_static" / "release-cards"
+    defaults = 0
+    for depth, classes, paragraphs in _release_covers():
+        version = paragraphs[-1]
+        assert re.fullmatch(r"\d+\.\d+\.\d+", version), paragraphs
+        art = [name for name in classes if name.startswith("release-art")]
+        if "release-default" in classes:
+            # The default stands in for art: a release with art shows it, and no art class mixes in.
+            defaults += 1
+            assert not (art_dir / f"{version}.jpg").exists() and not art, classes
+            if "release-cover" in classes:
+                # Masthead, the wordmark's image (never typed text) in the title's place, version.
+                assert len(paragraphs) == 3, paragraphs
+                image = re.fullmatch(
+                    r'<p class="sd-card-text">(<img [^>]*>)</p>', paragraphs[1], re.S
+                )
+                assert image, paragraphs[1]
+                src = re.search(r'src="([^"]+)"', image[1])[1]
+                assert src == "../" * depth + "_static/wordmark-dark.svg"
+                assert (ROOT / "site" / "brand" / "wordmark-dark.svg").exists()
+                assert 'class="dark-light"' in image[1] and re.search(r'alt="[^"]+"', image[1])
+        elif art:
+            # The art shown, `release-art-<release>` or the bare class 0.2.0's card keeps, is the
+            # release's own.
+            named = [name for name in art if name != "release-art"]
+            assert len(named) <= 1, classes
+            name = re.escape(named[0] if named else "release-art")
+            rule = re.search(rf"\.{name}(?![\w-])[^{{]*\{{([^}}]*)\}}", css)[1]
+            assert f'url("release-cards/{version}.jpg")' in rule, (version, classes)
+        else:
+            # 0.1.0's tile, released before the default, keeps the stipple ground.
+            assert version == "0.1.0" and classes == ["release-tile"], classes
+    assert defaults, "no default cover to check; DEVELOPMENT.md shows one"
+
+
+def test_the_default_cover_is_navy_with_no_amber_dot():
+    css = re.sub(
+        r"/\*.*?\*/", "", (ROOT / "docs" / "_static" / "benchmarks.css").read_text(), flags=re.S
+    )
+    rules = [(" ".join(s.split()), body) for s, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)]
+    grounds = [body for selector, body in rules if selector.endswith(".release-default")]
+    assert len(grounds) == 1
+    assert "var(--andrey-ground-navy)" in grounds[0] and "url(" not in grounds[0]
+    # The art covers' dot above the version, and the default's rule that removes it.
+    dot = ".release-cover .sd-card-text:nth-of-type(3)::before"
+    assert "var(--andrey-ground-amber)" in dict(rules)[dot]
+    no_dot = dot.replace(".release-cover", ".release-cover.release-default")
+    assert re.search(r"display:\s*none|content:\s*none", dict(rules)[no_dot])
+
+
+def test_a_banner_without_art_is_the_default_with_one_amber_accent(cards, conf):
+    pytest.importorskip("resvg_py")
+    # A post that names no art gets the "ground" kind.
+    app = types.SimpleNamespace(env=types.SimpleNamespace(metadata={"blog/post": {}}))
+    kind = conf["_cover_kind"](app, "blog/post")
+    svg = cards.preview_svg(kind, "Calibration", "Release 0.16.0")
+    # Navy, the white wordmark with its amber stroke, and the release: no art, title, or dot.
+    assert f'fill="{cards.grain.NAVY}"' in svg and "<image" not in svg
+    assert svg.count(cards.grain.AMBER) == 1 and "<circle" not in svg
+    assert "Release 0.16.0" in svg and "Calibration" not in svg
+    assert cards.preview_jpeg(kind, "Calibration", "Release 0.16.0")[:2] == b"\xff\xd8"
+    # A banner over art keeps its title and the dot before its release.
+    art = cards.preview_svg("crystal", "Multi-domain data", "Release 0.15.0")
+    assert "<circle" in art and "Multi-domain" in art and "<image" in art
 
 
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")

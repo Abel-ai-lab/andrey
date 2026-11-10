@@ -1086,7 +1086,7 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* A page's own fold: its toggle sits over the end of the page's row. */
-.docs-nav li > details > summary {
+.docs-nav li > details:not(.docs-nav__more) > summary {
   position: absolute;
   top: 0;
   right: 0;
@@ -1098,7 +1098,8 @@ html:not(:has(.andrey-home)) .bd-header::before {
   border-radius: 6px;
 }
 
-/* A section's fold of its later pages, a row of its own with its chevron at the end. */
+/* A section's fold of its later pages, or of the pages under one of its captions, a row of its
+   own with its chevron at the end. */
 .docs-nav__more > summary {
   display: flex;
   align-items: center;
@@ -1293,7 +1294,7 @@ html:not(:has(.andrey-home)) .bd-header::before {
     padding-block: 0.45rem;
   }
 
-  .docs-nav li > details > summary {
+  .docs-nav li > details:not(.docs-nav__more) > summary {
     height: calc(1.4em + 0.9rem);
   }
 }

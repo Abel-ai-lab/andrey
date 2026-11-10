@@ -253,10 +253,21 @@ class BootstrapOutput:
         nearest = None
         if lags is None and slices[0].kind in _MADE_VALID:
             nearest = _nearest(slices[0], coded[0], fits)
+        unmet: list[tuple[str, int, int]] = []
         structure, source = _average(
-            slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints, ranks
+            slices,
+            len(fits),
+            threshold,
+            lags,
+            n,
+            labels,
+            nearest,
+            strict,
+            constraints,
+            ranks,
+            unmet,
         )
-        return cls(
+        out = cls(
             _structure=structure,
             _n_resamples=len(fits),
             _threshold=threshold,
@@ -269,6 +280,11 @@ class BootstrapOutput:
             _constraints=constraints,
             _ranks=ranks,
         )
+        if constraints is None or constraints.required_paths is None:
+            return out
+        from andrey.api._method import drop_unmet
+
+        return drop_unmet(out, unmet, "bootstrap")
 
     # ---- surface --------------------------------------------------------------------------
 
@@ -507,11 +523,13 @@ def _average(
     strict: bool,
     constraints: Constraints | None,
     ranks: np.ndarray | None,
+    unmet: list[tuple[str, int, int]] | None = None,
 ) -> tuple[Structure, str]:
     """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``.
 
     Returns the graph and its ``metadata["averaged_graph"]``: ``"vote"``, ``"nearest_resample"``,
-    or ``"nearest_resample_invalid"`` when no fit is a valid graph of the kind.
+    or ``"nearest_resample_invalid"`` when no fit is a valid graph of the kind. The path claims a
+    valid vote does not meet are added to ``unmet`` (:func:`_valid_graph`).
     """
     if lags is not None:
         graphs = [_vote_graph(s, n_resamples, threshold, n, labels) for s in slices]
@@ -521,7 +539,7 @@ def _average(
         return _vote_graph(s, n_resamples, threshold, n, labels), "vote"
     try:
         return _valid_graph(
-            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks
+            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks, unmet
         ), "vote"
     except ValueError as exc:
         reason = f"the vote of the fits has no valid {s.kind}: {exc}"
@@ -595,6 +613,7 @@ def _valid_graph(
     labels: tuple[str, ...] | None,
     constraints: Constraints | None,
     ranks: np.ndarray | None,
+    unmet: list[tuple[str, int, int]] | None = None,
 ) -> GraphStructure:
     """Return the valid graph of ``kind`` that the published steps make of ``vote``.
 
@@ -604,10 +623,14 @@ def _valid_graph(
     ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
-    MPDAG, and a ``pag`` is oriented as ``fci`` orients one under knowledge: the vote and the PAG
-    get the knowledge's endpoints (``knowledge_marks``) before the MAG step and before the
-    orientation rules, which then run to a fixed point.
-    Raises ``ValueError``, saying why, when no extension or no MAG exists.
+    MPDAG, restricted by the knowledge's ``required_paths`` and ``forbidden_paths``
+    (:func:`~andrey.core.ancestral.restrict`), and a ``pag`` is oriented as ``fci`` orients one
+    under knowledge: the vote and the PAG get the knowledge's endpoints (``knowledge_marks``)
+    before the MAG step and before the orientation rules, which then run to a fixed point. The
+    claims of ``required_paths`` and ``forbidden_paths`` the graph does not meet, which the
+    ``cpdag`` step drops and the ``pag`` step finds as ``fci`` does
+    (:func:`~andrey.constraint.fci.unmet_path_claims`), are added to ``unmet``, each
+    ``(part, a, b)``. Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
         if constraints is not None:
@@ -616,7 +639,16 @@ def _valid_graph(
             vote = vote.copy()
             knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
         mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
-        return pag_of(mag, None, (), constraints)
+        pag = pag_of(mag, None, (), constraints)
+        if unmet is not None and constraints is not None and constraints.required_paths is not None:
+            from andrey.constraint.fci import unmet_path_claims
+
+            unmet.extend(
+                unmet_path_claims(
+                    pag.to_numpy(), constraints.required_paths, constraints.forbidden_paths
+                )
+            )
+        return pag
     if ((vote == ARROW) & (vote.T == ARROW)).any():
         raise ValueError("it has a bidirected edge, which no DAG has")
     if constraints is not None:
@@ -627,6 +659,14 @@ def _valid_graph(
     cpdag = cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
+        if constraints.required_paths is not None:
+            from andrey.core.ancestral import restrict
+
+            cpdag, _, dropped = restrict(
+                cpdag, constraints.required_paths, constraints.forbidden_paths
+            )
+            if unmet is not None:
+                unmet.extend(dropped)
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 
@@ -1071,18 +1111,23 @@ def bootstrap(
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
     is oriented as ``fci`` orients one under knowledge: the endpoints the knowledge sets come
     first, and Zhang's orientation rules then run from them until no endpoint changes, as they do
-    in a fit [9]_, [10]_. A time-series result's lag graphs
+    in a fit [9]_, [10]_. Its ``required_paths`` and ``forbidden_paths`` act on the averaged graph
+    as in a fit: a claim the graph does not meet is dropped, with a
+    :class:`~andrey.KnowledgeWarning`, and ``metadata["unmet_knowledge"]`` lists it, as each fit's
+    own metadata lists its claims. A time-series result's lag graphs
     keep the vote, as in [6]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 
-    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle
-    or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``, the
-    averaged graph is then the resample graph nearest the others, a graph the method returned: the
-    fit whose state of each pair the most fits share, summed over the pairs, which is the fit with
-    the least mean structural Hamming distance to the others. Only a resample that is a valid graph
-    of the method's kind can be that fit: a ``cpdag`` with a consistent DAG extension, or a PAG that
-    passes the steps above, because a method can return a graph labeled ``cpdag`` that no DAG
-    extends (``pc`` leaves conflicting orientations undirected). A warning says so, and
+    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle,
+    its undirected edges a chordless cycle of four or more nodes, or a bidirected edge joins a node
+    to one of its descendants. With ``strict=False``, the averaged graph is then the resample graph
+    nearest the others, a graph the method returned: the fit whose state of each pair the most fits
+    share, summed over the pairs, which is the fit with the least mean structural Hamming distance
+    to the others. Only a resample that is a valid graph of the method's kind can be that fit: a
+    ``cpdag`` with a consistent DAG extension, or a PAG that passes the steps above, because a
+    method can return a graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting
+    orientations undirected), or one labeled ``pag`` from which Zhang's construction builds no MAG
+    (``fci`` when test errors give results that no MAG fits). A warning says so, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is ``"vote"`` otherwise. When no
     resample is valid, a warning says so, the averaged graph is the resample nearest the others, and
     ``metadata["averaged_graph"]`` is ``"nearest_resample_invalid"``. ``strict=True`` raises in both

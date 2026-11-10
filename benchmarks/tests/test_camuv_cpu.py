@@ -118,16 +118,18 @@ def test_the_paper_simulation_draws_its_own_noise_only() -> None:
         regime_models.sample("camuv2021", d=14, n=50, seed=0, density=2.7, noise="gaussian")
 
 
-#: SHA-256 of the data and truth of the paper's simulation at seeds 0 to 2, 50 rows. A change to any
-#: drawn value changes it, and with it the datasets a campaign has stored.
-PAPER_DRAWS = "4f054bc3d4f7c9b4f6ca0e8687b548e70e9054ea9e36853dbbc5d2ad04e9477a"
+#: SHA-256 of the paper's simulation at seeds 0 to 2, 50 rows: each seed's data rounded to 5
+#: decimals, then its truth. A change to any drawn edge, value, or row changes it, and with it the
+#: datasets a campaign has stored. The data are rounded because NumPy's vectorized math rounds the
+#: last bits differently on different CPUs.
+PAPER_DRAWS = "56466e3146b2df625c3857c7033947ce215ceec13cbcf1632322cc5faed2f000"
 
 
 def test_the_paper_simulation_keeps_its_draws() -> None:
     digest = hashlib.sha256()
     for seed in range(3):
         data, marks = _paper(seed, n=50)
-        digest.update(np.ascontiguousarray(data).tobytes() + marks.tobytes())
+        digest.update((np.round(data, 5) + 0.0).tobytes() + marks.tobytes())
     assert digest.hexdigest() == PAPER_DRAWS
 
 

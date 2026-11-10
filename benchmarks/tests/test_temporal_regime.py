@@ -70,7 +70,11 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
     ]
     digests = {}
     for regime, (topology, functional, noise, standardize) in datasets.REGIMES.items():
-        if regime in datasets.TEMPORAL_REGIMES or functional in datasets.regime_models.MODELS:
+        if (
+            regime in datasets.TEMPORAL_REGIMES
+            or functional in datasets.regime_models.MODELS
+            or functional in datasets.pair_models.MODELS
+        ):
             continue
         key = datasets.DatasetKey(
             topology=topology,
@@ -99,16 +103,58 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
         "latent_lingam_er_unitless": ("f705e07cbd33", "1363233a2729"),
         "anm_pair": ("3fc95594c2c1", "a200dd78d80c"),
         "pnl_pair": ("dae8d1a6f304", "d015f7add4b2"),
+        "score_paper": ("570f07a8ee23", "03ad50e06833"),
+        "score_paper_standardized": ("19de8b4ac2e2", "bf470ea62e5e"),
+        "score_paper_rescaled": ("3044433ea49d", "cff0c785ca13"),
+        "score_paper_laplace": ("ee84d23114bd", "4c1afbaf642b"),
+        "score_paper_laplace_standardized": ("a1b56b5cf79b", "b6a4ff9497a5"),
+        "score_paper_laplace_rescaled": ("5adc4ac8158e", "67ef0660ecac"),
+        "score_paper_gumbel": ("7a306534bf9d", "c024ace573ac"),
+        "score_paper_gumbel_standardized": ("024d206107a4", "b2d613e08c9e"),
+        "score_paper_gumbel_rescaled": ("1a6102a00f19", "158d70ba8220"),
+        "lsnm_pair": ("437b4a935d24", "4dcfa6f8da52"),
+        "lsnm_gumbel_pair": ("547a97874ca6", "9429e2bbd3be"),
+        "lsnm_laplace_pair": ("98c89f5f5543", "9f4c0eaf7f25"),
+        "lsnm_rescaled_pair": ("4f145e5182d2", "43ca7d76fea3"),
+        "lsnm_gumbel_rescaled_pair": ("c89e49d48f17", "a6218adf0638"),
+        "lsnm_laplace_rescaled_pair": ("d1998a89487a", "a8c5a3576a03"),
         "anm_er": ("3fc95594c2c1", "a200dd78d80c"),
         "nonmonotone_er": ("ff3373b815bf", "94b3f4a7f493"),
         "discrete_er": ("389cde24484c", "1cff12e9af03"),
         "mixed_er": ("7fb1f31c503f", "cb7595f71def"),
         "anm_gumbel_er": ("aeeed32dca56", "e58c2967b520"),
+        "anm_laplace_er": ("55315697e1fc", "2fa462b290e8"),
         "lsnm_er": ("437b4a935d24", "4dcfa6f8da52"),
         "anm_er_raw": ("8fbacb8872d9", "68d165bdbba2"),
         "anm_gumbel_er_raw": ("eefd431b963e", "82e8a3206a9b"),
         "lsnm_er_raw": ("93272b311306", "893b91d16379"),
         "linear_gauss_er_raw": ("79f22a2abf00", "9c9507040168"),
+    }
+
+
+def test_the_pair_sets_keep_their_identity():
+    """The pair sets of Tagasovska et al. (2020), one pair of the paper's 1,000 rows each."""
+    digests = {}
+    for regime, (topology, functional, noise, standardize) in datasets.REGIMES.items():
+        if functional not in datasets.pair_models.MODELS:
+            continue
+        key = datasets.DatasetKey(
+            topology=topology,
+            functional=functional,
+            noise=noise,
+            standardize=standardize,
+            density=1.0,
+            d=2,
+            n=1000,
+            seed=0,
+        )
+        digests[regime] = (key.digest, dataclasses.replace(key, shuffle=False).digest)
+    assert digests == {
+        "tagasovska_an_pair": ("2904dbffdf7f", "f24d6378142d"),
+        "tagasovska_ans_pair": ("512a931521ff", "1221f0ca5f46"),
+        "tagasovska_ls_pair": ("d69b3e87063f", "82c8f7ca12eb"),
+        "tagasovska_lss_pair": ("0d5671c0e206", "560ed6a41acd"),
+        "tagasovska_mnu_pair": ("511f72765523", "5b65f8b1fa51"),
     }
 
 

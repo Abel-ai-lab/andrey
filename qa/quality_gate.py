@@ -174,9 +174,10 @@ ASIA_ARCS = (
 PAIRS: dict[str, dict[str, str]] = {
     "anm_pair": {"functional": "additive_noise", "noise": "gaussian"},
     "pnl_pair": {"functional": "post_nonlinear", "noise": "laplace"},
+    "lsnm_pair": {"functional": "location_scale", "noise": "gaussian"},
 }
 #: Rows per pair. The empty graph's SHD on a pair is 1, so a method passes only when its median SHD
-#: is 0: it names the true direction on most draws, as ANM and PNL do from 1,000 rows.
+#: is 0: it names the true direction on most draws, as ANM, PNL, and LOCI do from 1,000 rows.
 PAIR_N = 1000
 
 #: ``(d, n)`` of GIES's published regime, ``interventional_gauss_er``, at ``n = 50d``, drawn by its
@@ -881,6 +882,7 @@ SUPPORTED: dict[str, Method] = {
     "GIN": Method(lambda x: andrey.gin(x), "clusters", _models("latent_measurement")),
     "ANM": Method(lambda x: andrey.anm(x), "dag", (f"anm_pair_n{PAIR_N}",)),
     "PNL": Method(lambda x: andrey.pnl(x), "dag", (f"pnl_pair_n{PAIR_N}",)),
+    "LOCI": Method(lambda x: andrey.loci(x), "dag", (f"lsnm_pair_n{PAIR_N}",)),
     # Time series: the published settings (lags, levels, and order), on the published regimes.
     "PCMCI": Method(
         _adapted(AndreyPCMCI(name="pcmci", indep_test="student_t", tau_max=2)),

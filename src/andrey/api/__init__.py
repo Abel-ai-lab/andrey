@@ -17,7 +17,7 @@ from .constraint import cdnod, fci, fci_jci, gfci, icp, pc
 from .continuous import dagma, notears
 from .fcm import cam, camuv, resit
 from .hybrid import mmhc, rsmax2
-from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
+from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, boss_fci, grasp, grasp_fci, igsp, ut_igsp
@@ -84,6 +84,7 @@ __all__ = [
     # irregular / pairwise family
     "anm",
     "pnl",
+    "loci",
     # latent-variable family
     "gin",
     # hidden-confounder family

@@ -5,7 +5,8 @@ them; each category below it can be filtered on its own. A warning never changes
 
 Each distinct message warns once per process, pointing at the first line outside the package. A
 message is recorded only after :func:`warnings.warn` returns, so an ``error`` filter fails every
-call rather than only the first.
+call rather than only the first. A :class:`KnowledgeWarning` reports what one fit dropped, so it
+warns for every fit that drops a claim (:func:`warn_each`).
 """
 
 from __future__ import annotations
@@ -86,6 +87,12 @@ class DeprecatedArgumentWarning(AndreyWarning):
     """
 
 
+class KnowledgeWarning(AndreyWarning):
+    """Background knowledge the graph a fit found cannot meet: a path claim the fit drops and lists
+    in ``metadata["unmet_knowledge"]``. It warns once for each fit that drops a claim.
+    """
+
+
 def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = None) -> None:
     """Warn with ``message`` the first time this process sees it, at the caller's line.
 
@@ -97,6 +104,11 @@ def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = 
             return
         warnings.warn(message, category, stacklevel=_caller_stacklevel())
         _warned.add(seen)
+
+
+def warn_each(message: str, category: type[AndreyWarning]) -> None:
+    """Warn with ``message`` every time, at the caller's line, for a warning about one fit."""
+    warnings.warn(message, category, stacklevel=_caller_stacklevel())
 
 
 def warn_search_limit(method: str, parameter: str, value: int, unit: str) -> None:

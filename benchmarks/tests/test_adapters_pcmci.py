@@ -37,6 +37,7 @@ from andrey_bench.adapters.tigramite_pcmci import (
 )
 from andrey_bench.contracts import SolutionAdapter, links_from_temporal
 from andrey_bench.integration import _truth
+from andrey_bench.window import CONFLICT
 
 TIGRAMITE_PYTHON = Path(runner.BENCH_ROOT) / ".venv-tigramite" / "bin" / "python"
 
@@ -72,6 +73,17 @@ def _same_step_series(seed: int = 0, steps: int = 500) -> np.ndarray:
         x[t, 3] += 0.6 * x[t - 1, 2]
         x[t, 1] += 0.7 * x[t, 0]
         x[t, 2] += 0.6 * x[t, 1] + 0.6 * x[t, 3]
+    return x
+
+
+def _confounded_series(seed: int = 0, steps: int = 500) -> np.ndarray:
+    """Two autocorrelated series with a hidden common cause at each step and no link between them."""
+    rng = np.random.default_rng(seed)
+    noise = rng.standard_normal((steps, 2))
+    hidden = rng.standard_normal(steps)
+    x = np.zeros((steps, 2))
+    for t in range(1, steps):
+        x[t] = 0.6 * x[t - 1] + hidden[t] + noise[t]
     return x
 
 
@@ -227,6 +239,17 @@ def test_the_andrey_pcmciplus_marks_are_the_structure_andrey_returns() -> None:
     np.testing.assert_array_equal(marks[1], np.where(lag1, 1, 0))
     assert marks[1, 2, 3] == 1  # the planted lagged link
     assert adapter.to_structure(marks).lag0 == "cpdag"
+
+
+def test_a_pcmciplus_conflict_is_a_conflict_mark_at_both_ends() -> None:
+    """A hidden common cause makes PCMCI+ orient the link both ways. The structure shows it
+    undirected and ``metadata["conflicts"]`` lists it; the window marks a conflict at both ends, as
+    tigramite's ``x-x`` does."""
+    x = _confounded_series()
+    adapter = andrey_pcmciplus_adapter(1)
+    marks = adapter.fit(x, adapter.params())
+    assert andrey.pcmciplus(x, tau_max=1).metadata["conflicts"] == [[0, 0, 1]]
+    assert marks[0, 0, 1] == marks[0, 1, 0] == CONFLICT
 
 
 def test_the_andrey_lpcmci_marks_are_its_links() -> None:

@@ -591,6 +591,7 @@ def greedy_search(
     n_perturbations: int,
     seed: int,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Run ``search`` from the start DAG and from changed copies of the best DAG so far.
 
@@ -614,6 +615,7 @@ def greedy_search(
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
             categorical=categorical,
+            cov=cov,
         )
 
     score = new_score()
@@ -686,6 +688,7 @@ def hc(
     n_perturbations: int = 1,
     seed: int = 0,
     sources: tuple[int, ...] = (),
+    cov: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -748,6 +751,11 @@ def hc(
         one a parent, and their edges are then directed out of them, with Meek's rules orienting
         what follows (:func:`~andrey.core.orient.orient_out_of`). Empty, the default, leaves every
         variable free.
+    cov : ndarray of shape (n_features, n_features) or None
+        A covariance the linear-Gaussian BIC reads in place of the data's, over the rows of
+        ``data``, such as the expected covariance of data with missing values
+        (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
+        (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
 
     Returns
     -------
@@ -771,4 +779,5 @@ def hc(
         n_perturbations=n_perturbations,
         seed=seed,
         sources=sources,
+        cov=cov,
     )

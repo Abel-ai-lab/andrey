@@ -101,12 +101,6 @@ def test_every_post_is_dated_once_and_names_its_version():
             assert path.startswith(f"{meta['version']}/") and (POSTS / path).is_file(), path
 
 
-def test_the_old_demo_address_redirects_to_the_examples():
-    template = (ROOT / "docs" / "_templates" / "demo-redirect.html").read_text()
-    assert 'content="0; url=../docs/demos/index.html"' in template
-    assert '"demo/index": "demo-redirect.html"' in CONF
-
-
 def test_the_benchmark_explorer_address_redirects_to_the_release_cards():
     template = (ROOT / "docs" / "_templates" / "benchmark-explorer-redirect.html").read_text()
     assert 'content="0; url=../benchmarks.html"' in template

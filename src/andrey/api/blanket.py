@@ -91,6 +91,7 @@ def iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -133,6 +134,11 @@ def iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -152,12 +158,16 @@ def iamb(
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
         non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
         other parent belongs to the blanket without being adjacent, and is left out of the result.
-        Under ``structure="cpdag"``, the result directs every edge the knowledge
-        decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
-        it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
-        (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
-        kept into a directed cycle raises ``ValueError``. The undirected outputs do not read tiers
-        or edges forbidden one way.
+        Under ``structure="cpdag"``, the result directs every edge the knowledge decides, by a tier
+        or an edge forbidden one way, before the colliders, which never reverse it, and Meek's rules
+        direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -189,6 +199,10 @@ def iamb(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----
@@ -325,6 +339,7 @@ def inter_iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -366,6 +381,11 @@ def inter_iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -385,12 +405,16 @@ def inter_iamb(
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
         non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
         other parent belongs to the blanket without being adjacent, and is left out of the result.
-        Under ``structure="cpdag"``, the result directs every edge the knowledge
-        decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
-        it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
-        (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
-        kept into a directed cycle raises ``ValueError``. The undirected outputs do not read tiers
-        or edges forbidden one way.
+        Under ``structure="cpdag"``, the result directs every edge the knowledge decides, by a tier
+        or an edge forbidden one way, before the colliders, which never reverse it, and Meek's rules
+        direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -422,6 +446,10 @@ def inter_iamb(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----
@@ -551,6 +579,7 @@ def mmpc(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -592,6 +621,11 @@ def mmpc(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -608,13 +642,17 @@ def mmpc(
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
         the other's set from the start, and no test removes it; a pair the knowledge makes
-        non-adjacent, forbidden both ways or outside ``allowed``, is never a candidate.
-        Under ``structure="cpdag"``, the result directs every edge the knowledge
-        decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
-        it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
-        (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
-        kept into a directed cycle raises ``ValueError``. The undirected outputs do not read tiers
-        or edges forbidden one way.
+        non-adjacent, forbidden both ways or outside ``allowed``, is never a candidate. Under
+        ``structure="cpdag"``, the result directs every edge the knowledge decides, by a tier or an
+        edge forbidden one way, before the colliders, which never reverse it, and Meek's rules
+        direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -645,6 +683,10 @@ def mmpc(
         up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
         edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
 
     Warns
     -----

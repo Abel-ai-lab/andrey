@@ -47,6 +47,7 @@ from .api import (
     igsp,
     inter_iamb,
     jpcmciplus,
+    loci,
     longitudinal_lingam,
     lpcmci,
     mmhc,
@@ -76,6 +77,7 @@ from .core.warning_policy import (
     DataTypeWarning,
     DeprecatedArgumentWarning,
     ExperimentalWarning,
+    KnowledgeWarning,
     PerformanceWarning,
     SampleSizeWarning,
     SearchLimitWarning,
@@ -83,7 +85,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 __all__ = [
     "__version__",
@@ -112,6 +114,7 @@ __all__ = [
     "DataTypeWarning",
     "DeprecatedArgumentWarning",
     "ExperimentalWarning",
+    "KnowledgeWarning",
     "PerformanceWarning",
     "SearchLimitWarning",
     "SampleSizeWarning",
@@ -163,6 +166,7 @@ __all__ = [
     # Pairwise direction tests.
     "anm",
     "pnl",
+    "loci",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",

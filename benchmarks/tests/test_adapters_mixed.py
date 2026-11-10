@@ -125,10 +125,10 @@ def test_an_andrey_fit_gives_a_cpdag(adapter) -> None:
     assert structure.kind == "cpdag" and structure.n_nodes == 8
 
 
-def test_setup_imports_the_searches_fit_defers() -> None:
+def test_setup_imports_the_searches_fit_defers(unimport) -> None:
     searches = ("andrey.constraint.pc", "andrey.search.ges", "andrey.search.hc")
     for module in searches:
-        sys.modules.pop(module, None)
+        unimport(module)
     andrey_mixed_adapters()[0].setup()
     assert set(searches) <= set(sys.modules)
 

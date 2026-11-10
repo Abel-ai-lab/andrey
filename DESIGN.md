@@ -22,7 +22,8 @@ The brand uses the two parts of a causal graph as plain marks, never as drawn gr
 
 - **Node, a dot**, marks one thing to notice: the dot before a release's version on a link preview,
   above the version on a release card's cover, and on Release cards in the navbar for a release
-  the reader has not seen, for a week after the release (`nav-new`).
+  the reader has not seen, for a week after the release (`nav-new`). The default cover and its
+  link preview have no dot (see [Art](#art)).
 - **Edge, a line**, marks a relation or direction: the A's amber stroke, the single amber stroke
   in each artwork, and the hairline under a heading in the documentation footer.
 - **Amber is the one accent.** A composition (a cover, a card, a link preview, a page's header)
@@ -49,9 +50,9 @@ over art (SemiBold, white). Code uses the system's monospace font.
 ### Color
 
 The light theme is ink on paper and the dark theme pale ink on night. Cobalt marks links, selection,
-and the art's ground; navy is the art's deep ground and the footer's; amber is the sole accent. The
-website uses the `--andrey-ground-*` and `--andrey-*` custom properties (`site/grain.py`,
-`docs/palette_css.py`); no stylesheet specifies a hex value.
+and the art's ground; navy is the art's deep ground, the footer's, and the default cover's; amber
+is the sole accent. The website uses the `--andrey-ground-*` and `--andrey-*` custom properties
+(`site/grain.py`, `docs/palette_css.py`); no stylesheet specifies a hex value.
 
 ### Art
 
@@ -60,6 +61,13 @@ with fine stippling, modeled on Soviet space-age posters of 1958-1963. Each has 
 (a node or an edge), with the subject on the right and text on the left, and is stored after
 `brand_tones` processing. [`site/brand/README.md`](site/brand/README.md) lists each artwork and its
 subject.
+
+A release without its own art takes the default cover (`release-default` in
+`docs/_static/benchmarks.css`) on its card and on the Release cards page: the navy ground, the
+masthead, the wordmark's image in the title's place, and the version. It has no dot above the
+version: the wordmark's amber stroke is the composition's one accent. Its tile among the earlier
+releases is the navy ground and the version. A post without art has the same link preview: the
+white wordmark and its line on navy, with no dot (`preview_svg` in `site/cards.py`).
 
 ## Figures
 
@@ -124,9 +132,11 @@ post or a release card gets the tint and the bold at build time (`_comparison_ta
 
 - A latent node is hollow and dashed.
 - An intervened node (`targets=`) is a square, the shape of a regime or decision node in
-  influence diagrams, and a bar crosses each arrowhead into it: the edges an intervention cuts. A
-  target no arrowhead points into gets a short barred arrow from outside. Shape alone carries the
-  mark, so it reads without color, and a latent target keeps its dashed ring.
+  influence diagrams, and a cross marks the middle of each edge with an arrowhead into it: the
+  edges an intervention cuts. A target no arrowhead points into is marked by its square alone.
+  Shape alone carries the mark, so it reads without color, and a latent target keeps its dashed
+  ring. `to_graphviz` writes the square in DOT (`shape=square`) and leaves out the cross, since
+  Graphviz marks only the ends of an edge.
 - A 2-cycle is two parallel curved edges, distinct from one bidirected edge.
 - An edge that would cross a node it does not join bends around it, so a drawing never suggests an
   edge the graph lacks.

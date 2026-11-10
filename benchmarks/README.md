@@ -137,6 +137,44 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
+The references of the Stein-score screen, `stein_cpu.py`, need NumPy 1 and share an environment
+built from the lock file `requirements-stein.txt`: the authors' SCORE code, NoGAM in dodiscover at
+a pinned commit, and CausalDisco. SCORE has no package release, so `start_stein.sh` downloads its
+files at a pinned commit, checks each one's SHA-256, and keeps them in the git-ignored
+`benchmarks/.score`, from which the benchmark imports them. SCORE prunes with mgcv through Rscript,
+so load R as `start_r.sh --env` prints before a run:
+
+```shell
+benchmarks/start_stein.sh
+export ANDREY_BENCH_STEIN_PYTHON=$PWD/benchmarks/.venv-stein/bin/python
+export ANDREY_BENCH_SCORE=$PWD/benchmarks/.score
+```
+
+The authors' LOCI code, the reference for LOCI, has no license, so the harness runs it unmodified
+and keeps it out of the repository: `start_loci.sh` downloads the files of a pinned commit, checks
+each one's SHA-256, writes them to `benchmarks/.loci`, and builds an environment from the lock file
+`requirements-loci.txt` (see [LOCI](comparisons/loci.md)):
+
+```shell
+benchmarks/start_loci.sh
+export ANDREY_BENCH_LOCI_PYTHON=$PWD/benchmarks/.venv-loci/bin/python
+export ANDREY_BENCH_LOCI=$PWD/benchmarks/.loci
+```
+
+The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
+and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and
+extracts it into a git-ignored folder the adapters read from. MissDAG, the reference for
+`missing="em"`, fits in an environment of its own on Python 3.10; the MVPC authors' R code, the
+reference for `pc(missing="mvpc")`, adds its R packages to the R lane's library:
+
+```shell
+benchmarks/start_missdag.sh    # prints the two exports below
+export ANDREY_BENCH_MISSDAG=$PWD/benchmarks/.missdag/MissDAG-<commit>
+export ANDREY_BENCH_MISSDAG_PYTHON=$PWD/benchmarks/.venv-missdag/bin/python
+benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
+export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
+```
+
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
@@ -510,6 +548,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/datasets.py` - dataset store and regime vocabulary; every solution reads identical
   bytes.
 - `andrey_bench/regime_models.py` - the data of the domain, group, and latent-indicator regimes.
+- `andrey_bench/pair_models.py` - the synthetic cause-effect pair sets of Tagasovska et al. (2020).
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
 - `andrey_bench/oracle.py` - a solution returning the true graph; a correct pipeline scores SHD 0.

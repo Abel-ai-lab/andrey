@@ -8,50 +8,79 @@ html_theme.sidebar_secondary.remove: true
 
 # Release cards
 
-Every release comes with a post that announces it and a release card that keeps the record: the
-benchmarks first, then the methods the release adds or promotes, their known limits, and how to
-rerun the measurements. A card keeps the numbers its release published.
+Every release comes with a release card that keeps the record: the benchmarks first, then the
+methods the release adds or promotes, their known limits, and how to rerun the measurements. A
+release with a theme also comes with a post that announces it; a release without one updates the
+posts of the features it changes. A card keeps the numbers its release published.
 
 % The latest release: its cover, then its TL;DR. The next release replaces this block, and this
 % release moves to the top of "Earlier releases" (docs/DEVELOPMENT.md, "The release cards").
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.15.0
+:link: benchmarks/0.16.0
 :link-type: doc
-:link-alt: The 0.15.0 release card: multi-domain data
-:class-card: release-cover release-art release-art-0-15-0
+:link-alt: The 0.16.0 release card
+:class-card: release-cover release-default
 :shadow: none
 :margin: 0
 
 Release card
 
-Multi-domain data
+<p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
+width="190" height="40"></p>
 
-0.15.0
+0.16.0
 :::
 
 ::::{div} release-tldr
 
-0.15.0 is here: multi-domain data. The card measures the methods it makes supported against their
-authors' code: FCI-JCI, which learns from data collected in several environments, against pcalg;
-BOSS-FCI and GRaSP-FCI against Tetrad, on data with hidden common causes; and J-PCMCI+, which
-learns from time series of several datasets, against tigramite.
-
-:::{div} release-stats
-
-- **4 methods** newly supported: FCI-JCI, BOSS-FCI, GRaSP-FCI, and J-PCMCI+
-- **0 of 186** comparisons where pcalg, Tetrad 7.6.10, or tigramite makes significantly fewer errors
-- **72x to 79x** FCI-JCI's median speed over pcalg at 10 variables
-:::
+0.16.0 is here. Simulate missing values with a known cause, and fit incomplete data with MVPC for
+PC and EM for the score searches. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
+Tabu search. State causal paths and hidden common causes in background knowledge. LOCI reads the
+direction of a pair whose noise changes with the cause, and made no more errors than its authors'
+code. Drawings mark intervened variables, and HSIC p-values stay precise far below 1e-16.
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.15.0.md)
+[Read the release card](benchmarks/0.16.0.md)
+[Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+[Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.15.0
+:link-type: doc
+:link-alt: The 0.15.0 release card: multi-domain data
+:class-card: release-tile release-art-0-15-0
+:shadow: none
+:margin: 0
+
+0.15.0
+:::
+
+:::{div} release-body
+<h3>Multi-domain data</h3>
+
+FCI-JCI against pcalg, BOSS-FCI and GRaSP-FCI against Tetrad, and J-PCMCI+ against tigramite, on
+data from several environments or datasets, some with hidden common causes.
+
+- **0 of 186** comparisons where pcalg, Tetrad 7.6.10, or tigramite makes significantly fewer errors
+- FCI-JCI **72x to 79x** faster than pcalg in the median at 10 variables
+:::
+
+:::{div} release-meta
+Released November 8, 2026
+
+- [Release card<span class="visually-hidden"> 0.15.0</span>](benchmarks/0.15.0.md)
+- [Post: Multi-domain data](../blog/20261108-andrey-0-15-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -490,6 +519,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.16.0 <benchmarks/0.16.0>
 0.15.0: multi-domain data <benchmarks/0.15.0>
 0.14.0: interventional data <benchmarks/0.14.0>
 0.13.0: functional causal models <benchmarks/0.13.0>

@@ -24,6 +24,7 @@ from pydantic import model_validator
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -134,13 +135,13 @@ LINGAM = (
     "varma_lingam",
     "longitudinal_lingam",
 )
-RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
 TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -229,7 +230,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl")
+                for m in ("anm", "pnl", "loci")
             ),
             Deviation(
                 method="cam",
@@ -540,6 +541,7 @@ _CONCEPTS = (
                 "bottom_up_parce_lingam",
                 "anm",
                 "pnl",
+                "loci",
             ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
@@ -894,7 +896,9 @@ _CONCEPTS = (
         suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
-            *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
+            *_exempt(
+                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+            ),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -956,7 +960,23 @@ _CONCEPTS = (
     ),
     Concept(
         key="missing",
-        summary="NaN is a missing value, and each test reads the rows that observe its variables.",
+        summary="How a fit handles missing values: a NaN cell, pandas' NA, or an empty, NA, or N/A "
+        "field of a CSV file. testwise deletes rows per test, each test reading the rows that "
+        "observe its variables; em fits a search that reads only a covariance by structural EM "
+        "over the expected covariance. None picks the method's default handling: testwise for the "
+        "methods that delete rows per test, and a refusal for those that take only em; each method "
+        "lists the values it accepts.",
+        param=_template(
+            "missing",
+            "str",
+            None,
+            "How missing values (NaN) are handled: testwise = each test reads only the rows where "
+            "all of its variables are observed (test-wise deletion); null picks the method's "
+            "default, testwise.",
+            choices=MISSING_HANDLING,
+            nullable=True,
+        ),
+        fragment="missing values",
         suitable=(
             "pc",
             "fci",
@@ -968,6 +988,8 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
             "anm",
             "pnl",
+            "loci",
+            *EM_METHODS,
         ),
         exempt=(
             *_exempt(
@@ -975,11 +997,12 @@ _CONCEPTS = (
                 *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
             ),
             *_exempt(
-                "A score or a regression reads every column.",
-                *PURE_SCORE,
+                "Its score reads data from several environments, and no published EM covers them.",
+                "gies",
                 "gnies",
-                "calm",
-                *CONTINUOUS,
+            ),
+            *_exempt(
+                "A score or a regression reads every column.",
                 "cam",
                 "resit",
                 *LINGAM,
@@ -993,6 +1016,28 @@ _CONCEPTS = (
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
+        ),
+        deviations=(
+            Deviation(
+                method="pc",
+                name="missing",
+                default=None,
+                choices=(*MISSING_HANDLING, MVPC),
+                reason="mvpc, Missing-Value PC, corrects the test-wise deletion skeleton of PC "
+                "under causal sufficiency (Tu et al. 2019); its theory covers PC only.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="missing",
+                    default=None,
+                    choices=(EM,),
+                    reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
+                    "et al. 2022), suits a fit that reads only a covariance and the row count; "
+                    "None refuses missing values.",
+                )
+                for m in EM_METHODS
+            ),
         ),
     ),
     Concept(
@@ -1118,7 +1163,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "camuv", "anm", "pnl"),
+                *("cam", "resit", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),
@@ -1303,7 +1348,8 @@ _CONCEPTS = (
         key="warnings",
         summary="Every warning a fit raises is an AndreyWarning, one class per situation: "
         "ExperimentalWarning, BoundaryWarning, SearchLimitWarning, DataTypeWarning, "
-        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning.",
+        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning, "
+        "KnowledgeWarning.",
         suitable=ALL_METHODS,
     ),
     Concept(

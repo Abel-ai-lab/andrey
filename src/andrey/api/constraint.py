@@ -51,6 +51,7 @@ def pc(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -114,11 +115,20 @@ def pc(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise", "mvpc"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``"mvpc"`` is
+        Missing-Value PC [13]_: after the test-wise skeleton, it finds the parents of each
+        variable's missingness indicator and tests again, on virtual data that correct for them,
+        the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
+        ``None`` picks the method's default, ``"testwise"``. On data with missing values,
+        ``metadata["missing"]`` records the handling used. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make, and of the permutations of
+        ``missing="mvpc"``; the other tests ignore it. With those tests, or with ``"mvpc"`` on data
+        with missing values, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -133,7 +143,10 @@ def pc(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, giving the maximally
         oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
-        the search kept into a directed cycle raises ``ValueError``.
+        the search kept into a directed cycle raises ``ValueError``. In a CPDAG, ``required_paths``
+        and ``forbidden_paths`` keep the DAGs the graph stands for in which each listed path holds
+        or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped
+        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -147,8 +160,15 @@ def pc(
         column positions, the middle node second and ``x < y``, in ascending order.
         ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
         ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
-        which orientation each keeps. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        which orientation each keeps. With ``missing="mvpc"`` on data with missing values,
+        ``metadata["missingness_parents"]`` maps each column whose missingness indicator has
+        parents to them, and ``metadata["corrected_edges"]`` lists the edges tested again
+        (``"retested"``), those removed (``"removed"``), and those with a test that had too few
+        rows to correct (``"uncorrected"``), as ``[x, y]`` pairs in ascending order; both name a
+        DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is the seed of
+        the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
 
     Raises
@@ -168,7 +188,8 @@ def pc(
         categorical, by ``categorical`` or by its type. With ``"fisherz"`` or ``"student_t"``, also
         if a column repeats another up to scale and shift, before any test runs; one message names
         every group of copies and says to keep one column per group. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
+        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``.
 
     Warns
     -----
@@ -191,7 +212,9 @@ def pc(
     sparse graphs, where every variable has few neighbors, and then stays feasible with many
     variables [5]_; it returns a CPDAG. When unmeasured common causes are plausible, use
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`.
+    :func:`~andrey.direct_lingam`. When whether a value is missing depends on the variables,
+    through variables other than itself, ``missing="mvpc"`` removes the extra edges that
+    test-wise deletion can keep [13]_.
 
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
@@ -288,6 +311,36 @@ def pc(
     other tests, or when a continuous column is constant on its rows. With missing values, the
     skeleton search runs in one process.
 
+    **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
+    skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
+    missingness indicator of a variable in the test to be a common effect of ``x`` and ``y``, or a
+    descendant of one (their Proposition 2). Step 2 finds the parents of each indicator: the
+    variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
+    against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
+    ``alpha``, and ``max_depth``; a test whose rows hold one value of the indicator separates the
+    pair. Step 3 marks as candidates the adjacent pairs that share an adjacent variable or an
+    indicator they both cause. Step 4 runs the skeleton search again over the candidates, every
+    other edge kept, with the permutation-based correction (PermC, their Algorithm 2): a test of
+    ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``, ``y``, and
+    ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
+    observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
+    drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
+    virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
+    ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an empty ``W`` is the
+    test-wise one. So is a test with fewer than ``max(|S| + 3, |W| + 2)`` rows where ``x``, ``y``,
+    ``S``, and ``W`` are all observed, too few for the regressions on ``W`` or for the test: the
+    paper leaves that case open, and as the correction can only remove an edge the test-wise tests
+    kept, the pair keeps its test-wise answer for that ``S`` and is listed in
+    ``metadata["corrected_edges"]["uncorrected"]``. The colliders follow the corrected separating
+    sets; ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction
+    applies to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's
+    rules. Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
+    p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
+    where the queried columns' values are missing, so a result depends on neither the column order,
+    nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
+    the result of ``"testwise"``.
+
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
     stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
@@ -312,10 +365,61 @@ def pc(
     variables. The median fit at 40 variables took 0.38 s with ``"degen_gauss"``, 0.42 s with
     ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    them on up to 8 variables. With missing values, measured on simulated linear-Gaussian data on
+    one core with a cap of 30 minutes per fit, at ``alpha=0.01`` unless another level is named. In
+    the setting of Tu et al. [13]_ (random DAGs with 20 variables, 10 of them with missing values,
+    or with 50 and 16; 100 to 10,000 rows; one parent per indicator, always observed or with missing
+    values itself), the mean errors of ``missing="mvpc"`` stayed below the empty graph's in all 32
+    settings. They were below those of ``"testwise"`` in 10 of the 16 settings with such a mask and
+    tied in 6, and tied in the 16 controls with as many values missing completely at random: at 50
+    variables and 10,000 rows, 5.1 against 14.3 with observed parents and 7.4 against 14.9 with
+    parents that have missing values, in a median of 2.5 s. At 100 rows, 7 of 1,600 fits raised
+    because a test had fewer rows than it needs, as with ``"testwise"``. On Erdos-Renyi graphs of 10
+    to 100 variables (mean degree 2 or 4; 500, 2,000, or 10,000 rows; 10 to 30% of the values
+    missing), with one observed parent per indicator, ``"mvpc"`` had fewer errors than
+    ``"testwise"`` in 14 of 72 settings, and in 28 at ``alpha=0.05``, and more in none. The
+    correction does not help where there is nothing to correct or where an indicator has many weak
+    parents. With values missing completely at random it tied in 136 of 144 settings over both
+    levels, and no setting where it was behind repeated on fresh seeds. Under a logistic mask that
+    gives an indicator many weak parents, up to 30 at 100 variables, it tied in 125 of the 141
+    settings judged and was behind ``"testwise"`` in 12, in 3 of them on fresh seeds too, all with
+    100 variables and 30% missing: at mean degree 2 and 10,000 rows by 3.1 errors on the 11 of 20
+    datasets that finished, both times, and at mean degree 4 with 2,000 and 10,000 rows by 1.8 and
+    2.65 errors and then by 3.5. With one parent per indicator that has missing values itself, it
+    had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
+    ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
+    by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
+    ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
+    is the better choice. The correction holds when no missingness indicator causes a
+    variable, every independence in the observed rows also holds in the missing ones, no indicator
+    is a deterministic function of others, and no value causes its own missingness (self-masking)
+    [13]_; the data cannot check these, and a violation voids the correction. PermC also needs
+    linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
+    ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
+    on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
+    d-separated given ``S`` exactly when they are given ``S`` and those indicators. Condition (ii)
+    fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
+    descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
+    ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
+    The density-ratio correction the paper gives for these cases is not implemented. A corrected
+    test with too few rows is answered by the test-wise test (see **Missing-Value PC.**), so its
+    pair is not corrected: of the 14,323 fits that returned on the Erdos-Renyi graphs, 962 held such
+    a test, nearly all under masks where most columns have missing values, and
+    ``metadata["corrected_edges"]["uncorrected"]`` lists the pairs. Step 2 runs one skeleton search
+    per variable with missing values, and its cost grows with the parents an indicator has: under
+    the logistic mask at mean degree 2 with 100 variables and 10,000 rows, 77 of 120 fits ran past
+    the 30 minute cap in that search, on data where the fit with ``"testwise"`` took 3.3 s (median).
+    ``max_depth`` bounds the search. With true ``required_paths`` or ``forbidden_paths`` on 5 to 30%
+    of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree 2 or 4,
+    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 5.8% with required paths and 10.9% with forbidden paths
+    pointed against the true DAG, each in a fit whose graph had an edge missing or extra or a
+    collider wrong. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -378,15 +482,23 @@ def pc(
     >>> pc(data, indep_test="degen_gauss").structure.oriented_edges()
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
+    from andrey.constraint.mvpc import PERMC_TESTS
     from andrey.constraint.pc import pc as _pc
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     assert indep_test is not None  # method_spec picks it from the column types
+    assert seed is not None  # method_spec resolves it
+    if missing == "mvpc" and indep_test not in PERMC_TESTS:
+        raise ValueError(
+            'pc: missing="mvpc" corrects the partial-correlation tests, so indep_test must be '
+            f'"fisherz" or "student_t", got {indep_test!r}'
+        )
     X, mask, labels, constraints = fit_inputs(
         data, "indep_test", indep_test, categorical, knowledge, method="pc", missing=True
     )
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    found: dict = {}
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
@@ -399,16 +511,44 @@ def pc(
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
+            missing=missing or "testwise",
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _mvpc=found,
         )
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
+        **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
+    """Return MVPC's indicator parents, corrected edges, and ``seed`` as metadata, or ``{}``.
+
+    ``found`` is empty when the correction did not run, on data without missing values, and the
+    fit then drew no random numbers. A column is its label when ``labels`` is given, else its
+    0-based position.
+    """
+    if not found:
+        return {}
+
+    def name(j: int) -> object:
+        return j if labels is None else labels[j]
+
+    return {
+        "missingness_parents": {
+            name(c): [name(p) for p in pa] for c, pa in sorted(found["parents"].items())
+        },
+        "corrected_edges": {
+            key: [[name(x), name(y)] for x, y in found[key]]
+            for key in ("retested", "removed", "uncorrected")
+        },
+        "seed": seed,
+    }
 
 
 def _ambiguous_metadata(
@@ -431,6 +571,7 @@ def fci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -487,6 +628,11 @@ def fci(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -515,7 +661,12 @@ def fci(
         reads its unshielded triples as colliders or non-colliders. In the PAG, a forbidden
         ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``,
         and a required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge
-        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
+        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``. In the
+        PAG, ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an
+        arrowhead at the cause, and no test removes a ``confounded`` pair, as
+        :class:`~andrey.Knowledge` describes; these marks, and the check that drops a claim the PAG
+        does not meet with a :class:`~andrey.KnowledgeWarning` and lists it in
+        ``metadata["unmet_knowledge"]``, assume no selection bias.
 
     Returns
     -------
@@ -672,14 +823,22 @@ def fci(
     variable, it took 34 s against 23 to 29 s for ``"fast"`` over five column orders.
     ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES network with
     1,000 simulated rows, its median endpoint errors passed the empty graph's (696 against 676).
-    Rule R5 stops searching a pair after a fixed number of partial paths and leaves its circles, so
-    on graphs with many circle-circle edges it can miss an undirected cycle. With the mixed-data
-    tests, it is experimental and not benchmarked yet; its tests run it on 5 variables with 3,000
-    rows. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests
-    run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up
-    to 20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    Test errors can give results that no MAG fits, and the ``pag`` it returns is then not the PAG of
+    any MAG. With the default settings, of 200 simulated datasets with 10 variables, mean degree 3,
+    and 2,000 rows, 36 fits with ``"fisherz"`` and 36 with ``"normal_scores"`` returned one. On 28
+    and 29 of them, the MAG that Zhang's construction [3]_ builds from the ``pag`` is not ancestral,
+    and a graph query such as ``m_separated`` raised ``ValueError``; on the others, that MAG's PAG
+    differs from the ``pag``. Rule R5 stops searching a pair after a fixed number of partial paths
+    and leaves its circles, so on graphs with many circle-circle edges it can miss an undirected
+    cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its tests run it
+    on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
+    benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
+    yet; the tests run them on up to 20 variables with up to a fifth of the values missing
+    completely at random. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -781,7 +940,8 @@ def fci_hybrid(
         X, mask, constraints, index, "indep_test", indep_test
     )
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels, index_namer(labels, column)):
+    namer = index_namer(labels, column) or column_namer(labels)
+    with copies_named(labels, namer):
         pag = getattr(engines, name)(
             augmented,
             score_func=score_func,
@@ -955,7 +1115,11 @@ def gfci(
         :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
         removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
         arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``. With
-        ``env``, the environment index is unconstrained.
+        ``env``, the environment index is unconstrained. In the PAG, ``required_paths`` makes an
+        adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead at the cause, and no test
+        removes a ``confounded`` pair, as :class:`~andrey.Knowledge` describes; these marks, and the
+        check that drops a claim the PAG does not meet with a :class:`~andrey.KnowledgeWarning` and
+        lists it in ``metadata["unmet_knowledge"]``, assume no selection bias.
 
     Returns
     -------
@@ -1142,9 +1306,12 @@ def gfci(
     and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466
     cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric
     ``env`` as a number, so with three or more environments a shift that does not follow the labels'
-    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. A
+    required path says less than a required edge and directs less: it cannot restore an edge the
+    search left out, and on simulated data a required edge, which also states that the pair is
+    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1208,6 +1375,7 @@ def cdnod(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     dependence_threshold: float | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1280,6 +1448,11 @@ def cdnod(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -1304,7 +1477,11 @@ def cdnod(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
-        a directed cycle raises ``ValueError``. The environment index is unconstrained.
+        a directed cycle raises ``ValueError``. The environment index is unconstrained. In a CPDAG,
+        ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
+        listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
+        meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -1578,6 +1755,7 @@ def fci_jci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
     possible_dsep: str | None = None,
     confounded_index: bool = True,
     seed: int | None = None,
@@ -1644,6 +1822,11 @@ def fci_jci(
         categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
         by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
@@ -1673,7 +1856,12 @@ def fci_jci(
         pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and
         can leave a circle at ``b``, and a required one is ``a -> b``; knowledge that puts an
         arrowhead at ``a`` on an edge ``a - b`` while its required edges lead from ``a`` to ``b``
-        raises ``ValueError``. The environment index is unconstrained.
+        raises ``ValueError``. The environment index is unconstrained. In the PAG,
+        ``required_paths`` makes an adjacent pair ``a -> b``, ``forbidden_paths`` puts an arrowhead
+        at the cause, and no test removes a ``confounded`` pair, as :class:`~andrey.Knowledge`
+        describes; these marks, and the check that drops a claim the PAG does not meet with a
+        :class:`~andrey.KnowledgeWarning` and lists it in ``metadata["unmet_knowledge"]``, assume no
+        selection bias.
 
     Returns
     -------
@@ -1856,11 +2044,9 @@ def fci_jci(
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
+    namer = lambda j: "env" if j == d else column(j)  # noqa: E731
     ambiguous: set[tuple[int, int, int]] = set()
-    with (
-        copies_named(labels, lambda j: "env" if j == d else column(j)),
-        rows_tested() as rows,
-    ):
+    with copies_named(labels, namer), rows_tested() as rows:
         pag, index_edges = _fci_jci(
             X,
             c,
