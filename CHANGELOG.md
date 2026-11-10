@@ -48,14 +48,19 @@ names its pull request.
   variables: the graph found often has no consistent extension, and the fit then drops every
   claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
-- `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
-  them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
-  EM covariance policy, which estimates one covariance by EM before the search and is not structural
-  EM. On 132 settings of 10 to 50 variables with values missing completely at random or at random,
-  none was less accurate than Tetrad's in any setting: `ges` had fewer errors in 107 and tied in 25,
-  `boss` in 95 and 37, and `grasp` in 89 and 43. The 100-variable settings and the default
-  `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it stays
-  experimental, with no reference implementation to compare with. The
+- `missing="em"` is supported in `ges`. The benchmark lane `m2-tetrad` runs `ges`, `boss`, and
+  `grasp` at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under
+  its EM covariance policy, which estimates one covariance by EM before the search and is not
+  structural EM, on 132 settings of 10 to 50 variables with values missing completely at random or
+  at random. Against Tetrad's default, which counts every row as the sample size, none was less
+  accurate in any setting: `ges` had fewer errors in 107 and tied in 25, `boss` in 95 and 37, and
+  `grasp` in 89 and 43. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges`
+  had fewer errors in 81, tied in 50, and had more in 1, which tied on fresh datasets. `boss` (70,
+  58, and 4) and `grasp` (64, 62, and 6) each had more errors again on fresh datasets in one
+  setting, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, so in them
+  `missing="em"` stays experimental until the cause is known. The 100-variable settings and the
+  default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it
+  stays experimental, with no reference implementation to compare with. The
   [comparison page][em-tetrad] has the results. ([#873])
 - The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
   `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,

@@ -14,7 +14,7 @@
  "references": {
   "ges(missing=\"em\"), boss(missing=\"em\"), grasp(missing=\"em\")": "tetrad-lib 8.0.0, Java 21: FGES, BOSS, GRaSP with SemBicScore under MissingDataPolicy.EM_COVARIANCE at MissingDataSpec.of defaults (ridge 0, tolerance 1e-6, 1,000 iterations, FULL_N), penaltyDiscount 1.0; a one-pass EM estimate of a saturated covariance followed by the search, not structural EM; a second arm of it sets essMode to MEAN_PAIRWISE, the BIC's sample size being the mean over variable pairs of the rows where both are observed"
  },
- "verdict_rule": "per cell and search: D = SHD(Andrey) - SHD(reference) per dataset on the datasets both finished; worse when the 95% percentile-bootstrap interval of mean D over 10,000 resamples lies above 0, better when below, a tie otherwise; fewer than 10 pairs are not judged. A worse row counts only when the same cell on 20 fresh seeds is worse too. Floor: the interval of SHD(Andrey) - SHD(empty graph) must lie below 0; it decides a judged row at 15 variables and 100 rows where the reference's own interval lies below 0, and is reported elsewhere. A search passes when no judged row is worse again and no judged row fails the floor.",
+ "verdict_rule": "per cell and search: D = SHD(Andrey) - SHD(reference) per dataset on the datasets both finished; worse when the 95% percentile-bootstrap interval of mean D over 10,000 resamples lies above 0, better when below, a tie otherwise; fewer than 10 pairs are not judged. A worse row counts only when the same cell on 20 fresh seeds is worse too. Floor: the interval of SHD(Andrey) - SHD(empty graph) must lie below 0; it decides a judged row at 15 variables and 100 rows where the reference's own interval lies below 0, and is reported elsewhere. A search passes a reference when no judged row is worse again and no judged row fails the floor. Its status is supported when it passes both references, the EM arm at FULL_N and at MEAN_PAIRWISE, and experimental otherwise.",
  "verdicts": {
   "ges(missing=\"em\")": {
    "reference_lane": "m2-tetrad",
@@ -38,8 +38,10 @@
     0.087,
     1.7572
    ],
-   "status": "supported",
-   "limit": "at the plain BIC on Erdos-Renyi graphs of mean degree 4 the result is rarely better than the empty graph (5 of 54 cells); on the complete data the plain search's mean SHD is at or above the empty graph's in 4 of those 9 settings; at mean degree 2 it is below the empty graph in 51 of 54 cells"
+   "passes_first_reference": true,
+   "limit": "at the plain BIC on Erdos-Renyi graphs of mean degree 4 the result is rarely better than the empty graph (5 of 54 cells); on the complete data the plain search's mean SHD is at or above the empty graph's in 4 of those 9 settings; at mean degree 2 it is below the empty graph in 51 of 54 cells",
+   "passes_second_reference": true,
+   "status": "supported"
   },
   "boss(missing=\"em\")": {
    "reference_lane": "m2-tetrad",
@@ -63,7 +65,10 @@
     0.0671,
     4.122
    ],
-   "status": "supported"
+   "passes_first_reference": true,
+   "passes_second_reference": false,
+   "status": "experimental",
+   "status_reason": "worse than the second reference (the EM arm at MEAN_PAIRWISE) on both seed blocks in 1 of 132 cells: Erdos-Renyi graphs of mean degree 4, 20 variables, 2,000 rows, MCAR at 30%: mean SHD 17.85 against 8.60 on seeds 0 to 19 and 20.10 against 7.30 on seeds 20 to 39. In the other 131 cells it is not worse than that arm on both blocks (70 better, 58 tie, 4 worse on seeds 0 to 19, 3 of the worse a tie on seeds 20 to 39), and it is worse than the first reference in no cell. The cause is not known."
   },
   "grasp(missing=\"em\")": {
    "reference_lane": "m2-tetrad",
@@ -87,17 +92,20 @@
     0.0372,
     3.6807
    ],
-   "status": "supported"
+   "passes_first_reference": true,
+   "passes_second_reference": false,
+   "status": "experimental",
+   "status_reason": "worse than the second reference (the EM arm at MEAN_PAIRWISE) on both seed blocks in 1 of 132 cells: Erdos-Renyi graphs of mean degree 4, 50 variables, 2,000 rows, MCAR at 30%: mean SHD 42.00 against 17.60 on seeds 0 to 19 and 43.80 against 19.80 on seeds 20 to 39. In the other 131 cells it is not worse than that arm on both blocks (64 better, 62 tie, 6 worse on seeds 0 to 19, 5 of the worse a tie on seeds 20 to 39), and it is worse than the first reference in no cell. The cause is not known."
   }
  },
  "fresh_seeds": {
   "rows_worse_on_first_seeds": 0,
   "rows_rerun": 0,
   "rows_worse_again": 0,
-  "about": "no row is worse than the reference, so none ran again; the worse rows against test-wise PC, a baseline, were not rerun"
+  "about": "the first reference (FULL_N): no row is worse than it, so none ran again; the worse rows against test-wise PC, a baseline, were not rerun. The rows worse than the second reference are under second_reference.fresh_seed_reruns"
  },
  "second_reference": {
-  "about": "Tetrad's EM arm again with its effective sample size set to the mean pairwise count (MissingDataSpec.EffectiveSampleSizeMode.MEAN_PAIRWISE: the mean, over variable pairs, of the number of rows on which both variables are observed), on the same 2,640 masked datasets. Judged by the same rule as the first reference; it decides no status in this record.",
+  "about": "Tetrad's EM arm again with its effective sample size set to the mean pairwise count (MissingDataSpec.EffectiveSampleSizeMode.MEAN_PAIRWISE: the mean, over variable pairs, of the number of rows on which both variables are observed), on the same 2,640 masked datasets. Judged by the same rule as the first reference, and it counts for the status as the first does.",
   "arms": [
    "tetrad.fges.em_covariance.mean_pairwise",
    "tetrad.boss.em_covariance.mean_pairwise",
@@ -113,6 +121,9 @@
     "not_judged": 0,
     "worse_rerun_on_fresh_seeds": 1,
     "worse_again": 0,
+    "floor_applies": 4,
+    "floor_met_where_it_applies": 4,
+    "passes": true,
     "reference_below_empty_graph": 41,
     "default_reference_below_empty_graph": 28,
     "reference_below_empty_graph_at_15_variables_100_rows": "4 of 24",
@@ -141,6 +152,9 @@
     "not_judged": 0,
     "worse_rerun_on_fresh_seeds": 4,
     "worse_again": 1,
+    "floor_applies": 3,
+    "floor_met_where_it_applies": 3,
+    "passes": false,
     "reference_below_empty_graph": 80,
     "default_reference_below_empty_graph": 62,
     "reference_below_empty_graph_at_15_variables_100_rows": "3 of 24",
@@ -169,6 +183,9 @@
     "not_judged": 0,
     "worse_rerun_on_fresh_seeds": 6,
     "worse_again": 1,
+    "floor_applies": 4,
+    "floor_met_where_it_applies": 4,
+    "passes": false,
     "reference_below_empty_graph": 83,
     "default_reference_below_empty_graph": 63,
     "reference_below_empty_graph_at_15_variables_100_rows": "4 of 24",

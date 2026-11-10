@@ -65,10 +65,11 @@ For `ges`, `boss`, and `grasp` the reference is the closest thing a standard pac
 search, not structural EM: EM fits the mean and covariance of an unrestricted Gaussian once, without
 a graph, and the search then scores from that matrix. Tetrad's documentation calls it "the cheap
 approximation to structural EM, in which imputation under the current best graph alternates with
-re-search". It handles missing values by EM in the same searches with the same score, so it is the
-arm the three searches are judged against; a second arm of it with a heavier penalty is reported
-beside it. For `xges`, `exact_search`, `calm`, and `dagma` no
-reference exists, and the page reports the baselines and the floor.
+re-search". It handles missing values by EM in the same searches with the same score, so the three
+searches are judged against it, at two settings of the sample size its score counts: every row, its
+default, and the mean pairwise count, which makes it a stronger arm. Both count for the status. For
+`xges`, `exact_search`, `calm`, and `dagma` no reference exists, and the page reports the baselines
+and the floor.
 
 ## Scores
 
@@ -101,8 +102,11 @@ fits that raised, 56,564 were run, on AMD EPYC 7713 processors, in 60.1 CPU-hour
 | `hc(missing="em")` | `m2-bnlearn` | bnlearn `structural.em` | 29 / 7 / 0 of 36 | 0 | 12 of 12 at 500 and 2,000 rows; 11 of 24 at 100 rows, where bnlearn meets it in none | 0.04 to 1.25 | supported |
 | `tabu(missing="em")` | `m2-bnlearn` | bnlearn `structural.em` | 32 / 4 / 0 of 36 | 0 | 12 of 12 at 500 and 2,000 rows; 15 of 24 at 100 rows, where bnlearn meets it in one | 0.04 to 1.24 | supported |
 | `ges(missing="em")` | `m2-tetrad` | Tetrad FGES, EM covariance | 107 / 25 / 0 of 132 | 0 | 2 of the 2 cells where Tetrad meets it; 76 of 132 | 0.09 to 1.76 | supported |
-| `boss(missing="em")` | `m2-tetrad` | Tetrad BOSS, EM covariance | 95 / 37 / 0 of 132 | 0 | 1 of the 1 cell where Tetrad meets it; 121 of 132 | 0.07 to 4.12 | supported |
-| `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance | 89 / 43 / 0 of 132 | 0 | 2 of the 2 cells where Tetrad meets it; 122 of 132 | 0.04 to 3.68 | supported |
+| `ges(missing="em")` | `m2-tetrad` | Tetrad FGES, EM covariance at `MEAN_PAIRWISE` | 81 / 50 / 1 of 132 | 0 of 1 | 4 of the 4 cells where Tetrad meets it; 76 of 132 | | supported |
+| `boss(missing="em")` | `m2-tetrad` | Tetrad BOSS, EM covariance | 95 / 37 / 0 of 132 | 0 | 1 of the 1 cell where Tetrad meets it; 121 of 132 | 0.07 to 4.12 | experimental |
+| `boss(missing="em")` | `m2-tetrad` | Tetrad BOSS, EM covariance at `MEAN_PAIRWISE` | 70 / 58 / 4 of 132 | 1 of 4 | 3 of the 3 cells where Tetrad meets it; 121 of 132 | | experimental |
+| `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance | 89 / 43 / 0 of 132 | 0 | 2 of the 2 cells where Tetrad meets it; 122 of 132 | 0.04 to 3.68 | experimental |
+| `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance at `MEAN_PAIRWISE` | 64 / 62 / 6 of 132 | 1 of 6 | 4 of the 4 cells where Tetrad meets it; 122 of 132 | | experimental |
 | `xges`, `exact_search`, `calm`, `dagma` with `missing="em"` | `m2-reduced` | none exists | | | see below | | experimental |
 
 ### MVPC against the authors' R code
@@ -521,8 +525,8 @@ the minimum of those counts. Tetrad's BIC takes the count in place of the number
 likelihood and in the penalty's `log n`. The lane fits `tetrad.<search>.em_covariance.mean_pairwise`
 on the same 2,640 masked datasets as the first arm, with the same EM estimate, search, and plain
 BIC; `essMode` is the only difference. Andrey's EM arm is compared with it by the same paired
-bootstrap, the cells where Andrey is worse ran again on fresh seeds, and it decides no status on
-this page: the statuses above rest on the first arm.
+bootstrap, the cells where Andrey is worse ran again on fresh seeds, and it counts for the status
+as the first arm does.
 
 Andrey's EM arm is better than it in 81 (`ges`), 70 (`boss`), and 64 (`grasp`) of the 132 cells,
 ties in 50, 58, and 62, and is worse in 1, 4, and 6. All 2,640 fits of the arm per search finished.
@@ -531,7 +535,8 @@ It is a stronger arm than the first. Over the cells its mean SHD is 46.4 (FGES),
 with the empty graph at 35.0. It is below the empty graph in 41, 80, and 83 cells, against 28, 62,
 and 63 at `FULL_N`; it still returns dense graphs at 100 rows, at 50 variables with a mean SHD of
 154 to 300 against the empty graph's 50 at mean degree 2, and 192 to 295 against 100 at mean degree
-4.
+4. At 15 variables and 100 rows, where the floor decides a cell, it is below the empty graph in 4,
+3, and 4 cells, and Andrey's EM arm is below it in each of them.
 
 | search | cells | Andrey below the empty graph | Tetrad at `FULL_N` below it | Tetrad at `mean_pairwise` below it | of them at 15 variables, 100 rows | Andrey vs `mean_pairwise`: better / tie / worse | where `mean_pairwise` is below the empty graph: better / tie / worse | worse cells that are worse again |
 |---|---|---|---|---|---|---|---|---|
@@ -589,7 +594,8 @@ mean degree 4 with 50 variables and 2,000 rows, both under MCAR at 30%. The othe
 fresh datasets. Nine of the 11 cells are at mean degree 4, eight are at 30% missing, and all but one
 have 500 or 2,000 rows. The two that repeat have 2,000 rows with 30% missing, where the mean
 pairwise count is about 980 rows, and Andrey's EM arm counts every row. Whether a heavier penalty
-on Andrey's EM would close the gap was not measured.
+on Andrey's EM would close the gap was not measured. These two cells are why `missing="em"` is
+experimental in `boss` and `grasp`; [Status](#status) has the reasoning.
 
 ### EM against the baselines alone
 
@@ -664,20 +670,35 @@ of EM against each baseline in parentheses:
 The bar for a supported value of `missing`: never less accurate than its reference in a cell that
 repeats, and below the empty graph in its claimed setting.
 
-- `pc(missing="mvpc")` and `missing="em"` in `notears`, `hc`, `tabu`, `ges`, `boss`, and `grasp` are
-  supported: none is worse than its reference in any cell, so no cell needed a rerun for that
-  comparison, and each meets the floor wherever it decides a cell.
+- `pc(missing="mvpc")` and `missing="em"` in `notears`, `hc`, and `tabu` are supported: none is
+  worse than its reference in any cell, so no cell needed a rerun for that comparison, and each
+  meets the floor wherever it decides a cell.
 - `hc` and `tabu` with `missing="em"` are supported with a stated limit. At 15 variables and 100
   rows the result is often no better than the empty graph: `hc` meets the floor in 11 of those 24
   cells and `tabu` in 15. The cause is the plain search at that sample size, which misses the floor
   on the complete data too (on ER1, 8.8 for `hc` and 8.45 for `tabu` against the empty graph's
   8.0). At 20 variables with 500 and 2,000 rows both meet the floor in 12 of 12 cells.
-- `ges`, `boss`, and `grasp` with `missing="em"` are supported against Tetrad's EM covariance
-  policy, at the plain BIC, up to 50 variables, under MCAR and logistic MAR. The reference is a
-  one-pass covariance EM and is not below the empty graph in most cells of 100 rows, so there the
-  comparison says little more than that Andrey's EM does not fail the same way. `ges` has a
-  stated limit: at mean degree 4 and this penalty its result is rarely below the empty graph (5 of
-  54 cells), with EM and on the complete data.
+- `ges` with `missing="em"` is supported against Tetrad's EM covariance policy at both of its
+  sample sizes, at the plain BIC, up to 50 variables, under MCAR and logistic MAR. Against the
+  default arm it is worse in no cell (better in 107, a tie in 25). Against the `MEAN_PAIRWISE` arm
+  it is better in 81 cells, ties in 50, and is worse in 1, which is a tie on fresh datasets. It
+  meets the floor in the 2 and the 4 cells where the two arms decide it. The reference is a
+  one-pass covariance EM, and at its default it is not below the empty graph in most cells of 100
+  rows, so there the comparison says little more than that Andrey's EM does not fail the same way.
+  `ges` has a stated limit: at mean degree 4 and this penalty its result is rarely below the empty
+  graph (5 of 54 cells), with EM and on the complete data.
+- `boss` and `grasp` with `missing="em"` are experimental, for one measured reason. Each is worse
+  than the `MEAN_PAIRWISE` arm in one cell on the first datasets and again on fresh ones, both at
+  mean degree 4 with 2,000 rows under MCAR at 30%: `boss` at 20 variables (a mean SHD of 17.85
+  against 8.60, then 20.10 against 7.30) and `grasp` at 50 variables (42.00 against 17.60, then
+  43.80 against 19.80). Both arms count for the bar, so one such cell keeps a search from passing
+  it. In every other cell the two pass. Against the default arm neither is worse in any cell
+  (`boss` is better in 95 and ties in 37, `grasp` in 89 and 43). Against the `MEAN_PAIRWISE` arm
+  `boss` is better in 70 cells and ties in 58, `grasp` in 64 and 62, and their other 3 and 5 worse
+  cells are ties on fresh datasets. They are below the empty graph in 121 and 122 of the 132 cells
+  and meet the floor wherever an arm decides a cell. The cause of the two cells is not known: with
+  30% missing in 2,000 rows the reference's score counts about 980 rows and Andrey's EM counts
+  every row, and whether that explains them was not measured.
 - `xges`, `exact_search`, `calm`, and `dagma` with `missing="em"` stay experimental: no reference
   implementation exists to measure them against.
 
@@ -711,6 +732,10 @@ repeats, and below the empty graph in its claimed setting.
   baselines.
 - **GES with EM on denser graphs.** At the plain BIC and mean degree 4, `ges` with EM is below the
   empty graph in 5 of 54 cells and worse than test-wise PC in 22.
+- **BOSS and GRaSP with EM on denser graphs with 30% missing.** At mean degree 4 with 2,000 rows
+  under MCAR at 30%, `boss` at 20 variables and `grasp` at 50 are worse than Tetrad's EM arm at
+  `MEAN_PAIRWISE` on the first datasets and on fresh ones, by 9 to 24 SHD, while both stay far
+  below the empty graph (40 and 100). The cause is not known.
 - **Values missing not at random.** EM has no guarantee under self-masking; the rows of that mask
   are reported and not judged.
 
