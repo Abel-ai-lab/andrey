@@ -42,7 +42,7 @@ whose Reproduce table lists the driver.
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em` | 0.16.0 |
-| [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; lingam's DirectLiNGAM with `prior_knowledge` as context | |
+| [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
 | [PCMCI on lagged series](comparisons/pcmci.md) | `pcmci_cpu.py` | PCMCI | tigramite | 0.5.0, 0.9.0 |
@@ -63,10 +63,10 @@ build the separate environments some comparisons need ([setup](README.md#setup))
 ## Release cards
 
 Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
-hold measurements no card of their own presents:
-`published/0.2.0-small-fits/`, the faster small fits the 0.2.0 card links, and `published/0.4.1/`,
-DirectLiNGAM's causal-order search in the 0.4.1 fix. The 0.14.0 summary draws its rows from the lane
-files [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
+hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
+fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
+fix. The 0.14.0 summary draws its rows from the lane files
+[`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
 [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json), UT-IGSP with
 graphical-model-learning, [`published/0.14.0/igsp.json`](published/0.14.0/igsp.json), IGSP with
 graphical-model-learning, [`published/0.14.0/icp.json`](published/0.14.0/icp.json), ICP with
@@ -83,18 +83,19 @@ seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows 
 [comparison page](comparisons/fci-jci.md) presents; its median errors, fit times, and the counts and
 means of its floor intervals come from the runs behind the file. BOSS-FCI's and GRaSP-FCI's rows
 come from [`published/0.15.0/boss-fci-grasp-fci.json`](published/0.15.0/boss-fci-grasp-fci.json),
-both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md)
-presents, with the median errors and fit times from the runs behind the file. J-PCMCI+'s rows come
-from [`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with
-tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors,
-fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
-The 0.16.0 summary draws LOCI's rows from [`published/0.16.0/loci.json`](published/0.16.0/loci.json),
-LOCI with its authors' code, which its [comparison page](comparisons/loci.md) presents, with the
-size ladder and the other pairwise methods on the same pairs. The path and confounder claims are in
-no release summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json)
-holds their rows, which their [comparison page](comparisons/knowledge-paths.md) presents. The
-missing-data lanes' rows are in
-[`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
+both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md) presents,
+with the median errors and fit times from the runs behind the file. J-PCMCI+'s rows come from
+[`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with tigramite,
+which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors, fit times,
+link F1, and the counts and means of its floor intervals from the runs behind the file. The 0.16.0
+summary draws LOCI's rows from [`published/0.16.0/loci.json`](published/0.16.0/loci.json), LOCI with
+its authors' code, which its [comparison page](comparisons/loci.md) presents, with the size ladder
+and the other pairwise methods on the same pairs. The path and confounder claims are in no release
+summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
+rows of the first eight methods and
+[`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
+14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
+rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
 [comparison page](comparisons/missing-data.md).
 
 | Release | Release card | Summary |
