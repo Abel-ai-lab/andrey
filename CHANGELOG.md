@@ -100,7 +100,10 @@ names its pull request.
   permutation-based correction: after the test-wise skeleton, it finds the parents of each
   missingness indicator and tests again, on virtual data that correct for them, the edges such an
   indicator could have kept. It takes `"fisherz"` or `"student_t"`, and
-  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. ([#832])
+  `metadata["missingness_parents"]` and `metadata["corrected_edges"]` record what it found. A
+  corrected test with too few rows where its variables and the parents of their missingness
+  indicators are all observed is answered by the test-wise test, and
+  `metadata["corrected_edges"]["uncorrected"]` lists its pair. ([#832], [#856])
 - `missing="em"`, experimental, fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and
   `grasp` with `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values
   by structural EM over the expected covariance (Friedman, 1997; Gao et al., 2022): under a
@@ -109,6 +112,11 @@ names its pull request.
   returns, 10 times. `metadata["em"]` records the rounds and the observed-data log-likelihood after
   each, and a row that observes no value is dropped first. `missing=None` keeps refusing missing
   values, with a message that names `missing="em"` where EM would run. ([#842])
+- The benchmark harness measures missing data: `missing_cpu.py` fits `pc(missing="mvpc")` beside
+  the MVPC authors' R code, `notears(missing="em")` beside MissDAG, and the score searches with
+  `missing="em"` beside bnlearn's `structural.em`, each with test-wise PC, listwise deletion, mean
+  imputation, the complete data, and the empty graph, and `missing_summary.py` pairs the records
+  into summary rows with a paired bootstrap. ([#843], [#856])
 - The benchmark harness checks the path and confounder claims of `Knowledge`: against the answer
   that listing every small graph gives, with d-separation in place of the tests, and on simulated
   data against the same fit without the claims, for `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`,
@@ -2198,7 +2206,9 @@ First alpha release.
 [#835]: https://github.com/Abel-ai-lab/andrey/pull/835
 [#841]: https://github.com/Abel-ai-lab/andrey/pull/841
 [#842]: https://github.com/Abel-ai-lab/andrey/pull/842
+[#843]: https://github.com/Abel-ai-lab/andrey/pull/843
 [#848]: https://github.com/Abel-ai-lab/andrey/pull/848
 [#850]: https://github.com/Abel-ai-lab/andrey/pull/850
 [#853]: https://github.com/Abel-ai-lab/andrey/pull/853
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
+[#856]: https://github.com/Abel-ai-lab/andrey/pull/856
