@@ -1,0 +1,38 @@
+{
+  "algorithm": "AGES",
+  "case": "weak_triangle_3v",
+  "input": {
+    "case": "weak_triangle_3v",
+    "column_order": [
+      1,
+      2,
+      0
+    ],
+    "seed": 20170811,
+    "sha256": "6b63060f30b493b9be4cfbaeb5b6a3dbc969183d9affcabf8a84738b67d63ea0",
+    "shape": [
+      1000,
+      3
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        1,
+        1
+      ],
+      [
+        2,
+        0,
+        2
+      ],
+      [
+        1,
+        1,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

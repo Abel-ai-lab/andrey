@@ -16,6 +16,7 @@ _GRAPH = (
     frozenset(
         {
             "PC",
+            "AGES",
             "FCI",
             "GFCI",
             "CDNOD",
