@@ -12,6 +12,8 @@ rows complete on the variable and its parents.
 :class:`TetradMissing` is one search under one policy:
 
 - ``em_covariance``, the EM arm, named ``tetrad.<search>.em_covariance``;
+- ``em_covariance`` with ``ess="mean_pairwise"``, the EM arm with the effective sample size of
+  Tetrad's ``mean_pairwise`` mode, named ``tetrad.<search>.em_covariance.mean_pairwise``;
 - ``testwise``, test-wise deletion, named ``tetrad.<search>.testwise``;
 - ``fail``, which stops on a missing value: the search on complete data, named
   ``tetrad.<search>.complete``.
@@ -30,7 +32,10 @@ method it reaches and written out, none left to a default. The score is the stan
 ``n log s2 + penaltyDiscount * k log n`` with no structure prior, which Andrey's linear-Gaussian BIC
 scores at ``penalty_discount`` equal to ``penaltyDiscount`` and ``ebic_gamma=0.0``. The EM settings
 are those of ``MissingDataSpec.of``: no ridge, a tolerance of ``1e-6``, at most 1,000 iterations,
-and every row as the effective sample size. The search settings are those of
+and every row as the effective sample size (``full_n``). The EM arm's ``ess`` names another mode of
+``MissingDataSpec.EffectiveSampleSizeMode``: ``mean_pairwise``, the mean over variable pairs of the
+rows where both are observed, or ``min_pairwise``, their minimum. The BIC then takes that count as
+its sample size, in the likelihood and in the penalty's ``log n``. The search settings are those of
 :mod:`~andrey_bench.adapters.tetrad_search`; GRaSP has no seed in 8.0.0 and runs one start from the
 data's column order without internal randomness.
 
@@ -72,8 +77,11 @@ DRIVER = Path(__file__).with_name("TetradMissingDriver.java")
 PENALTY_DISCOUNT = 1.0
 #: The arm's name for each policy the driver reads (``MissingDataPolicy``, lower case).
 POLICIES = {"em_covariance": "em_covariance", "testwise": "testwise", "fail": "complete"}
+#: The effective sample sizes the driver reads (``EffectiveSampleSizeMode``, lower case) and
+#: ``MissingDataSpec.of``'s, ``full_n``. Only ``em_covariance`` reads one.
+ESS_MODES = ("full_n", "min_pairwise", "mean_pairwise")
 #: The score settings: no structure prior, the standard BIC rule, the covariance matrix read once,
-#: and ``MissingDataSpec.of``'s EM settings.
+#: and ``MissingDataSpec.of``'s EM settings; an arm's ``ess`` replaces ``essMode``.
 _SCORE = {
     "penaltyDiscount": PENALTY_DISCOUNT,
     "structurePrior": 0.0,
@@ -172,15 +180,20 @@ class TetradMissing:
     search_s: float | None = None
     warmup: int = 0
 
-    def __init__(self, search: str, policy: str = "em_covariance") -> None:
+    def __init__(self, search: str, policy: str = "em_covariance", ess: str = "full_n") -> None:
         if search not in _SEARCH:
             raise ValueError(f"search must be one of {sorted(_SEARCH)}, got {search!r}")
         if policy not in POLICIES:
             raise ValueError(f"policy must be one of {sorted(POLICIES)}, got {policy!r}")
+        if ess not in ESS_MODES:
+            raise ValueError(f"ess must be one of {list(ESS_MODES)}, got {ess!r}")
+        if ess != "full_n" and policy != "em_covariance":
+            raise ValueError(f"ess {ess!r} is read under em_covariance only, not {policy!r}")
         self.search = search
         self.policy = policy
+        self.ess = ess
         self.algorithm = _ALGORITHM[search]
-        self.name = f"tetrad.{search}.{POLICIES[policy]}"
+        self.name = f"tetrad.{search}.{POLICIES[policy]}" + ("" if ess == "full_n" else f".{ess}")
 
     @property
     def package_version(self) -> str:
@@ -198,7 +211,12 @@ class TetradMissing:
 
     def params(self) -> dict[str, Any]:
         """Every setting the driver reads but ``numThreads``, which is the fit's cores."""
-        return {"missingDataPolicy": self.policy, **_SCORE, **_SEARCH[self.search][0]}
+        return {
+            "missingDataPolicy": self.policy,
+            **_SCORE,
+            "essMode": self.ess,
+            **_SEARCH[self.search][0],
+        }
 
     def settings(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """The driver's settings: ``params`` over :meth:`params`, and the thread count."""
@@ -256,4 +274,12 @@ class TetradMissing:
         return structure_from_adjacency(native, kind=self.output_type)
 
 
-__all__ = ["DRIVER", "JAR_ENV", "PENALTY_DISCOUNT", "POLICIES", "TetradMissing", "versions"]
+__all__ = [
+    "DRIVER",
+    "ESS_MODES",
+    "JAR_ENV",
+    "PENALTY_DISCOUNT",
+    "POLICIES",
+    "TetradMissing",
+    "versions",
+]

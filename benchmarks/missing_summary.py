@@ -14,7 +14,9 @@ A reference is another package's implementation of the same method, and its row 
 search. In ``m2-tetrad`` it is Tetrad's FGES, BOSS, or GRaSP under its EM covariance policy,
 ``tetrad.<search>.em_covariance``, with the control ``tetrad.<search>.complete``; the same search
 under test-wise deletion, ``tetrad.<search>.testwise``, is paired too, as ``reference_testwise``, a
-baseline that is reported and decides no row.
+baseline that is reported and decides no row, and so is its EM arm with the effective sample size
+at ``mean_pairwise``, ``tetrad.<search>.em_covariance.mean_pairwise``, as ``reference_mean_pairwise``,
+with the interval of its SHD minus the empty graph's.
 
 The SHD of every pair is ``shd``, except in ``m2-bnlearn``: bnlearn returns a DAG, whose ``shd`` is
 the directed distance, and Andrey's searches return CPDAGs, whose ``shd`` is the distance between
@@ -97,12 +99,28 @@ REFERENCE_TESTWISE = {
         "grasp": "tetrad.grasp.testwise",
     },
 }
+#: The reference's EM arm with the effective sample size at ``mean_pairwise`` (Tetrad's
+#: ``essMode``), a second comparison beside it that is reported and decides no row.
+REFERENCE_MEAN_PAIRWISE = {
+    "m2-tetrad": {
+        "ges": "tetrad.fges.em_covariance.mean_pairwise",
+        "boss": "tetrad.boss.em_covariance.mean_pairwise",
+        "grasp": "tetrad.grasp.em_covariance.mean_pairwise",
+    },
+}
 #: The lanes that score on ``class_shd``: they pair a DAG arm with CPDAG arms.
 CLASS_LANES = ("m2-bnlearn",)
 CELL = ["lane", "graph", "density", "d", "n", "mechanism", "form", "rate"]
 #: The arms every lane has beside the method: a worse verdict against one is checked on a rerun.
 BASELINES = ("testwise", "listwise", "mean")
-OTHERS = ("reference", "reference_testwise", "testwise", "listwise", "mean")
+OTHERS = (
+    "reference",
+    "reference_testwise",
+    "reference_mean_pairwise",
+    "testwise",
+    "listwise",
+    "mean",
+)
 
 
 def bootstrap(values: np.ndarray) -> list[float] | None:
@@ -218,6 +236,8 @@ def arms_of(lane: str, name: str) -> dict[str, str] | None:
             arms["reference"] = theirs
         if theirs := REFERENCE_TESTWISE.get(lane, {}).get(m[1]):
             arms["reference_testwise"] = theirs
+        if theirs := REFERENCE_MEAN_PAIRWISE.get(lane, {}).get(m[1]):
+            arms["reference_mean_pairwise"] = theirs
     else:
         return None
     return arms | {"listwise": f"listwise.{plain}", "mean": f"impute_mean.{plain}"}
@@ -285,6 +305,7 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
             "method",
             "reference",
             "reference_testwise",
+            "reference_mean_pairwise",
             "testwise",
             "listwise",
             "mean",
@@ -318,6 +339,9 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
                     both = mine.index.intersection(records.index)
                     ratio = ok["method"]["wall_s"][both] / records["wall_s"][both]
                     row[role]["speed_ratio_median"] = _round(ratio.median(), 4)
+                elif role == "reference_mean_pairwise":
+                    interval = bootstrap((records[shd] - empty[records.index]).to_numpy())
+                    row[role]["minus_empty"] = interval
         # The same two packages without the method under test: both NOTEARS on the complete data
         # (M2), both test-wise PC on the masked data (M1), both searches without EM (M2 bnlearn).
         source = by_arm if lane == "m1-paper" else whole

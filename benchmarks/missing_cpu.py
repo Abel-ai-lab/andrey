@@ -41,9 +41,11 @@ complete values of every mask drawn over it. Lanes:
   ``m2-b`` (15 variables, 100 rows, MCAR at 0.1 to 0.5, raw data, on MissDAG's three graphs), the
   logistic MAR cells of ``m2-c`` at 15 variables, and the MCAR and logistic MAR cells of
   ``m2-generic`` up to 50 variables (ER2 and ER4; 10, 20, and 50 variables; 100 to 2,000 rows;
-  standardized). Each masked dataset also fits Tetrad's searches under test-wise deletion, its
-  default without a policy, and test-wise PC; each complete dataset fits both packages' plain
-  searches. Needs tetrad-lib 8.0.0 (``benchmarks/start_tetrad_missing.sh``).
+  standardized). Each masked dataset also fits Tetrad's searches under EM covariance with the
+  effective sample size at ``mean_pairwise``, the mean over variable pairs of the rows where both
+  are observed, and under test-wise deletion, its default without a policy, and test-wise PC; each
+  complete dataset fits both packages' plain searches. Needs tetrad-lib 8.0.0
+  (``benchmarks/start_tetrad_missing.sh``).
 
 ``--part i --parts k`` runs every k-th unit of the lane from the i-th, so a lane splits into
 independent jobs; ``--first-seed`` moves the seeds, for a rerun on fresh ones; ``--budget-s`` stops
@@ -317,8 +319,9 @@ def _tetrad_units(seeds: int) -> list[Unit]:
 
     A masked dataset fits Andrey's three EM arms with their listwise and mean-imputation baselines
     at ``ebic_gamma`` 0.0 (the standard BIC, which Tetrad scores at ``penaltyDiscount`` 1.0),
-    Tetrad's three searches under EM covariance and under test-wise deletion, and test-wise PC; the
-    complete dataset fits both packages' plain searches.
+    Tetrad's three searches under EM covariance, under EM covariance with the effective sample size
+    set to the mean pairwise count, and under test-wise deletion, and test-wise PC; the complete
+    dataset fits both packages' plain searches.
     """
     from andrey_bench.adapters.tetrad_missing import TetradMissing
 
@@ -345,7 +348,11 @@ def _tetrad_units(seeds: int) -> list[Unit]:
         masked += em
         complete += plain
     for search in TETRAD_SEARCHES.values():
-        masked += [TetradMissing(search, "em_covariance"), TetradMissing(search, "testwise")]
+        masked += [
+            TetradMissing(search, "em_covariance"),
+            TetradMissing(search, "em_covariance", ess="mean_pairwise"),
+            TetradMissing(search, "testwise"),
+        ]
         complete.append(TetradMissing(search, "fail"))
     return _units(pairs, masked, complete)
 

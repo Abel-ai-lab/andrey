@@ -28,6 +28,7 @@ from andrey_bench.contracts import SolutionAdapter
 
 SEARCHES = ("fges", "boss", "grasp")
 ARMS = [TetradMissing(s, p) for s in SEARCHES for p in tetrad_missing.POLICIES]
+ESS_ARMS = [TetradMissing(s, "em_covariance", ess="mean_pairwise") for s in SEARCHES]
 DRIVER = tetrad_missing.DRIVER.read_text()
 
 
@@ -112,6 +113,7 @@ def test_every_unit_fits_tetrad_beside_andrey_at_the_standard_bic():
             *[f"listwise.{p}" for p in plain],
             *[f"impute_mean.{p}" for p in plain],
             *[f"tetrad.{s}.em_covariance" for s in SEARCHES],
+            *[f"tetrad.{s}.em_covariance.mean_pairwise" for s in SEARCHES],
             *[f"tetrad.{s}.testwise" for s in SEARCHES],
             "baseline.empty",
         ]
@@ -132,7 +134,7 @@ def test_every_unit_fits_tetrad_beside_andrey_at_the_standard_bic():
 # --- the adapters -----------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("arm", ARMS, ids=lambda a: a.name)
+@pytest.mark.parametrize("arm", [*ARMS, *ESS_ARMS], ids=lambda a: a.name)
 def test_an_arm_meets_the_harness_contract(arm):
     assert isinstance(arm, SolutionAdapter)
     json.dumps(arm.params(), sort_keys=True)
@@ -156,6 +158,30 @@ def test_the_arms_are_named_for_their_search_and_policy():
         TetradMissing("fges", "em")
 
 
+def test_the_mean_pairwise_arm_differs_from_the_em_arm_in_its_effective_sample_size_only():
+    assert [a.name for a in ESS_ARMS] == [
+        f"tetrad.{s}.em_covariance.mean_pairwise" for s in SEARCHES
+    ]
+    for search in SEARCHES:
+        full, mean = TetradMissing(search), TetradMissing(search, ess="mean_pairwise")
+        assert full.name == f"tetrad.{search}.em_covariance"  # the recorded arm keeps its name
+        assert full.params()["essMode"] == "full_n" and mean.params()["essMode"] == "mean_pairwise"
+        assert {**mean.params(), "essMode": "full_n"} == full.params()
+        assert mean.package_version == full.package_version
+    assert (
+        TetradMissing("fges", ess="min_pairwise").name == "tetrad.fges.em_covariance.min_pairwise"
+    )
+
+
+def test_an_effective_sample_size_is_for_the_policy_that_reads_it():
+    for policy in ("testwise", "fail"):
+        assert TetradMissing("boss", policy, ess="full_n").params()["essMode"] == "full_n"
+        with pytest.raises(ValueError, match="em_covariance only"):
+            TetradMissing("boss", policy, ess="mean_pairwise")
+    with pytest.raises(ValueError, match="ess must be one of"):
+        TetradMissing("boss", ess="mean")
+
+
 def _read_by_driver() -> dict[str, set[str]]:
     """The setting names the driver reads for each algorithm, from its source."""
     body = DRIVER.split("static Graph run(", 1)[1].split("static String upper(", 1)[0]
@@ -167,7 +193,7 @@ def _read_by_driver() -> dict[str, set[str]]:
     return read
 
 
-@pytest.mark.parametrize("arm", ARMS, ids=lambda a: a.name)
+@pytest.mark.parametrize("arm", [*ARMS, *ESS_ARMS], ids=lambda a: a.name)
 def test_an_arm_passes_exactly_the_settings_the_driver_reads(arm, monkeypatch):
     monkeypatch.setenv("OMP_NUM_THREADS", "1")
     assert set(arm.settings({})) == _read_by_driver()[arm.search]
@@ -186,7 +212,7 @@ def test_the_em_settings_are_tetrads_own_and_written_out():
 # --- the summary ------------------------------------------------------------------------------
 
 
-def test_the_summary_pairs_each_search_with_tetrads_em_arm_and_its_testwise_baseline():
+def test_the_summary_pairs_each_search_with_tetrads_em_arms_and_its_testwise_baseline():
     arms = missing_summary.arms_of
     for method, search in missing_cpu.TETRAD_SEARCHES.items():
         got = arms("m2-tetrad", f"andrey.{method}.em.ebic_gamma0")
@@ -197,6 +223,7 @@ def test_the_summary_pairs_each_search_with_tetrads_em_arm_and_its_testwise_base
             "complete": plain,
             "reference": f"tetrad.{search}.em_covariance",
             "reference_testwise": f"tetrad.{search}.testwise",
+            "reference_mean_pairwise": f"tetrad.{search}.em_covariance.mean_pairwise",
             "listwise": f"listwise.{plain}",
             "mean": f"impute_mean.{plain}",
         }
@@ -204,9 +231,11 @@ def test_the_summary_pairs_each_search_with_tetrads_em_arm_and_its_testwise_base
             missing_summary.COMPLETE_REFERENCE["m2-tetrad"][method] == f"tetrad.{search}.complete"
         )
     assert arms("m2-tetrad", "tetrad.fges.em_covariance") is None
+    assert arms("m2-tetrad", "tetrad.fges.em_covariance.mean_pairwise") is None
     # The lanes without a reference for the three searches keep none.
     assert "reference" not in arms("m2-b", "andrey.ges.em.ebic_gamma0")
     assert "reference_testwise" not in arms("m2-bnlearn", "andrey.hc.em.ebic_gamma0")
+    assert "reference_mean_pairwise" not in arms("m2-b", "andrey.ges.em.ebic_gamma0")
     assert missing_summary.shd_column("m2-tetrad") == "shd"
 
 
@@ -227,12 +256,14 @@ def _records(arm: str, seeds: int, shd: float) -> pd.DataFrame:
 
 
 def _table(method_shd: float, d: int, n: int, mechanism: str = "mcar") -> pd.DataFrame:
-    """One ``m2-tetrad`` cell for ``ges``: Tetrad's EM arm at 19, its test-wise arm at 25, the
-    empty graph at 20, and the complete-data fits at 2 (Andrey) and 3 (Tetrad)."""
+    """One ``m2-tetrad`` cell for ``ges``: Tetrad's EM arm at 19, with its effective sample size at
+    the mean pairwise count at 17, its test-wise arm at 25, the empty graph at 20, and the
+    complete-data fits at 2 (Andrey) and 3 (Tetrad)."""
     masked = pd.concat(
         [
             _records("andrey.ges.em.ebic_gamma0", 12, method_shd),
             _records("tetrad.fges.em_covariance", 12, 19.0),
+            _records("tetrad.fges.em_covariance.mean_pairwise", 12, 17.0),
             _records("tetrad.fges.testwise", 12, 25.0),
             _records("baseline.empty", 12, 20.0),
         ]
@@ -261,6 +292,16 @@ def test_a_row_is_judged_against_tetrads_em_arm_and_reports_its_testwise_arm():
     assert worse["result"] == "worse" and worse["rerun"]
     # The test-wise arm decides nothing: the method is better than it and still worse.
     assert worse["reference_testwise"]["verdict"] == "better"
+    # Nor does the arm at the mean pairwise count: the method is worse than it and still better.
+    [row] = missing_summary.all_rows(_table(18.0, 20, 500))
+    assert row["result"] == "better" and not row["rerun"]
+    mean = row["reference_mean_pairwise"]
+    assert (mean["arm"], mean["mean_D"], mean["verdict"], mean["minus_empty"]) == (
+        "tetrad.fges.em_covariance.mean_pairwise",
+        1.0,
+        "worse",
+        [-3.0, -3.0],
+    )
     [out] = missing_summary.all_rows(_table(21.0, 20, 500, mechanism="self_masking"))
     assert not out["judged"] and out["result"] == "not judged"
 
@@ -277,14 +318,16 @@ def test_the_floor_decides_the_paper_size_cells_only():
 # --- fits -------------------------------------------------------------------------------------
 
 
-def _chain(n: int = 400, d: int = 5, rate: float = 0.2) -> tuple[np.ndarray, np.ndarray]:
+def _chain(
+    n: int = 400, d: int = 5, rate: float = 0.2, weight: float = 0.9
+) -> tuple[np.ndarray, np.ndarray]:
     """A linear-Gaussian chain ``x0 -> ... -> x{d-1}``, complete and with values missing at
     random."""
     rng = np.random.default_rng(0)
     x = np.zeros((n, d))
     x[:, 0] = rng.normal(size=n)
     for j in range(1, d):
-        x[:, j] = 0.9 * x[:, j - 1] + rng.normal(size=n)
+        x[:, j] = weight * x[:, j - 1] + rng.normal(size=n)
     masked = x.copy()
     masked[rng.random(x.shape) < rate] = np.nan
     return x, masked
@@ -309,6 +352,43 @@ def test_tetrad_recovers_a_chain_from_data_with_missing_values(search):
     skeleton = testwise.fit(masked, testwise.params())
     assert all(skeleton[j, j + 1] or skeleton[j + 1, j] for j in range(4))
     assert re.fullmatch(r"tetrad-lib \d+\.\d+\.\d+, Java .+", em.package_version)
+
+
+@needs_tetrad
+@pytest.mark.parametrize("search", SEARCHES)
+def test_the_mean_pairwise_arm_recovers_a_chain_from_data_with_missing_values(search):
+    _, masked = _chain()
+    chain = np.zeros((5, 5), dtype=np.int8)
+    for j in range(4):
+        chain[j, j + 1] = chain[j + 1, j] = 1
+    arm = TetradMissing(search, ess="mean_pairwise")
+    arm.setup()
+    assert np.array_equal(arm.fit(masked, arm.params()), chain)
+
+
+@needs_tetrad
+@pytest.mark.parametrize("search", SEARCHES)
+def test_the_mean_pairwise_count_makes_the_penalty_heavier_when_half_the_values_are_missing(search):
+    """The chain of 8 variables has 7 edges. Half the values are missing, so the mean pairwise count
+    is about a quarter of the rows: with every row as the sample size the EM covariance's weak
+    links pass the penalty, with the count they do not."""
+    _, masked = _chain(d=8, rate=0.5, weight=0.25)
+    edges = {}
+    for ess in ("full_n", "mean_pairwise"):
+        arm = TetradMissing(search, ess=ess)
+        adjacency = arm.fit(masked, arm.params())
+        edges[ess] = int(((adjacency + adjacency.T) > 0).sum() // 2)
+    assert edges["full_n"] > 7 >= edges["mean_pairwise"]
+
+
+@needs_tetrad
+def test_on_complete_data_the_effective_sample_size_is_the_rows():
+    complete, _ = _chain(n=200, d=8, weight=0.5)
+    fits = []
+    for ess in tetrad_missing.ESS_MODES:
+        arm = TetradMissing("boss", ess=ess)
+        fits.append(arm.fit(complete, arm.params()))
+    assert np.array_equal(fits[0], fits[1]) and np.array_equal(fits[0], fits[2])
 
 
 @needs_tetrad
