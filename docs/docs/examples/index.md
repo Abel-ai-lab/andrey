@@ -82,7 +82,8 @@ from interventions, and GnIES from environments whose changes it is not told.
 :img-top: /_generated/thumbs/calm.svg
 :img-alt: The true graph of this notebook's data
 
-CALM learns a weighted DAG by gradient descent on a penalized likelihood; it runs on torch.
+CALM learns a weighted DAG by gradient descent on a penalized likelihood, on torch; NOTEARS by
+least squares with an `l1` penalty, where the result depends on the units of the columns.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

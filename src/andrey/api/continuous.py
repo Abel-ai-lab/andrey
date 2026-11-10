@@ -145,9 +145,6 @@ def notears(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     SearchLimitWarning
         When the fit stops on ``max_iter`` rather than on ``h_tol`` or ``rho_max``, or, with
         ``robust``, when the path takes ``max_path`` steps.
@@ -221,52 +218,82 @@ def notears(
     suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
     whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
-    scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
-    variables, five graphs for each combination, at the default settings. Errors are SHD against the
-    true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
-    least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
-    traces this to the score. With a small enough penalty, the global minimizers of the penalized
-    likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.
-    The robust fit, though, starts from the weights of the least-squares fit, and its penalty and
-    threshold act on the weights in data units; rescaling the columns by powers of two, all by one
-    factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. Both
-    that starting point and the penalty and threshold on the weights in data units are the published
-    method's [2]_. The optimization is also harder on standardized data, and more so as the number
-    of variables grows [2]_. On standardized columns the default fit's median errors were 7, 18.5,
-    44.5 and 92 at those sizes, below the empty graph's in 61 of the 80 fits; on
-    ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89, below it
-    in 78 of 80. With ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns and 6.5,
-    14.5 and 32.5 on unitless data at 10, 20 and 50 variables; at 50 variables one graph per
-    combination was fit (four fits), and the one fit tried at 100 variables did not finish within
-    900 s, so there is no figure for it. On the same data, ``ges`` had median errors of 2, 4, 19.5
-    and 79 on standardized columns and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18
-    and 36, and 4, 12, 31.5 and 55. The default fit's median time was 0.6 s at 10 variables and 54 s
-    at 100 on standardized columns (0.4 s and 15.5 s on unitless data), on one core; with
-    ``robust=True`` it was 23 s at 10 variables and 198 s at 50 on standardized columns (5.3 s and
-    69 s on unitless data), because each Adam iteration of a path step computes a matrix
-    exponential. A fit can stop at a local optimum, and only weights that reach ``w_threshold``
-    become edges. Nothing was measured beyond 100 variables, at other densities, row counts or noise
-    types, or on non-linear data. With ``missing="em"``, measured in the setting of Gao et al. [8]_:
-    linear-Gaussian data with unit noise variances on raw columns, from Erdos-Renyi graphs of mean
-    degree 1 and 2 and scale-free graphs of mean degree 2, with 20 variables and 100 rows, 20
-    datasets per setting, at the default settings on one core. With 10 to 50% of the values missing
-    completely at random or at random given observed values, its mean errors (SHD) stayed below the
-    empty graph's in 22 of the 24 settings. With 10% missing completely at random they were 0.6,
-    1.8, and 3.25 on the three graphs, against 10, 20, and 19 for the empty graph and 0.2, 1.25, and
-    1.55 on the complete data; with 50% they were 8.65, 19.5, and 18.7, not below the empty graph's
-    on the two graphs of mean degree 2. It had fewer errors than :func:`~andrey.pc`, whose tests
-    delete rows per test, in 16 of the 24 settings and tied in 8, and fewer than the default fit on
-    data with column means filled in in 22, with 2 ties; dropping the incomplete rows left enough
-    rows to compare in 6 settings, and it had fewer errors in each. It runs the fit 10 times: the
-    median fit took 8 to 42 s, against 1.9 to 3.8 s on the complete data. On standardized columns
-    (Erdos-Renyi, mean degree 2, 20 variables, 500 rows, 20% missing), where the least-squares fit
-    is weaker, its mean errors were 15.35 completely at random and 16.0 at random, against 15.25 on
-    the complete data and 20 for the empty graph; ``pc`` had 7.5 there, and the default fit on
-    mean-filled data 13.55 with values missing completely at random, a difference not rerun on fresh
-    seeds. Under values missing not at random it has no guarantee. The numbers are a reference, not
-    a hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
+    magnitude 0.5 to 2 and unit noise variances, from Erdos-Renyi graphs with twice as many edges as
+    variables and scale-free graphs with four times as many, with Gaussian, exponential and Gumbel
+    noise, 1,000 rows, and 10, 20 and 50 variables (also 100 on standardized columns), 20 datasets
+    for each combination, at the default settings on one core. Errors are mean SHD against the true
+    DAG. On raw columns, where a variable's variance grows along the causal order, they were 2.5,
+    5.7 and 14.4 on the Erdos-Renyi graphs at 10, 20 and 50 variables and 5.9, 21.1 and 83.5 on the
+    scale-free ones, against 20, 40 and 100, and 24, 64 and 184 for the empty graph. Sorting the
+    columns by variance and regressing each on the ones before it reached 4.3, 14.3 and 42.7, and
+    5.0, 34.8 and 149.9 on the same data, so most of that accuracy can be read from the columns'
+    units [5]_. On standardized columns the errors were 18.5, 37.3, 87.3 and 157.2 on the
+    Erdos-Renyi graphs at 10, 20, 50 and 100 variables, against 20, 40, 100 and 200 for the empty
+    graph and below it in each of the 12 combinations there, and 23.1, 63.7, 181.6 and 378.8 on the
+    scale-free ones, against 24, 64, 184 and 384 and below it in 3 of 12; on 40 further datasets of
+    the scale-free graphs at 50 variables with exponential noise they were 184.8. On the SHD between
+    equivalence classes the fit was below the empty graph in 5 of those 24 combinations, the
+    Erdos-Renyi graphs at 50 and 100 variables, and above it on the scale-free graphs from 20
+    variables on. On standardized columns the thresholded weights are often cyclic, and the graph is
+    then what the cycle repair leaves: on the Erdos-Renyi graphs with Gaussian noise at 20 variables
+    it removed edges in 9 of the 20 fits, so these errors are those of the fit with its repair. The
+    fit ends at a local solution that the last bits of the input can change: on the Erdos-Renyi
+    graphs with Gaussian noise at 50 variables, changing every value by a relative ``1e-12`` gave
+    another graph in 47 of 100 fits (ten datasets, ten changes each) and moved the median error over
+    the datasets by at most 1, so a graph can differ between machines where the error does not. When
+    each variable is instead divided by its standard deviation as it is generated, the errors were
+    15.7, 28.0 and 62.1, and 19.7, 54.6 and 147.3, below the empty graph's in all 18 combinations.
+    The median fit took 2.1 s at 10 variables, 9.4 s at 20, 39 s at 50 and 291 s at 100 on
+    standardized columns, and 110 s at 50 on raw columns. With ``robust=True`` on standardized
+    columns the errors were 18.8 and 33.0 on the Erdos-Renyi graphs at 10 and 20 variables and 22.2
+    and 62.1 on the scale-free ones, below the empty graph's in 7 of those 12 combinations and below
+    the default fit's in 3, at a median of 64 to 96 s per fit. A second, smaller measurement used
+    sparser graphs (Erdos-Renyi and scale-free, mean degree 2) with Gaussian and uniform noise,
+    1,000 rows, and 10, 20, 50 and 100 variables, five graphs for each combination, at the default
+    settings. Its errors are SHD against the true CPDAG, medians over those 20 fits; the empty
+    graph's are 9.5, 19.5, 49.5 and 99.5. The least-squares fit changes when the columns are
+    rescaled or standardized [4]_ [5]_, and [6]_ traces this to the score. With a small enough
+    penalty, the global minimizers of the penalized likelihood that ``robust=True`` uses have the
+    same graph on raw and standardized columns [2]_. The robust fit, though, starts from the weights
+    of the least-squares fit, and its penalty and threshold act on the weights in data units;
+    rescaling the columns by powers of two, all by one factor or each by its own, changed its graph
+    in every fit tried at 10 and 20 variables. Both that starting point and the penalty and
+    threshold on the weights in data units are the published method's [2]_. The optimization is also
+    harder on standardized data, and more so as the number of variables grows [2]_. On standardized
+    columns the default fit's median errors were 7, 18.5, 44.5 and 92 at those sizes, below the
+    empty graph's in 61 of the 80 fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm``
+    they were 8, 17, 43.5 and 89, below it in 78 of 80. With ``robust=True`` they were 10, 14.5 and
+    30.5 on standardized columns and 6.5, 14.5 and 32.5 on unitless data at 10, 20 and 50 variables;
+    at 50 variables one graph per combination was fit (four fits), and the one fit tried at 100
+    variables did not finish within 900 s, so there is no figure for it. On the same data, ``ges``
+    had median errors of 2, 4, 19.5 and 79 on standardized columns and 3, 7.5, 29 and 90 on unitless
+    data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5 and 55. The default fit's median time was
+    0.6 s at 10 variables and 54 s at 100 on standardized columns (0.4 s and 15.5 s on unitless
+    data), on one core; with ``robust=True`` it was 23 s at 10 variables and 198 s at 50 on
+    standardized columns (5.3 s and 69 s on unitless data), because each Adam iteration of a path
+    step computes a matrix exponential. A fit can stop at a local optimum, and only weights that
+    reach ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other
+    densities, row counts or noise types, or on non-linear data. With ``missing="em"``, measured in
+    the setting of Gao et al. [8]_: linear-Gaussian data with unit noise variances on raw columns,
+    from Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs of mean degree 2, with 20
+    variables and 100 rows, 20 datasets per setting, at the default settings on one core. With 10 to
+    50% of the values missing completely at random or at random given observed values, its mean
+    errors (SHD) stayed below the empty graph's in 22 of the 24 settings. With 10% missing
+    completely at random they were 0.6, 1.8, and 3.25 on the three graphs, against 10, 20, and 19
+    for the empty graph and 0.2, 1.25, and 1.55 on the complete data; with 50% they were 8.65, 19.5,
+    and 18.7, not below the empty graph's on the two graphs of mean degree 2. It had fewer errors
+    than :func:`~andrey.pc`, whose tests delete rows per test, in 16 of the 24 settings and tied in
+    8, and fewer than the default fit on data with column means filled in in 22, with 2 ties;
+    dropping the incomplete rows left enough rows to compare in 6 settings, and it had fewer errors
+    in each. It runs the fit 10 times: the median fit took 8 to 42 s, against 1.9 to 3.8 s on the
+    complete data. On standardized columns (Erdos-Renyi, mean degree 2, 20 variables, 500 rows, 20%
+    missing), where the least-squares fit is weaker, its mean errors were 15.35 completely at random
+    and 16.0 at random, against 15.25 on the complete data and 20 for the empty graph; ``pc`` had
+    7.5 there, and the default fit on mean-filled data 13.55 with values missing completely at
+    random, a difference not rerun on fresh seeds. Under values missing not at random it has no
+    guarantee. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -514,10 +541,32 @@ def dagma(
     suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
     whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
+    **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
+    magnitude 0.5 to 2 and unit noise variances, from Erdos-Renyi graphs with twice as many edges as
+    variables and scale-free graphs with four times as many, with Gaussian, exponential and Gumbel
+    noise, 1,000 rows, and 10, 20 and 50 variables (also 100 on standardized columns), 20 datasets
+    for each combination, at the default settings on one core. Errors are mean SHD against the true
+    DAG. On raw columns, where a variable's variance grows along the causal order, they were 0.3,
+    1.0 and 2.4 on the Erdos-Renyi graphs at 10, 20 and 50 variables and 1.1, 6.9 and 27.2 on the
+    scale-free ones, against 20, 40 and 100, and 24, 64 and 184 for the empty graph. Sorting the
+    columns by variance and regressing each on the ones before it reached 4.3, 14.3 and 42.7, and
+    5.0, 34.8 and 149.9 on the same data, so much of that accuracy can be read from the columns'
+    units [5]_. On standardized columns the errors were 19.1, 42.3, 112.5 and 211.7 on the
+    Erdos-Renyi graphs at 10, 20, 50 and 100 variables, against 20, 40, 100 and 200 for the empty
+    graph, and 23.5, 67.9, 198.8 and 408.9 on the scale-free ones, against 24, 64, 184 and 384:
+    below the empty graph's in none of the 24 combinations and above it in 15, from 20 variables on
+    the scale-free graphs and from 50 on the Erdos-Renyi ones. The method is experimental for this
+    reason: on columns that carry no units it did not beat the empty graph in the setting of its
+    paper. When each variable is instead divided by its standard deviation as it is generated, the
+    errors were 14.7, 34.0 and 85.9, and 18.8, 53.2 and 145.4, below the empty graph's in all 18
+    combinations. The median fit took 2.9 s at 10 variables, 4.3 s at 20, 11 s at 50 and 47 s at 100
+    on standardized columns. With ``robust=True`` on standardized columns the errors were 19.1 and
+    40.1 on the Erdos-Renyi graphs at 10 and 20 variables and 23.0 and 65.5 on the scale-free ones,
+    below the empty graph's in none of those 12 combinations and below the default fit's in 4, at a
+    median of 16 to 24 s per fit. A second, smaller measurement used sparser graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
-    variables, five graphs for each combination, at the default settings. Errors are SHD against the
-    true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
+    variables, five graphs for each combination, at the default settings. Its errors are SHD against
+    the true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
     least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
     traces this to the score. With a small enough penalty, the global minimizers of the penalized
     likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.

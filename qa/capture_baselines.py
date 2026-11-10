@@ -129,6 +129,7 @@ ALGORITHMS = {
     "GRaSP": (_facade("grasp", penalty_discount=2.0), "gauss_5v"),
     "UT-IGSP": (_run_ut_igsp, "gauss_5v_noise_shift"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
+    "NOTEARS": (_facade("notears"), "gauss_5v"),
     "CAM": (_facade("cam"), "nonmonotone_4v"),
     "VARMALiNGAM": (_facade("varma_lingam", order=(1, 1), prune=False), "varma_3v"),
     "VARMALiNGAMPruned": (_facade("varma_lingam", order=(1, 1), prune=True), "varma_3v"),
