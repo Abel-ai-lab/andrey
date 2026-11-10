@@ -8,6 +8,17 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- `score_matching`, experimental, is SCORE (Rolland et al., 2022) for nonlinear effects with
+  additive Gaussian noise. It finds a causal order from the leaf up, each leaf the variable whose
+  second derivative of the log density varies least over the rows, estimated by a Stein kernel
+  estimator on the standardized columns, and prunes the complete DAG of the order with the
+  smooth-term tests of `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not
+  depend on the columns' units or order. ([#872])
+
 ## [0.16.0] - 2026-11-10
 
 ### Highlights
@@ -2240,3 +2251,4 @@ First alpha release.
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
+[#872]: https://github.com/Abel-ai-lab/andrey/pull/872
