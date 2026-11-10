@@ -57,6 +57,7 @@ import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
 import jpcmciplus_cpu  # noqa: E402
+import stein_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
 from andrey_bench import (  # noqa: E402
@@ -236,6 +237,19 @@ HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
     "latent_anm_er_tenth_d22_n1000": ("latent_anm_er_tenth", 22, 1000),
 }
 
+#: SCORE's and NoGAM's published regimes, drawn by their benchmark driver
+#: (``benchmarks/stein_cpu.py``) as in-claim cells of the comparison: the papers' simulation, a
+#: Gaussian process for each link and noise variances uniform on [0.4, 0.8], z-scored, 1,000 rows,
+#: at ``d`` variables and ``d`` edges (``er1``) or ``4 d`` (``er4``). SCORE's claim is Gaussian
+#: noise, at 10 and 20 variables here; NoGAM's is any additive noise, shown with Laplace and Gumbel
+#: noise at 10 variables, where a fit takes seconds.
+ORDER_CELLS: dict[str, tuple[str, int, str]] = {
+    "score_paper_standardized_d10_er1": ("score_paper_standardized", 10, "er1"),
+    "score_paper_standardized_d20_er4": ("score_paper_standardized", 20, "er4"),
+    "score_paper_laplace_standardized_d10_er1": ("score_paper_laplace_standardized", 10, "er1"),
+    "score_paper_gumbel_standardized_d10_er4": ("score_paper_gumbel_standardized", 10, "er4"),
+}
+
 #: FCI-JCI's published regimes, drawn by its benchmark driver (``benchmarks/fci_jci_cpu.py``) at
 #: the two in-claim cells of mechanism changes: the paper's small setting, 4 variables, and its
 #: larger one, 10, each with one context variable and 500 rows per regime. The environment is the
@@ -405,6 +419,16 @@ def hidden_cause_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
         x, marks, kind, _ = datasets.generate_one(key)
         types = datasets.latent_node_types(len(marks), key.latents)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind, node_types=types)))
+    return tuple(out)
+
+
+def order_draws(regime: str, d: int, density: str) -> tuple[Draw, ...]:
+    """One dataset per seed of a SCORE and NoGAM regime, with its true DAG, as the benchmark driver
+    draws it."""
+    out = []
+    for key in stein_cpu.regime_keys(regime, d, stein_cpu.DENSITIES[density], SEEDS):
+        x, marks, kind, _ = datasets.generate_one(key)
+        out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
     return tuple(out)
 
 
@@ -642,6 +666,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         name: functools.partial(hidden_cause_draws, *cell)
         for name, cell in HIDDEN_CAUSE_CELLS.items()
     },
+    **{name: functools.partial(order_draws, *cell) for name, cell in ORDER_CELLS.items()},
     **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
     **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
@@ -725,6 +750,7 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
 # have: interventions, environments that change noise variances, domains, groups, or latents
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
+# SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -735,6 +761,12 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
+#: SCORE and NoGAM need additive-noise data; each runs on the cells of its claim.
+SCORE_DATA = ("score_paper_standardized_d10_er1", "score_paper_standardized_d20_er4")
+NOGAM_DATA = (
+    "score_paper_laplace_standardized_d10_er1",
+    "score_paper_gumbel_standardized_d10_er4",
+)
 #: FCI-JCI needs data pooled from an observational and an interventional regime.
 INDEX_PAG_DATA = tuple(INDEX_PAG_CELLS)
 #: J-PCMCI+ needs time series from several datasets that differ through context variables.
@@ -862,6 +894,8 @@ SUPPORTED: dict[str, Method] = {
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
+    "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),
+    "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
@@ -1213,6 +1247,8 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
     ("CAM-UV", "latent_anm_er_tenth_d22_n1000"),
+    ("NoGAM", "score_paper_gumbel_standardized_d10_er4"),
+    ("NoGAM", "score_paper_laplace_standardized_d10_er1"),
     ("CMIknn", "nonmonotone_er_d5"),
     ("CALM", "asia_gauss"),
     ("DYNOTEARS", "dynotears_paper_d20_n500"),
@@ -1228,10 +1264,12 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("ANM", "anm_pair_n1000"),
     ("GnIES", "noise_interventional_gauss_er_d20"),
     ("GIN", "latent_measurement_d12"),
+    ("ScoreMatching", "score_paper_standardized_d20_er4"),
     ("GPDC", "anm_er_d5"),
     ("VARMA-LiNGAM", "varma_lingam_paper_d3_n300"),
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
+    ("ScoreMatching", "score_paper_standardized_d10_er1"),
 )
 
 

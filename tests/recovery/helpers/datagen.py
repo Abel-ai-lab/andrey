@@ -311,6 +311,22 @@ def _nonmonotone(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
     return np.column_stack([x0, x1, x2, x3])
 
 
+def _rational_chain(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
+    """Nonlinear SEM ``x0 -> x1 -> x2 -> x3`` with smooth links and Gaussian noise.
+
+    ``x0`` is standard normal; ``x1 = 4 x0 / (1 + x0**2) + n``, ``x2 = x1**2 + n``, and
+    ``x3 = 2 / (1 + x2**2) + n``, each ``n`` an independent normal draw of scale ``noise_scale``.
+    Every link is nonlinear and twice differentiable. Only sums, products, and quotients: each is
+    exactly rounded on every machine, so the input hash holds across runners.
+    """
+    rng = np.random.default_rng(seed)
+    x0 = rng.standard_normal(n_samples)
+    x1 = 4.0 * x0 / (1.0 + x0 * x0) + noise_scale * rng.standard_normal(n_samples)
+    x2 = x1 * x1 + noise_scale * rng.standard_normal(n_samples)
+    x3 = 2.0 / (1.0 + x2 * x2) + noise_scale * rng.standard_normal(n_samples)
+    return np.column_stack([x0, x1, x2, x3])
+
+
 def _nonlinear_fork(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
     """Nonlinear SEM ``x0 <- h -> x1``, ``x1 -> x2``, ``x0 -> x3``, with ``h`` hidden.
 
@@ -414,6 +430,14 @@ CASES: dict[str, dict] = {
         "noise_scale": 0.3,
         "edges": [(0, 2), (1, 2), (2, 3)],
         "queries": [(0, 1, ()), (0, 2, ()), (0, 2, (1,)), (0, 3, (2,)), (2, 3, (0, 1))],
+    },
+    # Nonlinear chain with smooth links and Gaussian noise (see ``_rational_chain``) - SCORE.
+    "rational_chain_4v": {
+        "model": "rational_chain",
+        "seed": 20261110,
+        "n_samples": 400,
+        "noise_scale": 0.3,
+        "edges": [(0, 1), (1, 2), (2, 3)],
     },
     # Linear-Gaussian tree with no collider - CALM: 0 -> 1, 0 -> 2, 1 -> 3, 1 -> 4. Its CPDAG
     # leaves every edge undirected.
@@ -767,7 +791,7 @@ def _n_columns(spec: dict) -> int:
         return len(spec["lags"][0])
     if model in ("anm", "lsnm"):
         return 2
-    if model in ("nonmonotone", "nonlinear_fork"):
+    if model in ("nonmonotone", "rational_chain", "nonlinear_fork"):
         return 4
     if model == "categorical":
         return len(spec["cardinalities"])
@@ -890,6 +914,10 @@ def _generate(case_id: str, replicate: int) -> np.ndarray:
         )
     if model == "nonmonotone":
         return _nonmonotone(seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"])
+    if model == "rational_chain":
+        return _rational_chain(
+            seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"]
+        )
     if model == "nonlinear_fork":
         return _nonlinear_fork(
             seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"]
@@ -938,7 +966,7 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         return len(spec["lags"][0]), len(spec["lags"][0]), np.stack([cause, effect], 1)[keep]
     if model in ("anm", "lsnm"):
         return 2, 2, np.array([[0, 1]])
-    if model == "nonmonotone":
+    if model in ("nonmonotone", "rational_chain"):
         return 4, 4, np.array(spec["edges"])
     if model == "nonlinear_fork":
         return 4, 5, np.array(spec["edges"])

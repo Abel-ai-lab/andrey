@@ -1882,6 +1882,76 @@ _add(
         references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
     )
 )
+_add(
+    MethodSpec(
+        name="score_matching",
+        family="functional",
+        summary="SCORE for nonlinear effects with additive Gaussian noise: a causal order from the "
+        "leaf up, each leaf the variable whose diagonal entry of the score's Jacobian, estimated "
+        "by a Stein kernel estimator on the standardized columns, varies least over the rows, then "
+        "the complete DAG of the order pruned by smooth-term tests. Returns a DAG and a causal "
+        "order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is the causal order of the leaf search.",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the value of the paper's experiments.",
+            ),
+        ),
+        references=(
+            "Rolland et al. 2022",
+            "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="nogam",
+        family="functional",
+        summary="NoGAM for nonlinear effects with additive noise of any distribution: a causal "
+        "order from the leaf up, each leaf the variable whose entry of the score, estimated by a "
+        "Stein kernel estimator, is best predicted from the variable's kernel-ridge residual on "
+        "the others, on the standardized columns, then the complete DAG of the order pruned by "
+        "smooth-term tests. Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is the causal order of the leaf search.",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the value of the paper's experiments.",
+            ),
+        ),
+        references=(
+            "Montagna et al. 2023",
+            "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
 
 # --- temporal family ------------------------------------------------------------------------------
 
@@ -2792,9 +2862,16 @@ _MOVE_RULE = (
     "edges. "
 )
 _CANDIDATE_RULE = (
-    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
-    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
-    "alone. "
+    "The restrict phase keeps the pair of each required edge without a test and conditions the "
+    "tests of the other pairs on it, and never keeps a pair the knowledge makes non-adjacent; the "
+    "score search considers the pairs it keeps. "
+)
+_RESTRICT_RULE = (
+    "With restrict=mmpc or pc, the restrict phase keeps the pair of each required edge without a "
+    "test and conditions the tests of the other pairs on it, and never keeps a pair the knowledge "
+    "makes non-adjacent; with restrict=iamb or inter_iamb it reads the data alone. The score "
+    "search considers the pairs the restrict phase keeps and the pairs of the required edges, "
+    "less the pairs the knowledge makes non-adjacent. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
@@ -2851,7 +2928,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
-    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _RESTRICT_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     **dict.fromkeys(
@@ -2878,6 +2955,16 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pairs outside the allowed set are in no regression and never in the result; each test still "
     "reads every remaining variable or predecessor. The edge removal never removes a required "
     "edge.",
+    "score_matching": "A variable is the next leaf only when no remaining variable is in a later "
+    "tier or is the effect of a required edge out of it. Forbidden edges, edges into an earlier "
+    "tier, and pairs outside the allowed set are in no pruning fit and never in the result; the "
+    "score estimate still reads every remaining variable. The pruning never removes a required "
+    "edge.",
+    "nogam": "A variable is the next leaf only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no pruning fit and never in the result; the score "
+    "estimate and the residual regressions still read every remaining variable. The pruning never "
+    "removes a required edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -3032,9 +3119,10 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc ended
-#: farther from the class the claims leave than without them, and tabu, mmhc, and rsmax2 made more
-#: errors than their reference given the required edges, each on repeated seeds.
+#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc mostly
+#: did not apply the claims, since the graph they found often had no consistent extension, and tabu,
+#: mmhc, and rsmax2 made more errors than their reference given the required edges, each on repeated
+#: seeds.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,

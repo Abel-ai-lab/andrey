@@ -1,0 +1,54 @@
+{
+  "algorithm": "ScoreMatching",
+  "case": "rational_chain_4v",
+  "input": {
+    "case": "rational_chain_4v",
+    "column_order": [
+      3,
+      0,
+      1,
+      2
+    ],
+    "seed": 20261110,
+    "sha256": "e20431c92ae26022e88510138453274bb708d48608838b67b69454640214ca09",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "causal_order": [
+      1,
+      2,
+      3,
+      0
+    ],
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        2,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

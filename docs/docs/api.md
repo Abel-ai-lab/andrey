@@ -127,11 +127,12 @@ you. Every method that takes `indep_test`, with a partial-correlation test, `"fi
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, and `camuv` reject copies the same way, and a column of fewer than 3 distinct values, such
-as a binary one, on which no smooth term can be fit; `resit` and `camuv` also need at least twice as
-many rows as columns, and `camuv` rejects a column that is a linear function of other columns, such
-as a total, as the BIC methods do. Other data raises a `ValueError` that names the argument and, for
-a bad cell, its row and column. A single column gives a one-node graph.
+`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
+than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
+rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
+single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
@@ -150,11 +151,18 @@ refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]`
 and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
 takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
-`hc`, and `tabu`: in the
-[missing-data benchmark](benchmarks/0.16.0.md#what-we-measured-on-missing-data), none was less
-accurate than its reference implementation in any setting. In the other methods `missing="em"` is
-experimental, as no reference implementation exists to compare them with; the benchmark reports
-their results beside the baselines. A value a method does not list raises a `ValueError` that
+`hc`, `tabu`, and `ges`: in the
+[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
+none was less accurate than its reference implementation in a setting that repeated on fresh
+datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
+search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
+variables, at two settings of the sample size the reference's score counts. In `boss` and `grasp`,
+`missing="em"` is experimental: each was less accurate than the reference's stronger setting in one
+of the 132 settings, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, and
+the cause is not yet known; the comparison has both settings' numbers. In `xges`, `exact_search`,
+`dagma`, and `calm` it is experimental, as no reference implementation exists to compare them with;
+the benchmark reports their results beside the baselines. A value a method does not list raises a
+`ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
 for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
@@ -179,11 +187,12 @@ reports only p-values is ordered by its p-value, smallest first.
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`,
-`jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
-`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
-be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. Every
 required edge is in the result, whatever its weight, test, or score says. For the time-series
 methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
 time `t`. Three more parts state causal paths and hidden common causes: `required_paths` and
@@ -206,9 +215,10 @@ than the same fit without them and than a reference package given the same knowl
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
 and `required_paths` and `forbidden_paths` are experimental in `iamb`, `inter_iamb`, and `mmpc`,
-where true claims left the CPDAG farther from the class the claims define at 50 variables. An
-experimental part warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change
-without deprecation. A CPDAG
+where the claims are mostly not applied at 50 variables: the graph found often has no consistent
+extension, and the fit then drops every claim, lists them in `metadata["unmet_knowledge"]`, and
+returns the graph it finds without them. An experimental part warns with
+{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
 says less than an edge and so directs less: when you know the edge itself, state it as `required`.
@@ -451,6 +461,8 @@ variable.
    multi_group_direct_lingam
    cam
    resit
+   score_matching
+   nogam
    camuv
    anm
    pnl
@@ -486,6 +498,23 @@ finds most independent of the remaining variables, then removes each parent whos
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
 causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
 variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
+SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
+effects with additive Gaussian noise, without a regression in its order search: under that model a
+variable is a leaf exactly when the second derivative of the log density in that variable is the
+same at every point. It estimates those derivatives at the rows with a Stein kernel estimator on the
+standardized columns, takes the variable whose derivative varies least as the next leaf, and prunes
+the complete DAG of the order with CAM's smooth-term tests at `alpha=0.001`. It returns a DAG and a
+causal order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it from 10 to
+50 variables against the authors' code.
+
+NoGAM (Montagna et al. 2023), {py:func}`~andrey.nogam`, drops SCORE's Gaussian noise: with additive
+noise of any distribution, a leaf's entry of the score is a function of the leaf's noise alone. It
+estimates the score with the same Stein estimator and each variable's residual by kernel ridge
+regression on all the others, takes as the next leaf the variable whose score entry its residual
+predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
+order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it at 10 and 20
+variables against dodiscover.
 
 LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
 location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not

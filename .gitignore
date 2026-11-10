@@ -21,6 +21,8 @@ benchmarks/.resit-r/
 benchmarks/.mvpc-r/
 # MissDAG's code that benchmarks/start_missdag.sh fetches, read from disk and never committed.
 benchmarks/.missdag/
+# The tetrad-lib jar that benchmarks/start_tetrad_missing.sh fetches, read from disk and never committed.
+benchmarks/.tetrad-missing/
 # The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
 benchmarks/.loci/
 # The authors' NOTEARS code that benchmarks/start_notears.sh fetches, read from disk and never
