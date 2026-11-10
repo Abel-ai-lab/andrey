@@ -92,7 +92,7 @@ EM_METHODS = (
 #: (benchmarks/comparisons/missing-data.md) none was less accurate than its reference
 #: implementation in any setting. In the other :data:`EM_METHODS` it is experimental, as no
 #: reference implementation exists to compare them with.
-EM_SUPPORTED = ("hc", "tabu", "notears")
+EM_SUPPORTED = ("ges", "hc", "tabu", "boss", "grasp", "notears")
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"

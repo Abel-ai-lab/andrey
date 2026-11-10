@@ -42,6 +42,15 @@ names its pull request.
   experimental in `iamb`, `inter_iamb`, and `mmpc`, where true claims left the CPDAG farther from
   the class they define at 50 variables. The evidence is on the [comparison page][kp-paths].
   ([#870])
+- `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
+  them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
+  EM covariance policy, which estimates one covariance by EM before the search and is not structural
+  EM. On 132 settings of 10 to 50 variables with values missing completely at random or at random,
+  none was less accurate than Tetrad's in any setting: `ges` had fewer errors in 107 and tied in 25,
+  `boss` in 95 and 37, and `grasp` in 89 and 43. The 100-variable settings and the default
+  `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it stays
+  experimental, with no reference implementation to compare with. The [missing-data
+  comparison](benchmarks/comparisons/missing-data.md) has the results. ([#873])
 
 ### Fixed
 
@@ -2294,6 +2303,7 @@ First alpha release.
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#873]: https://github.com/Abel-ai-lab/andrey/pull/873
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md

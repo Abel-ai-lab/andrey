@@ -191,9 +191,10 @@ missing depends on the variables, a test can be biased. The [release cards](benc
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
 the data, sound when values are missing completely at random or at random given observed values. It
-is supported in NOTEARS, hill climbing, and Tabu search, and experimental in the others, which have
-no reference implementation to compare with; the
-[0.16.0 release card](benchmarks/0.16.0.md#what-we-measured-on-missing-data) has what we measured.
+is supported in NOTEARS, hill climbing, Tabu search, GES, BOSS, and GRaSP, and experimental in the
+others, which have no reference implementation to compare with; the
+[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+has what we measured.
 The other methods refuse missing values with an error that says what to do
 instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
 

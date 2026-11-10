@@ -4,7 +4,9 @@
 `pc(missing="mvpc")` (Tu et al., 2019), and structural EM, `missing="em"` on the searches that read
 the data through a covariance (Friedman, 1997; Gao et al., 2022). `missing_summary.py` pairs the
 records into the rows of
-[`published/0.16.0/missing-data.json`](../published/0.16.0/missing-data.json).
+[`published/0.16.0/missing-data.json`](../published/0.16.0/missing-data.json) and, for the lane
+`m2-tetrad`, of
+[`published/0.17.0/missing-data-em.json`](../published/0.17.0/missing-data-em.json).
 
 ## Arms
 
@@ -31,6 +33,7 @@ is never scored as a graph. Listwise deletion that keeps fewer than 4 rows is an
 | `m2-c` | the `m2-a` and `m2-b` methods | the `m2-a` and `m2-b` cells with 30% of the columns always observed: logistic MAR and logistic self-masking at 10, 30, 50% | 18 each | 20 |
 | `m2-generic` | `ges`, `boss`, `grasp` with `missing="em"` | the `m1-generic` graphs and masks at 100, 500, 2,000 rows | 360 | 20 |
 | `m2-reduced` | `hc`, `tabu`, `xges`, `exact_search`, `calm`, `notears`, `dagma` with `missing="em"` | ER2, standardized, 20 variables, 500 rows; MCAR and logistic MAR at 20% | 2 | 20 |
+| `m2-tetrad` | `ges`, `boss`, `grasp` with `missing="em"` at `ebic_gamma=0.0`; Tetrad's FGES, BOSS, GRaSP under its EM covariance policy and under test-wise deletion | the `m2-b` cells and the 15-variable logistic MAR cells of `m2-c`; the MCAR and logistic MAR cells of `m2-generic` at 10, 20, 50 variables | 132 | 20 |
 | `m2-bnlearn` | `hc` and `tabu` with `missing="em"` at `ebic_gamma=0.0`; bnlearn's `structural.em` | the `m2-b` cells and the 15-variable `m2-c` cells; ER2, standardized, 20 variables, 500 and 2,000 rows, MCAR and logistic MAR at 10, 20, 30% | 45 | 20 |
 
 Every PC arm of `m1-generic` and `m1-paper` runs at `alpha` 0.05, Andrey's default, and 0.01, the
@@ -44,19 +47,27 @@ up to 20 variables.
 | `pc(missing="mvpc")` | the MVPC authors' R code, `mvpc` with `gaussCItest.td` and `gaussCItest.permc`, the indicators' parents detected by its `detection_prt_m`; pcalg's `pc` with `gaussCItest.td` as the test-wise control | commit `e95160c0`, R 4.6.1, pcalg 2.7.12 | `alpha = 0.01`, R seed 0 |
 | `notears(missing="em")` | MissDAG, `miss_dag_gaussian` with its NOTEARS; its NOTEARS on the complete data as the control | commit `3c1eeed8`, Python 3.10, NumPy 1.21.5 | `em_iter = 10`, `lambda_1_ev = 0.02`, `graph_thres = 0.3`, `equal_variances=True`, NumPy seed 0 |
 | `hc(missing="em")`, `tabu(missing="em")` | bnlearn's `structural.em` with `maximize = "hc"` or `"tabu"`; `hc` and `tabu` on the complete data as the control | bnlearn 5.2.1 | `maximize.args = list(score = "bic-g")`, `fit = "mle-g"`, `impute = "exact"`, `max.iter = 10`, the rounds Andrey's EM runs |
+| `ges(missing="em")`, `boss(missing="em")`, `grasp(missing="em")` | Tetrad's FGES, BOSS, and GRaSP with `SemBicScore` under `MissingDataPolicy.EM_COVARIANCE`; the same searches under `TESTWISE`, Tetrad's default, as a baseline, and on the complete data as the control | tetrad-lib 8.0.0, Java 21 | `MissingDataSpec.of(policy)`: ridge 0, tolerance 1e-6, at most 1,000 iterations, `FULL_N`; `penaltyDiscount = 1.0`; search settings as the `tetrad-continuous` lane |
 
 The MVPC and MissDAG repositories carry no license, so `start_mvpc_r.sh` and `start_missdag.sh`
 download each at its pinned commit, check the archive's SHA-256, and the benchmark runs the code
 unmodified from a git-ignored folder. bnlearn is GPL (>= 2) and comes with the R lane
-(`start_r.sh`).
+(`start_r.sh`). Tetrad is GPL (>= 2); `start_tetrad_missing.sh` downloads the 8.0.0 jar from Maven
+Central and checks its SHA-256. The other Tetrad lanes run 7.6.10, which has no EM policy.
 
 No package implements structural EM around GES, BOSS, GRaSP, XGES, or an exact search. MissDAG's
 release holds NOTEARS M-steps only, although its paper reports GES and A*; bnlearn's
 `structural.em` takes `hc` and `tabu`; causal-learn, pcalg, XGES, pgmpy, and pyAgrum search
-structures on complete data only. Tetrad's structural EM is for discrete Bayesian networks, and its
-EM covariance policy estimates one covariance under a saturated Gaussian model before the search, a
-different estimator that this benchmark does not run. For those five methods, and for
-`calm` and `dagma`, the page reports the baselines and the floor.
+structures on complete data only, and Tetrad's structural EM is for discrete Bayesian networks.
+
+For `ges`, `boss`, and `grasp` the reference is the closest thing a standard package has: Tetrad
+8.0.0's EM covariance policy. It is a one-pass EM estimate of a saturated covariance followed by the
+search, not structural EM: EM fits the mean and covariance of an unrestricted Gaussian once, without
+a graph, and the search then scores from that matrix. Tetrad's documentation calls it "the cheap
+approximation to structural EM, in which imputation under the current best graph alternates with
+re-search". It handles missing values by EM in the same searches with the same score, so it is the
+arm the three searches are judged against. For `xges`, `exact_search`, `calm`, and `dagma` no
+reference exists, and the page reports the baselines and the floor.
 
 ## Scores
 
@@ -64,12 +75,12 @@ A comparison is the per-dataset difference `D = SHD(method) - SHD(other)` on the
 finished, with the 95% percentile-bootstrap interval of its mean over 10,000 resamples: worse when
 the interval lies wholly above 0, better when wholly below, a tie otherwise. Fewer than 10 paired
 datasets are reported and not judged. A worse cell counts only if it is worse again on 20 fresh
-seeds. The floor holds in a cell when the interval of `SHD(method) - SHD(empty graph)` lies below
-0. It decides a judged cell at the papers' sizes, `m1-paper`, `m2-a`, `m2-b`, `m2-c`, and the
-100-row cells of `m2-bnlearn`, where the reference is below the empty graph too; elsewhere it is
-reported. A mask outside a method's claim, self-masking for both corrections, is reported and not
-judged. `m2-bnlearn` pairs DAGs with CPDAGs, so every arm there is scored on the SHD between the
-equivalence classes of the estimate and of the truth.
+seeds. The floor holds in a cell when the interval of `SHD(method) - SHD(empty graph)` lies below 0.
+It decides a judged cell at the papers' sizes, `m1-paper`, `m2-a`, `m2-b`, `m2-c`, the 100-row cells
+of `m2-bnlearn`, and the cells of 15 variables and 100 rows of `m2-tetrad`, where the reference is
+below the empty graph too; elsewhere it is reported. A mask outside a method's claim, self-masking
+for both corrections, is reported and not judged. `m2-bnlearn` pairs DAGs with CPDAGs, so every arm
+there is scored on the SHD between the equivalence classes of the estimate and of the truth.
 
 The bar for a supported method: never less accurate than its reference in a cell that repeats, and
 below the empty graph in its claimed setting.
@@ -78,7 +89,8 @@ below the empty graph in its claimed setting.
 
 Every number is on simulated data, one core per fit, on AMD EPYC 7713 and AMD EPYC 9555 processors.
 The record holds 192,700 fits; with the reruns on fresh seeds, the reruns of the fits that raised,
-and the reference check on fresh seeds, 200,860 were run, in 232 CPU-hours of fit time.
+and the reference check on fresh seeds, 200,860 were run, in 232 CPU-hours of fit time. The lane
+`m2-tetrad` holds 47,820 more, on AMD EPYC 7713 processors, in 50 CPU-hours of fit time.
 
 | method | lane | reference | better / tie / worse | worse again | floor | median fit time, Andrey / reference | status |
 |---|---|---|---|---|---|---|---|
@@ -86,7 +98,10 @@ and the reference check on fresh seeds, 200,860 were run, in 232 CPU-hours of fi
 | `notears(missing="em")` | `m2-a`, `m2-c` | MissDAG | 19 / 5 / 0 of 24 | 0 | 15 of the 15 cells where MissDAG meets it; 22 of 24 | 0.13 to 0.52 | supported |
 | `hc(missing="em")` | `m2-bnlearn` | bnlearn `structural.em` | 29 / 7 / 0 of 36 | 0 | 12 of 12 at 500 and 2,000 rows; 11 of 24 at 100 rows, where bnlearn meets it in none | 0.04 to 1.25 | supported |
 | `tabu(missing="em")` | `m2-bnlearn` | bnlearn `structural.em` | 32 / 4 / 0 of 36 | 0 | 12 of 12 at 500 and 2,000 rows; 15 of 24 at 100 rows, where bnlearn meets it in one | 0.04 to 1.24 | supported |
-| `ges`, `boss`, `grasp`, `xges`, `exact_search`, `calm`, `dagma` with `missing="em"` | `m2-b`, `m2-c`, `m2-generic`, `m2-reduced` | none exists | | | see below | | experimental |
+| `ges(missing="em")` | `m2-tetrad` | Tetrad FGES, EM covariance | 107 / 25 / 0 of 132 | 0 | 2 of the 2 cells where Tetrad meets it; 76 of 132 | 0.09 to 1.76 | supported |
+| `boss(missing="em")` | `m2-tetrad` | Tetrad BOSS, EM covariance | 95 / 37 / 0 of 132 | 0 | 1 of the 1 cell where Tetrad meets it; 121 of 132 | 0.07 to 4.12 | supported |
+| `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance | 89 / 43 / 0 of 132 | 0 | 2 of the 2 cells where Tetrad meets it; 122 of 132 | 0.04 to 3.68 | supported |
+| `xges`, `exact_search`, `calm`, `dagma` with `missing="em"` | `m2-reduced` | none exists | | | see below | | experimental |
 
 ### MVPC against the authors' R code
 
@@ -331,10 +346,153 @@ are below it in all 12 cells. Both are worse than test-wise PC in most cells at 
 in 34 of 36, `tabu` in 18), as their complete-data fits are. The median fit took 0.7 to 3.1 s against
 bnlearn's 0.8 to 2.2 s at 100 rows, 6 to 14 s at 500, and 26 to 53 s at 2,000.
 
-### EM in the searches without a reference
+### GES, BOSS, and GRaSP with EM against Tetrad's EM covariance
 
-`ges`, `boss`, and `grasp` at the papers' size, 15 variables and 100 rows, in the cells of the
-claim (MCAR and logistic MAR):
+`m2-tetrad`, 20 datasets per cell, 132 cells per search. Both packages score with the plain BIC:
+Andrey at `ebic_gamma=0.0` and `penalty_discount=1.0`, Tetrad at `penaltyDiscount = 1.0`, and both
+count every row as the sample size. Andrey's default is `ebic_gamma=1.0`, which has no matching
+objective in Tetrad and is not compared here; the lanes below run it against the baselines.
+
+| method | size | mask | cells | below the empty graph | Tetrad's EM arm below it | errors / timeouts of fits | Tetrad, EM covariance: better / tie / worse | worse again | Tetrad, test-wise: better / tie / worse | test-wise PC: better / tie / worse | listwise: better / tie / worse | mean imputation: better / tie / worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `ges` | 15 variables, 100 rows | MAR, logistic | 9 | 7 of 9 | 1 of 9 | 0 / 0 of 180 | 9 / 0 / 0 | 0 | 9 / 0 / 0 | 1 / 6 / 2 | 3 / 0 / 0 (6 not judged) | 8 / 1 / 0 |
+| `ges` | 15 variables, 100 rows | MCAR | 15 | 13 of 15 | 1 of 15 | 0 / 0 of 300 | 15 / 0 / 0 | 0 | 15 / 0 / 0 | 1 / 11 / 3 | 3 / 0 / 0 (12 not judged) | 15 / 0 / 0 |
+| `ges` | 10 to 50 variables, 100 rows | MAR, logistic | 18 | 7 of 18 | 2 of 18 | 0 / 0 of 360 | 15 / 3 / 0 | 0 | 18 / 0 / 0 | 0 / 9 / 9 | 7 / 3 / 0 (8 not judged) | 16 / 2 / 0 |
+| `ges` | 10 to 50 variables, 100 rows | MCAR | 18 | 9 of 18 | 1 of 18 | 0 / 0 of 360 | 16 / 2 / 0 | 0 | 17 / 1 / 0 | 0 / 12 / 6 | 5 / 1 / 0 (12 not judged) | 17 / 1 / 0 |
+| `ges` | 10 to 50 variables, 500 rows | MAR, logistic | 18 | 10 of 18 | 5 of 18 | 0 / 0 of 360 | 15 / 3 / 0 | 0 | 18 / 0 / 0 | 0 / 11 / 7 | 10 / 4 / 0 (4 not judged) | 18 / 0 / 0 |
+| `ges` | 10 to 50 variables, 500 rows | MCAR | 18 | 11 of 18 | 4 of 18 | 0 / 0 of 360 | 16 / 2 / 0 | 0 | 18 / 0 / 0 | 1 / 13 / 4 | 7 / 3 / 0 (8 not judged) | 18 / 0 / 0 |
+| `ges` | 10 to 50 variables, 2,000 rows | MAR, logistic | 18 | 9 of 18 | 8 of 18 | 0 / 0 of 360 | 9 / 9 / 0 | 0 | 18 / 0 / 0 | 3 / 12 / 3 | 9 / 5 / 0 (4 not judged) | 18 / 0 / 0 |
+| `ges` | 10 to 50 variables, 2,000 rows | MCAR | 18 | 10 of 18 | 6 of 18 | 0 / 0 of 360 | 12 / 6 / 0 | 0 | 18 / 0 / 0 | 0 / 13 / 5 | 9 / 3 / 0 (6 not judged) | 18 / 0 / 0 |
+| `boss` | 15 variables, 100 rows | MAR, logistic | 9 | 7 of 9 | 1 of 9 | 0 / 0 of 180 | 8 / 1 / 0 | 0 | 9 / 0 / 0 | 0 / 6 / 3 | 3 / 0 / 0 (6 not judged) | 9 / 0 / 0 |
+| `boss` | 15 variables, 100 rows | MCAR | 15 | 13 of 15 | 0 of 15 | 0 / 0 of 300 | 15 / 0 / 0 | 0 | 15 / 0 / 0 | 2 / 9 / 4 | 3 / 0 / 0 (12 not judged) | 15 / 0 / 0 |
+| `boss` | 10 to 50 variables, 100 rows | MAR, logistic | 18 | 14 of 18 | 4 of 18 | 0 / 0 of 360 | 14 / 4 / 0 | 0 | 18 / 0 / 0 | 8 / 7 / 3 | 9 / 1 / 0 (8 not judged) | 18 / 0 / 0 |
+| `boss` | 10 to 50 variables, 100 rows | MCAR | 18 | 15 of 18 | 1 of 18 | 0 / 0 of 360 | 15 / 3 / 0 | 0 | 18 / 0 / 0 | 7 / 9 / 2 | 5 / 1 / 0 (12 not judged) | 18 / 0 / 0 |
+| `boss` | 10 to 50 variables, 500 rows | MAR, logistic | 18 | 18 of 18 | 14 of 18 | 0 / 0 of 360 | 12 / 6 / 0 | 0 | 18 / 0 / 0 | 9 / 8 / 1 | 11 / 3 / 0 (4 not judged) | 18 / 0 / 0 |
+| `boss` | 10 to 50 variables, 500 rows | MCAR | 18 | 18 of 18 | 11 of 18 | 0 / 0 of 360 | 11 / 7 / 0 | 0 | 18 / 0 / 0 | 11 / 7 / 0 | 9 / 1 / 0 (8 not judged) | 18 / 0 / 0 |
+| `boss` | 10 to 50 variables, 2,000 rows | MAR, logistic | 18 | 18 of 18 | 17 of 18 | 0 / 0 of 360 | 9 / 9 / 0 | 0 | 16 / 0 / 0 (2 not judged) | 11 / 7 / 0 | 10 / 4 / 0 (4 not judged) | 18 / 0 / 0 |
+| `boss` | 10 to 50 variables, 2,000 rows | MCAR | 18 | 18 of 18 | 14 of 18 | 0 / 0 of 360 | 11 / 7 / 0 | 0 | 16 / 0 / 0 (2 not judged) | 8 / 10 / 0 | 9 / 3 / 0 (6 not judged) | 18 / 0 / 0 |
+| `grasp` | 15 variables, 100 rows | MAR, logistic | 9 | 7 of 9 | 1 of 9 | 0 / 0 of 180 | 8 / 1 / 0 | 0 | 9 / 0 / 0 | 0 / 7 / 2 | 3 / 0 / 0 (6 not judged) | 9 / 0 / 0 |
+| `grasp` | 15 variables, 100 rows | MCAR | 15 | 13 of 15 | 1 of 15 | 0 / 0 of 300 | 15 / 0 / 0 | 0 | 15 / 0 / 0 | 1 / 9 / 5 | 3 / 0 / 0 (12 not judged) | 15 / 0 / 0 |
+| `grasp` | 10 to 50 variables, 100 rows | MAR, logistic | 18 | 16 of 18 | 4 of 18 | 0 / 0 of 360 | 13 / 5 / 0 | 0 | 18 / 0 / 0 | 6 / 9 / 3 | 8 / 2 / 0 (8 not judged) | 17 / 1 / 0 |
+| `grasp` | 10 to 50 variables, 100 rows | MCAR | 18 | 15 of 18 | 3 of 18 | 0 / 0 of 360 | 15 / 3 / 0 | 0 | 18 / 0 / 0 | 4 / 12 / 2 | 5 / 1 / 0 (12 not judged) | 18 / 0 / 0 |
+| `grasp` | 10 to 50 variables, 500 rows | MAR, logistic | 18 | 18 of 18 | 13 of 18 | 0 / 0 of 360 | 11 / 7 / 0 | 0 | 18 / 0 / 0 | 15 / 3 / 0 | 13 / 1 / 0 (4 not judged) | 18 / 0 / 0 |
+| `grasp` | 10 to 50 variables, 500 rows | MCAR | 18 | 17 of 18 | 10 of 18 | 0 / 0 of 360 | 12 / 6 / 0 | 0 | 18 / 0 / 0 | 15 / 3 / 0 | 8 / 2 / 0 (8 not judged) | 18 / 0 / 0 |
+| `grasp` | 10 to 50 variables, 2,000 rows | MAR, logistic | 18 | 18 of 18 | 17 of 18 | 0 / 0 of 360 | 5 / 13 / 0 | 0 | 16 / 0 / 0 (2 not judged) | 15 / 3 / 0 | 10 / 4 / 0 (4 not judged) | 18 / 0 / 0 |
+| `grasp` | 10 to 50 variables, 2,000 rows | MCAR | 18 | 18 of 18 | 14 of 18 | 0 / 0 of 360 | 10 / 8 / 0 | 0 | 16 / 0 / 0 (2 not judged) | 12 / 6 / 0 | 9 / 3 / 0 (6 not judged) | 18 / 0 / 0 |
+
+No search is worse than Tetrad's EM arm in any cell, so no cell ran again on fresh seeds. `ges` is
+better in 107 cells and ties in 25, `boss` is better in 95 and ties in 37, and `grasp` is better in
+89 and ties in 43. No EM fit of either package raised or ran past the cap, in 7,920 fits each. Three
+of Andrey's fits, one EM fit of `boss` and two baseline fits, failed on a read of the Python
+environment's files and were fit again; the record holds the second fits.
+
+Much of the margin is the reference's weakness, not a strength of Andrey's. Tetrad's EM arm is below
+the empty graph in 28 (FGES), 62 (BOSS), and 63 (GRaSP) of the 132 cells, most of them at 500 and
+2,000 rows. With 100 rows and 15 or more variables, or with 50 variables and 500 rows, its mean SHD
+is far above the empty graph's: the search returns dense graphs. The likely cause is the saturated
+covariance, which is estimated without a graph and scored as if every row were complete (see Known
+differences). In the cells where Tetrad's EM arm is itself below the empty graph, `ges` is better in
+20 and ties in 8, `boss` is better in 29 and ties in 33, and `grasp` is better in 25 and ties in 38.
+The mean SHD over the cells of each setting (two masks by three rates; the eight cells of each graph
+at 15 variables):
+
+| graph | variables | rows | cells | empty graph | `ges`: Andrey / Tetrad | `boss`: Andrey / Tetrad | `grasp`: Andrey / Tetrad |
+|---|---|---|---|---|---|---|---|
+| er, degree 1 | 15 | 100 | 8 | 8.00 | 5.23 / 35.69 | 4.86 / 37.27 | 4.86 / 36.62 |
+| er, degree 2 | 15 | 100 | 8 | 15.00 | 10.62 / 37.16 | 9.90 / 39.44 | 10.07 / 38.90 |
+| scale_free, degree 2 | 15 | 100 | 8 | 14.00 | 9.47 / 36.61 | 10.93 / 40.71 | 10.44 / 40.36 |
+| er, degree 2 | 10 | 100 | 6 | 10.00 | 5.38 / 8.63 | 4.89 / 8.83 | 5.32 / 8.04 |
+| er, degree 2 | 10 | 500 | 6 | 10.00 | 2.92 / 5.32 | 2.93 / 4.46 | 1.88 / 4.23 |
+| er, degree 2 | 10 | 2,000 | 6 | 10.00 | 2.08 / 3.00 | 2.22 / 2.79 | 1.65 / 2.54 |
+| er, degree 2 | 20 | 100 | 6 | 20.00 | 13.65 / 43.87 | 12.17 / 48.83 | 10.86 / 48.68 |
+| er, degree 2 | 20 | 500 | 6 | 20.00 | 6.58 / 16.11 | 6.08 / 15.99 | 4.77 / 14.41 |
+| er, degree 2 | 20 | 2,000 | 6 | 20.00 | 5.30 / 11.91 | 4.38 / 9.94 | 2.89 / 9.28 |
+| er, degree 2 | 50 | 100 | 6 | 50.00 | 49.38 / 281.38 | 48.02 / 463.00 | 45.76 / 429.78 |
+| er, degree 2 | 50 | 500 | 6 | 50.00 | 23.27 / 99.16 | 17.35 / 114.68 | 14.92 / 109.98 |
+| er, degree 2 | 50 | 2,000 | 6 | 50.00 | 13.34 / 49.00 | 10.88 / 48.43 | 7.77 / 44.57 |
+| er, degree 4 | 10 | 100 | 6 | 20.00 | 18.78 / 20.77 | 16.74 / 18.80 | 16.41 / 18.37 |
+| er, degree 4 | 10 | 500 | 6 | 20.00 | 17.62 / 18.88 | 10.61 / 10.22 | 11.02 / 12.00 |
+| er, degree 4 | 10 | 2,000 | 6 | 20.00 | 16.77 / 17.07 | 7.67 / 6.84 | 8.45 / 9.98 |
+| er, degree 4 | 20 | 100 | 6 | 40.00 | 40.19 / 61.93 | 25.68 / 61.05 | 31.66 / 60.45 |
+| er, degree 4 | 20 | 500 | 6 | 40.00 | 41.95 / 50.82 | 10.54 / 17.12 | 14.28 / 21.93 |
+| er, degree 4 | 20 | 2,000 | 6 | 40.00 | 40.32 / 45.52 | 9.23 / 10.24 | 10.12 / 10.03 |
+| er, degree 4 | 50 | 100 | 6 | 100.00 | 103.88 / 307.57 | 61.76 / 471.53 | 68.29 / 431.48 |
+| er, degree 4 | 50 | 500 | 6 | 100.00 | 95.99 / 178.81 | 22.40 / 127.16 | 28.94 / 134.12 |
+| er, degree 4 | 50 | 2,000 | 6 | 100.00 | 105.19 / 144.71 | 16.37 / 41.48 | 19.94 / 40.73 |
+
+The floor decides a cell of 15 variables and 100 rows only where Tetrad's EM arm is below the empty
+graph: 2 cells for `ges`, 1 for `boss`, and 2 for `grasp`, and each search is below it in all of
+them. Over all 24 cells of that size each search is below the empty graph in 20; the 4 misses are at
+50% missing, but for one of `ges` at 10% under logistic MAR on ER1 (6.70 against 8.00, the interval
+reaching 0). On the generic cells `boss` is below the empty graph in 101 of 108 and `grasp` in 102,
+the misses at 100 rows but for one of `grasp` at 500. `ges` is below it in 51 of the 54 cells of
+mean degree 2 and in 5 of the 54 of mean degree 4, where the plain search at this penalty is near or
+above the empty graph on the complete data too (the control below).
+
+The complete-data control separates the plain searches from the missing-data layers: both
+packages' searches on the data before the mask, the same 20 datasets per setting.
+
+| graph | variables | rows | empty graph | `ges`: Andrey / Tetrad FGES, difference | `boss`: Andrey / Tetrad BOSS, difference | `grasp`: Andrey / Tetrad GRaSP, difference |
+|---|---|---|---|---|---|---|
+| er, degree 1 | 15 | 100 | 8.00 | 7.75 / 7.50, +0.25 [+0.00, +0.70] tie | 7.50 / 7.65, -0.15 [-0.70, +0.35] tie | 6.40 / 6.70, -0.30 [-1.10, +0.50] tie |
+| er, degree 2 | 15 | 100 | 15.00 | 11.05 / 10.55, +0.50 [+0.00, +1.20] tie | 7.85 / 8.80, -0.95 [-3.55, +0.80] tie | 6.15 / 7.00, -0.85 [-2.40, +0.65] tie |
+| scale_free, degree 2 | 15 | 100 | 14.00 | 8.75 / 8.75, +0.00 [-0.25, +0.20] tie | 9.50 / 8.50, +1.00 [-1.10, +3.55] tie | 9.65 / 7.75, +1.90 [-0.30, +4.10] tie |
+| er, degree 2 | 10 | 100 | 10.00 | 5.50 / 4.10, +1.40 [+0.40, +2.50] **worse** | 5.00 / 5.50, -0.50 [-1.90, +0.80] tie | 4.85 / 4.90, -0.05 [-2.00, +1.90] tie |
+| er, degree 2 | 10 | 500 | 10.00 | 2.75 / 2.90, -0.15 [-1.05, +0.60] tie | 3.10 / 1.85, +1.25 [-0.25, +3.00] tie | 1.85 / 2.35, -0.50 [-1.85, +0.70] tie |
+| er, degree 2 | 10 | 2,000 | 10.00 | 1.20 / 1.05, +0.15 [-0.15, +0.60] tie | 2.00 / 1.25, +0.75 [-0.40, +2.00] tie | 2.05 / 1.25, +0.80 [+0.00, +1.95] tie |
+| er, degree 2 | 20 | 100 | 20.00 | 15.25 / 14.55, +0.70 [-0.30, +1.75] tie | 14.65 / 14.40, +0.25 [-2.35, +2.75] tie | 13.65 / 13.25, +0.40 [-2.45, +3.35] tie |
+| er, degree 2 | 20 | 500 | 20.00 | 8.55 / 8.45, +0.10 [-0.50, +0.65] tie | 6.45 / 7.35, -0.90 [-3.50, +1.70] tie | 5.45 / 6.40, -0.95 [-3.10, +1.25] tie |
+| er, degree 2 | 20 | 2,000 | 20.00 | 4.10 / 4.35, -0.25 [-1.65, +1.00] tie | 5.20 / 4.50, +0.70 [-0.85, +2.35] tie | 4.10 / 3.45, +0.65 [-1.70, +3.15] tie |
+| er, degree 2 | 50 | 100 | 50.00 | 66.40 / 63.85, +2.55 [+0.55, +4.55] **worse** | 71.20 / 65.10, +6.10 [+1.50, +10.60] **worse** | 64.15 / 63.70, +0.45 [-2.60, +3.60] tie |
+| er, degree 2 | 50 | 500 | 50.00 | 36.85 / 34.65, +2.20 [-0.45, +5.05] tie | 29.85 / 28.65, +1.20 [-0.45, +2.85] tie | 23.80 / 24.05, -0.25 [-2.95, +2.45] tie |
+| er, degree 2 | 50 | 2,000 | 50.00 | 17.05 / 17.70, -0.65 [-2.90, +1.10] tie | 12.65 / 15.10, -2.45 [-4.70, -0.35] **better** | 11.35 / 9.95, +1.40 [-1.00, +3.40] tie |
+| er, degree 4 | 10 | 100 | 20.00 | 18.95 / 19.70, -0.75 [-1.55, +0.00] tie | 11.10 / 15.45, -4.35 [-8.45, -0.55] **better** | 13.40 / 11.90, +1.50 [-3.60, +6.35] tie |
+| er, degree 4 | 10 | 500 | 20.00 | 16.75 / 16.40, +0.35 [-0.75, +1.40] tie | 7.35 / 8.25, -0.90 [-4.65, +3.00] tie | 7.50 / 7.00, +0.50 [-4.00, +4.80] tie |
+| er, degree 4 | 10 | 2,000 | 20.00 | 16.50 / 15.90, +0.60 [-0.80, +2.05] tie | 5.25 / 4.95, +0.30 [-3.90, +4.55] tie | 1.60 / 7.35, -5.75 [-9.65, -2.25] **better** |
+| er, degree 4 | 20 | 100 | 40.00 | 40.25 / 40.80, -0.55 [-3.25, +1.80] tie | 20.55 / 17.45, +3.10 [-4.30, +10.20] tie | 19.75 / 21.50, -1.75 [-8.55, +4.35] tie |
+| er, degree 4 | 20 | 500 | 40.00 | 41.85 / 46.75, -4.90 [-9.85, -1.15] **better** | 9.50 / 8.35, +1.15 [-7.05, +7.35] tie | 8.15 / 7.85, +0.30 [-5.55, +6.00] tie |
+| er, degree 4 | 20 | 2,000 | 40.00 | 35.05 / 41.55, -6.50 [-13.10, -0.90] **better** | 9.70 / 5.90, +3.80 [-1.90, +10.60] tie | 4.95 / 4.25, +0.70 [-2.15, +4.20] tie |
+| er, degree 4 | 50 | 100 | 100.00 | 108.45 / 109.85, -1.40 [-6.40, +5.45] tie | 61.65 / 60.35, +1.30 [-5.80, +8.45] tie | 75.20 / 78.05, -2.85 [-22.00, +15.70] tie |
+| er, degree 4 | 50 | 500 | 100.00 | 99.35 / 108.05, -8.70 [-16.75, -1.15] **better** | 26.60 / 26.45, +0.15 [-11.50, +12.10] tie | 31.20 / 20.50, +10.70 [+1.10, +21.55] **worse** |
+| er, degree 4 | 50 | 2,000 | 100.00 | 102.00 / 106.85, -4.85 [-19.50, +9.25] tie | 8.35 / 14.15, -5.80 [-15.70, +0.60] tie | 14.85 / 8.25, +6.60 [-0.60, +17.60] tie |
+
+The plain searches tie in 53 of the 63 comparisons. Andrey's is behind in 4: `ges` at mean degree
+2 with 100 rows (10 and 50 variables), `boss` at mean degree 2 with 50 variables and 100 rows, and
+`grasp` at mean degree 4 with 50 variables and 500 rows. It is ahead in 6: `ges` at mean degree 4
+(20 variables with 500 and 2,000 rows, 50 with 500), `boss` at mean degree 2 with 50 variables and
+2,000 rows and at mean degree 4 with 10 variables and 100 rows, and `grasp` at mean degree 4 with
+10 variables and 2,000 rows. In those 6 settings a margin with EM may be the search and not the
+EM layer. None of the 10 was rerun on fresh datasets; with 63 comparisons at 95%, about 3 would
+differ by chance. Elsewhere the searches tie, so the margin is the missing-data layer.
+
+Against the baselines:
+
+- **Tetrad's test-wise deletion**, its default. Every search with EM is better in every judged
+  cell but one tie (`ges`, mean degree 4, 10 variables, 100 rows, MCAR at 10%). At 50 variables
+  and 2,000 rows, 170 of Tetrad's test-wise BOSS and GRaSP fits were killed for memory (a fit that
+  finished there used up to 12 GB, and the benchmark ran 16 fits side by side in 48 GB) and 6
+  GRaSP fits ran past the cap, so 4 cells of each of the two are not judged and the others pair
+  fewer datasets. Tetrad's test-wise FGES finished every fit.
+- **Test-wise PC.** At this penalty `ges` with EM is worse than `pc` in 39 cells and better in 6,
+  `boss` is worse in 13 and better in 56, and `grasp` is worse in 12 and better in 68. The worse
+  cells of `boss` and `grasp` are at 100 rows, but for one of `boss` at 500; those of `ges` are at
+  every size, 22 of them at mean degree 4. They were not rerun.
+- **Listwise deletion and mean imputation.** No search is worse than either in any cell. Listwise
+  deletion kept fewer than 4 rows in 3,534 of 7,920 fits, which are errors; PC raised in 5 fits at
+  15 variables and 100 rows, where a test had too few rows.
+
+The median EM fit took 0.7 to 9.9 s for `ges`, 0.7 to 33 s for `boss`, and 0.8 to 34 s for `grasp`,
+against 0.7 to 45 s, 0.7 to 48 s, and 0.7 to 70 s for Tetrad's, which include about 1.3 s to start
+the Java process. By the median ratio of the paired fit times, Andrey's fit was the slower one in 17
+(`ges`), 64 (`boss`), and 58 (`grasp`) of the 132 cells, by up to 1.8, 4.1, and 3.7 times, the
+largest at mean degree 4 with 500 and 2,000 rows, and the faster one in the others, by up to 11, 15,
+and 27 times.
+
+### EM against the baselines alone
+
+These lanes run no reference. `ges`, `boss`, and `grasp` at the papers' size, 15 variables and 100
+rows, in the cells of the claim (MCAR and logistic MAR), at the default `ebic_gamma=1.0` and at
+0.0:
 
 | method | `ebic_gamma` | missing | cells | below the empty graph | test-wise PC: better / tie / worse | listwise or mean imputation: worse |
 |---|---|---|---|---|---|---|
@@ -403,7 +561,7 @@ of EM against each baseline in parentheses:
 The bar for a supported value of `missing`: never less accurate than its reference in a cell that
 repeats, and below the empty graph in its claimed setting.
 
-- `pc(missing="mvpc")`, `notears(missing="em")`, `hc(missing="em")`, and `tabu(missing="em")` are
+- `pc(missing="mvpc")` and `missing="em"` in `notears`, `hc`, `tabu`, `ges`, `boss`, and `grasp` are
   supported: none is worse than its reference in any cell, so no cell needed a rerun for that
   comparison, and each meets the floor wherever it decides a cell.
 - `hc` and `tabu` with `missing="em"` are supported with a stated limit. At 15 variables and 100
@@ -411,8 +569,14 @@ repeats, and below the empty graph in its claimed setting.
   cells and `tabu` in 15. The cause is the plain search at that sample size, which misses the floor
   on the complete data too (on ER1, 8.8 for `hc` and 8.45 for `tabu` against the empty graph's
   8.0). At 20 variables with 500 and 2,000 rows both meet the floor in 12 of 12 cells.
-- `ges`, `boss`, `grasp`, `xges`, `exact_search`, `calm`, and `dagma` with `missing="em"` stay
-  experimental: no reference implementation exists to measure them against.
+- `ges`, `boss`, and `grasp` with `missing="em"` are supported against Tetrad's EM covariance
+  policy, at the plain BIC, up to 50 variables, under MCAR and logistic MAR. The reference is a
+  one-pass covariance EM and is not below the empty graph in most cells of 100 rows, so there the
+  comparison says little more than that Andrey's EM does not fail the same way. `ges` has a
+  stated limit: at mean degree 4 and this penalty its result is rarely below the empty graph (5 of
+  54 cells), with EM and on the complete data.
+- `xges`, `exact_search`, `calm`, and `dagma` with `missing="em"` stay experimental: no reference
+  implementation exists to measure them against.
 
 ## Limits
 
@@ -437,6 +601,12 @@ repeats, and below the empty graph in its claimed setting.
   under MCAR on two of three graphs, and `ges`, `boss`, and `grasp` in 5 of 9 cells. `hc` and
   `tabu` at the plain BIC miss it in 13 and 9 of the 24 cells with 100 rows, at low rates too, as
   their complete-data fits do on ER1.
+- **GES, BOSS, and GRaSP with EM: what was not compared.** The 100-variable cells and the
+  quantile MAR mask of the generic grid, self-masking, and the default `ebic_gamma=1.0` did not run
+  against Tetrad. At 100 variables one dataset of 100 rows took Tetrad's six fits 365 s. Those
+  cells are in `m2-generic` against the baselines.
+- **GES with EM on denser graphs.** At the plain BIC and mean degree 4, `ges` with EM is below the
+  empty graph in 5 of 54 cells and worse than test-wise PC in 22.
 - **Values missing not at random.** EM has no guarantee under self-masking; the rows of that mask
   are reported and not judged.
 
@@ -444,9 +614,12 @@ repeats, and below the empty graph in its claimed setting.
 
 ```shell
 benchmarks/start.sh && benchmarks/start_r.sh && benchmarks/start_mvpc_r.sh && benchmarks/start_missdag.sh
+benchmarks/start_tetrad_missing.sh
 $ANDREY_BENCH_PYTHON benchmarks/missing_cpu.py --lane m1-paper --out outputs/m1-paper-0 --resume
 $ANDREY_BENCH_PYTHON benchmarks/missing_cpu.py --lane m2-bnlearn --part 0 --parts 32 \
     --out outputs/m2-bnlearn-0 --resume
+$ANDREY_BENCH_PYTHON benchmarks/missing_cpu.py --lane m2-tetrad --part 0 --parts 64 \
+    --out outputs/m2-tetrad-0 --resume
 $ANDREY_BENCH_PYTHON benchmarks/missing_cpu.py --lane m1-generic --first-seed 20 \
     --out outputs-rerun/m1-generic-0 --resume
 $ANDREY_BENCH_PYTHON benchmarks/missing_summary.py --runs outputs/*/ --data outputs/data \
@@ -454,7 +627,7 @@ $ANDREY_BENCH_PYTHON benchmarks/missing_summary.py --runs outputs/*/ --data outp
 ```
 
 `--part i --parts k` splits a lane into independent jobs, and `--first-seed` moves the seeds for a
-rerun. The scripts print the environment variables the R and MissDAG arms read.
+rerun. The scripts print the environment variables the R, MissDAG, and Tetrad arms read.
 
 ## Known differences
 
@@ -498,6 +671,20 @@ rerun. The scripts print the environment variables the R and MissDAG arms read.
 - **MissDAG's M-step.** MissDAG keeps the weights NOTEARS returns and one noise variance for every
   variable. Andrey fits the weights and a variance per variable again by least squares on the
   parents the fit returns.
+- **Tetrad's EM.** Tetrad's EM covariance policy estimates the mean and covariance of a saturated
+  Gaussian by EM once, to convergence, from the available-case means and variances, and the search
+  scores from that matrix. Andrey's EM alternates 10 rounds of an E-step under the current graph's
+  linear-Gaussian model with the search. Both count every row as the sample size; Tetrad's
+  documentation notes that this under-penalizes a covariance estimated with missing values, and it
+  has other effective-sample-size modes, which the lane does not run.
+- **Tetrad's searches.** FGES stands beside `ges`. Tetrad's BOSS and GRaSP start from the columns'
+  order in the data, and the benchmark shuffles the columns by the seed. `m2-tetrad` runs
+  tetrad-lib 8.0.0, the first release with the policy; the other Tetrad lanes run 7.6.10.
+- **Tetrad's default.** Without a policy, Tetrad's score deletes rows per local score (test-wise
+  deletion). That arm is a baseline and decides no cell.
+- **The plain BIC.** `ges`, `boss`, and `grasp` run at `ebic_gamma=0.0` against Tetrad's
+  `penaltyDiscount = 1.0`; their default is `ebic_gamma=1.0`, which `m2-b`, `m2-c`, and
+  `m2-generic` run.
 
 ## References
 
@@ -506,6 +693,9 @@ rerun. The scripts print the environment variables the R and MissDAG arms read.
 - Gao, E., Ng, I., Gong, M., Shen, L., Huang, W., Liu, T., Zhang, K., and Bondell, H. (2022).
   MissDAG: Causal discovery in the presence of missing data with continuous additive noise models.
   Advances in Neural Information Processing Systems 35.
+- Ramsey, J. D., Zhang, K., Glymour, M., Sanchez Romero, R., Huang, B., Ebert-Uphoff, I.,
+  Samarasinghe, S., Barnes, E. A., and Glymour, C. (2018). TETRAD: a toolbox for causal discovery.
+  8th International Workshop on Climate Informatics.
 - Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of Statistical
   Software 35(3), 1-22.
 - Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
