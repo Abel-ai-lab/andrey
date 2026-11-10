@@ -160,7 +160,8 @@ _add(
             "[x, z, y] triples the rule left ambiguous, by 0-based position; with missing=mvpc on "
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
-            "edges tested again (retested) and removed (removed), by name or 0-based position",
+            "edges tested again (retested), removed (removed), and left with a test that had too "
+            "few rows to correct (uncorrected), by name or 0-based position",
         ),
         accel="numpy",
         status="supported",

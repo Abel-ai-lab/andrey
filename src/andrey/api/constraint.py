@@ -163,9 +163,10 @@ def pc(
         which orientation each keeps. With ``missing="mvpc"`` on data with missing values,
         ``metadata["missingness_parents"]`` maps each column whose missingness indicator has
         parents to them, and ``metadata["corrected_edges"]`` lists the edges tested again
-        (``"retested"``) and those removed (``"removed"``), as ``[x, y]`` pairs in ascending order;
-        both name a DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is
-        the seed of the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        (``"retested"``), those removed (``"removed"``), and those with a test that had too few
+        rows to correct (``"uncorrected"``), as ``[x, y]`` pairs in ascending order; both name a
+        DataFrame's columns and number an array's from 0, and ``metadata["seed"]`` is the seed of
+        the permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the
         seed used.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
@@ -188,8 +189,7 @@ def pc(
         if a column repeats another up to scale and shift, before any test runs; one message names
         every group of copies and says to keep one column per group. Also if ``knowledge`` names a
         column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if
-        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``, or a
-        corrected test reads fewer rows than it needs.
+        ``missing="mvpc"`` is given with a test other than ``"fisherz"`` or ``"student_t"``.
 
     Warns
     -----
@@ -326,11 +326,15 @@ def pc(
     observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
     drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
     virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
-    ``W`` is observed (their Eq. (4)), and the test runs on them. A test
-    with an empty ``W`` is the test-wise one. The colliders follow the corrected separating sets;
-    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
-    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
-    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an empty ``W`` is the
+    test-wise one. So is a test with fewer than ``max(|S| + 3, |W| + 2)`` rows where ``x``, ``y``,
+    ``S``, and ``W`` are all observed, too few for the regressions on ``W`` or for the test: the
+    paper leaves that case open, and as the correction can only remove an edge the test-wise tests
+    kept, the pair keeps its test-wise answer for that ``S`` and is listed in
+    ``metadata["corrected_edges"]["uncorrected"]``. The colliders follow the corrected separating
+    sets; ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction
+    applies to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's
+    rules. Each regression has an intercept, where their Eq. (2) has none and so assumes that every
     variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
     p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
     where the queried columns' values are missing, so a result depends on neither the column order,
@@ -511,7 +515,8 @@ def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict
             name(c): [name(p) for p in pa] for c, pa in sorted(found["parents"].items())
         },
         "corrected_edges": {
-            key: [[name(x), name(y)] for x, y in found[key]] for key in ("retested", "removed")
+            key: [[name(x), name(y)] for x, y in found[key]]
+            for key in ("retested", "removed", "uncorrected")
         },
         "seed": seed,
     }

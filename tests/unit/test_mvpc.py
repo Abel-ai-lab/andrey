@@ -110,11 +110,46 @@ def test_a_corrected_test_is_the_test_on_the_virtual_rows_it_builds():
     assert test(1, 0) == FisherZ(virtual)(0, 1)
 
 
-def test_a_corrected_test_with_too_few_rows_raises():
+def test_a_corrected_test_with_too_few_rows_is_the_deletion_test():
     X = figure_1b(0)[:8]
-    X[:, 1] = [0.1, np.nan, 0.3, np.nan, np.nan, np.nan, np.nan, np.nan]
-    with pytest.raises(ValueError, match="reads 2 rows .* it needs 3"):
-        _correction(X, {1: [2]})(0, 1)
+    X[:, 1] = [0.1, np.nan, 0.3, np.nan, np.nan, 0.2, np.nan, 0.5]
+    X[[5, 7], 2] = np.nan  # columns 0, 1, and their indicator's parent 2 share two rows
+    test = _correction(X, {1: [2]})
+    assert test(0, 1) == make_indep_test("fisherz", X)(0, 1)
+    assert test.uncorrected == {(0, 1)}
+    assert test(0, 2) == make_indep_test("fisherz", X)(0, 2)  # no indicator parent: not counted
+    assert test.uncorrected == {(0, 1)}
+
+
+def _blocked(seed: int, n: int = 450) -> np.ndarray:
+    """A triangle whose three columns are observed together on two rows, each pair on a third."""
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal(n)
+    y = x + 0.5 * rng.standard_normal(n)
+    w = x + y + 0.5 * rng.standard_normal(n)
+    X = np.column_stack([x, y, w])
+    third = n // 3
+    X[:third, 2] = np.nan
+    low = np.zeros(n, dtype=bool)
+    low[third:] = w[third:] < np.median(w[third:])
+    X[low, 1] = np.nan  # y is missing where w is low: w is a parent of its indicator
+    high = np.flatnonzero(~low & (np.arange(n) >= third))
+    X[high[2:], 0] = np.nan
+    return X
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_a_fit_whose_corrected_tests_lack_rows_returns_the_test_wise_edges_and_names_them(seed):
+    X = _blocked(seed)
+    out = andrey.pc(X, missing="mvpc", max_depth=0)
+    assert out.metadata["missingness_parents"]
+    assert out.metadata["corrected_edges"] == {
+        "retested": [[0, 1], [0, 2], [1, 2]],
+        "removed": [],
+        "uncorrected": [[0, 1], [0, 2], [1, 2]],
+    }
+    testwise = andrey.pc(X, max_depth=0)
+    assert np.array_equal(out.structure.to_numpy(), testwise.structure.to_numpy())
 
 
 def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
