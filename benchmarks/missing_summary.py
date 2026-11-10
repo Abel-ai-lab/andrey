@@ -11,7 +11,10 @@ A reference is another package's implementation of the same method, and its row 
 ``m2-bnlearn`` it is bnlearn's ``structural.em`` with the same search inside, at ``max.iter`` 10:
 ``bnlearn.structural_em.hc.iter10`` for ``hc`` and ``bnlearn.structural_em.tabu.iter10`` for
 ``tabu``, with the complete-data control ``bnlearn.hc`` or ``bnlearn.tabu`` against Andrey's plain
-search.
+search. In ``m2-tetrad`` it is Tetrad's FGES, BOSS, or GRaSP under its EM covariance policy,
+``tetrad.<search>.em_covariance``, with the control ``tetrad.<search>.complete``; the same search
+under test-wise deletion, ``tetrad.<search>.testwise``, is paired too, as ``reference_testwise``, a
+baseline that is reported and decides no row.
 
 The SHD of every pair is ``shd``, except in ``m2-bnlearn``: bnlearn returns a DAG, whose ``shd`` is
 the directed distance, and Andrey's searches return CPDAGs, whose ``shd`` is the distance between
@@ -24,12 +27,12 @@ finished, with the 95% percentile-bootstrap interval of its mean over 10,000 res
 otherwise; fewer than 10 paired datasets are reported, not judged. A dataset the other arm finished
 and the method did not is listed in ``failures``: an error or a timeout is never scored as a graph.
 The reference comparison is also made on the skeleton F1 alone. A dataset's error is recorded with
-its arm and never moves a verdict. In the lanes at the papers' sizes and the 100-row cells of
-``m2-bnlearn``, a judged row whose reference lies below the empty graph fails when the method does
-not. ``--replications`` adds each row's rerun on fresh seeds: a worse
-verdict against the reference counts only when the rerun agrees, and a better one is the first
-run's. A worse verdict against test-wise PC, listwise deletion, or mean imputation carries
-``worse_again``, whether its rerun is worse too.
+its arm and never moves a verdict. In the lanes at the papers' sizes and the cells of that size
+(15 variables, 100 rows) of ``m2-bnlearn`` and ``m2-tetrad``, a judged row whose reference lies
+below the empty graph fails when the method does not. ``--replications`` adds each row's rerun on
+fresh seeds: a worse verdict against the reference counts only when the rerun agrees, and a better
+one is the first run's. A worse verdict against test-wise PC, listwise deletion, or mean imputation
+carries ``worse_again``, whether its rerun is worse too.
 
     $ANDREY_BENCH_PYTHON benchmarks/missing_summary.py --runs outputs/*/ --data outputs/data \
         --out missing-data.json
@@ -55,9 +58,10 @@ REFERENCE_ALPHA = 0.01
 CLAIMED = {"mvpc": ("mcar", "mar", "mnar"), "em": ("mcar", "mar")}
 #: The lanes at the papers' sizes, where the floor is judged.
 PAPER_LANES = ("m1-paper", "m2-a", "m2-b", "m2-c")
-#: ``m2-bnlearn`` mixes sizes: its cells at this row count are the ``m2-b`` and ``m2-c`` cells, the
-#: papers' size, and the floor is judged in them; in its other cells it is reported.
-BNLEARN_PAPER_ROWS = 100
+#: These lanes mix sizes: the floor is judged in their cells at the papers' size, the variables and
+#: rows of the ``m2-b`` and ``m2-c`` cells (:data:`PAPER_SIZE`), and reported in their other cells.
+MIXED_LANES = ("m2-bnlearn", "m2-tetrad")
+PAPER_SIZE = (15, 100)
 #: Another package's arm for the same method: lane -> method -> arm.
 REFERENCES = {
     "m1-paper": {"pc": "mvpc-r.permc"},
@@ -66,6 +70,11 @@ REFERENCES = {
         "hc": "bnlearn.structural_em.hc.iter10",
         "tabu": "bnlearn.structural_em.tabu.iter10",
     },
+    "m2-tetrad": {
+        "ges": "tetrad.fges.em_covariance",
+        "boss": "tetrad.boss.em_covariance",
+        "grasp": "tetrad.grasp.em_covariance",
+    },
 }
 REFERENCES["m2-c"] = REFERENCES["m2-a"]
 #: The reference's complete-data arm, the control against the method's plain search.
@@ -73,14 +82,27 @@ COMPLETE_REFERENCE = {
     "m1-paper": {"pc": "mvpc-r.testwise"},
     "m2-a": {"notears": "missdag.notears"},
     "m2-bnlearn": {"hc": "bnlearn.hc", "tabu": "bnlearn.tabu"},
+    "m2-tetrad": {
+        "ges": "tetrad.fges.complete",
+        "boss": "tetrad.boss.complete",
+        "grasp": "tetrad.grasp.complete",
+    },
 }
 COMPLETE_REFERENCE["m2-c"] = COMPLETE_REFERENCE["m2-a"]
+#: The reference package's own test-wise deletion in the same search, a baseline beside its EM arm.
+REFERENCE_TESTWISE = {
+    "m2-tetrad": {
+        "ges": "tetrad.fges.testwise",
+        "boss": "tetrad.boss.testwise",
+        "grasp": "tetrad.grasp.testwise",
+    },
+}
 #: The lanes that score on ``class_shd``: they pair a DAG arm with CPDAG arms.
 CLASS_LANES = ("m2-bnlearn",)
 CELL = ["lane", "graph", "density", "d", "n", "mechanism", "form", "rate"]
 #: The arms every lane has beside the method: a worse verdict against one is checked on a rerun.
 BASELINES = ("testwise", "listwise", "mean")
-OTHERS = ("reference", "testwise", "listwise", "mean")
+OTHERS = ("reference", "reference_testwise", "testwise", "listwise", "mean")
 
 
 def bootstrap(values: np.ndarray) -> list[float] | None:
@@ -194,6 +216,8 @@ def arms_of(lane: str, name: str) -> dict[str, str] | None:
         arms = {"method": name, "testwise": "andrey.pc.default", "complete": plain}
         if theirs := REFERENCES.get(lane, {}).get(m[1]):
             arms["reference"] = theirs
+        if theirs := REFERENCE_TESTWISE.get(lane, {}).get(m[1]):
+            arms["reference_testwise"] = theirs
     else:
         return None
     return arms | {"listwise": f"listwise.{plain}", "mean": f"impute_mean.{plain}"}
@@ -260,6 +284,7 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
         for role in (
             "method",
             "reference",
+            "reference_testwise",
             "testwise",
             "listwise",
             "mean",
@@ -309,7 +334,7 @@ def cell_rows(cell: dict[str, Any], frame: pd.DataFrame, complete: pd.DataFrame)
         if row["judged"]:
             ref = row["reference"]
             paper_size = lane in PAPER_LANES or (
-                lane == "m2-bnlearn" and cell["n"] == BNLEARN_PAPER_ROWS
+                lane in MIXED_LANES and (cell["d"], cell["n"]) == PAPER_SIZE
             )
             floor_applies = paper_size and ref["minus_empty"][1] < 0
             row["floor"]["applies"] = floor_applies

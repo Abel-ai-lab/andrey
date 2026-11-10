@@ -34,6 +34,16 @@ complete values of every mask drawn over it. Lanes:
   two packages' searches from their EM layers. The pairs follow ``tabu_cpu.py``: Andrey's ``hc``
   and ``tabu`` run at ``ebic_gamma`` 0.0, the standard BIC that bnlearn's ``bic-g`` scores, with
   no parent cap and the tabu list of 10 on both sides. Needs R (``benchmarks/start_r.sh``).
+- ``m2-tetrad``: ``ges``, ``boss``, and ``grasp`` with ``missing="em"`` against Tetrad's FGES,
+  BOSS, and GRaSP under its EM covariance policy, their reference: Tetrad estimates one covariance
+  by EM under a saturated Gaussian model and searches on it. Both sides score the standard BIC,
+  Andrey at ``ebic_gamma`` 0.0 and Tetrad at ``penaltyDiscount`` 1.0. The cells are those of
+  ``m2-b`` (15 variables, 100 rows, MCAR at 0.1 to 0.5, raw data, on MissDAG's three graphs), the
+  logistic MAR cells of ``m2-c`` at 15 variables, and the MCAR and logistic MAR cells of
+  ``m2-generic`` (ER2 and ER4, 10 to 100 variables, 100 to 2,000 rows, standardized). Each masked
+  dataset also fits Tetrad's searches under test-wise deletion, its default without a policy, and
+  test-wise PC; each complete dataset fits both packages' plain searches. Needs tetrad-lib 8.0.0
+  (``benchmarks/start_tetrad_missing.sh``).
 
 ``--part i --parts k`` runs every k-th unit of the lane from the i-th, so a lane splits into
 independent jobs; ``--first-seed`` moves the seeds, for a rerun on fresh ones; ``--budget-s`` stops
@@ -86,6 +96,8 @@ M2_SEARCHES = ("ges", "boss", "grasp")
 M2_REDUCED = ("hc", "tabu", "xges", "exact_search", "calm", "notears", "dagma")
 #: ``m2-bnlearn``: the iterations of bnlearn's structural EM, the rounds Andrey's EM runs.
 BNLEARN_EM_ITERATIONS = 10
+#: ``m2-tetrad``: Tetrad's search for each of Andrey's.
+TETRAD_SEARCHES = {"ges": "fges", "boss": "boss", "grasp": "grasp"}
 
 
 @dataclass(frozen=True)
@@ -250,6 +262,8 @@ def _plan(lane: str, seeds: int) -> list[Unit]:
         return _units(pairs, masked, complete)
     if lane == "m2-bnlearn":
         return _bnlearn_units(seeds)
+    if lane == "m2-tetrad":
+        return _tetrad_units(seeds)
     raise SystemExit(f"unknown lane {lane!r}; one of {', '.join(LANES)}")
 
 
@@ -292,7 +306,55 @@ def _bnlearn_units(seeds: int) -> list[Unit]:
     return _units(pairs, masked, complete)
 
 
-LANES = ("m1-generic", "m1-paper", "m2-a", "m2-b", "m2-c", "m2-generic", "m2-reduced", "m2-bnlearn")
+def _tetrad_units(seeds: int) -> list[Unit]:
+    """The ``m2-tetrad`` units: ``ges``, ``boss``, and ``grasp`` with EM beside Tetrad's FGES,
+    BOSS, and GRaSP under its EM covariance policy, on the cells of the EM claim (MCAR and logistic
+    MAR) that ``m2-b``, ``m2-c``, and ``m2-generic`` run for the three searches, each dataset once.
+
+    A masked dataset fits Andrey's three EM arms with their listwise and mean-imputation baselines
+    at ``ebic_gamma`` 0.0 (the standard BIC, which Tetrad scores at ``penaltyDiscount`` 1.0),
+    Tetrad's three searches under EM covariance and under test-wise deletion, and test-wise PC; the
+    complete dataset fits both packages' plain searches.
+    """
+    from andrey_bench.adapters.tetrad_missing import TetradMissing
+
+    mcar, mar = [("mcar", "")], [("mar", "logistic")]
+    paper = [(15, 100)]
+    pairs = [
+        *_cells(PAPER_GRAPHS, paper, mcar, PAPER_RATES, seeds, "raw"),
+        *_cells(PAPER_GRAPHS, paper, mar, F2_RATES, seeds, "raw"),
+        *_cells(
+            [("er", 2.0), ("er", 4.0)],
+            itertools.product((10, 20, 50, 100), (100, 500, 2000)),
+            [*mcar, *mar],
+            GENERIC_RATES,
+            seeds,
+            "standardized",
+        ),
+    ]
+    masked: list[Any] = [AndreyMissing("pc", None)]
+    complete: list[Any] = []
+    for method in M2_SEARCHES:
+        em, plain = _em_arms(method, ebic_gamma=0.0)
+        masked += em
+        complete += plain
+    for search in TETRAD_SEARCHES.values():
+        masked += [TetradMissing(search, "em_covariance"), TetradMissing(search, "testwise")]
+        complete.append(TetradMissing(search, "fail"))
+    return _units(pairs, masked, complete)
+
+
+LANES = (
+    "m1-generic",
+    "m1-paper",
+    "m2-a",
+    "m2-b",
+    "m2-c",
+    "m2-generic",
+    "m2-reduced",
+    "m2-bnlearn",
+    "m2-tetrad",
+)
 #: Seeds per cell: 50 in the MVPC paper's setting, 20 elsewhere.
 DEFAULT_SEEDS = {"m1-paper": 50}
 
