@@ -670,23 +670,23 @@ def score_matching(
     tables are on data as simulated, and the order search reads standardized columns, where it
     orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
     variables with as many edges, the same search put 99% of the true edges in the true direction
-    when it read the columns as simulated and 80% on standardized columns. The order search reads
-    standardized columns, and the error of its estimate for a variable grows with about the square
-    of that variable's variance-to-noise ratio (its variance over the variance of its noise term).
-    Where links have a strong linear part, variance builds up along the causal order, the sinks have
-    the largest ratios, and the search ranks them last: on additive-noise data with links ``z + sin
-    z`` (1,000 rows, 10 and 20 variables, as many edges as variables), where a sink's ratio had a
-    median of 10 to 13 against 1.6 to 1.7 in the paper's simulation, the order put 41% to 53% of the
-    true edges in the true direction, a random order's share, and 16,000 rows (52%), another ridge
-    term, or another bandwidth did not change that. Use :func:`~andrey.cam` on such data (76% to 94%
-    on the same datasets). One kernel bandwidth serves every variable, and links it does not resolve
-    leave a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 -> x3`` with ``x2 = 2 x0
-    / (1 + x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard deviation 0.7 or 1,
-    over 400 and 800 rows, the search took ``x0`` and ``x1`` for the leaves in 24 of 24 fits. The
-    leaf rule is exact only for Gaussian noise: under other noise a leaf's entry changes with its
-    residual, and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. A fit took
-    1.0 s at 10 variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB. Each step factors a
-    matrix with one row and one column per sample, so the order search's time grows with the cube of
+    when it read the columns as simulated and 80% on standardized columns. On standardized columns
+    the error of the search's estimate for a variable grows with about the square of that variable's
+    variance-to-noise ratio (its variance over the variance of its noise term). Where links have a
+    strong linear part, variance builds up along the causal order, the sinks have the largest
+    ratios, and the search ranks them last: on additive-noise data with links ``z + sin z`` (1,000
+    rows, 10 and 20 variables, as many edges as variables), where a sink's ratio had a median of 10
+    to 13 against 1.6 to 1.7 in the paper's simulation, the order put 41% to 53% of the true edges
+    in the true direction, a random order's share, and 16,000 rows (52%), another ridge term, or
+    another bandwidth did not change that. Use :func:`~andrey.cam` on such data (76% to 94% on the
+    same datasets). One kernel bandwidth serves every variable, and links it does not resolve leave
+    a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 -> x3`` with ``x2 = 2 x0 / (1 +
+    x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard deviation 0.7 or 1, over 400
+    and 800 rows, the search took ``x0`` and ``x1`` for the leaves in 24 of 24 fits. The leaf rule
+    is exact only for Gaussian noise: under other noise a leaf's entry changes with its residual,
+    and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. A fit took 1.0 s at 10
+    variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB. Each step factors a matrix with
+    one row and one column per sample, so the order search's time grows with the cube of
     ``n_samples`` and its memory with the square. The pruning starts from the complete DAG of the
     order, so its last fits have nearly ``n_variables`` smooth terms each: it needs at least twice
     as many rows as columns, and it takes most of a fit's time as the variables grow. Binary
