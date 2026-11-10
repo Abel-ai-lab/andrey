@@ -525,8 +525,13 @@ def multi_group_direct_lingam(
     rows per group. Every ladder ended at the largest planned size. The median fit took 1,996 s at
     200 variables (mean degree 4, 5,000 rows per group, 3 groups). It assumes linear effects and
     non-Gaussian noise in every group, and it gives every group the one shared causal order, even
-    when a group's own order differs. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    when a group's own order differs. With true ``required_paths`` or ``forbidden_paths`` on 10 or
+    30% of the variable pairs of simulated linear data with uniform noise (3 groups, 10 to 50
+    variables, 500 or 2,000 rows per group), its graphs had no more errors than without them in any
+    setting that repeated on a second set of 20 datasets. Required paths changed no fit's errors,
+    and the fits dropped 0.3% of the forbidden paths as claims their order could not meet. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

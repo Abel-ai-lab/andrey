@@ -168,13 +168,15 @@ def mmhc(
         the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and temporal tiers, all honored. The score search considers the
-        pairs of the MMPC skeleton and of the required edges, less the pairs the knowledge makes
-        non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The MMPC phase reads
-        the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the
-        graph stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
-        describes; a claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and
-        listed in ``metadata["unmet_knowledge"]``.
+        allowed to be adjacent, and temporal tiers, all honored. Both phases read them. The MMPC
+        phase reads them as :func:`~andrey.mmpc` does: each end of a required edge is in the
+        other's set from the start, so it conditions the tests of the other candidates, and a pair
+        the knowledge makes non-adjacent is never a candidate. The score search considers the pairs
+        of that skeleton, and then honors the knowledge as :func:`~andrey.hc` does. In a CPDAG,
+        ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
+        listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
+        meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
+        ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -260,7 +262,18 @@ def mmhc(
     took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the
     MMPC phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC
     tests each candidate against every subset of the current members, so its cost grows
-    exponentially with the size of a variable's parents-and-children set. The numbers are a
+    exponentially with the size of a variable's parents-and-children set. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
+    no farther from the true DAG than without them in any setting. The claims direct edges of the
+    graph the search found, as their rules take the class as given: of the edges they directed,
+    18.2% with required paths and 24.7% with forbidden paths pointed against the true DAG.
+    ``required_paths`` is experimental: given the required edges those paths imply, it made more
+    errors than a reference implementation given the same edges at mean degree 4, in 2 of 36
+    settings with required paths alone and 4 of 36 with both parts, each on two sets of 20 datasets.
+    A required path says less than a required edge and directs less: it cannot restore an edge the
+    search left out, and on simulated data a required edge, which also states that the pair is
+    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -342,7 +355,9 @@ def rsmax2(
         keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
         [3]_ and no subset of the smaller blanket separates the two, the skeleton of
         ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
-        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
+        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With
+        ``knowledge``, ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and
+        ``"inter_iamb"`` read the data alone; ``knowledge`` below says why. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -399,11 +414,25 @@ def rsmax2(
         the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
-        pairs the restrict phase keeps and the pairs of the required edges, less the pairs the
-        knowledge makes non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does. The
-        restrict phase reads the data alone. In a CPDAG, ``required_paths`` and ``forbidden_paths``
-        keep the DAGs the graph stands for in which each listed path holds or does not, as
+        allowed to be adjacent, and temporal tiers, all honored. With ``restrict="mmpc"`` or
+        ``"pc"``, the restrict phase reads them as :func:`~andrey.mmpc` and :func:`~andrey.pc` do:
+        the pair of a required edge is kept without a test and conditions the tests of the other
+        pairs, and a pair the knowledge makes non-adjacent is never a candidate. With
+        ``restrict="iamb"`` or ``"inter_iamb"``, the restrict phase reads the data alone. For every
+        ``restrict``, the maximize phase considers the pairs the restrict phase keeps and the pairs
+        of the required edges, less the pairs the knowledge makes non-adjacent, and then honors the
+        knowledge as :func:`~andrey.hc` does. The blanket restricts are left out for a measured
+        reason: required edges enlarge the Markov blankets, the step that drops a pair some subset
+        of the smaller blanket separates then drops more true pairs, and their skeleton holds
+        almost no false pair for the knowledge to remove. On simulated linear-Gaussian graphs of
+        mean degree 4 with 10 to 50 variables and required edges taken from the true graph, 240
+        datasets per setting, passing the knowledge to the blanket restricts gave 0.3 to 0.5 more
+        errors against the true DAG on average (a missing, extra, or reversed edge counts 2, an
+        undirected one 1) with up to about four in ten of the true edges required, and as many
+        with most of them required. Over 120 of those datasets ``"mmpc"`` made 1.0 to 1.5 fewer
+        errors with the knowledge in its restrict phase, and ``"pc"`` 0.9 to 1.9 fewer over 30
+        with 20 and 50 variables. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the
+        DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
         :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
@@ -502,9 +531,19 @@ def rsmax2(
     never added, and the maximize phase stops at a local optimum. MMPC tests each candidate against
     every subset of the current members, so its cost grows exponentially with the size of a
     variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
-    so each of their tests needs more rows as the blankets grow. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    so each of their tests needs more rows as the blankets grow. With true ``required_paths`` or
+    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
+    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
+    DAG than without them in any setting. The claims direct edges of the graph the search found, as
+    their rules take the class as given: of the edges they directed, 18.2% with required paths and
+    24.7% with forbidden paths pointed against the true DAG. ``required_paths`` is experimental:
+    given the required edges those paths imply, it made more errors than a reference implementation
+    given the same edges at mean degree 4, in 2 of 36 settings with required paths alone and 4 of 36
+    with both parts, each on two sets of 20 datasets. A required path says less than a required edge
+    and directs less: it cannot restore an edge the search left out, and on simulated data a
+    required edge, which also states that the pair is adjacent, lowered the errors more. A known
+    edge belongs in ``required``. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

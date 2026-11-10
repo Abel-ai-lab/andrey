@@ -181,6 +181,7 @@ _CONCEPTS = (
             *RESIDUAL,
             "cam",
             "resit",
+            "score_matching",
             "camuv",
             "icp",
             "igsp",
@@ -240,6 +241,13 @@ _CONCEPTS = (
                 "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
             ),
             Deviation(
+                method="score_matching",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the method's published "
+                "experiments (Rolland et al. 2022, Section 4.1).",
+            ),
+            Deviation(
                 method="camuv",
                 name="alpha",
                 default=0.01,
@@ -295,7 +303,11 @@ _CONCEPTS = (
             ),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
-            *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
+            *_exempt(
+                "Its pruning tests the smooth terms of its own additive model.",
+                "cam",
+                "score_matching",
+            ),
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
                 "icp",
@@ -533,6 +545,7 @@ _CONCEPTS = (
                 "calm",
                 "cam",
                 "resit",
+                "score_matching",
                 *CONTINUOUS,
                 *LINGAM,
                 "granger",
@@ -647,6 +660,11 @@ _CONCEPTS = (
                 "resit",
             ),
             *_exempt(
+                "An order search with no search over parent sets: the pruning starts from every "
+                "variable before a node in the order.",
+                "score_matching",
+            ),
+            *_exempt(
                 "The paper's search sets no cap on a variable's parents; max_depth caps the "
                 "candidates one sink test adds.",
                 "camuv",
@@ -717,6 +735,7 @@ _CONCEPTS = (
                 *CONTINUOUS,
                 "cam",
                 "resit",
+                "score_matching",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -1005,6 +1024,7 @@ _CONCEPTS = (
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
+                "score_matching",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1163,7 +1183,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),
