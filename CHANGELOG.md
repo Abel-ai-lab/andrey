@@ -25,6 +25,12 @@ names its pull request.
 
 ### Changed
 
+- `notears` and `dagma` are measured against their authors' code in the papers' setting, and
+  both docstrings' Limitations give the numbers. On standardized columns `notears` made no more
+  errors than the authors' code in any of 24 settings and fewer than the empty graph in 15, which
+  meets the bar for a supported method; `dagma` made fewer errors than the empty graph in none of
+  the 24, as its authors' package did, and stays experimental for that reason. The evidence is in
+  `benchmarks/comparisons/notears-dagma.md`. ([#871])
 - Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
   in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
   `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
@@ -2270,5 +2276,6 @@ First alpha release.
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
+[#871]: https://github.com/Abel-ai-lab/andrey/pull/871
 [#875]: https://github.com/Abel-ai-lab/andrey/pull/875
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md

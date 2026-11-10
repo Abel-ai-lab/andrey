@@ -38,7 +38,7 @@ whose Reproduce table lists the driver.
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
 | Stein-score screen | `stein_cpu.py` | CAM as context; no Andrey SCORE or NoGAM | the authors' SCORE, NoGAM (dodiscover), CausalDisco (R2-SortnRegress) | |
-| NOTEARS and DAGMA | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | |
+| [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
@@ -98,7 +98,9 @@ rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
 14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
 rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
-[comparison page](comparisons/missing-data.md).
+[comparison page](comparisons/missing-data.md). The NOTEARS and DAGMA lane's rows are in
+[`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
+[comparison page](comparisons/notears-dagma.md).
 
 | Release | Release card | Summary |
 |---|---|---|
