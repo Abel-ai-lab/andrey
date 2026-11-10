@@ -209,10 +209,12 @@ class _MissesEdges(DSeparation):
 
 
 @pytest.mark.parametrize("restrict", ["mmpc", "iamb", "inter_iamb", "pc"])
-def test_a_required_edge_separates_a_pair_in_the_restrict_phase(restrict, oracle_test):
+def test_a_required_edge_separates_a_pair_in_the_mmpc_and_pc_restrict_phases(restrict, oracle_test):
     """On the chain 0 -> 1 -> 2 with a test that sees neither edge, the restrict phase keeps the
-    pair 0, 2, which only column 1 separates, and the maximize phase joins it. The required edge
-    1 -> 2 makes 1 a neighbor of 2 in the restrict phase, so the pair 0, 2 is separated there."""
+    pair 0, 2, which only column 1 separates, and the maximize phase joins it. Under MMPC and PC
+    the required edge 1 -> 2 makes 1 a neighbor of 2 in the restrict phase, so the pair 0, 2 is
+    separated there; the blanket restricts read the data alone, so the pair stays joined beside
+    the required edge."""
     rng = np.random.default_rng(0)
     a, e, f = rng.standard_normal((3, 2000))
     b = a + e
@@ -223,13 +225,18 @@ def test_a_required_edge_separates_a_pair_in_the_restrict_phase(restrict, oracle
     assert _adjacent(alone) == {frozenset((0, 2))}
     knowledge = andrey.Knowledge(required=[(1, 2)])
     out = andrey.rsmax2(x, restrict=restrict, indep_test="dsep", knowledge=knowledge)
-    assert _edges(out) == {(1, 2, "directed")}
+    if restrict in ("mmpc", "pc"):
+        assert _edges(out) == {(1, 2, "directed")}
+    else:
+        assert _adjacent(out) == {frozenset((0, 2)), frozenset((1, 2))}
 
 
 @pytest.mark.parametrize("restrict", ["mmpc", "iamb", "inter_iamb", "pc"])
-def test_the_restrict_phase_reads_knowledge_as_its_learner_does_alone(restrict):
-    """The candidates under required edges, a forbidden pair, and a one-way forbidden edge are the
-    skeleton the restrict learner returns for the same knowledge."""
+def test_the_restrict_phase_reads_knowledge_under_mmpc_and_pc_only(restrict):
+    """Under required edges, a forbidden pair, and a one-way forbidden edge, the MMPC and PC
+    candidates are the skeleton the learner returns for the same knowledge, and the IAMB and
+    Inter-IAMB candidates are the skeleton from the data alone; the result holds every required
+    edge and never the forbidden pair."""
     from andrey.core.knowledge import resolve
     from andrey.search.hybrid import rsmax2
 
@@ -244,11 +251,19 @@ def test_the_restrict_phase_reads_knowledge_as_its_learner_does_alone(restrict):
     constraints = resolve(knowledge, 15, None, method="rsmax2")
     *_, candidates = rsmax2(sample.data, restrict=restrict, constraints=constraints)
     pairs = {frozenset(map(int, pair)) for pair in np.argwhere(np.triu(candidates))}
-    setting = {} if restrict in ("mmpc", "pc") else {"structure": "skeleton"}
-    alone = getattr(andrey, restrict)(sample.data, knowledge=knowledge, **setting)
-    assert pairs == _adjacent(alone)
-    assert {frozenset(edge) for edge in true[::3]} <= pairs
-    assert frozenset(apart) not in pairs
+    required = {frozenset(edge) for edge in true[::3]}
+    if restrict in ("mmpc", "pc"):
+        alone = getattr(andrey, restrict)(sample.data, knowledge=knowledge)
+        assert pairs == _adjacent(alone)
+        assert required <= pairs
+        assert frozenset(apart) not in pairs
+    else:
+        data_alone = getattr(andrey, restrict)(sample.data, structure="skeleton")
+        assert pairs == _adjacent(data_alone)
+        assert not required <= pairs
+    out = andrey.rsmax2(sample.data, restrict=restrict, knowledge=knowledge)
+    assert required <= _adjacent(out) <= pairs | required
+    assert frozenset(apart) not in _adjacent(out)
 
 
 @pytest.mark.parametrize("seed", range(5))
