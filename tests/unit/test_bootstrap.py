@@ -875,7 +875,8 @@ def test_an_edge_the_knowledge_directs_stays_directed_in_the_averaged_graph(meth
 def test_a_path_claim_restricts_the_averaged_graph():
     # a - b - c is undirected in a CPDAG; b is not an ancestor of a, so a -> b, and then b -> c.
     knowledge = andrey.Knowledge(forbidden_paths=[("b", "a")])
-    with pytest.warns(andrey.ExperimentalWarning, match="forbidden_paths"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.ExperimentalWarning)  # the part is supported in pc
         out = bootstrap("pc", lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
     assert out.metadata["averaged_graph"] == "vote"
     assert out.structure.endpoints(0, 1) == (TAIL, ARROW)
