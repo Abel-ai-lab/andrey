@@ -54,12 +54,15 @@ class SCMParams:
     ----------
     edges : np.ndarray of shape (m, 2)
         Directed edges ``(parent, child)`` in node-label space; row ``k`` pairs with ``weights[k]``.
-    weights : np.ndarray of shape (m,)
+    weights : np.ndarray of shape (m,) or (m, 3, n_features)
         Structural coefficient of each edge (empty for parameter-free functionals). Under the
-        location-scale functional, the weight of each edge in the location.
+        location-scale functional, the weight of each edge in the location. Under the
+        random-features functional, the frequencies, phases, and amplitudes of each edge's
+        function.
     noise_scales : np.ndarray of shape (d,)
         Per-node exogenous-noise standard deviation. Under the location-scale functional the noise
-        of a node is this constant times a scale that depends on its parents.
+        of a node is this constant times a scale that depends on its parents. A measurement
+        column's entry is the standard deviation of its measurement noise.
     functional : str
         Functional-form name (for example, ``"linear"``).
     noise : str
@@ -67,6 +70,11 @@ class SCMParams:
     scale_weights : np.ndarray of shape (m,) or (0,), default=empty
         Under the location-scale functional, the weight of each edge in the scale, row ``k``
         pairing with ``edges[k]``; empty for every other functional.
+
+    Notes
+    -----
+    The edges are those of the structural causal model. The edge from a variable into its
+    measurement column is in the dataset's ``graph`` and in ``measurements.parents``, not here.
     """
 
     edges: np.ndarray
@@ -116,6 +124,31 @@ class Missingness:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Measurements:
+    """The measurement columns appended to a dataset, each a variable plus independent noise.
+
+    :func:`andrey.data.measurement.noisy_children` describes them and ``measurements=`` on
+    :meth:`~andrey.data.SCM.sample` draws them.
+
+    Parameters
+    ----------
+    parents : dict of int to int
+        Each measurement column mapped to the column it measures, in ascending order of the
+        measurement columns. In the true graph the measured column is the measurement column's
+        only parent.
+    noise : str
+        The family of the measurement noise (for example, ``"gaussian"``).
+    noise_scale : float
+        The standard deviation of the measurement noise, as a multiple of the standard deviation
+        of the measured column.
+    """
+
+    parents: dict[int, int]
+    noise: str
+    noise_scale: float
+
+
+@dataclass(frozen=True, kw_only=True)
 class CausalDataset:
     """Simulated data paired with its ground-truth causal graph.
 
@@ -148,6 +181,11 @@ class CausalDataset:
     missing : Missingness or None, default=None
         The missing values drawn by ``missing=`` on :meth:`~andrey.data.SCM.sample`, their mask
         and the parents of each missingness indicator; ``None`` when the data are complete.
+    measurements : Measurements or None, default=None
+        The measurement columns appended by ``measurements=`` on
+        :meth:`~andrey.data.SCM.sample`, each with the column it measures; ``None`` without them.
+        They are the last columns of ``data`` and nodes of ``graph``, each a child of the column
+        it measures.
 
     Notes
     -----
@@ -163,6 +201,7 @@ class CausalDataset:
     env: np.ndarray | None = None
     targets: dict[int, list[int]] | None = None
     missing: Missingness | None = None
+    measurements: Measurements | None = None
 
     @property
     def observed_graph(self) -> GraphStructure:
@@ -170,7 +209,8 @@ class CausalDataset:
 
         Equal to ``graph`` for a causally-sufficient SCM. For a latent SCM it is the subgraph
         induced on the observed nodes (indices ``0 .. n_obs-1``, observed-first) -- a DAG over
-        exactly ``data``'s columns, so ``shd(estimate, observed_graph)`` is well-shaped. This
+        exactly ``data``'s columns, measurement columns included, so
+        ``shd(estimate, observed_graph)`` is well-shaped. This
         induced DAG drops the confounding paths through latents; the confounding-aware observed
         truth is the latent-projected MAG (``andrey.data.latent.marginal``).
         """
@@ -181,5 +221,8 @@ class CausalDataset:
 
         n_obs = self.data.shape[1]
         e = self.params.edges
-        keep = (e[:, 0] < n_obs) & (e[:, 1] < n_obs)
-        return dag_truth(e[keep, 0], e[keep, 1], n_obs)
+        e = e[(e[:, 0] < n_obs) & (e[:, 1] < n_obs)]
+        if self.measurements is not None:
+            measured = [(parent, column) for column, parent in self.measurements.parents.items()]
+            e = np.concatenate([e, np.array(measured, dtype=e.dtype).reshape(-1, 2)])
+        return dag_truth(e[:, 0], e[:, 1], n_obs)

@@ -990,6 +990,46 @@ scale stays a smooth function of the parents at every depth of the graph.
 `andrey.data.functional.linear(positive=True)` makes every weight positive, and
 `variance_range=(lo, hi)` on a noise family draws each variable's noise variance from `U[lo, hi]`,
 as the simulations of GnIES (Gamella et al. 2022) do.
+
+`functional` names how a variable depends on its parents, by name in `sample_scm` or as a spec from
+`andrey.data.functional` in `SCM`, which also sets a family's parameters:
+
+| `functional` | Model of a variable given its parents | Parameters |
+|---|---|---|
+| `"linear"` (default) | a weighted sum of the parents plus noise | `weight_range`, `positive` |
+| `"additive_noise"` | a weighted sum of `z + sin(z)` of each parent, plus noise | `weight_range` |
+| `"nonmonotone"` | a weighted sum of `cos(z)` of each parent, plus noise | `weight_range` |
+| `"random_features"` | a sum of one function per parent plus noise, each function an approximate draw of a Gaussian process by random Fourier features (Rahimi and Recht, 2007), the additive model of the CAM simulations (Buhlmann, Peters, and Ernest, 2014) | `n_features` (100), `length_scale` (1.0) |
+| `"post_nonlinear"` | an invertible transform of a weighted sum of the parents plus noise | `weight_range`, `outer` |
+| `"location_scale"` | `additive_noise` with a noise scale that depends on the parents | `weight_range`, `scale_range` |
+| `"var"`, `"varma"` | a linear time series | `n_lags`, `lag_density`, `ma_lags` |
+
+`outer` on `andrey.data.functional.post_nonlinear` names the transform, each strictly increasing on
+the real line. It draws nothing, so the weights and the noise are the same for every one:
+
+| `outer` | Transform | Note |
+|---|---|---|
+| `"tanh"` (default) | `z + 0.5 tanh(z)` | grows as its argument does |
+| `"cube"` | `z**3` (Montagna et al., 2023) | use `scale="rescale"` on paths of more than a few edges, where raw values overflow |
+| `"cube_root"` | `z**(1/3)`, the inverse of `"cube"` | compresses large values |
+| `"sigmoid"` | `1 / (1 + exp(-z))` (Lachapelle et al., 2020) | values in (0, 1) |
+
+`noise` names the family of each variable's noise, by name or as a spec from `andrey.data.noise`.
+Every family has mean 0 and variance 1 before its scale, so the family changes the shape of the
+noise and never its size; `heteroscedastic` and `variance_range` set the scales for every family:
+
+| `noise` | Shape | Parameters |
+|---|---|---|
+| `"gaussian"` (default) | normal | |
+| `"uniform"` | flat, bounded | |
+| `"laplace"` | symmetric, heavier tails | |
+| `"exponential"`, `"gumbel"` | skewed | |
+| `"student_t"` | symmetric, tails heavier the smaller `df` is | `df` (5.0), greater than 2 |
+| `"gaussian_mixture"` | two Gaussian components: two modes by default (Marron and Wand, 1992, density 6), skewed with unequal components | `weight` (0.5), `means` ((-1, 1)), `sds` ((2/3, 2/3)) |
+
+A sample records its family parameters in `provenance["config"]`, under `functional_params` and
+`noise_params`.
+
 `andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
 scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
 for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
@@ -1023,6 +1063,13 @@ each context drives exactly one variable, so no hidden context is a common cause
    missingness.draw
    missingness.Mechanism
    missingness.Missingness
+   measurement.noisy_children
+   measurement.NoisyChildren
+   measurement.Measurements
+   functional.post_nonlinear
+   functional.random_features
+   noise.student_t
+   noise.gaussian_mixture
 ```
 
 #### Scale
@@ -1130,6 +1177,34 @@ The mask is drawn after the scaling and the column shuffle, from the seed's own 
 seed without `missing` gives the complete data, and, for a sample drawn without `screen`,
 `missingness.draw(ds.data, mechanism, seed=)` draws its mask again. Every column keeps at least 2
 observed values.
+
+#### Measurement columns
+
+`measurements=` on `SCM.sample` and `sample_scm` appends measurement columns: for each variable you
+select, a new last column that is the variable plus independent noise, the random measurement error
+model (Scheines and Ramsey, 2016). `andrey.data.measurement.noisy_children` selects the variables,
+by `columns` or by a `share` drawn from the seed, and sets the noise: `noise_scale` is its standard
+deviation as a multiple of the measured column's, so a measurement keeps `1 / (1 + noise_scale**2)`
+of its variance from the variable in any units, 0.8 at the default 0.5, and `noise` is its family,
+Gaussian by default. In the true graph a measurement column is a child of the column it measures:
+
+```python
+import andrey.data as data
+from andrey.data import measurement
+
+ds = data.sample_scm(d=20, n=2000, seed=0, density=2,
+                     measurements=measurement.noisy_children([3, 7], noise_scale=0.5))
+ds.data.shape            # (2000, 22): columns 20 and 21 measure columns 3 and 7
+ds.measurements.parents  # {20: 3, 21: 7}
+ds.graph                 # the true graph, with the edges 3 -> 20 and 7 -> 21
+```
+
+The measurement columns are drawn after the scaling and the column shuffle, from the seed's own
+streams, so the other columns are those of the same seed without `measurements`; each measurement
+is then scaled as `scale` scales a variable. They always come last, so their position marks them,
+unlike the other columns. To give a method a variable only through its measurement, drop the
+variable's column and its node; the variable is then a hidden parent of the measurement. `missing=`
+draws its mask over the measurement columns too.
 
 ## Metrics
 
