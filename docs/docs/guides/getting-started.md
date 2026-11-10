@@ -470,14 +470,13 @@ puts an arrowhead at its cause; no test removes a `confounded` pair. These marks
 no selection bias: the samples were not kept or dropped by the value of a variable the measured ones
 cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths` to
 narrow the causal order, as their paper describes. Every other method raises `NotImplementedError`
-for a part it does not honor, naming the methods that do. Forbidden paths are supported in PC, GES,
-BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM; required paths in BOSS-FCI, LPCMCI, and
-DirectLiNGAM; and hidden common causes in FCI, GFCI, BOSS-FCI, and LPCMCI: with true claims, each
-measured no worse than the same fit without them and than reference packages given the same
-knowledge, on the [0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims).
-Elsewhere the parts are experimental. In PC, GES, BOSS, FCI, and GFCI a required path helps, and a
-required edge helps more where you know the pair is adjacent: a path cannot restore an edge the
-search left out.
+for a part it does not honor, naming the methods that do. The parts are supported in PC, GES, BOSS,
+FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM: with true claims, each measured no worse than the
+same fit without them and than reference packages given the same knowledge, on the
+[0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims). In the other methods,
+which we have not measured, they are experimental. A path claim says less than an edge and so
+directs less: a required path cannot restore an edge the search left out. When you know the edge
+itself, state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite

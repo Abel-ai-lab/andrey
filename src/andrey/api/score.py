@@ -363,11 +363,11 @@ def ges(
     farther from the true DAG than without them in any setting. The claims direct edges of the graph
     the search found, as their rules take the class as given: of the edges they directed, 1.1% with
     required paths and 1.7% with forbidden paths pointed against the true DAG, each in a fit whose
-    graph had an edge missing or extra or a collider wrong. ``required_paths`` is experimental in
-    this method: a required path cannot restore an edge the search left out, and on simulated data a
-    required edge, which also states that the pair is adjacent, lowered the errors more. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    graph had an edge missing or extra or a collider wrong. A required path says less than a
+    required edge and directs less: it cannot restore an edge the search left out, and on simulated
+    data a required edge, which also states that the pair is adjacent, lowered the errors more. A
+    known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

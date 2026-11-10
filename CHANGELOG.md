@@ -20,12 +20,11 @@ names its pull request.
 - Background knowledge states causal paths and hidden common causes:
   `andrey.Knowledge(required_paths=, forbidden_paths=, confounded=)`. The CPDAG searches keep the
   DAGs of their class that meet the path claims, the PAG methods and `lpcmci` honor all three parts,
-  and `direct_lingam` narrows its causal order. `forbidden_paths` is supported in `pc`, `ges`,
-  `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, and `direct_lingam`; `required_paths` in `boss_fci`,
-  `lpcmci`, and `direct_lingam`; and `confounded` in `fci`, `gfci`, `boss_fci`, and `lpcmci`, where
-  true claims measured no worse than the same fit without them and than reference packages given the
-  same knowledge. Elsewhere the parts are experimental: a required path lowers the errors of `pc`,
-  `ges`, `boss`, `fci`, and `gfci`, and a required edge lowers them more. ([#829], [#835], [#854])
+  and `direct_lingam` narrows its causal order. The parts are supported in `pc`, `ges`, `boss`,
+  `fci`, `gfci`, `boss_fci`, `lpcmci`, and `direct_lingam`, where true claims measured no worse than
+  the same fit without them and than reference packages given the same knowledge, and experimental
+  in the other methods, which the benchmark does not run. A path claim says less than an edge and
+  directs less: a known edge belongs in `required`. ([#829], [#835], [#854])
 - `loci`, experimental, decides a pair's direction under the location-scale noise model of Immer
   et al. (2023), whose noise scale changes with the cause. ([#830])
 - Drawings mark intervened variables as causal-discovery figures do: `andrey.viz.draw` puts a cross
@@ -65,7 +64,8 @@ names its pull request.
   The parts are supported in `pc`, `ges`, and `boss`, and experimental in the other CPDAG methods,
   which the benchmark does not run. A claim directs edges of the graph the search found, so where
   that graph is wrong, a true claim can direct an edge the wrong way: 1 to 11% of the edges true
-  claims directed in the benchmark. ([#829], [#850], [#854])
+  claims directed in the benchmark. A required path cannot restore an edge the search left out,
+  which a required edge states. ([#829], [#850], [#854])
 - `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor `required_paths`,
   `forbidden_paths`, and `confounded`: on a pair the tests keep, a required path
   makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause before Zhang's

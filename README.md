@@ -25,9 +25,8 @@ whose cause you know, then fit incomplete data with MVPC, which corrects PC when
 on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM. Tell a method that
 one variable causes another by some path, that it does not, or that two share a hidden common cause.
 LOCI reads the direction of a pair whose noise changes with the cause. MVPC, EM, and LOCI are
-experimental, and so are required paths outside BOSS-FCI, LPCMCI, and DirectLiNGAM and every new
-claim in the methods we have not measured. Drawings also mark intervened variables, and every HSIC
-p-value stays precise far below 1e-16.
+experimental, and so are the new claims in the methods we have not measured. Drawings also mark
+intervened variables, and every HSIC p-value stays precise far below 1e-16.
 
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
 **[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·

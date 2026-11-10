@@ -25732,7 +25732,7 @@
   },
   "translation": "the references of the cpdag and pag lanes take edges, not paths: a forbidden path a -> b becomes the forbidden edge a -> b; a required path on a pair adjacent in the true graph becomes the required edge a -> b; a required path on any other pair, and a confounded pair, has no edge form and is left out. A required edge says more than the path it comes from: it states that the pair is adjacent.",
   "arms": "same_edges: the method with the translated edges as required and forbidden against the reference with the same edges. same_claims: the method with the claims against a reference that takes the claims themselves (tigramite, lingam). claims_against_reference: the method with the path claims against the reference with the translated edges. without_knowledge: both without knowledge. ges_bic is ges with ebic_gamma=0, the plain BIC of the FGES arm.",
-  "rule": "per method, reference, cell, part, and fraction: D = errors(method) - errors(reference) per dataset both fit, dag_errors in cpdag and errors elsewhere; worse when the 95% percentile-bootstrap interval of mean D (10,000 resamples) lies above 0; a worse row counts when the same row on seeds 100-119 is worse too. Floor: the interval of the method's errors minus the empty graph's must lie below 0. Rows with in_setting false (ges at expected degree 4) are reported and not judged. A part of a method is supported when it passes the lanes above and no judged row of its own, or of the all-parts runs for required_paths, is worse again against a reference or misses the floor.",
+  "rule": "per method, reference, cell, part, and fraction: D = errors(method) - errors(reference) per dataset both fit, dag_errors in cpdag and errors elsewhere; worse when the 95% percentile-bootstrap interval of mean D (10,000 resamples) lies above 0; a worse row counts when the same row on seeds 100-119 is worse too. Floor: the interval of the method's errors minus the empty graph's must lie below 0. Rows with in_setting false (ges at expected degree 4) are reported and not judged. A part of a method is supported when it passes the lanes above and, with the same knowledge as the reference (same_edges or same_claims), no judged row of its own, or of the all-parts runs for required_paths, is worse again against a reference or misses the floor. claims_against_reference is not like for like and does not decide the status: the reference's required edge also states that the pair is adjacent, which the translation reads from the true graph, and a path claim does not. status lists its rows that are worse again under path_claims_against_reference_edges.",
   "no_edge_form": {
    "cpdag/all": {
     "fits": 720,
@@ -27622,8 +27622,9 @@
   "status": {
    "pc": {
     "required_paths": {
-     "supported": false,
-     "reasons": [
+     "supported": true,
+     "reasons": [],
+     "path_claims_against_reference_edges": [
       "claims_against_reference against pcalg.pc (required_paths): 6 of 36 rows worse again",
       "claims_against_reference against tetrad.pc (required_paths): 23 of 36 rows worse again",
       "claims_against_reference against pcalg.pc (all parts): 6 of 36 rows worse again",
@@ -27632,103 +27633,122 @@
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "ges": {
     "required_paths": {
-     "supported": false,
-     "reasons": [
+     "supported": true,
+     "reasons": [],
+     "path_claims_against_reference_edges": [
       "with ebic_gamma=0, claims_against_reference against tetrad.ges (required_paths): 11 of 18 rows worse again",
       "with ebic_gamma=0, claims_against_reference against tetrad.ges (all parts): 10 of 18 rows worse again"
      ]
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "boss": {
     "required_paths": {
-     "supported": false,
-     "reasons": [
+     "supported": true,
+     "reasons": [],
+     "path_claims_against_reference_edges": [
       "claims_against_reference against tetrad.boss (all parts): 1 of 36 rows worse again"
      ]
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "direct_lingam": {
     "required_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "fci": {
     "required_paths": {
-     "supported": false,
-     "reasons": [
+     "supported": true,
+     "reasons": [],
+     "path_claims_against_reference_edges": [
       "claims_against_reference against tetrad.fci (required_paths): 4 of 8 rows worse again",
       "claims_against_reference against tetrad.fci (all parts): 2 of 8 rows worse again"
      ]
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "confounded": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "gfci": {
     "required_paths": {
-     "supported": false,
-     "reasons": [
+     "supported": true,
+     "reasons": [],
+     "path_claims_against_reference_edges": [
       "claims_against_reference against tetrad.gfci (required_paths): 4 of 8 rows worse again"
      ]
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "confounded": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "boss_fci": {
     "required_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "confounded": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    },
    "lpcmci": {
     "required_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "forbidden_paths": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     },
     "confounded": {
      "supported": true,
-     "reasons": []
+     "reasons": [],
+     "path_claims_against_reference_edges": []
     }
    }
   }

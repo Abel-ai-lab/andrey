@@ -3026,14 +3026,14 @@ for _name in EM_METHODS:
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
-#: and against the method's reference packages. A part a method honors beyond the edge parts and
-#: does not list here is experimental.
+#: and against the method's reference packages given the same knowledge. A part a method honors
+#: beyond the edge parts and does not list here is experimental.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
-    "pc": ("forbidden_paths",),
-    "ges": ("forbidden_paths",),
-    "boss": ("forbidden_paths",),
-    "fci": ("forbidden_paths", "confounded"),
-    "gfci": ("forbidden_paths", "confounded"),
+    "pc": PATH_PARTS,
+    "ges": PATH_PARTS,
+    "boss": PATH_PARTS,
+    "fci": _PAG_PARTS,
+    "gfci": _PAG_PARTS,
     "boss_fci": _PAG_PARTS,
     "lpcmci": _PAG_PARTS,
     "direct_lingam": PATH_PARTS,

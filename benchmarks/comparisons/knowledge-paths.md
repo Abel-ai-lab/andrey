@@ -143,7 +143,10 @@ translation reads from the true graph.
 
 Each method of the `cpdag` and `pag` lanes therefore runs in two arms beside the reference's:
 `edges`, with the translated edges as `required` and `forbidden`, the same knowledge the reference
-has; and `true`, with the path claims.
+has; and `true`, with the path claims. The two answer different questions. `edges` against the
+reference is like for like, and decides a part's status. `true` against the reference's edges
+compares a path claim with the edge it implies, which says more; it is reported and does not decide
+the status.
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --seeds 0 20 \
@@ -285,9 +288,11 @@ Seeds 0 to 19, the cells and fractions above; a row pairs the datasets both side
 gives the rows where the method made fewer errors than the reference, tied, made more, and made
 more again on seeds 100 to 119, by the 95 % interval of the mean difference (`dag_errors` in
 `cpdag`, `errors` elsewhere). Same knowledge compares the method and the reference given the same
-edges, or the same claims for tigramite and lingam. The last column compares the method given the
-path claims with the reference given the edges they imply. Every judged row of every method is
-below the empty graph. The `ges` rows are its 18 at expected degree 2.
+edges, or the same claims for tigramite and lingam: the like-for-like comparison, which decides a
+part's status. The last column compares the method given the path claims with the reference given
+the edges they imply; it is not like for like, and is shown for what it says about paths and edges.
+Every row of every method is below the empty graph. `ges` is judged in its setting: its rows are
+its 18 at expected degree 2.
 
 | Method | Reference | Part | Rows | Same knowledge | Path claims against the reference's edges |
 |---|---|---|---|---|---|
@@ -327,26 +332,29 @@ Without knowledge, no method was worse than a reference in a row that repeated. 
 knowledge, none was either: with the same edges, `pc` made fewer errors than pcalg in 33 of 36
 rows and than Tetrad's PC in 19, `boss` fewer than Tetrad's BOSS in 18, and `fci`, `gfci`, and
 `boss_fci` fewer than Tetrad's in 4, 2, and 6 of 8; `lpcmci` tied tigramite, and `direct_lingam`
-tied or beat lingam. `ges` with the plain BIC tied FGES in 16 of 18 rows with the edges and 5 of 6
-without, and with its default extended BIC it made fewer errors in 16 of 18 rows.
+tied or beat lingam. FGES scores with the plain BIC, so `ges` with `ebic_gamma=0` is its
+like-for-like arm: it tied FGES in 16 of 18 rows with the edges and 5 of 6 without, and was worse
+in no row that repeated. With its default extended BIC, `ges` made fewer errors than FGES in 16 of
+18 rows. Every part passes this comparison in every method.
 
-`forbidden_paths` passes in every method: given the forbidden paths, no method was worse than its
-reference given the forbidden edges in a row that repeated.
+The last column is not like for like. A required edge says more than the required path it comes
+from: it also states that the pair is adjacent, which the translation reads from the true graph,
+and the reference puts the edge in. A required path says only that one variable is an ancestor of
+the other, so a method reads it on the graph the search found and cannot restore an edge the search
+left out. With forbidden paths, no method was worse than its reference given the forbidden edges in
+a row that repeated. With required paths, `pc`, `ges` with the plain BIC, `fci`, and `gfci` made
+more errors than their references given the required edges, in rows that repeated: `pc` in 23 of 36
+rows against Tetrad and 6 against pcalg, `fci` and `gfci` in 4 of 8, and `ges` with the plain BIC in
+11 of 18. `boss` did in one row of the all-parts runs (10 variables, expected degree 4, 2,000
+samples, 30 % of the pairs), and `boss_fci` was worse in one row that did not repeat. In the rows
+that repeated, the fits with path claims kept the adjacency errors of the fits without claims (in
+`fci` with 20 observed variables, 1,000 samples, and 30 % of the pairs: 5.55 per graph with the
+paths and without, 2.65 with the edges, and 3.55 for Tetrad with the edges). With its default
+score, `ges` was not worse than FGES in any row that repeated here, because the extended BIC starts
+from fewer errors than the plain BIC of FGES.
 
-`required_paths` does not pass in `pc`, `ges`, `boss`, `fci`, or `gfci`. Given the required paths,
-each made more errors than its reference given the required edges, in rows that repeated: `pc` in
-23 of 36 rows against Tetrad and 6 against pcalg, `fci` and `gfci` in 4 of 8, `ges` with the plain
-BIC in 11 of 18, and `boss` in one row of the all-parts runs (10 variables, expected degree 4,
-2,000 samples, 30 % of the pairs). The cause is what the knowledge says, not how it is applied. A
-required edge states that the pair is adjacent, and the reference puts the edge in; a required
-path says only that one variable is an ancestor of the other, so these methods read it on the
-graph the search found and cannot restore an edge the search left out. In the rows that repeated,
-the fits with path claims kept the adjacency errors of the fits without claims (in `fci` with 20
-observed variables, 1,000 samples, and 30 % of the pairs: 5.55 per graph with the paths and
-without, 2.65 with the edges, and 3.55 for Tetrad with the edges). `ges` with its default score
-was not worse than FGES in any row that repeated, because the extended BIC starts from fewer
-errors than the plain BIC of FGES; with the same score it is, so the part stays experimental in
-`ges` too. `boss_fci` was worse in one row that did not repeat, and passes.
+So when you know the edge itself, state it as `required`. A path claim says less, and so directs
+less.
 
 Of the true required paths, 21,818 of 37,726 in `cpdag` (57.8 %) and 784 of 2,454 in `pag` (31.9 %)
 were between variables that are not adjacent and had no edge form, and none of the 206 confounded
@@ -367,14 +375,31 @@ the 30-minute cap on 2, and lingam raised on 140 of 240 datasets with forbidden 
 ### Status
 
 A part is supported in a method when it passes all three checks: the exactness lane, no worse
-than the same fit without the claims, and no worse than its references in any row that repeats.
+than the same fit without the claims, and no worse than its references given the same knowledge in
+any row that repeats.
 
 | Part | Supported in |
 |---|---|
+| `required_paths` | `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, `direct_lingam` |
 | `forbidden_paths` | `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, `direct_lingam` |
-| `required_paths` | `boss_fci`, `lpcmci`, `direct_lingam` |
 | `confounded` | `fci`, `gfci`, `boss_fci`, `lpcmci` |
 
-`required_paths` is experimental in `pc`, `ges`, `boss`, `fci`, and `gfci`: it lowers their errors
-against the same fit without it, and a required edge, where the pair is known to be adjacent,
-lowers them more. Every part is experimental in the methods the driver does not run.
+The limits the measurements show:
+
+- A claim is read on the graph the search found. Where that graph has an edge missing or extra or
+  a collider missed, a true claim can force a wrong direction: 5.8 and 10.9 % of the edges that
+  required and forbidden paths directed in `pc`, 1.7 and 4.1 % in `boss`, and 1.1 and 1.7 % in
+  `ges`.
+- A required path says less than a required edge and cannot restore an edge the search left out. In
+  `pc`, `ges` with the plain BIC, `fci`, and `gfci`, a reference given the required edges made
+  fewer errors than the method given the paths. When you know the edge itself, state it as
+  `required`.
+- `ges` is judged in its setting, expected degree 2.
+
+The driver does not run `cdnod`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `grasp`, `exact_search`,
+`iamb`, `inter_iamb`, `mmpc`, `fci_jci`, `grasp_fci`, or `multi_group_direct_lingam`. The parts
+were not measured in these methods, and every part is experimental there.
+
+`published/0.16.0/knowledge-paths.json` holds each part's status under `references`, `status`, with
+the rows of the path-against-edge comparison that repeated in
+`path_claims_against_reference_edges`.

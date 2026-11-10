@@ -382,11 +382,11 @@ def pc(
     DAG than without them in any setting. The claims direct edges of the graph the search found, as
     their rules take the class as given: of the edges they directed, 5.8% with required paths and
     10.9% with forbidden paths pointed against the true DAG, each in a fit whose graph had an edge
-    missing or extra or a collider wrong. ``required_paths`` is experimental in this method: a
-    required path cannot restore an edge the search left out, and on simulated data a required edge,
-    which also states that the pair is adjacent, lowered the errors more. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    missing or extra or a collider wrong. A required path says less than a required edge and directs
+    less: it cannot restore an edge the search left out, and on simulated data a required edge,
+    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -800,10 +800,11 @@ def fci(
     on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
     benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
     yet; the tests run them on up to 20 variables with up to a fifth of the values missing
-    completely at random. ``required_paths`` is experimental in this method: a required path cannot
+    completely at random. A required path says less than a required edge and directs less: it cannot
     restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1271,11 +1272,12 @@ def gfci(
     and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466
     cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric
     ``env`` as a number, so with three or more environments a shift that does not follow the labels'
-    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase.
-    ``required_paths`` is experimental in this method: a required path cannot restore an edge the
+    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. A
+    required path says less than a required edge and directs less: it cannot restore an edge the
     search left out, and on simulated data a required edge, which also states that the pair is
-    adjacent, lowered the errors more. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

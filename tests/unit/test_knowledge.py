@@ -684,19 +684,20 @@ def test_an_undirected_result_refuses_the_path_parts(name, setting, part, data):
 
 def test_a_part_warns_exactly_where_it_is_experimental(data):
     required = Knowledge(required_paths=[("a", "f")])
-    for name in ("pc", "ges", "boss", "fci", "gfci", "grasp"):
-        with pytest.warns(
-            andrey.ExperimentalWarning, match=f"{name}: knowledge required_paths is experimental"
-        ):
-            getattr(andrey, name)(data, knowledge=required)
     forbidden = Knowledge(forbidden_paths=[("f", "a")])
+    for part, knowledge in (("required_paths", required), ("forbidden_paths", forbidden)):
+        with pytest.warns(
+            andrey.ExperimentalWarning, match=f"grasp: knowledge {part} is experimental"
+        ):
+            andrey.grasp(data, knowledge=knowledge)
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.KnowledgeWarning)
-        andrey.boss_fci(data, knowledge=required)
-        for name in ("pc", "ges", "boss", "fci", "gfci", "boss_fci"):
+        for name in ("pc", "ges", "boss", "fci", "gfci", "boss_fci", "direct_lingam"):
+            getattr(andrey, name)(data, knowledge=required)
             getattr(andrey, name)(data, knowledge=forbidden)
-        andrey.fci(data, knowledge=Knowledge(confounded=[("a", "f")]))
+        for name in ("fci", "gfci", "boss_fci"):
+            getattr(andrey, name)(data, knowledge=Knowledge(confounded=[("a", "f")]))
 
 
 @pytest.mark.parametrize("name", ["pc", "ges", "boss"])
