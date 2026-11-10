@@ -646,7 +646,9 @@ On simulated data in the paper's setting, MVPC made fewer errors than test-wise 
 16 settings where values go missing for a reason and tied in the rest, and tied where they are
 missing completely at random; at 50 variables and 10,000 rows it made 5.1 errors against 14.3. It
 does not help when every missingness indicator depends weakly on many variables, and there its
-search for those variables can take long; `max_depth` bounds it. The
+search for those variables can take long; `max_depth` bounds it. On larger graphs, 50 or 100
+variables with 20 or 30% of the values missing, it made 0.7 to 3.6 more errors than test-wise
+deletion in 12 settings, on two sets of datasets each. The
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
 
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,

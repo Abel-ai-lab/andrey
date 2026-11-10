@@ -77,8 +77,8 @@ below the empty graph in its claimed setting.
 ## Results
 
 Every number is on simulated data, one core per fit, on AMD EPYC 7713 and AMD EPYC 9555 processors.
-The record holds 192,700 fits; with the reruns on fresh seeds and of the fits that raised, 198,800
-were run, in 223 CPU-hours of fit time.
+The record holds 192,700 fits; with the reruns on fresh seeds and of the fits that raised, 200,740
+were run, in 228 CPU-hours of fit time.
 
 | method | lane | reference | better / tie / worse | worse again | floor | median fit time, Andrey / reference | status |
 |---|---|---|---|---|---|---|---|
@@ -154,14 +154,14 @@ The one cell worse than mean imputation is the MCAR control of MAR at 20 variabl
 
 | alpha | mask | cells | below the empty graph | errors / timeouts of fits | test-wise PC: better / tie / worse | worse again | listwise: better / tie / worse | worse again | mean imputation: better / tie / worse | worse again |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.01 | MAR, logistic | 72 | 72 of 72 | 0 / 20 of 1,440 | 0 / 65 / 7 | 1 of 6 rerun | 36 / 10 / 0 (26 not judged) | 0 | 72 / 0 / 0 | 0 |
-| 0.05 | MAR, logistic | 72 | 71 of 72 | 0 / 57 of 1,440 | 4 / 60 / 5 (3 not judged) | 0 of 4 rerun | 28 / 17 / 0 (27 not judged) | 0 | 69 / 0 / 0 (3 not judged) | 0 |
+| 0.01 | MAR, logistic | 72 | 72 of 72 | 0 / 20 of 1,440 | 0 / 65 / 7 | 2 of 7 rerun | 36 / 10 / 0 (26 not judged) | 0 | 72 / 0 / 0 | 0 |
+| 0.05 | MAR, logistic | 72 | 71 of 72 | 0 / 57 of 1,440 | 4 / 60 / 5 (3 not judged) | 1 of 5 rerun | 28 / 17 / 0 (27 not judged) | 0 | 69 / 0 / 0 (3 not judged) | 0 |
 | 0.01 | MAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 14 / 58 / 0 | 0 | 41 / 21 / 0 (10 not judged) | 0 | 72 / 0 / 0 | 0 |
 | 0.05 | MAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 28 / 44 / 0 | 0 | 46 / 16 / 0 (10 not judged) | 0 | 72 / 0 / 0 | 0 |
 | 0.01 | MCAR | 72 | 72 of 72 | 0 / 0 of 1,440 | 1 / 69 / 2 | 0 of 2 rerun | 30 / 6 / 0 (36 not judged) | 0 | 72 / 0 / 0 | 0 |
 | 0.05 | MCAR | 72 | 72 of 72 | 0 / 0 of 1,440 | 2 / 67 / 3 | 0 of 3 rerun | 30 / 6 / 0 (36 not judged) | 0 | 72 / 0 / 0 | 0 |
-| 0.01 | MNAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 5 / 55 / 12 | 0 of 4 rerun | 35 / 19 / 0 (18 not judged) | 0 | 72 / 0 / 0 | 0 |
-| 0.05 | MNAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 7 / 53 / 12 | 0 of 5 rerun | 37 / 17 / 0 (18 not judged) | 0 | 72 / 0 / 0 | 0 |
+| 0.01 | MNAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 5 / 55 / 12 | 3 of 12 rerun | 35 / 19 / 0 (18 not judged) | 0 | 72 / 0 / 0 | 0 |
+| 0.05 | MNAR, quantile | 72 | 72 of 72 | 0 / 0 of 1,440 | 7 / 53 / 12 | 6 of 12 rerun | 37 / 17 / 0 (18 not judged) | 0 | 72 / 0 / 0 | 0 |
 | 0.01 | self-masking | 72 | 72 of 72 | 0 / 0 of 1,440 | 1 / 65 / 6 | not rerun | 33 / 12 / 0 (27 not judged) | 0 | 72 / 0 / 0 | 0 |
 | 0.05 | self-masking | 72 | 72 of 72 | 0 / 0 of 1,440 | 2 / 61 / 9 | not rerun | 28 / 17 / 0 (27 not judged) | 0 | 72 / 0 / 0 | 0 |
 
@@ -175,15 +175,34 @@ The one cell worse than mean imputation is the MCAR control of MAR at 20 variabl
   MNAR, and self-masking, where most columns go missing.
 - **Against test-wise PC.** Under quantile MAR, the paper's mask, MVPC is better in 14 cells at
   `alpha` 0.01 and 28 at 0.05 and worse in none. Under MCAR it ties, as it should. Under logistic
-  MAR, where every indicator has many weak parents, the correction does not help.
-- **Fresh seeds.** 41 rows of the claimed masks are worse than test-wise PC on seeds 0 to 19. The
-  24 that were worse before the fits that raised were fit again ran on seeds 20 to 39, and 1 is
-  worse again: logistic MAR at mean degree 2, 100 variables, 10,000 rows, 30% missing, `alpha`
-  0.01, 13.5 against 11.8 on the 11 datasets that finished, and +3.1 again on 11 fresh ones. None
-  of the 5 MCAR rows repeats. The other 17 rows, 15 under quantile MNAR and 2 under logistic MAR,
-  turned worse when the fits that had raised were added and have no rerun yet.
+  MAR, where every indicator has many weak parents, the correction does not help. Under quantile
+  MNAR it is better in 12 rows and worse in 24 on seeds 0 to 19.
 - **Floor.** Met in every cell but one: logistic MAR, 100 variables, 10,000 rows, 30% missing, at
   `alpha` 0.05, where most fits ran past the cap.
+
+On seeds 0 to 19, 41 rows of the claimed masks are worse than test-wise PC: 24 under quantile MNAR,
+12 under logistic MAR, and 5 under MCAR. All 41 ran again on seeds 20 to 39, and 12 are worse
+again: 9 under quantile MNAR, 3 under logistic MAR, and none under MCAR. The 12 are at 50 or 100
+variables with 20 or 30% missing, and the difference on the fresh seeds is 0.7 to 3.6 SHD:
+
+| mask | mean degree | variables | rows | missing | `alpha` | MVPC | test-wise PC | difference, seeds 0 to 19 | difference, seeds 20 to 39 |
+|---|---|---|---|---|---|---|---|---|---|
+| MAR, logistic | 2 | 100 | 10,000 | 30% | 0.01 | 13.46 | 11.75 | +3.09 [+1.09, +6.00] | +3.09 [+1.82, +4.91] |
+| MAR, logistic | 4 | 100 | 2,000 | 30% | 0.05 | 128.50 | 126.70 | +1.80 [+0.70, +3.00] | +3.50 [+1.75, +5.50] |
+| MAR, logistic | 4 | 100 | 10,000 | 30% | 0.01 | 119.35 | 116.70 | +2.65 [+1.25, +3.95] | +3.50 [+1.60, +5.30] |
+| MNAR, quantile | 2 | 50 | 500 | 30% | 0.05 | 19.30 | 18.30 | +1.00 [+0.55, +1.50] | +1.05 [+0.45, +1.65] |
+| MNAR, quantile | 2 | 50 | 2,000 | 30% | 0.01 | 11.95 | 11.35 | +0.60 [+0.15, +1.10] | +0.95 [+0.30, +1.60] |
+| MNAR, quantile | 2 | 100 | 2,000 | 20% | 0.05 | 20.80 | 19.40 | +1.40 [+0.65, +2.25] | +0.90 [+0.10, +1.90] |
+| MNAR, quantile | 2 | 100 | 2,000 | 30% | 0.01 | 22.30 | 21.75 | +0.55 [+0.10, +1.25] | +0.70 [+0.10, +1.35] |
+| MNAR, quantile | 2 | 100 | 2,000 | 30% | 0.05 | 23.00 | 22.25 | +0.75 [+0.25, +1.25] | +0.95 [+0.25, +1.80] |
+| MNAR, quantile | 4 | 50 | 500 | 30% | 0.05 | 77.65 | 76.80 | +0.85 [+0.15, +1.60] | +0.75 [+0.20, +1.30] |
+| MNAR, quantile | 4 | 100 | 2,000 | 20% | 0.05 | 123.60 | 121.50 | +2.10 [+0.55, +3.85] | +3.55 [+2.05, +5.15] |
+| MNAR, quantile | 4 | 100 | 2,000 | 30% | 0.01 | 129.05 | 127.80 | +1.25 [+0.25, +2.30] | +1.25 [+0.35, +2.25] |
+| MNAR, quantile | 4 | 100 | 10,000 | 20% | 0.05 | 117.35 | 115.05 | +2.30 [+0.65, +4.00] | +3.20 [+0.80, +5.70] |
+
+The two SHD columns are the means on seeds 0 to 19. The first row is paired on the 11 datasets
+that finished within the cap, on both sets of seeds, and the others on all 20. Of the other 29
+rows, 28 tie on the fresh seeds and 1 is better.
 
 ### NOTEARS with EM against MissDAG
 
@@ -256,21 +275,35 @@ separates the search from its EM layer:
 | search | graph | variables | rows | Andrey | bnlearn | difference | verdict | empty graph |
 |---|---|---|---|---|---|---|---|---|
 | `hc` | er, degree 1 | 15 | 100 | 8.80 | 8.50 | +0.30 [-0.75, +1.45] | tie | 8.00 |
-| `hc` | er, degree 2 | 15 | 100 | 13.30 | 10.90 | +2.40 [+0.20, +4.65] | worse | 15.00 |
+| `hc` | er, degree 2 | 15 | 100 | 13.30 | 10.90 | +2.40 [+0.20, +4.65] | worse; tie on fresh datasets | 15.00 |
 | `hc` | er, degree 2 | 20 | 2,000 | 11.85 | 12.70 | -0.85 [-4.35, +2.65] | tie | 20.00 |
 | `hc` | er, degree 2 | 20 | 500 | 13.75 | 13.05 | +0.70 [-2.80, +4.15] | tie | 20.00 |
 | `hc` | scale_free, degree 2 | 15 | 100 | 13.05 | 13.10 | -0.05 [-1.75, +1.70] | tie | 14.00 |
 | `tabu` | er, degree 1 | 15 | 100 | 8.45 | 8.30 | +0.15 [-0.85, +1.05] | tie | 8.00 |
-| `tabu` | er, degree 2 | 15 | 100 | 12.95 | 11.30 | +1.65 [+0.10, +3.20] | worse | 15.00 |
+| `tabu` | er, degree 2 | 15 | 100 | 12.95 | 11.30 | +1.65 [+0.10, +3.20] | worse; tie on fresh datasets | 15.00 |
 | `tabu` | er, degree 2 | 20 | 2,000 | 7.30 | 7.15 | +0.15 [-2.85, +3.55] | tie | 20.00 |
 | `tabu` | er, degree 2 | 20 | 500 | 10.80 | 9.50 | +1.30 [-1.95, +4.90] | tie | 20.00 |
 | `tabu` | scale_free, degree 2 | 15 | 100 | 12.75 | 12.40 | +0.35 [-1.35, +2.05] | tie | 14.00 |
 
-Without missing values the two packages' searches tie in four of the five settings, and Andrey's
-`hc` and `tabu` are behind bnlearn's at ER2 with 15 variables and 100 rows, on these 20 datasets.
-With EM they are ahead there too, so the margin is the EM layer: `structural.em` fills each
-missing value with its conditional mean, and its error grows with the missing rate (under MCAR on
-ER2, from 12.4 to 30.1 SHD between 10 and 50%, where Andrey's `hc` goes from 12.0 to 15.2).
+Without missing values the two packages' searches tie in four of the five settings. In the fifth,
+ER2 with 15 variables and 100 rows, Andrey's `hc` and `tabu` are behind bnlearn's on these 20
+datasets. That setting ran again on 20 fresh datasets, seeds 100 to 119, and both searches tie, so
+the difference does not repeat. The rerun adds mean degree 4 at 20 variables with 500 and 2,000
+rows, a density the lane does not hold: all four rows tie, with both packages near or above the
+empty graph.
+
+| search | graph | variables | rows | Andrey | bnlearn | difference | verdict | empty graph |
+|---|---|---|---|---|---|---|---|---|
+| `hc` | er, degree 2 | 15 | 100 | 12.85 | 13.40 | -0.55 [-2.40, +1.15] | tie | 15.00 |
+| `tabu` | er, degree 2 | 15 | 100 | 12.45 | 13.10 | -0.65 [-2.40, +1.05] | tie | 15.00 |
+| `hc` | er, degree 4 | 20 | 500 | 41.45 | 44.35 | -2.90 [-10.15, +3.95] | tie | 40.00 |
+| `tabu` | er, degree 4 | 20 | 500 | 36.90 | 43.15 | -6.25 [-13.45, +1.25] | tie | 40.00 |
+| `hc` | er, degree 4 | 20 | 2,000 | 43.85 | 46.65 | -2.80 [-13.20, +7.75] | tie | 40.00 |
+| `tabu` | er, degree 4 | 20 | 2,000 | 35.80 | 39.25 | -3.45 [-15.20, +8.25] | tie | 40.00 |
+
+The plain searches tie, so the margin with EM is the EM layer: `structural.em` fills each missing
+value with its conditional mean, and its error grows with the missing rate (under MCAR on ER2,
+from 12.4 to 30.1 SHD between 10 and 50%, where Andrey's `hc` goes from 12.0 to 15.2).
 
 At 15 variables and 100 rows the plain BIC overfits: the complete-data fits are not clearly below
 the empty graph (on ER1, 8.8 for `hc` and 8.45 for `tabu` against 8.0), and with EM `hc` is below
@@ -368,7 +401,13 @@ repeats, and below the empty graph in its claimed setting.
   causes its own missingness, and its permutation test needs the paper's two conditions; it can
   keep an extra edge when the indicator of a variable it conditions on is a common effect of the
   tested pair. Under masks where every indicator has many weak parents (logistic MAR) it does not
-  improve on test-wise PC, and one such cell is worse on fresh seeds too.
+  improve on test-wise PC.
+- **MVPC at 50 and 100 variables.** With 20 or 30% missing, MVPC is worse than test-wise PC on
+  the first seeds and again on fresh ones in 12 rows of the generic grid, by 0.7 to 3.6 SHD: 9
+  under quantile MNAR (mean degree 2 and 4; 50 and 100 variables; 500, 2,000, and 10,000 rows) and
+  3 under logistic MAR (100 variables, 30% missing; 2,000 and 10,000 rows). The table under "MVPC
+  on the generic grid" lists them. In the paper's setting, at 20 and 50 variables, it is worse than
+  test-wise PC in no cell.
 - **Too few rows.** A corrected test that lacks rows is answered by the test-wise test, so the
   pair keeps its test-wise result; `metadata["corrected_edges"]["uncorrected"]` lists it.
 - **MVPC's cost.** At 100 variables and 10,000 rows under logistic MAR, 77 fits ran past 30

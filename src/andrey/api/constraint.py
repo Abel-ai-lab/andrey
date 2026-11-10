@@ -382,11 +382,14 @@ def pc(
     parents. With values missing completely at random it tied in 136 of 144 settings over both
     levels, and no setting where it was behind repeated on fresh seeds. Under a logistic mask that
     gives an indicator many weak parents, up to 30 at 100 variables, it tied in 125 of the 141
-    settings judged, and one was behind ``"testwise"`` on fresh seeds too: mean degree 2, 100
-    variables, 10,000 rows, and 30% missing, with 3.1 more errors on the 11 of 20 datasets that
-    finished, both times. With one parent per indicator that has missing values itself, it had fewer
-    errors in 12 of 144 settings and more in 24 on the first seeds; none of the 9 of those rerun on
-    fresh seeds was behind again. The correction holds when no missingness indicator causes a
+    settings judged and was behind ``"testwise"`` in 12, in 3 of them on fresh seeds too, all with
+    100 variables and 30% missing: at mean degree 2 and 10,000 rows by 3.1 errors on the 11 of 20
+    datasets that finished, both times, and at mean degree 4 with 2,000 and 10,000 rows by 1.8 and
+    2.65 errors and then by 3.5. With one parent per indicator that has missing values itself, it
+    had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
+    ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
+    by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
+    ``"testwise"`` made 11 to 128. The correction holds when no missingness indicator causes a
     variable, every independence in the observed rows also holds in the missing ones, no indicator
     is a deterministic function of others, and no value causes its own missingness (self-masking)
     [13]_; the data cannot check these, and a violation voids the correction. PermC also needs

@@ -115,6 +115,8 @@ names its pull request.
   4, and worse in none, and below the empty graph in all 32. It does not improve on test-wise
   deletion where each indicator has many weak parents, and there, at 100 variables and 10,000 rows,
   77 fits ran past 30 minutes in the search for the indicators' parents, which `max_depth` bounds.
+  On a wider grid, with 50 or 100 variables and 20 or 30% of the values missing, it made 0.7 to 3.6
+  more errors than test-wise deletion in 12 settings, on the first datasets and again on fresh ones.
   ([#832], [#856])
 - `missing="em"` fits `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, and `grasp` with
   `score_func="bic"`, and `notears`, `dagma`, and `calm`, on data with missing values by structural

@@ -28,7 +28,8 @@
    "floor_applies": 32,
    "floor_met_where_it_applies": 32,
    "below_empty_graph": 32,
-   "status": "supported"
+   "status": "supported",
+   "limit": "against test-wise PC on the generic grid (m1-generic), which is a baseline and not the reference, 12 of the 41 rows of the claimed masks that were worse on seeds 0-19 are worse again on seeds 20-39 (9 under quantile MNAR, 3 under logistic MAR, 0 under MCAR), all at 50 or 100 variables with 20 or 30% missing; fresh_seeds lists them"
   },
   "notears(missing=\"em\")": {
    "reference_lane": "m2-a, m2-c",
@@ -71,13 +72,456 @@
   }
  },
  "fresh_seeds": {
-  "cells": "the m1-generic rows of the claimed masks that were worse than test-wise PC on seeds 0-19 before the fits that raised were fit again, on seeds 20-39",
+  "cells": "the m1-generic rows of the claimed masks that were worse than test-wise PC on seeds 0-19, on seeds 20-39",
   "rows_worse_on_first_seeds": 41,
-  "rows_rerun": 24,
-  "rows_worse_again": 1
+  "rows_rerun": 41,
+  "rows_worse_again": 12,
+  "rows_worse_on_first_seeds_by_mask": {
+   "MCAR": 5,
+   "MAR, logistic": 12,
+   "MNAR, quantile": 24
+  },
+  "rows_worse_again_by_mask": {
+   "MCAR": 0,
+   "MAR, logistic": 3,
+   "MNAR, quantile": 9
+  },
+  "worse_again": [
+   {
+    "regime": "m1-generic|er|2.0|50|500|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 2.0,
+    "d": 50,
+    "n": 500,
+    "rate": 0.3,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 1.0,
+     "bootstrap_95": [
+      0.55,
+      1.5
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 1.05,
+     "bootstrap_95": [
+      0.45,
+      1.65
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|2.0|50|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
+    "mask": "MNAR, quantile",
+    "density": 2.0,
+    "d": 50,
+    "n": 2000,
+    "rate": 0.3,
+    "alpha": 0.01,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      0.15,
+      1.1
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 0.95,
+     "bootstrap_95": [
+      0.3,
+      1.6
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.2|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 2.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.2,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 1.4,
+     "bootstrap_95": [
+      0.65,
+      2.25
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 0.9,
+     "bootstrap_95": [
+      0.1,
+      1.9
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
+    "mask": "MNAR, quantile",
+    "density": 2.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.3,
+    "alpha": 0.01,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 0.55,
+     "bootstrap_95": [
+      0.1,
+      1.25
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 0.7,
+     "bootstrap_95": [
+      0.1,
+      1.35
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 2.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.3,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 0.75,
+     "bootstrap_95": [
+      0.25,
+      1.25
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 0.95,
+     "bootstrap_95": [
+      0.25,
+      1.8
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|2.0|100|10000|mar|logistic|0.3|andrey.pc.mvpc.alpha0.01.seed0",
+    "mask": "MAR, logistic",
+    "density": 2.0,
+    "d": 100,
+    "n": 10000,
+    "rate": 0.3,
+    "alpha": 0.01,
+    "seeds_0_19": {
+     "paired": 11,
+     "mean_D": 3.091,
+     "bootstrap_95": [
+      1.0909,
+      6.0
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 11,
+     "mean_D": 3.091,
+     "bootstrap_95": [
+      1.8182,
+      4.9091
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|50|500|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 4.0,
+    "d": 50,
+    "n": 500,
+    "rate": 0.3,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 0.85,
+     "bootstrap_95": [
+      0.15,
+      1.6
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 0.75,
+     "bootstrap_95": [
+      0.2,
+      1.3
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|100|2000|mar|logistic|0.3|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MAR, logistic",
+    "density": 4.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.3,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 1.8,
+     "bootstrap_95": [
+      0.7,
+      3.0
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 3.5,
+     "bootstrap_95": [
+      1.75,
+      5.5
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|100|2000|mnar|quantile|0.2|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 4.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.2,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 2.1,
+     "bootstrap_95": [
+      0.55,
+      3.85
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 3.55,
+     "bootstrap_95": [
+      2.05,
+      5.15
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
+    "mask": "MNAR, quantile",
+    "density": 4.0,
+    "d": 100,
+    "n": 2000,
+    "rate": 0.3,
+    "alpha": 0.01,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 1.25,
+     "bootstrap_95": [
+      0.25,
+      2.3
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 1.25,
+     "bootstrap_95": [
+      0.35,
+      2.2512
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|100|10000|mar|logistic|0.3|andrey.pc.mvpc.alpha0.01.seed0",
+    "mask": "MAR, logistic",
+    "density": 4.0,
+    "d": 100,
+    "n": 10000,
+    "rate": 0.3,
+    "alpha": 0.01,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 2.65,
+     "bootstrap_95": [
+      1.25,
+      3.95
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 3.5,
+     "bootstrap_95": [
+      1.6,
+      5.3
+     ]
+    }
+   },
+   {
+    "regime": "m1-generic|er|4.0|100|10000|mnar|quantile|0.2|andrey.pc.mvpc.alpha0.05.seed0",
+    "mask": "MNAR, quantile",
+    "density": 4.0,
+    "d": 100,
+    "n": 10000,
+    "rate": 0.2,
+    "alpha": 0.05,
+    "seeds_0_19": {
+     "paired": 20,
+     "mean_D": 2.3,
+     "bootstrap_95": [
+      0.65,
+      4.0
+     ]
+    },
+    "seeds_20_39": {
+     "paired": 20,
+     "mean_D": 3.2,
+     "bootstrap_95": [
+      0.8,
+      5.7
+     ]
+    }
+   }
+  ]
  },
- "fit_hours_all_runs": 222.9,
- "fits_all_runs": 198800,
+ "control_replication": {
+  "about": "the complete-data control of plain hc and tabu (ebic_gamma 0.0) against bnlearn's hc and tabu on 20 fresh datasets per cell, seeds 100-119: the cell where both were worse on seeds 0-19 (ER, mean degree 2, 15 variables, 100 rows) and two cells at mean degree 4 that the lane does not hold; D = SHD(Andrey) - SHD(bnlearn) between equivalence classes, judged as the rows are",
+  "first_seeds_worse": [
+   {
+    "cell": "er degree 2, 15 variables, 100 rows",
+    "method": "hc",
+    "paired": 20,
+    "mean_D": 2.4,
+    "bootstrap_95": [
+     0.2,
+     4.65
+    ],
+    "verdict": "worse"
+   },
+   {
+    "cell": "er degree 2, 15 variables, 100 rows",
+    "method": "tabu",
+    "paired": 20,
+    "mean_D": 1.65,
+    "bootstrap_95": [
+     0.1,
+     3.2
+    ],
+    "verdict": "worse"
+   }
+  ],
+  "rows": [
+   {
+    "cell": "er degree 2, 15 variables, 100 rows (raw)",
+    "method": "hc",
+    "paired": 20,
+    "andrey_mean_shd": 12.85,
+    "bnlearn_mean_shd": 13.4,
+    "empty_mean_shd": 15.0,
+    "mean_D": -0.55,
+    "bootstrap_95": [
+     -2.4,
+     1.15
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.2679,
+    "bnlearn_fit_s_median": 0.0158
+   },
+   {
+    "cell": "er degree 2, 15 variables, 100 rows (raw)",
+    "method": "tabu",
+    "paired": 20,
+    "andrey_mean_shd": 12.45,
+    "bnlearn_mean_shd": 13.1,
+    "empty_mean_shd": 15.0,
+    "mean_D": -0.65,
+    "bootstrap_95": [
+     -2.4,
+     1.05
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.2884,
+    "bnlearn_fit_s_median": 0.0244
+   },
+   {
+    "cell": "er degree 4, 20 variables, 500 rows (standardized)",
+    "method": "hc",
+    "paired": 20,
+    "andrey_mean_shd": 41.45,
+    "bnlearn_mean_shd": 44.35,
+    "empty_mean_shd": 40.0,
+    "mean_D": -2.9,
+    "bootstrap_95": [
+     -10.15,
+     3.95
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.3085,
+    "bnlearn_fit_s_median": 0.0795
+   },
+   {
+    "cell": "er degree 4, 20 variables, 500 rows (standardized)",
+    "method": "tabu",
+    "paired": 20,
+    "andrey_mean_shd": 36.9,
+    "bnlearn_mean_shd": 43.15,
+    "empty_mean_shd": 40.0,
+    "mean_D": -6.25,
+    "bootstrap_95": [
+     -13.45,
+     1.2512
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.3448,
+    "bnlearn_fit_s_median": 0.099
+   },
+   {
+    "cell": "er degree 4, 20 variables, 2000 rows (standardized)",
+    "method": "hc",
+    "paired": 20,
+    "andrey_mean_shd": 43.85,
+    "bnlearn_mean_shd": 46.65,
+    "empty_mean_shd": 40.0,
+    "mean_D": -2.8,
+    "bootstrap_95": [
+     -13.2,
+     7.7512
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.3248,
+    "bnlearn_fit_s_median": 0.2072
+   },
+   {
+    "cell": "er degree 4, 20 variables, 2000 rows (standardized)",
+    "method": "tabu",
+    "paired": 20,
+    "andrey_mean_shd": 35.8,
+    "bnlearn_mean_shd": 39.25,
+    "empty_mean_shd": 40.0,
+    "mean_D": -3.45,
+    "bootstrap_95": [
+     -15.2,
+     8.25
+    ],
+    "verdict": "tie",
+    "failures": 0,
+    "andrey_fit_s_median": 0.3393,
+    "bnlearn_fit_s_median": 0.2889
+   }
+  ]
+ },
+ "fit_hours_all_runs": 228.4,
+ "fits_all_runs": 200740,
  "parity_rule": "paired bootstrap",
  "bootstrap": {
   "resamples": 10000,
@@ -21827,7 +22271,8 @@
      0.65
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -21874,7 +22319,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -30.25,
+      -25.8
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 21.75,
+     "mean_skeleton_f1": 0.843,
+     "fit_s_median": 0.3265,
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      0.0,
+      0.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 37.3,
+     "mean_skeleton_f1": 0.723,
+     "fit_s_median": 0.2458,
+     "paired": 20,
+     "mean_D": -15.35,
+     "bootstrap_95": [
+      -18.4,
+      -12.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|50|500|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -21928,7 +22438,8 @@
      1.5
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -21975,7 +22486,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -32.1013,
+      -27.5988
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 19.1,
+     "mean_skeleton_f1": 0.87,
+     "fit_s_median": 0.2903,
+     "paired": 20,
+     "mean_D": 1.05,
+     "bootstrap_95": [
+      0.45,
+      1.65
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 49.15,
+     "mean_skeleton_f1": 0.681,
+     "fit_s_median": 0.2423,
+     "paired": 20,
+     "mean_D": -29.0,
+     "bootstrap_95": [
+      -32.15,
+      -25.7
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|50|500|self_masking|logistic|0.1|andrey.pc.mvpc.alpha0.01.seed0",
@@ -24909,7 +25485,8 @@
      1.1
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -24956,7 +25533,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -40.2,
+      -36.4988
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 10.65,
+     "mean_skeleton_f1": 0.924,
+     "fit_s_median": 0.3404,
+     "paired": 20,
+     "mean_D": 0.95,
+     "bootstrap_95": [
+      0.3,
+      1.6
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 47.25,
+     "mean_skeleton_f1": 0.7,
+     "fit_s_median": 0.2752,
+     "paired": 20,
+     "mean_D": -35.65,
+     "bootstrap_95": [
+      -39.25,
+      -32.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|50|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -28134,7 +28776,8 @@
      2.05
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -28185,7 +28828,76 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -43.9,
+      -41.2
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 8.05,
+     "mean_skeleton_f1": 0.951,
+     "fit_s_median": 0.8745,
+     "paired": 20,
+     "mean_D": -0.6,
+     "bootstrap_95": [
+      -1.6,
+      0.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 6,
+     "status": {
+      "error": 14,
+      "ok": 6
+     },
+     "mean_shd": 53.5,
+     "mean_skeleton_f1": 0.048,
+     "fit_s_median": 0.1909,
+     "paired": 6,
+     "mean_D": -47.167,
+     "bootstrap_95": [
+      -50.3333,
+      -42.8333
+     ],
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 60.45,
+     "mean_skeleton_f1": 0.654,
+     "fit_s_median": 0.3163,
+     "paired": 20,
+     "mean_D": -53.0,
+     "bootstrap_95": [
+      -56.6,
+      -49.4
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|50|10000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -34193,7 +34905,8 @@
      2.45
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -34240,7 +34953,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -84.2,
+      -78.35
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 18.15,
+     "mean_skeleton_f1": 0.936,
+     "fit_s_median": 0.776,
+     "paired": 20,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      -0.2,
+      1.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 72.0,
+     "mean_skeleton_f1": 0.747,
+     "fit_s_median": 0.2917,
+     "paired": 20,
+     "mean_D": -53.25,
+     "bootstrap_95": [
+      -58.3,
+      -48.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.2|andrey.pc.mvpc.alpha0.05.seed0",
@@ -34294,7 +35072,8 @@
      2.25
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -34341,7 +35120,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -84.3,
+      -77.55
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 18.1,
+     "mean_skeleton_f1": 0.938,
+     "fit_s_median": 0.9936,
+     "paired": 20,
+     "mean_D": 0.9,
+     "bootstrap_95": [
+      0.1,
+      1.9
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 106.85,
+     "mean_skeleton_f1": 0.678,
+     "fit_s_median": 0.3344,
+     "paired": 20,
+     "mean_D": -87.85,
+     "bootstrap_95": [
+      -94.55,
+      -80.8
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
@@ -34395,7 +35239,8 @@
      1.25
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -34442,7 +35287,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -81.4,
+      -75.4
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 20.9,
+     "mean_skeleton_f1": 0.922,
+     "fit_s_median": 0.714,
+     "paired": 20,
+     "mean_D": 0.7,
+     "bootstrap_95": [
+      0.1,
+      1.35
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 86.95,
+     "mean_skeleton_f1": 0.705,
+     "fit_s_median": 0.2885,
+     "paired": 20,
+     "mean_D": -65.35,
+     "bootstrap_95": [
+      -71.65,
+      -58.9
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -34496,7 +35406,8 @@
      1.25
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -34543,7 +35454,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -82.1,
+      -75.4
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 20.25,
+     "mean_skeleton_f1": 0.93,
+     "fit_s_median": 1.0403,
+     "paired": 20,
+     "mean_D": 0.95,
+     "bootstrap_95": [
+      0.25,
+      1.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 127.95,
+     "mean_skeleton_f1": 0.633,
+     "fit_s_median": 0.4091,
+     "paired": 20,
+     "mean_D": -106.75,
+     "bootstrap_95": [
+      -115.2,
+      -98.65
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|100|2000|self_masking|logistic|0.1|andrey.pc.mvpc.alpha0.01.seed0",
@@ -37989,7 +38965,8 @@
      2.05
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -38036,7 +39013,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -88.8,
+      -82.15
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 13.7,
+     "mean_skeleton_f1": 0.955,
+     "fit_s_median": 2.549,
+     "paired": 20,
+     "mean_D": 0.75,
+     "bootstrap_95": [
+      -0.3,
+      1.8
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 112.9,
+     "mean_skeleton_f1": 0.658,
+     "fit_s_median": 0.4275,
+     "paired": 20,
+     "mean_D": -98.45,
+     "bootstrap_95": [
+      -104.7,
+      -92.4
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|2.0|100|10000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -60442,7 +61484,8 @@
      1.6
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -60489,7 +61532,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -24.15,
+      -18.9
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 77.65,
+     "mean_skeleton_f1": 0.598,
+     "fit_s_median": 0.5073,
+     "paired": 20,
+     "mean_D": 0.75,
+     "bootstrap_95": [
+      0.2,
+      1.3
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 111.2,
+     "mean_skeleton_f1": 0.495,
+     "fit_s_median": 0.3081,
+     "paired": 20,
+     "mean_D": -32.8,
+     "bootstrap_95": [
+      -36.35,
+      -29.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|50|500|self_masking|logistic|0.1|andrey.pc.mvpc.alpha0.01.seed0",
@@ -63805,7 +64913,8 @@
      2.75
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -63856,7 +64965,76 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -33.3,
+      -23.9988
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 70.75,
+     "mean_skeleton_f1": 0.66,
+     "fit_s_median": 1.2606,
+     "paired": 20,
+     "mean_D": 0.3,
+     "bootstrap_95": [
+      -1.05,
+      1.6
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 1,
+     "status": {
+      "error": 19,
+      "ok": 1
+     },
+     "mean_shd": 103.0,
+     "mean_skeleton_f1": 0.019,
+     "fit_s_median": 0.1709,
+     "paired": 1,
+     "mean_D": -35.0,
+     "bootstrap_95": [
+      -35.0,
+      -35.0
+     ],
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 122.9,
+     "mean_skeleton_f1": 0.502,
+     "fit_s_median": 0.3355,
+     "paired": 20,
+     "mean_D": -51.85,
+     "bootstrap_95": [
+      -56.25,
+      -47.15
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|50|2000|self_masking|logistic|0.1|andrey.pc.mvpc.alpha0.01.seed0",
@@ -66802,7 +67980,8 @@
      2.8
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": false
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -66853,7 +68032,76 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -38.65,
+      -30.35
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 64.7,
+     "mean_skeleton_f1": 0.697,
+     "fit_s_median": 6.2229,
+     "paired": 20,
+     "mean_D": 0.9,
+     "bootstrap_95": [
+      -0.1,
+      2.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 9,
+     "status": {
+      "error": 11,
+      "ok": 9
+     },
+     "mean_shd": 100.667,
+     "mean_skeleton_f1": 0.115,
+     "fit_s_median": 0.1807,
+     "paired": 9,
+     "mean_D": -35.111,
+     "bootstrap_95": [
+      -41.7778,
+      -29.1111
+     ],
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 130.75,
+     "mean_skeleton_f1": 0.505,
+     "fit_s_median": 0.4168,
+     "paired": 20,
+     "mean_D": -65.15,
+     "bootstrap_95": [
+      -69.5,
+      -60.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|50|10000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -71718,7 +72966,8 @@
      3.0
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -71765,7 +73014,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -80.85,
+      -65.7488
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 123.45,
+     "mean_skeleton_f1": 0.702,
+     "fit_s_median": 5.0751,
+     "paired": 20,
+     "mean_D": 3.5,
+     "bootstrap_95": [
+      1.75,
+      5.5
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 230.8,
+     "mean_skeleton_f1": 0.558,
+     "fit_s_median": 0.6928,
+     "paired": 20,
+     "mean_D": -103.85,
+     "bootstrap_95": [
+      -111.9,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|100|2000|mar|quantile|0.1|andrey.pc.mvpc.alpha0.01.seed0",
@@ -73616,7 +74930,8 @@
      3.85
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -73663,7 +74978,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -82.1,
+      -70.0
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 120.55,
+     "mean_skeleton_f1": 0.725,
+     "fit_s_median": 5.7108,
+     "paired": 20,
+     "mean_D": 3.55,
+     "bootstrap_95": [
+      2.05,
+      5.15
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 220.45,
+     "mean_skeleton_f1": 0.574,
+     "fit_s_median": 0.584,
+     "paired": 20,
+     "mean_D": -96.35,
+     "bootstrap_95": [
+      -102.1012,
+      -90.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
@@ -73717,7 +75097,8 @@
      2.3
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -73764,7 +75145,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -81.1513,
+      -67.65
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 124.4,
+     "mean_skeleton_f1": 0.688,
+     "fit_s_median": 4.2666,
+     "paired": 20,
+     "mean_D": 1.25,
+     "bootstrap_95": [
+      0.35,
+      2.2512
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 221.5,
+     "mean_skeleton_f1": 0.551,
+     "fit_s_median": 0.5329,
+     "paired": 20,
+     "mean_D": -95.85,
+     "bootstrap_95": [
+      -103.0,
+      -88.45
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|100|2000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -74945,7 +76391,8 @@
      3.95
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.01",
@@ -74992,7 +76439,72 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -92.15,
+      -78.85
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 111.0,
+     "mean_skeleton_f1": 0.75,
+     "fit_s_median": 28.3499,
+     "paired": 20,
+     "mean_D": 3.5,
+     "bootstrap_95": [
+      1.6,
+      5.3
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.01",
+     "finished": 0,
+     "status": {
+      "error": 20
+     },
+     "mean_shd": null,
+     "mean_skeleton_f1": null,
+     "fit_s_median": null,
+     "paired": 0,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.01",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 251.75,
+     "mean_skeleton_f1": 0.556,
+     "fit_s_median": 1.2077,
+     "paired": 20,
+     "mean_D": -137.25,
+     "bootstrap_95": [
+      -145.0,
+      -129.4
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|100|10000|mar|logistic|0.3|andrey.pc.mvpc.alpha0.05.seed0",
@@ -76686,7 +78198,8 @@
      4.0
     ],
     "verdict": "worse",
-    "failures": 0
+    "failures": 0,
+    "worse_again": true
    },
    "listwise": {
     "arm": "listwise.andrey.pc.default.alpha0.05",
@@ -76737,7 +78250,76 @@
    },
    "judged": false,
    "result": "not judged",
-   "rerun": false
+   "rerun": false,
+   "replication": {
+    "datasets": 20,
+    "status": {
+     "ok": 20
+    },
+    "floor": {
+     "andrey_minus_empty": [
+      -91.2,
+      -78.5
+     ],
+     "pass": true
+    },
+    "result": "not judged",
+    "testwise": {
+     "arm": "andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 112.05,
+     "mean_skeleton_f1": 0.767,
+     "fit_s_median": 41.3967,
+     "paired": 20,
+     "mean_D": 3.2,
+     "bootstrap_95": [
+      0.8,
+      5.7
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "listwise": {
+     "arm": "listwise.andrey.pc.default.alpha0.05",
+     "finished": 7,
+     "status": {
+      "error": 13,
+      "ok": 7
+     },
+     "mean_shd": 203.143,
+     "mean_skeleton_f1": 0.05,
+     "fit_s_median": 0.1785,
+     "paired": 7,
+     "mean_D": -86.286,
+     "bootstrap_95": [
+      -93.7143,
+      -78.2857
+     ],
+     "verdict": null,
+     "failures": 0
+    },
+    "mean": {
+     "arm": "impute_mean.andrey.pc.default.alpha0.05",
+     "finished": 20,
+     "status": {
+      "ok": 20
+     },
+     "mean_shd": 257.05,
+     "mean_skeleton_f1": 0.558,
+     "fit_s_median": 0.939,
+     "paired": 20,
+     "mean_D": -141.8,
+     "bootstrap_95": [
+      -149.55,
+      -134.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    }
+   }
   },
   {
    "regime": "m1-generic|er|4.0|100|10000|mnar|quantile|0.3|andrey.pc.mvpc.alpha0.01.seed0",
