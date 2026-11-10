@@ -440,14 +440,14 @@ result.metadata["ancestor_clauses"]
 The methods whose result is a CPDAG (PC, CD-NOD, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP,
 exact search, and IAMB, Inter-IAMB, and MMPC with `structure="cpdag"` and no `target`) honor them:
 of the DAGs the graph they found stands for, they keep those that meet every claim and return their
-MPDAG, so an edge is directed when all of those DAGs direct it alike. With an undirected result,
-which the claims cannot restrict, IAMB, Inter-IAMB, and MMPC raise `NotImplementedError`. Some
-claims cannot be shown by directing edges. If `smoking` causes `cancer` exactly when it is a direct
-cause of `tar` or of `gene`, and the data leave both edges undirected,
-`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. The result is
-the class the search found, restricted, not a new search for the best class that meets the claims.
-A claim directs edges of the graph the search found, and where that graph is wrong, a true claim
-can direct an edge the wrong way: in our measurements, 1 to 11% of the edges true claims directed.
+MPDAG (Fang, Zhao, Liu, and He, 2025), so an edge is directed when all of those DAGs direct it
+alike. With an undirected result, which the claims cannot restrict, IAMB, Inter-IAMB, and MMPC raise
+`NotImplementedError`. Some claims cannot be shown by directing edges. If `smoking` causes `cancer`
+exactly when it is a direct cause of `tar` or of `gene`, and the data leave both edges undirected,
+`metadata["ancestor_clauses"]` lists the claim as `["smoking", ["gene", "tar"]]`. The result is the
+class the search found, restricted, not a new search for the best class that meets the claims. A
+claim directs edges of the graph the search found, and where that graph is wrong, a true claim can
+direct an edge the wrong way: in our measurements, 1 to 11% of the edges true claims directed.
 
 When hidden common causes are possible, `confounded` lists the pairs that share one, a variable
 that is not in the data; a common cause that is in the data does not make the pair adjacent. The
@@ -469,14 +469,14 @@ On a pair the tests keep, a required path makes the edge `smoking -> cancer` and
 puts an arrowhead at its cause; no test removes a `confounded` pair. These marks and checks assume
 no selection bias: the samples were not kept or dropped by the value of a variable the measured ones
 cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forbidden_paths` to
-narrow the causal order, as their paper describes. Every other method raises `NotImplementedError`
-for a part it does not honor, naming the methods that do. The parts are supported in PC, GES, BOSS,
-FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM: with true claims, each measured no worse than the
-same fit without them and than reference packages given the same knowledge, on the
-[0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims). In the other methods,
-which we have not measured, they are experimental. A path claim says less than an edge and so
-directs less: a required path cannot restore an edge the search left out. When you know the edge
-itself, state it as `required`.
+narrow the causal order, as their paper describes (Shimizu et al., 2011). Every other method raises
+`NotImplementedError` for a part it does not honor, naming the methods that do. The parts are
+supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM: with true claims, each
+measured no worse than the same fit without them and than reference packages given the same
+knowledge, on the [0.16.0 release card](../benchmarks/0.16.0.md#path-and-confounder-claims). In the
+other methods, which we have not measured, they are experimental. A path claim says less than an
+edge and so directs less: a required path cannot restore an edge the search left out. When you know
+the edge itself, state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -635,12 +635,20 @@ rows where those variables are observed. It takes `fisherz` or `student_t`;
 edges it tested again and removed. A corrected test reads the rows where its pair, its conditioning
 set, and those parents are all observed. When they are too few for it, the test-wise test answers
 instead, so the pair keeps its test-wise result for that conditioning set, and
-`metadata["corrected_edges"]["uncorrected"]` lists the pair. The correction holds when no indicator
-causes a variable and no value causes its own missingness, which the data cannot check. It also
-needs the rows it rebuilds from to keep the independence of each pair it tests: when a variable it
-rebuilds from goes missing because of a common effect of that pair, as when two effects of the same
-causes each hide the other, the extra edge can stay. `andrey.data.missingness` simulates data whose
-missingness graph you know, to see where it helps.
+`metadata["corrected_edges"]["uncorrected"]` lists the pair. On complete data, MVPC gives the
+test-wise result.
+
+The correction holds when no indicator causes a variable, every independence in the observed rows
+also holds in the missing ones, no indicator is a deterministic function of others, and no value
+causes its own missingness, which the data cannot check. The permutation correction also needs
+linear-Gaussian variables and the paper's two conditions: given `W`, the parents of the indicators
+involved, those indicators are independent of the tested variables, and conditioning on the
+indicators of `W` leaves the tested relation unchanged. The second asks the rows the test rebuilds
+from to keep the independence of each pair it tests: when a variable it rebuilds from goes missing
+because of a common effect of that pair, as in the paper's Figure 1c and as when two effects of the
+same causes each hide the other, the extra edge can stay. The paper's density-ratio correction for
+those cases is not implemented. `andrey.data.missingness` simulates data whose missingness graph
+you know, to see where it helps.
 
 On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
 16 settings where values go missing for a reason and tied in the rest, and tied where they are
@@ -659,13 +667,13 @@ observed value, or with one value throughout, raises before the fit, and so does
 not a missing value. CD-NOD needs a complete `env`.
 
 The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
-rows per test, and refuse missing values by default. They take `missing="em"` instead: structural
-EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates two steps.
-Under a linear-Gaussian model of the current graph, it replaces each row's missing values by their
-expected values given the row's observed ones and adds their uncertainty, which gives the expected
-covariance of the data; then the search runs on that covariance over every row, and the model is fit
-again to the graph it returns. It runs 10 rounds, and `metadata["em"]` records the observed-data
-log-likelihood after each:
+rows per test, and refuse missing values by default, with a message that names `missing="em"`. They
+take `missing="em"` instead: structural EM (Friedman, 1997; [Gao et al., 2022][missdag]) alternates
+two steps. Under a linear-Gaussian model of the current graph, it replaces each row's missing values
+by their expected values given the row's observed ones and adds their uncertainty, which gives the
+expected covariance of the data; then the search runs on that covariance over every row, and the
+model is fit again to the graph it returns. It runs 10 rounds, and `metadata["em"]` records the
+observed-data log-likelihood after each:
 
 ```{code-cell} ipython3
 em = andrey.ges(gappy, missing="em")
@@ -747,6 +755,12 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
   Test-Wise Deletion][strobl]: FCI with test-wise deletion.
 - [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
   deletion.
+- Shimizu et al. (2011), DirectLiNGAM: A Direct Method for Learning a Linear Non-Gaussian
+  Structural Equation Model, Journal of Machine Learning Research 12: DirectLiNGAM with prior
+  knowledge.
+- Fang, Zhao, Liu, and He (2025), On the Representation of Pairwise Causal Background Knowledge
+  and Its Applications in Causal Inference, Journal of Machine Learning Research 26(229): path
+  claims in a CPDAG.
 - Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
   Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
 - [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous
