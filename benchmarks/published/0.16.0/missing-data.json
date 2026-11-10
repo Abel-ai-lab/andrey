@@ -520,8 +520,465 @@
    }
   ]
  },
- "fit_hours_all_runs": 228.4,
- "fits_all_runs": 200740,
+ "reference_check": {
+  "about": "three of the settings of fresh_seeds.worse_again, all ER graphs under quantile MNAR: the MVPC authors' R code, its MVPC (mvpc-r.permc) and its test-wise PC (mvpc-r.testwise) at the setting's alpha, on the same 20 datasets of seeds 20-39 as Andrey's MVPC and test-wise PC; each comparison is D = SHD(first) - SHD(second) on the datasets both arms finished, judged as the rows are, and failures counts the datasets the second arm finished and the first did not. Test-wise PC is a baseline: the check is reported and decides no verdict",
+  "bootstrap": {
+   "resamples": 10000,
+   "interval": "percentile 95%",
+   "rng": "default_rng(0)"
+  },
+  "min_pairs": 10,
+  "settings": [
+   {
+    "label": "er2-d50-n500-mnar-quantile-r0.3-a0.05",
+    "setting": {
+     "density": 2.0,
+     "d": 50,
+     "n": 500,
+     "mechanism": "mnar",
+     "form": "quantile",
+     "rate": 0.3,
+     "alpha": 0.05
+    },
+    "seeds": [
+     20,
+     39
+    ],
+    "arms": {
+     "r_mvpc": {
+      "arm": "mvpc-r.permc.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 18,
+       "error": 2
+      },
+      "finished": 18,
+      "timeouts": 0,
+      "mean_shd": 21.5,
+      "fit_s_median": 4.3474
+     },
+     "r_testwise": {
+      "arm": "mvpc-r.testwise.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 22.15,
+      "fit_s_median": 1.284
+     },
+     "andrey_mvpc": {
+      "arm": "andrey.pc.mvpc.alpha0.05.seed0",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 20.15,
+      "fit_s_median": 1.947
+     },
+     "andrey_testwise": {
+      "arm": "andrey.pc.default.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 19.1,
+      "fit_s_median": 0.2903
+     }
+    },
+    "comparisons": {
+     "a_r_mvpc_minus_r_testwise": {
+      "paired": 18,
+      "mean_first": 21.5,
+      "mean_second": 21.333,
+      "mean_D": 0.167,
+      "bootstrap_95": [
+       -0.2222,
+       0.6111
+      ],
+      "verdict": "tie",
+      "failures": 2,
+      "failures_second": 0,
+      "first": "mvpc-r.permc.alpha0.05",
+      "second": "mvpc-r.testwise.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 4.3474,
+      "fit_s_median_second": 1.284
+     },
+     "b_andrey_mvpc_minus_andrey_testwise": {
+      "paired": 20,
+      "mean_first": 20.15,
+      "mean_second": 19.1,
+      "mean_D": 1.05,
+      "bootstrap_95": [
+       0.45,
+       1.65
+      ],
+      "verdict": "worse",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.mvpc.alpha0.05.seed0",
+      "second": "andrey.pc.default.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 1.947,
+      "fit_s_median_second": 0.2903
+     },
+     "c_andrey_mvpc_minus_r_mvpc": {
+      "paired": 18,
+      "mean_first": 19.944,
+      "mean_second": 21.5,
+      "mean_D": -1.556,
+      "bootstrap_95": [
+       -3.1667,
+       0.0556
+      ],
+      "verdict": "tie",
+      "failures": 0,
+      "failures_second": 2,
+      "first": "andrey.pc.mvpc.alpha0.05.seed0",
+      "second": "mvpc-r.permc.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 1.947,
+      "fit_s_median_second": 4.3474
+     },
+     "d_andrey_testwise_minus_r_testwise": {
+      "paired": 20,
+      "mean_first": 19.1,
+      "mean_second": 22.15,
+      "mean_D": -3.05,
+      "bootstrap_95": [
+       -4.75,
+       -1.5
+      ],
+      "verdict": "better",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.default.alpha0.05",
+      "second": "mvpc-r.testwise.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 0.2903,
+      "fit_s_median_second": 1.284
+     }
+    }
+   },
+   {
+    "label": "er2-d50-n2000-mnar-quantile-r0.3-a0.01",
+    "setting": {
+     "density": 2.0,
+     "d": 50,
+     "n": 2000,
+     "mechanism": "mnar",
+     "form": "quantile",
+     "rate": 0.3,
+     "alpha": 0.01
+    },
+    "seeds": [
+     20,
+     39
+    ],
+    "arms": {
+     "r_mvpc": {
+      "arm": "mvpc-r.permc.alpha0.01",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 15.75,
+      "fit_s_median": 10.8708
+     },
+     "r_testwise": {
+      "arm": "mvpc-r.testwise.alpha0.01",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 15.5,
+      "fit_s_median": 4.4192
+     },
+     "andrey_mvpc": {
+      "arm": "andrey.pc.mvpc.alpha0.01.seed0",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 11.6,
+      "fit_s_median": 2.1946
+     },
+     "andrey_testwise": {
+      "arm": "andrey.pc.default.alpha0.01",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 10.65,
+      "fit_s_median": 0.3404
+     }
+    },
+    "comparisons": {
+     "a_r_mvpc_minus_r_testwise": {
+      "paired": 20,
+      "mean_first": 15.75,
+      "mean_second": 15.5,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       -0.4,
+       0.95
+      ],
+      "verdict": "tie",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "mvpc-r.permc.alpha0.01",
+      "second": "mvpc-r.testwise.alpha0.01",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 10.8708,
+      "fit_s_median_second": 4.4192
+     },
+     "b_andrey_mvpc_minus_andrey_testwise": {
+      "paired": 20,
+      "mean_first": 11.6,
+      "mean_second": 10.65,
+      "mean_D": 0.95,
+      "bootstrap_95": [
+       0.3,
+       1.6
+      ],
+      "verdict": "worse",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.mvpc.alpha0.01.seed0",
+      "second": "andrey.pc.default.alpha0.01",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 2.1946,
+      "fit_s_median_second": 0.3404
+     },
+     "c_andrey_mvpc_minus_r_mvpc": {
+      "paired": 20,
+      "mean_first": 11.6,
+      "mean_second": 15.75,
+      "mean_D": -4.15,
+      "bootstrap_95": [
+       -5.75,
+       -2.65
+      ],
+      "verdict": "better",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.mvpc.alpha0.01.seed0",
+      "second": "mvpc-r.permc.alpha0.01",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 2.1946,
+      "fit_s_median_second": 10.8708
+     },
+     "d_andrey_testwise_minus_r_testwise": {
+      "paired": 20,
+      "mean_first": 10.65,
+      "mean_second": 15.5,
+      "mean_D": -4.85,
+      "bootstrap_95": [
+       -6.45,
+       -3.35
+      ],
+      "verdict": "better",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.default.alpha0.01",
+      "second": "mvpc-r.testwise.alpha0.01",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 0.3404,
+      "fit_s_median_second": 4.4192
+     }
+    }
+   },
+   {
+    "label": "er4-d100-n2000-mnar-quantile-r0.2-a0.05",
+    "setting": {
+     "density": 4.0,
+     "d": 100,
+     "n": 2000,
+     "mechanism": "mnar",
+     "form": "quantile",
+     "rate": 0.2,
+     "alpha": 0.05
+    },
+    "seeds": [
+     20,
+     39
+    ],
+    "arms": {
+     "r_mvpc": {
+      "arm": "mvpc-r.permc.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 19,
+       "error": 1
+      },
+      "finished": 19,
+      "timeouts": 0,
+      "mean_shd": 136.368,
+      "fit_s_median": 419.0147
+     },
+     "r_testwise": {
+      "arm": "mvpc-r.testwise.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 135.15,
+      "fit_s_median": 259.2065
+     },
+     "andrey_mvpc": {
+      "arm": "andrey.pc.mvpc.alpha0.05.seed0",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 124.1,
+      "fit_s_median": 51.7086
+     },
+     "andrey_testwise": {
+      "arm": "andrey.pc.default.alpha0.05",
+      "datasets": 20,
+      "records": 20,
+      "no_record": 0,
+      "status": {
+       "ok": 20
+      },
+      "finished": 20,
+      "timeouts": 0,
+      "mean_shd": 120.55,
+      "fit_s_median": 5.7108
+     }
+    },
+    "comparisons": {
+     "a_r_mvpc_minus_r_testwise": {
+      "paired": 19,
+      "mean_first": 136.368,
+      "mean_second": 135.947,
+      "mean_D": 0.421,
+      "bootstrap_95": [
+       -1.3158,
+       2.1053
+      ],
+      "verdict": "tie",
+      "failures": 1,
+      "failures_second": 0,
+      "first": "mvpc-r.permc.alpha0.05",
+      "second": "mvpc-r.testwise.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 419.0147,
+      "fit_s_median_second": 259.2065
+     },
+     "b_andrey_mvpc_minus_andrey_testwise": {
+      "paired": 20,
+      "mean_first": 124.1,
+      "mean_second": 120.55,
+      "mean_D": 3.55,
+      "bootstrap_95": [
+       2.05,
+       5.15
+      ],
+      "verdict": "worse",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.mvpc.alpha0.05.seed0",
+      "second": "andrey.pc.default.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 51.7086,
+      "fit_s_median_second": 5.7108
+     },
+     "c_andrey_mvpc_minus_r_mvpc": {
+      "paired": 19,
+      "mean_first": 124.421,
+      "mean_second": 136.368,
+      "mean_D": -11.947,
+      "bootstrap_95": [
+       -15.3158,
+       -8.5263
+      ],
+      "verdict": "better",
+      "failures": 0,
+      "failures_second": 1,
+      "first": "andrey.pc.mvpc.alpha0.05.seed0",
+      "second": "mvpc-r.permc.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 51.7086,
+      "fit_s_median_second": 419.0147
+     },
+     "d_andrey_testwise_minus_r_testwise": {
+      "paired": 20,
+      "mean_first": 120.55,
+      "mean_second": 135.15,
+      "mean_D": -14.6,
+      "bootstrap_95": [
+       -17.65,
+       -11.65
+      ],
+      "verdict": "better",
+      "failures": 0,
+      "failures_second": 0,
+      "first": "andrey.pc.default.alpha0.05",
+      "second": "mvpc-r.testwise.alpha0.05",
+      "timeouts_first": 0,
+      "timeouts_second": 0,
+      "fit_s_median_first": 5.7108,
+      "fit_s_median_second": 259.2065
+     }
+    }
+   }
+  ]
+ },
+ "fit_hours_all_runs": 232.2,
+ "fits_all_runs": 200860,
  "parity_rule": "paired bootstrap",
  "bootstrap": {
   "resamples": 10000,

@@ -389,7 +389,8 @@ def pc(
     had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
     ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
     by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
-    ``"testwise"`` made 11 to 128. The correction holds when no missingness indicator causes a
+    ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
+    is the better choice. The correction holds when no missingness indicator causes a
     variable, every independence in the observed rows also holds in the missing ones, no indicator
     is a deterministic function of others, and no value causes its own missingness (self-masking)
     [13]_; the data cannot check these, and a violation voids the correction. PermC also needs

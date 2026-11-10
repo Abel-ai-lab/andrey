@@ -77,8 +77,8 @@ below the empty graph in its claimed setting.
 ## Results
 
 Every number is on simulated data, one core per fit, on AMD EPYC 7713 and AMD EPYC 9555 processors.
-The record holds 192,700 fits; with the reruns on fresh seeds and of the fits that raised, 200,740
-were run, in 228 CPU-hours of fit time.
+The record holds 192,700 fits; with the reruns on fresh seeds, the reruns of the fits that raised,
+and the reference check on fresh seeds, 200,860 were run, in 232 CPU-hours of fit time.
 
 | method | lane | reference | better / tie / worse | worse again | floor | median fit time, Andrey / reference | status |
 |---|---|---|---|---|---|---|---|
@@ -203,6 +203,25 @@ variables with 20 or 30% missing, and the difference on the fresh seeds is 0.7 t
 The two SHD columns are the means on seeds 0 to 19. The first row is paired on the 11 datasets
 that finished within the cap, on both sets of seeds, and the others on all 20. Of the other 29
 rows, 28 tie on the fresh seeds and 1 is better.
+
+In three of the 12 rows, all under quantile MNAR, the MVPC authors' R code ran on the same 20
+datasets of seeds 20 to 39, its MVPC and its test-wise PC at the row's `alpha`:
+
+| mean degree | variables | rows | missing | `alpha` | R code, MVPC | R code, test-wise PC | Andrey, MVPC | Andrey, test-wise PC | R code: MVPC minus test-wise PC | Andrey: MVPC minus test-wise PC | MVPC: Andrey minus R code | test-wise PC: Andrey minus R code |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 50 | 500 | 30% | 0.05 | 21.50 | 22.15 | 20.15 | 19.10 | +0.17 [-0.22, +0.61] tie (18 pairs) | +1.05 [+0.45, +1.65] worse | -1.56 [-3.17, +0.06] tie (18 pairs) | -3.05 [-4.75, -1.50] better |
+| 2 | 50 | 2,000 | 30% | 0.01 | 15.75 | 15.50 | 11.60 | 10.65 | +0.25 [-0.40, +0.95] tie | +0.95 [+0.30, +1.60] worse | -4.15 [-5.75, -2.65] better | -4.85 [-6.45, -3.35] better |
+| 4 | 100 | 2,000 | 20% | 0.05 | 136.37 | 135.15 | 124.10 | 120.55 | +0.42 [-1.32, +2.11] tie (19 pairs) | +3.55 [+2.05, +5.15] worse | -11.95 [-15.32, -8.53] better (19 pairs) | -14.60 [-17.65, -11.65] better |
+
+SHD is each arm's mean over the datasets it finished, and a difference is paired on the datasets
+both arms finished, 20 unless the cell says otherwise: the R code's MVPC raised on 2 datasets of
+the first row and 1 of the third. In these settings the correction does not help in either
+implementation. The R code's MVPC ties its own test-wise PC. Andrey's MVPC is behind Andrey's
+test-wise PC by 0.95 to 3.55 SHD and is still no less accurate than the R code's MVPC, a tie in
+one row and fewer errors in two, because Andrey's test-wise PC starts 3.05 to 14.6 SHD ahead of
+the R code's. So in these settings test-wise deletion is the better choice in Andrey. Why the
+correction costs Andrey more than it costs the R code is not traced. The median MVPC fit took 1.9,
+2.2, and 52 s in Andrey against 4.3, 10.9, and 419 s in the R code.
 
 ### NOTEARS with EM against MissDAG
 
@@ -406,8 +425,10 @@ repeats, and below the empty graph in its claimed setting.
   the first seeds and again on fresh ones in 12 rows of the generic grid, by 0.7 to 3.6 SHD: 9
   under quantile MNAR (mean degree 2 and 4; 50 and 100 variables; 500, 2,000, and 10,000 rows) and
   3 under logistic MAR (100 variables, 30% missing; 2,000 and 10,000 rows). The table under "MVPC
-  on the generic grid" lists them. In the paper's setting, at 20 and 50 variables, it is worse than
-  test-wise PC in no cell.
+  on the generic grid" lists them. In three of them the MVPC authors' R code ran on the same fresh
+  datasets: its MVPC ties its own test-wise PC, and Andrey's MVPC is no less accurate than the R
+  code's, so in these settings test-wise deletion is the better choice. In the paper's setting, at
+  20 and 50 variables, it is worse than test-wise PC in no cell.
 - **Too few rows.** A corrected test that lacks rows is answered by the test-wise test, so the
   pair keeps its test-wise result; `metadata["corrected_edges"]["uncorrected"]` lists it.
 - **MVPC's cost.** At 100 variables and 10,000 rows under logistic MAR, 77 fits ran past 30
