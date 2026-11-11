@@ -1,0 +1,10109 @@
+{
+ "release": "0.17.0",
+ "generated": "2026-11-10",
+ "build": "Andrey pre-release build of 10 November 2026 (version string 0.16.0, the 0.17.0 release branch with ages as merged)",
+ "driver": "benchmarks/ages_cpu.py",
+ "summarizer": "benchmarks/ages_summary.py",
+ "solutions": {
+  "andrey": "andrey.ages.numpy",
+  "reference": "pcalg.ages",
+  "ges": "andrey.ges.numpy.bic"
+ },
+ "settings": {
+  "andrey.ages.numpy": "ages(data), penalty_discount=1.0",
+  "pcalg.ages": "pcalg::ages(data) with its defaults: lambda_min = 0.5 log(n), the BIC, adaptive = \"none\", no degree cap",
+  "andrey.ges.numpy.bic": "ges with the BIC (ebic_gamma=0.0) and max_parents=9, the first CPDAG of AGES's path"
+ },
+ "verdict_rule": "per setting (strong share, weak share, rows; 20 datasets): D = Andrey - reference per dataset on shd, correct, and wrong; a setting where every dataset has the reference's graph is a tie with every D equal to 0 (same_graph equals paired); otherwise a measure is worse when the 95% percentile-bootstrap interval of mean D lies entirely on its worse side of 0 (above for shd and wrong, below for correct), better when entirely on the other, and the setting is worse if any measure is, better if one is and none is worse, a tie otherwise. mean_D and bootstrap_95 are those of shd. 10,000 resamples of the datasets, default_rng(0). A worse setting is rerun on fresh seeds, 20-39, and counts only if it is worse again",
+ "error_metric": "shd: the variable pairs where the graph differs from every graph between the true CPDAG and the true DAG (a missing or extra edge, an edge directed against the true DAG, or an edge left undirected that the true CPDAG directs, each 1; an edge directed as the true DAG directs it is no error): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means. precision is the share of a graph's directed edges that the true DAG directs the same way and recall the share of the true DAG's edges the graph directs correctly, the paper's measures, each pooled over the setting's datasets; measures holds the paired comparison of shd, correct (correctly directed edges) and wrong (other directed edges) with the reference, and against_ges the same against Andrey's GES at the same penalty, with the unshielded colliders of the AGES graph that the GES CPDAG lacks",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit then one timed fit, a cap of 1,800 s per fit, past which a fit is a timeout and never scored as a graph; no fit failed or timed out. ratio is the median over the paired datasets of the reference's time over Andrey's",
+ "seeds_note": "every setting holds 20 datasets, seeds 0-19; no setting was worse than the reference, so none was rerun",
+ "packages": {
+  "pcalg": "2.7-12",
+  "R": "R version 4.6.1 (2026-06-24)",
+  "NumPy (Andrey)": "2.5.4"
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor"
+  ],
+  "cores_per_fit": 1,
+  "blas_threads": 1
+ },
+ "rows": [
+  {
+   "cell": "ages|qs=0.1|qw=0.1|n=10000",
+   "mean_degree": 1.8,
+   "qs": 0.1,
+   "qw": 0.1,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.9259,
+     "recall": 0.6173,
+     "shd_mean": 0.45,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.6,
+     "shd_dag_mean": 3.45,
+     "directed_mean": 5.4,
+     "wall_s": 0.0248,
+     "peak_rss_mb": 110.0
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.9259,
+     "recall": 0.6173,
+     "shd_mean": 0.45,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.6,
+     "shd_dag_mean": 3.45,
+     "directed_mean": 5.4,
+     "wall_s": 0.2759,
+     "peak_rss_mb": 258.6
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.9245,
+     "recall": 0.6049,
+     "shd_mean": 0.45,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.5,
+     "shd_dag_mean": 3.55,
+     "directed_mean": 5.3,
+     "wall_s": 0.0142,
+     "peak_rss_mb": 111.0
+    }
+   },
+   "empty_shd_mean": 8.1,
+   "empty_shd_median": 8.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 11.27
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.65,
+     "bootstrap_95": [
+      -8.75,
+      -6.55
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.65,
+     "bootstrap_95": [
+      -8.75,
+      -6.55
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 19,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 1.81
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.3|n=10000",
+   "mean_degree": 3.6,
+   "qs": 0.1,
+   "qw": 0.3,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.6786,
+     "recall": 0.6766,
+     "shd_mean": 6.2,
+     "shd_median": 6.5,
+     "shd_cpdag_mean": 7.15,
+     "shd_dag_mean": 7.75,
+     "directed_mean": 16.8,
+     "wall_s": 0.0706,
+     "peak_rss_mb": 101.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.6786,
+     "recall": 0.6766,
+     "shd_mean": 6.2,
+     "shd_median": 6.5,
+     "shd_cpdag_mean": 7.15,
+     "shd_dag_mean": 7.75,
+     "directed_mean": 16.8,
+     "wall_s": 0.7248,
+     "peak_rss_mb": 254.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.6877,
+     "recall": 0.6469,
+     "shd_mean": 6.1,
+     "shd_median": 7.0,
+     "shd_cpdag_mean": 6.75,
+     "shd_dag_mean": 8.25,
+     "directed_mean": 15.85,
+     "wall_s": 0.0254,
+     "peak_rss_mb": 108.6
+    }
+   },
+   "empty_shd_mean": 16.85,
+   "empty_shd_median": 17.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.45
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.65,
+     "bootstrap_95": [
+      -12.95,
+      -8.35
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.65,
+     "bootstrap_95": [
+      -12.95,
+      -8.35
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 12,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -0.2,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       0.2,
+       0.85
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.15,
+       0.8
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.78
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.5|n=10000",
+   "mean_degree": 5.4,
+   "qs": 0.1,
+   "qw": 0.5,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4833,
+     "recall": 0.5509,
+     "shd_mean": 18.6,
+     "shd_median": 18.5,
+     "shd_cpdag_mean": 20.1,
+     "shd_dag_mean": 18.7,
+     "directed_mean": 31.35,
+     "wall_s": 0.1289,
+     "peak_rss_mb": 102.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4833,
+     "recall": 0.5509,
+     "shd_mean": 18.6,
+     "shd_median": 18.5,
+     "shd_cpdag_mean": 20.1,
+     "shd_dag_mean": 18.7,
+     "directed_mean": 31.35,
+     "wall_s": 1.0926,
+     "peak_rss_mb": 263.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4915,
+     "recall": 0.5273,
+     "shd_mean": 18.85,
+     "shd_median": 18.0,
+     "shd_cpdag_mean": 20.15,
+     "shd_dag_mean": 19.35,
+     "directed_mean": 29.5,
+     "wall_s": 0.0361,
+     "peak_rss_mb": 103.0
+    }
+   },
+   "empty_shd_mean": 27.5,
+   "empty_shd_median": 28.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.74
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.9,
+     "bootstrap_95": [
+      -11.3,
+      -6.55
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.9,
+     "bootstrap_95": [
+      -11.3,
+      -6.55
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 7,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.25,
+      "bootstrap_95": [
+       -0.75,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.65,
+      "bootstrap_95": [
+       0.2,
+       1.2
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.2,
+      "bootstrap_95": [
+       0.65,
+       1.85
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.45
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.7|n=10000",
+   "mean_degree": 7.2,
+   "qs": 0.1,
+   "qw": 0.7,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5134,
+     "recall": 0.4913,
+     "shd_mean": 21.3,
+     "shd_median": 23.5,
+     "shd_cpdag_mean": 25,
+     "shd_dag_mean": 21.95,
+     "directed_mean": 35.55,
+     "wall_s": 0.1749,
+     "peak_rss_mb": 107.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5134,
+     "recall": 0.4913,
+     "shd_mean": 21.3,
+     "shd_median": 23.5,
+     "shd_cpdag_mean": 25,
+     "shd_dag_mean": 21.95,
+     "directed_mean": 35.55,
+     "wall_s": 1.2782,
+     "peak_rss_mb": 265.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.513,
+     "recall": 0.4522,
+     "shd_mean": 22.2,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 25.6,
+     "shd_dag_mean": 23.4,
+     "directed_mean": 32.75,
+     "wall_s": 0.044,
+     "peak_rss_mb": 107.9
+    }
+   },
+   "empty_shd_mean": 37.15,
+   "empty_shd_median": 37.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 19,
+    "verdict": "tie",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.55
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -15.85,
+     "bootstrap_95": [
+      -18.95,
+      -12.8
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -15.85,
+     "bootstrap_95": [
+      -18.95,
+      -12.8
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 4,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.9,
+      "bootstrap_95": [
+       -1.65,
+       -0.2
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.45,
+      "bootstrap_95": [
+       0.85,
+       2.15
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.35,
+      "bootstrap_95": [
+       0.75,
+       2.05
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 2,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.75
+   },
+   "verdict": "tie",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.1|n=10000",
+   "mean_degree": 3.6,
+   "qs": 0.3,
+   "qw": 0.1,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5078,
+     "recall": 0.6173,
+     "shd_mean": 12.1,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 13.1,
+     "shd_dag_mean": 13.05,
+     "directed_mean": 22.55,
+     "wall_s": 0.0849,
+     "peak_rss_mb": 107.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5078,
+     "recall": 0.6173,
+     "shd_mean": 12.1,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 13.1,
+     "shd_dag_mean": 13.05,
+     "directed_mean": 22.55,
+     "wall_s": 0.8137,
+     "peak_rss_mb": 262.4
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5012,
+     "recall": 0.5714,
+     "shd_mean": 12.55,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 13.25,
+     "shd_dag_mean": 13.9,
+     "directed_mean": 21.15,
+     "wall_s": 0.0305,
+     "peak_rss_mb": 108.0
+    }
+   },
+   "empty_shd_mean": 18.55,
+   "empty_shd_median": 19.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.17
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.45,
+     "bootstrap_95": [
+      -9.75,
+      -2.85
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.45,
+     "bootstrap_95": [
+      -9.75,
+      -2.85
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 8,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.45,
+      "bootstrap_95": [
+       -0.9,
+       -0.05
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.85,
+      "bootstrap_95": [
+       0.4,
+       1.4
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.2,
+       0.9
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.87
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.3|n=10000",
+   "mean_degree": 5.4,
+   "qs": 0.3,
+   "qw": 0.3,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5189,
+     "recall": 0.5903,
+     "shd_mean": 18.4,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 20.05,
+     "shd_dag_mean": 18.6,
+     "directed_mean": 31.8,
+     "wall_s": 0.1454,
+     "peak_rss_mb": 109.5
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5189,
+     "recall": 0.5903,
+     "shd_mean": 18.4,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 20.05,
+     "shd_dag_mean": 18.6,
+     "directed_mean": 31.8,
+     "wall_s": 1.2727,
+     "peak_rss_mb": 264.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.523,
+     "recall": 0.5707,
+     "shd_mean": 18.45,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 19.85,
+     "shd_dag_mean": 19.15,
+     "directed_mean": 30.5,
+     "wall_s": 0.042,
+     "peak_rss_mb": 110.6
+    }
+   },
+   "empty_shd_mean": 27.95,
+   "empty_shd_median": 28.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.92
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.55,
+     "bootstrap_95": [
+      -14.2,
+      -5.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.55,
+     "bootstrap_95": [
+      -14.2,
+      -5.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 6,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.4,
+       0.35
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.25,
+       0.85
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.75,
+      "bootstrap_95": [
+       0.35,
+       1.25
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.42
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.5|n=10000",
+   "mean_degree": 7.2,
+   "qs": 0.3,
+   "qw": 0.5,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5083,
+     "recall": 0.5219,
+     "shd_mean": 22.2,
+     "shd_median": 21.0,
+     "shd_cpdag_mean": 24.9,
+     "shd_dag_mean": 22.25,
+     "directed_mean": 36.3,
+     "wall_s": 0.2012,
+     "peak_rss_mb": 103.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5083,
+     "recall": 0.5219,
+     "shd_mean": 22.2,
+     "shd_median": 21.0,
+     "shd_cpdag_mean": 24.9,
+     "shd_dag_mean": 22.25,
+     "directed_mean": 36.3,
+     "wall_s": 1.551,
+     "peak_rss_mb": 265.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5132,
+     "recall": 0.4936,
+     "shd_mean": 22.6,
+     "shd_median": 22.0,
+     "shd_cpdag_mean": 25.15,
+     "shd_dag_mean": 23.25,
+     "directed_mean": 34,
+     "wall_s": 0.0522,
+     "peak_rss_mb": 103.8
+    }
+   },
+   "empty_shd_mean": 35.35,
+   "empty_shd_median": 35.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.63
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -13.15,
+     "bootstrap_95": [
+      -15.5,
+      -10.75
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -13.15,
+     "bootstrap_95": [
+      -15.5,
+      -10.75
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 6,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.4,
+      "bootstrap_95": [
+       -0.95,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.0,
+      "bootstrap_95": [
+       0.55,
+       1.55
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.3,
+      "bootstrap_95": [
+       0.6,
+       2.1
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 1,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.61
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.7|n=10000",
+   "mean_degree": 9.0,
+   "qs": 0.3,
+   "qw": 0.7,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4582,
+     "recall": 0.3833,
+     "shd_mean": 26.05,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.3,
+     "shd_dag_mean": 27.75,
+     "directed_mean": 37.65,
+     "wall_s": 0.2205,
+     "peak_rss_mb": 108.0
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4568,
+     "recall": 0.3822,
+     "shd_mean": 26.1,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 43.3,
+     "shd_dag_mean": 27.8,
+     "directed_mean": 37.65,
+     "wall_s": 1.8631,
+     "peak_rss_mb": 264.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4583,
+     "recall": 0.36,
+     "shd_mean": 24.8,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 41,
+     "shd_dag_mean": 28.8,
+     "directed_mean": 35.35,
+     "wall_s": 0.0601,
+     "peak_rss_mb": 109.2
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 19,
+    "verdict": "tie",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.53
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.95,
+     "bootstrap_95": [
+      -21.0,
+      -16.95
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.9,
+     "bootstrap_95": [
+      -20.95,
+      -16.9
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 4,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 1.25,
+      "bootstrap_95": [
+       0.65,
+       2.05
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.05,
+      "bootstrap_95": [
+       0.6,
+       1.7
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.25,
+      "bootstrap_95": [
+       0.65,
+       2.05
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 2,
+    "datasets_with_new_colliders": 2,
+    "time_ratio": 3.67
+   },
+   "verdict": "tie",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.1|n=10000",
+   "mean_degree": 5.4,
+   "qs": 0.5,
+   "qw": 0.1,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4729,
+     "recall": 0.5466,
+     "shd_mean": 20.75,
+     "shd_median": 22.0,
+     "shd_cpdag_mean": 22.2,
+     "shd_dag_mean": 21.25,
+     "directed_mean": 32.25,
+     "wall_s": 0.2219,
+     "peak_rss_mb": 107.7
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4729,
+     "recall": 0.5466,
+     "shd_mean": 20.75,
+     "shd_median": 22.0,
+     "shd_cpdag_mean": 22.2,
+     "shd_dag_mean": 21.25,
+     "directed_mean": 32.25,
+     "wall_s": 1.4334,
+     "peak_rss_mb": 265.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4797,
+     "recall": 0.5287,
+     "shd_mean": 20.8,
+     "shd_median": 21.5,
+     "shd_cpdag_mean": 22.05,
+     "shd_dag_mean": 21.75,
+     "directed_mean": 30.75,
+     "wall_s": 0.063,
+     "peak_rss_mb": 107.2
+    }
+   },
+   "empty_shd_mean": 27.9,
+   "empty_shd_median": 28.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 6.65
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.15,
+     "bootstrap_95": [
+      -10.75,
+      -3.7
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.15,
+     "bootstrap_95": [
+      -10.75,
+      -3.7
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 9,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.45,
+       0.35
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       0.2,
+       0.85
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.0,
+      "bootstrap_95": [
+       0.35,
+       1.9
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.16
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.3|n=10000",
+   "mean_degree": 7.2,
+   "qs": 0.5,
+   "qw": 0.3,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4219,
+     "recall": 0.4335,
+     "shd_mean": 26.45,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 28.7,
+     "shd_dag_mean": 26.75,
+     "directed_mean": 37.45,
+     "wall_s": 0.2237,
+     "peak_rss_mb": 102.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4219,
+     "recall": 0.4335,
+     "shd_mean": 26.45,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 28.7,
+     "shd_dag_mean": 26.75,
+     "directed_mean": 37.45,
+     "wall_s": 1.5225,
+     "peak_rss_mb": 262.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4148,
+     "recall": 0.3909,
+     "shd_mean": 27.3,
+     "shd_median": 27.5,
+     "shd_cpdag_mean": 29.3,
+     "shd_dag_mean": 28.3,
+     "directed_mean": 34.35,
+     "wall_s": 0.056,
+     "peak_rss_mb": 104.9
+    }
+   },
+   "empty_shd_mean": 36.45,
+   "empty_shd_median": 37.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.04
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.0,
+     "bootstrap_95": [
+      -12.3,
+      -7.7
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.0,
+     "bootstrap_95": [
+      -12.3,
+      -7.7
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 6,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.85,
+      "bootstrap_95": [
+       -1.7,
+       -0.15
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.55,
+      "bootstrap_95": [
+       0.85,
+       2.4
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.55,
+      "bootstrap_95": [
+       0.8,
+       2.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 3,
+    "datasets_with_new_colliders": 2,
+    "time_ratio": 3.79
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.5|n=10000",
+   "mean_degree": 9.0,
+   "qs": 0.5,
+   "qw": 0.5,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4706,
+     "recall": 0.4089,
+     "shd_mean": 25.65,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 44.05,
+     "shd_dag_mean": 26.6,
+     "directed_mean": 39.1,
+     "wall_s": 0.2146,
+     "peak_rss_mb": 105.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4706,
+     "recall": 0.4089,
+     "shd_mean": 25.65,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 44.05,
+     "shd_dag_mean": 26.6,
+     "directed_mean": 39.1,
+     "wall_s": 1.6397,
+     "peak_rss_mb": 263.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4731,
+     "recall": 0.3622,
+     "shd_mean": 23.1,
+     "shd_median": 23.0,
+     "shd_cpdag_mean": 39.4,
+     "shd_dag_mean": 28.7,
+     "directed_mean": 34.45,
+     "wall_s": 0.0538,
+     "peak_rss_mb": 104.3
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.84
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.35,
+     "bootstrap_95": [
+      -22.1,
+      -16.45
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.35,
+     "bootstrap_95": [
+      -22.1,
+      -16.45
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 4,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 2.55,
+      "bootstrap_95": [
+       1.45,
+       3.7
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 2.1,
+      "bootstrap_95": [
+       1.25,
+       3.05
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 2.55,
+      "bootstrap_95": [
+       1.45,
+       3.7
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.32
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.1|n=10000",
+   "mean_degree": 7.2,
+   "qs": 0.7,
+   "qw": 0.1,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.424,
+     "recall": 0.4387,
+     "shd_mean": 25.8,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 27.8,
+     "shd_dag_mean": 26.2,
+     "directed_mean": 37.15,
+     "wall_s": 0.1968,
+     "peak_rss_mb": 104.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.424,
+     "recall": 0.4387,
+     "shd_mean": 25.8,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 27.8,
+     "shd_dag_mean": 26.2,
+     "directed_mean": 37.15,
+     "wall_s": 1.6008,
+     "peak_rss_mb": 261.4
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4367,
+     "recall": 0.4081,
+     "shd_mean": 26.55,
+     "shd_median": 28.5,
+     "shd_cpdag_mean": 28.45,
+     "shd_dag_mean": 27.3,
+     "directed_mean": 33.55,
+     "wall_s": 0.0531,
+     "peak_rss_mb": 107.3
+    }
+   },
+   "empty_shd_mean": 35.9,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.15
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.1,
+     "bootstrap_95": [
+      -13.25,
+      -7.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.1,
+     "bootstrap_95": [
+      -13.25,
+      -7.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 4,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.75,
+      "bootstrap_95": [
+       -1.45,
+       -0.2
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.1,
+      "bootstrap_95": [
+       0.6,
+       1.75
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 2.5,
+      "bootstrap_95": [
+       1.5,
+       3.65
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.57
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.3|n=10000",
+   "mean_degree": 9.0,
+   "qs": 0.7,
+   "qw": 0.3,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4602,
+     "recall": 0.3922,
+     "shd_mean": 25.55,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.2,
+     "shd_dag_mean": 27.35,
+     "directed_mean": 38.35,
+     "wall_s": 0.1937,
+     "peak_rss_mb": 108.5
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4602,
+     "recall": 0.3922,
+     "shd_mean": 25.55,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.2,
+     "shd_dag_mean": 27.35,
+     "directed_mean": 38.35,
+     "wall_s": 1.776,
+     "peak_rss_mb": 264.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4618,
+     "recall": 0.3622,
+     "shd_mean": 23.85,
+     "shd_median": 24.0,
+     "shd_cpdag_mean": 40.15,
+     "shd_dag_mean": 28.7,
+     "directed_mean": 35.3,
+     "wall_s": 0.051,
+     "peak_rss_mb": 103.8
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.94
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.45,
+     "bootstrap_95": [
+      -22.0,
+      -17.05
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.45,
+     "bootstrap_95": [
+      -22.0,
+      -17.05
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 4,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 1.7,
+      "bootstrap_95": [
+       1.0,
+       2.5
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.35,
+      "bootstrap_95": [
+       0.6,
+       2.2
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.7,
+      "bootstrap_95": [
+       1.0,
+       2.5
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.62
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.0|n=10000",
+   "mean_degree": 0.9,
+   "qs": 0.1,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.9796,
+     "recall": 0.4752,
+     "shd_mean": 0.1,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.3,
+     "shd_dag_mean": 2.75,
+     "directed_mean": 2.45,
+     "wall_s": 0.0164,
+     "peak_rss_mb": 101.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.9796,
+     "recall": 0.4752,
+     "shd_mean": 0.1,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.3,
+     "shd_dag_mean": 2.75,
+     "directed_mean": 2.45,
+     "wall_s": 0.2,
+     "peak_rss_mb": 213.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.9787,
+     "recall": 0.4554,
+     "shd_mean": 0.1,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 0.2,
+     "shd_dag_mean": 2.85,
+     "directed_mean": 2.35,
+     "wall_s": 0.0108,
+     "peak_rss_mb": 103.1
+    }
+   },
+   "empty_shd_mean": 5.05,
+   "empty_shd_median": 5.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 11.87
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.95,
+     "bootstrap_95": [
+      -6.1,
+      -3.85
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.95,
+     "bootstrap_95": [
+      -6.1,
+      -3.85
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 1.55
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.2|qw=0.0|n=10000",
+   "mean_degree": 1.8,
+   "qs": 0.2,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.7832,
+     "recall": 0.6292,
+     "shd_mean": 1.75,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 2.15,
+     "shd_dag_mean": 4,
+     "directed_mean": 7.15,
+     "wall_s": 0.0263,
+     "peak_rss_mb": 101.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.7832,
+     "recall": 0.6292,
+     "shd_mean": 1.75,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 2.15,
+     "shd_dag_mean": 4,
+     "directed_mean": 7.15,
+     "wall_s": 0.29,
+     "peak_rss_mb": 239.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.8162,
+     "recall": 0.6236,
+     "shd_mean": 1.6,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 1.95,
+     "shd_dag_mean": 4.05,
+     "directed_mean": 6.8,
+     "wall_s": 0.0154,
+     "peak_rss_mb": 101.9
+    }
+   },
+   "empty_shd_mean": 8.9,
+   "empty_shd_median": 9.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.72
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.15,
+     "bootstrap_95": [
+      -8.65,
+      -5.35
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.15,
+     "bootstrap_95": [
+      -8.65,
+      -5.35
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.0,
+       0.7
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 1.86
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.0|n=10000",
+   "mean_degree": 2.7,
+   "qs": 0.3,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.7309,
+     "recall": 0.6667,
+     "shd_mean": 3.95,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 5.25,
+     "shd_dag_mean": 6.4,
+     "directed_mean": 12.45,
+     "wall_s": 0.0609,
+     "peak_rss_mb": 108.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.7309,
+     "recall": 0.6667,
+     "shd_mean": 3.95,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 5.25,
+     "shd_dag_mean": 6.4,
+     "directed_mean": 12.45,
+     "wall_s": 0.5949,
+     "peak_rss_mb": 255.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.7522,
+     "recall": 0.6227,
+     "shd_mean": 3.5,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 4.2,
+     "shd_dag_mean": 7,
+     "directed_mean": 11.3,
+     "wall_s": 0.0245,
+     "peak_rss_mb": 107.6
+    }
+   },
+   "empty_shd_mean": 13.65,
+   "empty_shd_median": 13.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.0
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.7,
+     "bootstrap_95": [
+      -11.6,
+      -7.5
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.7,
+     "bootstrap_95": [
+      -11.6,
+      -7.5
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 11,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.15,
+       0.85
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.6,
+      "bootstrap_95": [
+       0.15,
+       1.2
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.25,
+       0.95
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 3,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 2.23
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.4|qw=0.0|n=10000",
+   "mean_degree": 3.6,
+   "qs": 0.4,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4316,
+     "recall": 0.5601,
+     "shd_mean": 15.25,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 16.45,
+     "shd_dag_mean": 16.15,
+     "directed_mean": 23.75,
+     "wall_s": 0.1235,
+     "peak_rss_mb": 106.3
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4316,
+     "recall": 0.5601,
+     "shd_mean": 15.25,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 16.45,
+     "shd_dag_mean": 16.15,
+     "directed_mean": 23.75,
+     "wall_s": 1.0174,
+     "peak_rss_mb": 261.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4457,
+     "recall": 0.5383,
+     "shd_mean": 15.1,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 16,
+     "shd_dag_mean": 16.55,
+     "directed_mean": 22.1,
+     "wall_s": 0.0396,
+     "peak_rss_mb": 104.8
+    }
+   },
+   "empty_shd_mean": 18.3,
+   "empty_shd_median": 18.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.28
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.05,
+     "bootstrap_95": [
+      -7.4,
+      1.65
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.05,
+     "bootstrap_95": [
+      -7.4,
+      1.65
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 10,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       -0.15,
+       0.5
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.4,
+      "bootstrap_95": [
+       0.15,
+       0.65
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.25,
+      "bootstrap_95": [
+       0.55,
+       2.1
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.06
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.0|n=10000",
+   "mean_degree": 4.5,
+   "qs": 0.5,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5769,
+     "recall": 0.6567,
+     "shd_mean": 12.2,
+     "shd_median": 11.5,
+     "shd_cpdag_mean": 13.4,
+     "shd_dag_mean": 13,
+     "directed_mean": 24.7,
+     "wall_s": 0.1447,
+     "peak_rss_mb": 103.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5769,
+     "recall": 0.6567,
+     "shd_mean": 12.2,
+     "shd_median": 11.5,
+     "shd_cpdag_mean": 13.4,
+     "shd_dag_mean": 13,
+     "directed_mean": 24.7,
+     "wall_s": 1.0908,
+     "peak_rss_mb": 262.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5867,
+     "recall": 0.6313,
+     "shd_mean": 12.15,
+     "shd_median": 11.5,
+     "shd_cpdag_mean": 13,
+     "shd_dag_mean": 13.55,
+     "directed_mean": 23.35,
+     "wall_s": 0.0484,
+     "peak_rss_mb": 99.5
+    }
+   },
+   "empty_shd_mean": 21.7,
+   "empty_shd_median": 22.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.98
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.5,
+     "bootstrap_95": [
+      -13.95,
+      -5.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.5,
+     "bootstrap_95": [
+      -13.95,
+      -5.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 10,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.35
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.2,
+       0.95
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.8,
+      "bootstrap_95": [
+       0.25,
+       1.6
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.88
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.6|qw=0.0|n=10000",
+   "mean_degree": 5.4,
+   "qs": 0.6,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3946,
+     "recall": 0.468,
+     "shd_mean": 23.05,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 24.45,
+     "shd_dag_mean": 23.35,
+     "directed_mean": 31.55,
+     "wall_s": 0.1844,
+     "peak_rss_mb": 103.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3946,
+     "recall": 0.468,
+     "shd_mean": 23.05,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 24.45,
+     "shd_dag_mean": 23.35,
+     "directed_mean": 31.55,
+     "wall_s": 1.3433,
+     "peak_rss_mb": 263.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3997,
+     "recall": 0.4568,
+     "shd_mean": 23,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 24.2,
+     "shd_dag_mean": 23.65,
+     "directed_mean": 30.4,
+     "wall_s": 0.0467,
+     "peak_rss_mb": 102.9
+    }
+   },
+   "empty_shd_mean": 26.6,
+   "empty_shd_median": 26.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.24
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.55,
+     "bootstrap_95": [
+      -7.95,
+      0.7
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.55,
+     "bootstrap_95": [
+      -7.95,
+      0.7
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 13,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.35
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.1,
+       0.55
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.85,
+      "bootstrap_95": [
+       0.25,
+       1.6
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.54
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.0|n=10000",
+   "mean_degree": 6.3,
+   "qs": 0.7,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4374,
+     "recall": 0.4818,
+     "shd_mean": 24.5,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 26.75,
+     "shd_dag_mean": 24.7,
+     "directed_mean": 36.35,
+     "wall_s": 0.1861,
+     "peak_rss_mb": 102.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4374,
+     "recall": 0.4818,
+     "shd_mean": 24.5,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 26.75,
+     "shd_dag_mean": 24.7,
+     "directed_mean": 36.35,
+     "wall_s": 1.3361,
+     "peak_rss_mb": 263.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4366,
+     "recall": 0.4591,
+     "shd_mean": 24.7,
+     "shd_median": 27.0,
+     "shd_cpdag_mean": 26.75,
+     "shd_dag_mean": 25.45,
+     "directed_mean": 34.7,
+     "wall_s": 0.049,
+     "peak_rss_mb": 100.4
+    }
+   },
+   "empty_shd_mean": 33,
+   "empty_shd_median": 33.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.25
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.5,
+     "bootstrap_95": [
+      -11.9012,
+      -5.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.5,
+     "bootstrap_95": [
+      -11.9012,
+      -5.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 6,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -1.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.75,
+      "bootstrap_95": [
+       0.15,
+       1.5
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.9,
+      "bootstrap_95": [
+       0.4,
+       1.55
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.3
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.8|qw=0.0|n=10000",
+   "mean_degree": 7.2,
+   "qs": 0.8,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4526,
+     "recall": 0.4588,
+     "shd_mean": 25.85,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 28.1,
+     "shd_dag_mean": 25.95,
+     "directed_mean": 36.9,
+     "wall_s": 0.1938,
+     "peak_rss_mb": 110.0
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4526,
+     "recall": 0.4588,
+     "shd_mean": 25.85,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 28.1,
+     "shd_dag_mean": 25.95,
+     "directed_mean": 36.9,
+     "wall_s": 1.3653,
+     "peak_rss_mb": 262.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4575,
+     "recall": 0.4437,
+     "shd_mean": 26.05,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28.2,
+     "shd_dag_mean": 26.5,
+     "directed_mean": 35.3,
+     "wall_s": 0.0612,
+     "peak_rss_mb": 103.8
+    }
+   },
+   "empty_shd_mean": 36.4,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 6.83
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.55,
+     "bootstrap_95": [
+      -13.45,
+      -7.85
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -10.55,
+     "bootstrap_95": [
+      -13.45,
+      -7.85
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 9,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.55,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.15,
+       1.05
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.05,
+      "bootstrap_95": [
+       0.55,
+       1.6
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 1,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.21
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.9|qw=0.0|n=10000",
+   "mean_degree": 8.1,
+   "qs": 0.9,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4643,
+     "recall": 0.436,
+     "shd_mean": 25.4,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 31.2,
+     "shd_dag_mean": 26.25,
+     "directed_mean": 37.8,
+     "wall_s": 0.2008,
+     "peak_rss_mb": 101.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4643,
+     "recall": 0.436,
+     "shd_mean": 25.4,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 31.2,
+     "shd_dag_mean": 26.25,
+     "directed_mean": 37.8,
+     "wall_s": 1.4018,
+     "peak_rss_mb": 264.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4707,
+     "recall": 0.4087,
+     "shd_mean": 25.75,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 31.1,
+     "shd_dag_mean": 27.35,
+     "directed_mean": 34.95,
+     "wall_s": 0.0566,
+     "peak_rss_mb": 104.4
+    }
+   },
+   "empty_shd_mean": 40.25,
+   "empty_shd_median": 40.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.48
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -14.85,
+     "bootstrap_95": [
+      -17.95,
+      -11.9
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -14.85,
+     "bootstrap_95": [
+      -17.95,
+      -11.9
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 3,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.35,
+      "bootstrap_95": [
+       -0.9,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.1,
+      "bootstrap_95": [
+       0.6,
+       1.75
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.75,
+      "bootstrap_95": [
+       1.05,
+       2.5
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.49
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=1.0|qw=0.0|n=10000",
+   "mean_degree": 9.0,
+   "qs": 1.0,
+   "qw": 0.0,
+   "d": 10,
+   "n": 10000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5007,
+     "recall": 0.4222,
+     "shd_mean": 24.55,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.55,
+     "shd_dag_mean": 26,
+     "directed_mean": 37.95,
+     "wall_s": 0.2107,
+     "peak_rss_mb": 99.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5007,
+     "recall": 0.4222,
+     "shd_mean": 24.55,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.55,
+     "shd_dag_mean": 26,
+     "directed_mean": 37.95,
+     "wall_s": 1.478,
+     "peak_rss_mb": 266.5
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5051,
+     "recall": 0.3856,
+     "shd_mean": 22.6,
+     "shd_median": 23.0,
+     "shd_cpdag_mean": 39.95,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 34.35,
+     "wall_s": 0.0545,
+     "peak_rss_mb": 105.5
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 6.86
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -20.45,
+     "bootstrap_95": [
+      -22.75,
+      -18.3
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -20.45,
+     "bootstrap_95": [
+      -22.75,
+      -18.3
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 5,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 1.95,
+      "bootstrap_95": [
+       1.15,
+       2.8
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 1.65,
+      "bootstrap_95": [
+       0.8,
+       2.6512
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 1.95,
+      "bootstrap_95": [
+       1.15,
+       2.8
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.62
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.1|n=1000",
+   "mean_degree": 1.8,
+   "qs": 0.1,
+   "qw": 0.1,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.8559,
+     "recall": 0.5838,
+     "shd_mean": 1.2,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 1.65,
+     "shd_dag_mean": 3.9,
+     "directed_mean": 5.9,
+     "wall_s": 0.0257,
+     "peak_rss_mb": 109.3
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.8559,
+     "recall": 0.5838,
+     "shd_mean": 1.2,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 1.65,
+     "shd_dag_mean": 3.9,
+     "directed_mean": 5.9,
+     "wall_s": 0.268,
+     "peak_rss_mb": 172.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.8559,
+     "recall": 0.5838,
+     "shd_mean": 1.2,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 1.65,
+     "shd_dag_mean": 3.9,
+     "directed_mean": 5.9,
+     "wall_s": 0.0116,
+     "peak_rss_mb": 110.3
+    }
+   },
+   "empty_shd_mean": 8.65,
+   "empty_shd_median": 9.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.43
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.45,
+     "bootstrap_95": [
+      -8.4,
+      -6.4
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.45,
+     "bootstrap_95": [
+      -8.4,
+      -6.4
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 20,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.22
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.3|n=1000",
+   "mean_degree": 3.6,
+   "qs": 0.1,
+   "qw": 0.3,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.7182,
+     "recall": 0.622,
+     "shd_mean": 7.9,
+     "shd_median": 8.0,
+     "shd_cpdag_mean": 9.1,
+     "shd_dag_mean": 8.65,
+     "directed_mean": 16.5,
+     "wall_s": 0.0568,
+     "peak_rss_mb": 105.7
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.7182,
+     "recall": 0.622,
+     "shd_mean": 7.9,
+     "shd_median": 8.0,
+     "shd_cpdag_mean": 9.1,
+     "shd_dag_mean": 8.65,
+     "directed_mean": 16.5,
+     "wall_s": 0.4782,
+     "peak_rss_mb": 202.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.7195,
+     "recall": 0.6194,
+     "shd_mean": 7.95,
+     "shd_median": 8.0,
+     "shd_cpdag_mean": 9.15,
+     "shd_dag_mean": 8.7,
+     "directed_mean": 16.4,
+     "wall_s": 0.0189,
+     "peak_rss_mb": 108.8
+    }
+   },
+   "empty_shd_mean": 19.05,
+   "empty_shd_median": 19.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.32
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.15,
+     "bootstrap_95": [
+      -13.25,
+      -9.05
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.15,
+     "bootstrap_95": [
+      -13.25,
+      -9.05
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 19,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.83
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.5|n=1000",
+   "mean_degree": 5.4,
+   "qs": 0.1,
+   "qw": 0.5,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5747,
+     "recall": 0.4982,
+     "shd_mean": 15.9,
+     "shd_median": 16.5,
+     "shd_cpdag_mean": 17.3,
+     "shd_dag_mean": 16.1,
+     "directed_mean": 23.75,
+     "wall_s": 0.083,
+     "peak_rss_mb": 101.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5747,
+     "recall": 0.4982,
+     "shd_mean": 15.9,
+     "shd_median": 16.5,
+     "shd_cpdag_mean": 17.3,
+     "shd_dag_mean": 16.1,
+     "directed_mean": 23.75,
+     "wall_s": 0.7409,
+     "peak_rss_mb": 215.4
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5683,
+     "recall": 0.4781,
+     "shd_mean": 16.4,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 17.8,
+     "shd_dag_mean": 16.65,
+     "directed_mean": 23.05,
+     "wall_s": 0.0245,
+     "peak_rss_mb": 107.3
+    }
+   },
+   "empty_shd_mean": 27.4,
+   "empty_shd_median": 28.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.86
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.5,
+     "bootstrap_95": [
+      -13.35,
+      -9.75
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.5,
+     "bootstrap_95": [
+      -13.35,
+      -9.75
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 13,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.5,
+      "bootstrap_95": [
+       -1.0,
+       -0.1
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.15,
+       1.0
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.24
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.7|n=1000",
+   "mean_degree": 7.2,
+   "qs": 0.1,
+   "qw": 0.7,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5177,
+     "recall": 0.421,
+     "shd_mean": 22.05,
+     "shd_median": 22.5,
+     "shd_cpdag_mean": 24,
+     "shd_dag_mean": 22.35,
+     "directed_mean": 28.3,
+     "wall_s": 0.0977,
+     "peak_rss_mb": 102.7
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5177,
+     "recall": 0.421,
+     "shd_mean": 22.05,
+     "shd_median": 22.5,
+     "shd_cpdag_mean": 24,
+     "shd_dag_mean": 22.35,
+     "directed_mean": 28.3,
+     "wall_s": 0.8476,
+     "peak_rss_mb": 218.4
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5201,
+     "recall": 0.4095,
+     "shd_mean": 22.25,
+     "shd_median": 23.0,
+     "shd_cpdag_mean": 24.1,
+     "shd_dag_mean": 22.75,
+     "directed_mean": 27.4,
+     "wall_s": 0.0274,
+     "peak_rss_mb": 108.1
+    }
+   },
+   "empty_shd_mean": 34.8,
+   "empty_shd_median": 35.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.7
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.75,
+     "bootstrap_95": [
+      -14.95,
+      -10.8
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.75,
+     "bootstrap_95": [
+      -14.95,
+      -10.8
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.6,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.4,
+      "bootstrap_95": [
+       0.0,
+       0.95
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       0.05,
+       1.15
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.54
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.1|n=1000",
+   "mean_degree": 3.6,
+   "qs": 0.3,
+   "qw": 0.1,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5748,
+     "recall": 0.6083,
+     "shd_mean": 10.2,
+     "shd_median": 10.0,
+     "shd_cpdag_mean": 11.55,
+     "shd_dag_mean": 11.6,
+     "directed_mean": 19.05,
+     "wall_s": 0.0738,
+     "peak_rss_mb": 107.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5748,
+     "recall": 0.6083,
+     "shd_mean": 10.2,
+     "shd_median": 10.0,
+     "shd_cpdag_mean": 11.55,
+     "shd_dag_mean": 11.6,
+     "directed_mean": 19.05,
+     "wall_s": 0.5593,
+     "peak_rss_mb": 218.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5745,
+     "recall": 0.5889,
+     "shd_mean": 10.3,
+     "shd_median": 10.0,
+     "shd_cpdag_mean": 11.45,
+     "shd_dag_mean": 11.95,
+     "directed_mean": 18.45,
+     "wall_s": 0.0246,
+     "peak_rss_mb": 107.3
+    }
+   },
+   "empty_shd_mean": 18,
+   "empty_shd_median": 17.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.15
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.8,
+     "bootstrap_95": [
+      -10.7,
+      -4.75
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.8,
+     "bootstrap_95": [
+      -10.7,
+      -4.75
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 15,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.35,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.35,
+      "bootstrap_95": [
+       0.1,
+       0.65
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.7
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.91
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.3|n=1000",
+   "mean_degree": 5.4,
+   "qs": 0.3,
+   "qw": 0.3,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.541,
+     "recall": 0.5348,
+     "shd_mean": 17.55,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 18.8,
+     "shd_dag_mean": 18.05,
+     "directed_mean": 26.25,
+     "wall_s": 0.1025,
+     "peak_rss_mb": 108.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.541,
+     "recall": 0.5348,
+     "shd_mean": 17.55,
+     "shd_median": 17.0,
+     "shd_cpdag_mean": 18.8,
+     "shd_dag_mean": 18.05,
+     "directed_mean": 26.25,
+     "wall_s": 0.9717,
+     "peak_rss_mb": 221.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5374,
+     "recall": 0.5141,
+     "shd_mean": 18,
+     "shd_median": 18.5,
+     "shd_cpdag_mean": 19.2,
+     "shd_dag_mean": 18.6,
+     "directed_mean": 25.4,
+     "wall_s": 0.0315,
+     "peak_rss_mb": 110.4
+    }
+   },
+   "empty_shd_mean": 26.55,
+   "empty_shd_median": 27.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.71
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.0,
+     "bootstrap_95": [
+      -12.6,
+      -5.35
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.0,
+     "bootstrap_95": [
+      -12.6,
+      -5.35
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 13,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.45,
+      "bootstrap_95": [
+       -0.95,
+       -0.1
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.15,
+       1.05
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.0,
+       0.75
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.29
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.5|n=1000",
+   "mean_degree": 7.2,
+   "qs": 0.3,
+   "qw": 0.5,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5161,
+     "recall": 0.4391,
+     "shd_mean": 24.1,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 26.4,
+     "shd_dag_mean": 24.25,
+     "directed_mean": 31.1,
+     "wall_s": 0.1385,
+     "peak_rss_mb": 106.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5161,
+     "recall": 0.4391,
+     "shd_mean": 24.1,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 26.4,
+     "shd_dag_mean": 24.25,
+     "directed_mean": 31.1,
+     "wall_s": 1.0603,
+     "peak_rss_mb": 219.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5158,
+     "recall": 0.4241,
+     "shd_mean": 24.45,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 26.6,
+     "shd_dag_mean": 24.8,
+     "directed_mean": 30.05,
+     "wall_s": 0.037,
+     "peak_rss_mb": 107.6
+    }
+   },
+   "empty_shd_mean": 36.55,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.45
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.45,
+     "bootstrap_95": [
+      -15.15,
+      -9.95
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.45,
+     "bootstrap_95": [
+      -15.15,
+      -9.95
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 15,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.35,
+      "bootstrap_95": [
+       -0.65,
+       -0.1
+      ],
+      "verdict": "better"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.15,
+       1.05
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       0.05,
+       1.2
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.62
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.7|n=1000",
+   "mean_degree": 9.0,
+   "qs": 0.3,
+   "qw": 0.7,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5338,
+     "recall": 0.3856,
+     "shd_mean": 26.85,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 44.2,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 32.5,
+     "wall_s": 0.1533,
+     "peak_rss_mb": 108.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5338,
+     "recall": 0.3856,
+     "shd_mean": 26.85,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 44.2,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 32.5,
+     "wall_s": 1.43,
+     "peak_rss_mb": 221.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5452,
+     "recall": 0.3822,
+     "shd_mean": 26.05,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.25,
+     "shd_dag_mean": 27.8,
+     "directed_mean": 31.55,
+     "wall_s": 0.0431,
+     "peak_rss_mb": 109.6
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.21
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.15,
+     "bootstrap_95": [
+      -20.45,
+      -15.85
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.15,
+     "bootstrap_95": [
+      -20.45,
+      -15.85
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 13,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.8,
+      "bootstrap_95": [
+       0.3,
+       1.4
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.8,
+      "bootstrap_95": [
+       0.3,
+       1.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 1,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.47
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.1|n=1000",
+   "mean_degree": 5.4,
+   "qs": 0.5,
+   "qw": 0.1,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3688,
+     "recall": 0.4249,
+     "shd_mean": 24.35,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 25.2,
+     "shd_dag_mean": 24.6,
+     "directed_mean": 31.45,
+     "wall_s": 0.1456,
+     "peak_rss_mb": 105.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3688,
+     "recall": 0.4249,
+     "shd_mean": 24.35,
+     "shd_median": 25.5,
+     "shd_cpdag_mean": 25.2,
+     "shd_dag_mean": 24.6,
+     "directed_mean": 31.45,
+     "wall_s": 1.0227,
+     "peak_rss_mb": 219.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.371,
+     "recall": 0.4084,
+     "shd_mean": 24.55,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 25.35,
+     "shd_dag_mean": 25.05,
+     "directed_mean": 30.05,
+     "wall_s": 0.0369,
+     "peak_rss_mb": 105.0
+    }
+   },
+   "empty_shd_mean": 27.3,
+   "empty_shd_median": 27.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.34
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.95,
+     "bootstrap_95": [
+      -6.4512,
+      0.35
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.95,
+     "bootstrap_95": [
+      -6.4512,
+      0.35
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 5,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.65,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.15,
+       0.8
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.95,
+      "bootstrap_95": [
+       0.55,
+       1.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 1,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.46
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.3|n=1000",
+   "mean_degree": 7.2,
+   "qs": 0.5,
+   "qw": 0.3,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4815,
+     "recall": 0.444,
+     "shd_mean": 24.9,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28.75,
+     "shd_dag_mean": 24.95,
+     "directed_mean": 33.75,
+     "wall_s": 0.15,
+     "peak_rss_mb": 105.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4815,
+     "recall": 0.444,
+     "shd_mean": 24.9,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28.75,
+     "shd_dag_mean": 24.95,
+     "directed_mean": 33.75,
+     "wall_s": 1.0957,
+     "peak_rss_mb": 219.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4847,
+     "recall": 0.4317,
+     "shd_mean": 25.1,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28.8,
+     "shd_dag_mean": 25.4,
+     "directed_mean": 32.6,
+     "wall_s": 0.0382,
+     "peak_rss_mb": 109.5
+    }
+   },
+   "empty_shd_mean": 36.6,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.28
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.7,
+     "bootstrap_95": [
+      -13.95,
+      -9.45
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.7,
+     "bootstrap_95": [
+      -13.95,
+      -9.45
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 9,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.5,
+       0.05
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.15,
+       0.75
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.7,
+      "bootstrap_95": [
+       0.35,
+       1.1
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.91
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.5|n=1000",
+   "mean_degree": 9.0,
+   "qs": 0.5,
+   "qw": 0.5,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4645,
+     "recall": 0.3567,
+     "shd_mean": 27.3,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.35,
+     "shd_dag_mean": 28.95,
+     "directed_mean": 34.55,
+     "wall_s": 0.1411,
+     "peak_rss_mb": 101.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4645,
+     "recall": 0.3567,
+     "shd_mean": 27.3,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.35,
+     "shd_dag_mean": 28.95,
+     "directed_mean": 34.55,
+     "wall_s": 1.1787,
+     "peak_rss_mb": 218.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4626,
+     "recall": 0.35,
+     "shd_mean": 27.1,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 42.85,
+     "shd_dag_mean": 29.25,
+     "directed_mean": 34.05,
+     "wall_s": 0.0375,
+     "peak_rss_mb": 102.7
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.27
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -17.7,
+     "bootstrap_95": [
+      -19.6,
+      -15.7
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -17.7,
+     "bootstrap_95": [
+      -19.6,
+      -15.7
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.0,
+       0.8
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.54
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.1|n=1000",
+   "mean_degree": 7.2,
+   "qs": 0.7,
+   "qw": 0.1,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4209,
+     "recall": 0.409,
+     "shd_mean": 27,
+     "shd_median": 27.0,
+     "shd_cpdag_mean": 29.85,
+     "shd_dag_mean": 27.2,
+     "directed_mean": 34.45,
+     "wall_s": 0.1474,
+     "peak_rss_mb": 104.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4209,
+     "recall": 0.409,
+     "shd_mean": 27,
+     "shd_median": 27.0,
+     "shd_cpdag_mean": 29.85,
+     "shd_dag_mean": 27.2,
+     "directed_mean": 34.45,
+     "wall_s": 1.1949,
+     "peak_rss_mb": 218.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4208,
+     "recall": 0.3935,
+     "shd_mean": 27.35,
+     "shd_median": 27.5,
+     "shd_cpdag_mean": 30.15,
+     "shd_dag_mean": 27.75,
+     "directed_mean": 33.15,
+     "wall_s": 0.041,
+     "peak_rss_mb": 108.7
+    }
+   },
+   "empty_shd_mean": 35.45,
+   "empty_shd_median": 35.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.96
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.45,
+     "bootstrap_95": [
+      -11.05,
+      -6.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.45,
+     "bootstrap_95": [
+      -11.05,
+      -6.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 11,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.35,
+      "bootstrap_95": [
+       -0.8,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.15,
+       1.1
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.75,
+      "bootstrap_95": [
+       0.3,
+       1.25
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.61
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.3|n=1000",
+   "mean_degree": 9.0,
+   "qs": 0.7,
+   "qw": 0.3,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5051,
+     "recall": 0.3856,
+     "shd_mean": 26.15,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.5,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 34.35,
+     "wall_s": 0.1594,
+     "peak_rss_mb": 99.6
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5051,
+     "recall": 0.3856,
+     "shd_mean": 26.15,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 43.5,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 34.35,
+     "wall_s": 1.2826,
+     "peak_rss_mb": 221.5
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5105,
+     "recall": 0.3778,
+     "shd_mean": 25.45,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 42.45,
+     "shd_dag_mean": 28,
+     "directed_mean": 33.3,
+     "wall_s": 0.0398,
+     "peak_rss_mb": 105.5
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.15
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.85,
+     "bootstrap_95": [
+      -21.2,
+      -16.55
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -18.85,
+     "bootstrap_95": [
+      -21.2,
+      -16.55
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 12,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.7,
+      "bootstrap_95": [
+       0.3,
+       1.2
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.35,
+      "bootstrap_95": [
+       0.05,
+       0.75
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.7,
+      "bootstrap_95": [
+       0.3,
+       1.2
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.91
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.0|n=1000",
+   "mean_degree": 0.9,
+   "qs": 0.1,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.7368,
+     "recall": 0.4421,
+     "shd_mean": 0.9,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 1.2,
+     "shd_dag_mean": 3.35,
+     "directed_mean": 2.85,
+     "wall_s": 0.0157,
+     "peak_rss_mb": 109.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.7368,
+     "recall": 0.4421,
+     "shd_mean": 0.9,
+     "shd_median": 1.0,
+     "shd_cpdag_mean": 1.2,
+     "shd_dag_mean": 3.35,
+     "directed_mean": 2.85,
+     "wall_s": 0.182,
+     "peak_rss_mb": 172.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.7407,
+     "recall": 0.4211,
+     "shd_mean": 0.85,
+     "shd_median": 0.5,
+     "shd_cpdag_mean": 1.05,
+     "shd_dag_mean": 3.45,
+     "directed_mean": 2.7,
+     "wall_s": 0.008,
+     "peak_rss_mb": 104.8
+    }
+   },
+   "empty_shd_mean": 4.75,
+   "empty_shd_median": 5.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 11.44
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.85,
+     "bootstrap_95": [
+      -4.8,
+      -2.85
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -3.85,
+     "bootstrap_95": [
+      -4.8,
+      -2.85
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 1.87
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.2|qw=0.0|n=1000",
+   "mean_degree": 1.8,
+   "qs": 0.2,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.8873,
+     "recall": 0.6923,
+     "shd_mean": 1.05,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 1.4,
+     "shd_dag_mean": 3.3,
+     "directed_mean": 7.1,
+     "wall_s": 0.0252,
+     "peak_rss_mb": 101.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.8873,
+     "recall": 0.6923,
+     "shd_mean": 1.05,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 1.4,
+     "shd_dag_mean": 3.3,
+     "directed_mean": 7.1,
+     "wall_s": 0.2483,
+     "peak_rss_mb": 170.5
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.903,
+     "recall": 0.6648,
+     "shd_mean": 0.9,
+     "shd_median": 0.0,
+     "shd_cpdag_mean": 1,
+     "shd_dag_mean": 3.55,
+     "directed_mean": 6.7,
+     "wall_s": 0.0132,
+     "peak_rss_mb": 102.9
+    }
+   },
+   "empty_shd_mean": 9.1,
+   "empty_shd_median": 10.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.06
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.05,
+     "bootstrap_95": [
+      -9.5,
+      -6.6
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.05,
+     "bootstrap_95": [
+      -9.5,
+      -6.6
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.6
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.02
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.0|n=1000",
+   "mean_degree": 2.7,
+   "qs": 0.3,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5725,
+     "recall": 0.5746,
+     "shd_mean": 7.25,
+     "shd_median": 4.5,
+     "shd_cpdag_mean": 8,
+     "shd_dag_mean": 9.2,
+     "directed_mean": 13.45,
+     "wall_s": 0.0406,
+     "peak_rss_mb": 105.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5725,
+     "recall": 0.5746,
+     "shd_mean": 7.25,
+     "shd_median": 4.5,
+     "shd_cpdag_mean": 8,
+     "shd_dag_mean": 9.2,
+     "directed_mean": 13.45,
+     "wall_s": 0.3566,
+     "peak_rss_mb": 216.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5798,
+     "recall": 0.556,
+     "shd_mean": 7.1,
+     "shd_median": 3.5,
+     "shd_cpdag_mean": 7.65,
+     "shd_dag_mean": 9.45,
+     "directed_mean": 12.85,
+     "wall_s": 0.0181,
+     "peak_rss_mb": 100.3
+    }
+   },
+   "empty_shd_mean": 13.4,
+   "empty_shd_median": 13.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.49
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.15,
+     "bootstrap_95": [
+      -8.8,
+      -2.95
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.15,
+     "bootstrap_95": [
+      -8.8,
+      -2.95
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       -0.15,
+       0.6
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.7
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.35,
+      "bootstrap_95": [
+       0.05,
+       0.8
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.42
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.4|qw=0.0|n=1000",
+   "mean_degree": 3.6,
+   "qs": 0.4,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4163,
+     "recall": 0.4891,
+     "shd_mean": 15.55,
+     "shd_median": 14.0,
+     "shd_cpdag_mean": 17.05,
+     "shd_dag_mean": 16.2,
+     "directed_mean": 21.5,
+     "wall_s": 0.0863,
+     "peak_rss_mb": 105.7
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4163,
+     "recall": 0.4891,
+     "shd_mean": 15.55,
+     "shd_median": 14.0,
+     "shd_cpdag_mean": 17.05,
+     "shd_dag_mean": 16.2,
+     "directed_mean": 21.5,
+     "wall_s": 0.6361,
+     "peak_rss_mb": 216.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4147,
+     "recall": 0.4781,
+     "shd_mean": 15.65,
+     "shd_median": 14.0,
+     "shd_cpdag_mean": 17.1,
+     "shd_dag_mean": 16.4,
+     "directed_mean": 21.1,
+     "wall_s": 0.0288,
+     "peak_rss_mb": 104.5
+    }
+   },
+   "empty_shd_mean": 18.3,
+   "empty_shd_median": 19.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.58
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.75,
+     "bootstrap_95": [
+      -5.7,
+      0.25
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.75,
+     "bootstrap_95": [
+      -5.7,
+      0.25
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 15,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.88
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.0|n=1000",
+   "mean_degree": 4.5,
+   "qs": 0.5,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4762,
+     "recall": 0.5664,
+     "shd_mean": 17.95,
+     "shd_median": 19.0,
+     "shd_cpdag_mean": 19.25,
+     "shd_dag_mean": 18.35,
+     "directed_mean": 27.3,
+     "wall_s": 0.1148,
+     "peak_rss_mb": 100.6
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4762,
+     "recall": 0.5664,
+     "shd_mean": 17.95,
+     "shd_median": 19.0,
+     "shd_cpdag_mean": 19.25,
+     "shd_dag_mean": 18.35,
+     "directed_mean": 27.3,
+     "wall_s": 0.8731,
+     "peak_rss_mb": 219.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4764,
+     "recall": 0.549,
+     "shd_mean": 18,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 19.1,
+     "shd_dag_mean": 18.75,
+     "directed_mean": 26.45,
+     "wall_s": 0.0343,
+     "peak_rss_mb": 102.7
+    }
+   },
+   "empty_shd_mean": 22.95,
+   "empty_shd_median": 23.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.54
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.0,
+     "bootstrap_95": [
+      -8.5,
+      -1.55
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.0,
+     "bootstrap_95": [
+      -8.5,
+      -1.55
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 11,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.35,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.4,
+      "bootstrap_95": [
+       0.15,
+       0.7
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.15,
+       0.85
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.33
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.6|qw=0.0|n=1000",
+   "mean_degree": 5.4,
+   "qs": 0.6,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3652,
+     "recall": 0.4283,
+     "shd_mean": 24.75,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 25.8,
+     "shd_dag_mean": 24.9,
+     "directed_mean": 31.9,
+     "wall_s": 0.1228,
+     "peak_rss_mb": 102.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3652,
+     "recall": 0.4283,
+     "shd_mean": 24.75,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 25.8,
+     "shd_dag_mean": 24.9,
+     "directed_mean": 31.9,
+     "wall_s": 0.9396,
+     "peak_rss_mb": 218.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3661,
+     "recall": 0.4246,
+     "shd_mean": 24.8,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 25.85,
+     "shd_dag_mean": 25,
+     "directed_mean": 31.55,
+     "wall_s": 0.0344,
+     "peak_rss_mb": 104.0
+    }
+   },
+   "empty_shd_mean": 27.2,
+   "empty_shd_median": 28.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.76
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.45,
+     "bootstrap_95": [
+      -4.95,
+      0.15
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.45,
+     "bootstrap_95": [
+      -4.95,
+      0.15
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 14,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.1,
+       0.45
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.5
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.0|n=1000",
+   "mean_degree": 6.3,
+   "qs": 0.7,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3624,
+     "recall": 0.3793,
+     "shd_mean": 27.45,
+     "shd_median": 29.5,
+     "shd_cpdag_mean": 29,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 33.8,
+     "wall_s": 0.1386,
+     "peak_rss_mb": 100.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3624,
+     "recall": 0.3793,
+     "shd_mean": 27.45,
+     "shd_median": 29.5,
+     "shd_cpdag_mean": 29,
+     "shd_dag_mean": 27.65,
+     "directed_mean": 33.8,
+     "wall_s": 0.9647,
+     "peak_rss_mb": 219.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3638,
+     "recall": 0.37,
+     "shd_mean": 27.65,
+     "shd_median": 30.0,
+     "shd_cpdag_mean": 29.15,
+     "shd_dag_mean": 27.95,
+     "directed_mean": 32.85,
+     "wall_s": 0.0369,
+     "peak_rss_mb": 102.7
+    }
+   },
+   "empty_shd_mean": 32.3,
+   "empty_shd_median": 32.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.18
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.85,
+     "bootstrap_95": [
+      -7.7512,
+      -2.2
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.85,
+     "bootstrap_95": [
+      -7.7512,
+      -2.2
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 13,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.5,
+       0.05
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.1,
+       0.55
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.65,
+      "bootstrap_95": [
+       0.25,
+       1.15
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.42
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.8|qw=0.0|n=1000",
+   "mean_degree": 7.2,
+   "qs": 0.8,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4189,
+     "recall": 0.4154,
+     "shd_mean": 27.05,
+     "shd_median": 27.5,
+     "shd_cpdag_mean": 29.25,
+     "shd_dag_mean": 27.2,
+     "directed_mean": 35.45,
+     "wall_s": 0.1357,
+     "peak_rss_mb": 102.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4189,
+     "recall": 0.4154,
+     "shd_mean": 27.05,
+     "shd_median": 27.5,
+     "shd_cpdag_mean": 29.25,
+     "shd_dag_mean": 27.2,
+     "directed_mean": 35.45,
+     "wall_s": 1.0145,
+     "peak_rss_mb": 217.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4139,
+     "recall": 0.3902,
+     "shd_mean": 27.55,
+     "shd_median": 28.5,
+     "shd_cpdag_mean": 29.55,
+     "shd_dag_mean": 28.1,
+     "directed_mean": 33.7,
+     "wall_s": 0.0368,
+     "peak_rss_mb": 102.3
+    }
+   },
+   "empty_shd_mean": 35.75,
+   "empty_shd_median": 35.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.26
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.7,
+     "bootstrap_95": [
+      -11.45,
+      -6.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.7,
+     "bootstrap_95": [
+      -11.45,
+      -6.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 9,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.5,
+      "bootstrap_95": [
+       -1.05,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.9,
+      "bootstrap_95": [
+       0.35,
+       1.55
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.85,
+      "bootstrap_95": [
+       0.35,
+       1.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 1,
+    "datasets_with_new_colliders": 1,
+    "time_ratio": 3.63
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.9|qw=0.0|n=1000",
+   "mean_degree": 8.1,
+   "qs": 0.9,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4195,
+     "recall": 0.3596,
+     "shd_mean": 28.55,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 34.35,
+     "shd_dag_mean": 28.85,
+     "directed_mean": 34.8,
+     "wall_s": 0.1482,
+     "peak_rss_mb": 106.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4195,
+     "recall": 0.3596,
+     "shd_mean": 28.55,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 34.35,
+     "shd_dag_mean": 28.85,
+     "directed_mean": 34.8,
+     "wall_s": 1.069,
+     "peak_rss_mb": 220.6
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4213,
+     "recall": 0.3461,
+     "shd_mean": 28.65,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 34.4,
+     "shd_dag_mean": 29.4,
+     "directed_mean": 33.35,
+     "wall_s": 0.0388,
+     "peak_rss_mb": 102.9
+    }
+   },
+   "empty_shd_mean": 40.6,
+   "empty_shd_median": 40.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.07
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.05,
+     "bootstrap_95": [
+      -14.7,
+      -9.45
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.05,
+     "bootstrap_95": [
+      -14.7,
+      -9.45
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 10,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.75,
+       0.75
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.2,
+       0.95
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.9,
+      "bootstrap_95": [
+       0.35,
+       1.65
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.92
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=1.0|qw=0.0|n=1000",
+   "mean_degree": 9.0,
+   "qs": 1.0,
+   "qw": 0.0,
+   "d": 10,
+   "n": 1000,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5303,
+     "recall": 0.4089,
+     "shd_mean": 25.5,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 43.9,
+     "shd_dag_mean": 26.6,
+     "directed_mean": 34.7,
+     "wall_s": 0.1472,
+     "peak_rss_mb": 99.0
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5303,
+     "recall": 0.4089,
+     "shd_mean": 25.5,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 43.9,
+     "shd_dag_mean": 26.6,
+     "directed_mean": 34.7,
+     "wall_s": 1.0516,
+     "peak_rss_mb": 220.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5343,
+     "recall": 0.3978,
+     "shd_mean": 24.8,
+     "shd_median": 24.5,
+     "shd_cpdag_mean": 42.7,
+     "shd_dag_mean": 27.1,
+     "directed_mean": 33.5,
+     "wall_s": 0.0356,
+     "peak_rss_mb": 100.4
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.27
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.5,
+     "bootstrap_95": [
+      -21.8,
+      -17.25
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -19.5,
+     "bootstrap_95": [
+      -21.8,
+      -17.25
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 10,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.7,
+      "bootstrap_95": [
+       0.25,
+       1.25
+      ],
+      "verdict": "worse"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       0.2,
+       0.85
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.7,
+      "bootstrap_95": [
+       0.25,
+       1.25
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.9
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.1|n=100",
+   "mean_degree": 1.8,
+   "qs": 0.1,
+   "qw": 0.1,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5769,
+     "recall": 0.4054,
+     "shd_mean": 4.55,
+     "shd_median": 4.5,
+     "shd_cpdag_mean": 5.1,
+     "shd_dag_mean": 5.75,
+     "directed_mean": 5.2,
+     "wall_s": 0.0206,
+     "peak_rss_mb": 109.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5769,
+     "recall": 0.4054,
+     "shd_mean": 4.55,
+     "shd_median": 4.5,
+     "shd_cpdag_mean": 5.1,
+     "shd_dag_mean": 5.75,
+     "directed_mean": 5.2,
+     "wall_s": 0.2235,
+     "peak_rss_mb": 170.6
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5769,
+     "recall": 0.4054,
+     "shd_mean": 4.55,
+     "shd_median": 4.5,
+     "shd_cpdag_mean": 5.1,
+     "shd_dag_mean": 5.75,
+     "directed_mean": 5.2,
+     "wall_s": 0.0096,
+     "peak_rss_mb": 110.3
+    }
+   },
+   "empty_shd_mean": 7.4,
+   "empty_shd_median": 8.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.84
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.85,
+     "bootstrap_95": [
+      -4.25,
+      -1.6
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.85,
+     "bootstrap_95": [
+      -4.25,
+      -1.6
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 20,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.07
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.3|n=100",
+   "mean_degree": 3.6,
+   "qs": 0.1,
+   "qw": 0.3,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.6303,
+     "recall": 0.39,
+     "shd_mean": 11.5,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 12.3,
+     "shd_dag_mean": 11.9,
+     "directed_mean": 10.55,
+     "wall_s": 0.0301,
+     "peak_rss_mb": 104.0
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.6303,
+     "recall": 0.39,
+     "shd_mean": 11.5,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 12.3,
+     "shd_dag_mean": 11.9,
+     "directed_mean": 10.55,
+     "wall_s": 0.286,
+     "peak_rss_mb": 170.4
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.6346,
+     "recall": 0.3871,
+     "shd_mean": 11.5,
+     "shd_median": 12.0,
+     "shd_cpdag_mean": 12.3,
+     "shd_dag_mean": 11.95,
+     "directed_mean": 10.4,
+     "wall_s": 0.0123,
+     "peak_rss_mb": 105.5
+    }
+   },
+   "empty_shd_mean": 17.05,
+   "empty_shd_median": 17.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.56
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.55,
+     "bootstrap_95": [
+      -6.6,
+      -4.5
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.55,
+     "bootstrap_95": [
+      -6.6,
+      -4.5
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.47
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.5|n=100",
+   "mean_degree": 5.4,
+   "qs": 0.1,
+   "qw": 0.5,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5749,
+     "recall": 0.2768,
+     "shd_mean": 20.05,
+     "shd_median": 20.5,
+     "shd_cpdag_mean": 21,
+     "shd_dag_mean": 20.5,
+     "directed_mean": 12.35,
+     "wall_s": 0.0371,
+     "peak_rss_mb": 106.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5749,
+     "recall": 0.2768,
+     "shd_mean": 20.05,
+     "shd_median": 20.5,
+     "shd_cpdag_mean": 21,
+     "shd_dag_mean": 20.5,
+     "directed_mean": 12.35,
+     "wall_s": 0.367,
+     "peak_rss_mb": 170.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5749,
+     "recall": 0.2768,
+     "shd_mean": 20.05,
+     "shd_median": 20.5,
+     "shd_cpdag_mean": 21,
+     "shd_dag_mean": 20.5,
+     "directed_mean": 12.35,
+     "wall_s": 0.0143,
+     "peak_rss_mb": 107.1
+    }
+   },
+   "empty_shd_mean": 25.65,
+   "empty_shd_median": 25.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.54
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.6,
+     "bootstrap_95": [
+      -6.75,
+      -4.35
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.6,
+     "bootstrap_95": [
+      -6.75,
+      -4.35
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 20,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.65
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.7|n=100",
+   "mean_degree": 7.2,
+   "qs": 0.1,
+   "qw": 0.7,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5429,
+     "recall": 0.2418,
+     "shd_mean": 28.55,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 30.65,
+     "shd_dag_mean": 28.8,
+     "directed_mean": 16.3,
+     "wall_s": 0.0473,
+     "peak_rss_mb": 108.6
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5429,
+     "recall": 0.2418,
+     "shd_mean": 28.55,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 30.65,
+     "shd_dag_mean": 28.8,
+     "directed_mean": 16.3,
+     "wall_s": 0.4501,
+     "peak_rss_mb": 170.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5401,
+     "recall": 0.2391,
+     "shd_mean": 28.6,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 30.65,
+     "shd_dag_mean": 28.9,
+     "directed_mean": 16.2,
+     "wall_s": 0.0178,
+     "peak_rss_mb": 107.4
+    }
+   },
+   "empty_shd_mean": 36.6,
+   "empty_shd_median": 37.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.23
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.05,
+     "bootstrap_95": [
+      -9.75,
+      -6.4
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -8.05,
+     "bootstrap_95": [
+      -9.75,
+      -6.4
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.69
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.1|n=100",
+   "mean_degree": 3.6,
+   "qs": 0.3,
+   "qw": 0.1,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5192,
+     "recall": 0.4783,
+     "shd_mean": 13.95,
+     "shd_median": 12.5,
+     "shd_cpdag_mean": 15.3,
+     "shd_dag_mean": 14.4,
+     "directed_mean": 16.95,
+     "wall_s": 0.0515,
+     "peak_rss_mb": 103.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5192,
+     "recall": 0.4783,
+     "shd_mean": 13.95,
+     "shd_median": 12.5,
+     "shd_cpdag_mean": 15.3,
+     "shd_dag_mean": 14.4,
+     "directed_mean": 16.95,
+     "wall_s": 0.4054,
+     "peak_rss_mb": 205.9
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.524,
+     "recall": 0.4755,
+     "shd_mean": 14,
+     "shd_median": 12.5,
+     "shd_cpdag_mean": 15.35,
+     "shd_dag_mean": 14.45,
+     "directed_mean": 16.7,
+     "wall_s": 0.0184,
+     "peak_rss_mb": 106.7
+    }
+   },
+   "empty_shd_mean": 18.4,
+   "empty_shd_median": 18.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.08
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.45,
+     "bootstrap_95": [
+      -6.5,
+      -2.25
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.45,
+     "bootstrap_95": [
+      -6.5,
+      -2.25
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.74
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.3|n=100",
+   "mean_degree": 5.4,
+   "qs": 0.3,
+   "qw": 0.3,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5435,
+     "recall": 0.3724,
+     "shd_mean": 19.15,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 20.5,
+     "shd_dag_mean": 19.65,
+     "directed_mean": 18.4,
+     "wall_s": 0.0587,
+     "peak_rss_mb": 108.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5435,
+     "recall": 0.3724,
+     "shd_mean": 19.15,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 20.5,
+     "shd_dag_mean": 19.65,
+     "directed_mean": 18.4,
+     "wall_s": 0.5638,
+     "peak_rss_mb": 170.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.545,
+     "recall": 0.3724,
+     "shd_mean": 19.1,
+     "shd_median": 20.0,
+     "shd_cpdag_mean": 20.45,
+     "shd_dag_mean": 19.65,
+     "directed_mean": 18.35,
+     "wall_s": 0.0203,
+     "peak_rss_mb": 109.9
+    }
+   },
+   "empty_shd_mean": 26.85,
+   "empty_shd_median": 27.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.5
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.7,
+     "bootstrap_95": [
+      -9.85,
+      -5.6
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.7,
+     "bootstrap_95": [
+      -9.85,
+      -5.6
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 19,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.89
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.5|n=100",
+   "mean_degree": 7.2,
+   "qs": 0.3,
+   "qw": 0.5,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5347,
+     "recall": 0.3025,
+     "shd_mean": 26.5,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28,
+     "shd_dag_mean": 26.75,
+     "directed_mean": 20.2,
+     "wall_s": 0.0787,
+     "peak_rss_mb": 108.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5347,
+     "recall": 0.3025,
+     "shd_mean": 26.5,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28,
+     "shd_dag_mean": 26.75,
+     "directed_mean": 20.2,
+     "wall_s": 0.5968,
+     "peak_rss_mb": 208.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5352,
+     "recall": 0.2983,
+     "shd_mean": 26.6,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 28.05,
+     "shd_dag_mean": 26.9,
+     "directed_mean": 19.9,
+     "wall_s": 0.0251,
+     "peak_rss_mb": 106.2
+    }
+   },
+   "empty_shd_mean": 35.7,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.7
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.2,
+     "bootstrap_95": [
+      -10.8,
+      -7.6
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.2,
+     "bootstrap_95": [
+      -10.8,
+      -7.6
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.12
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.7|n=100",
+   "mean_degree": 9.0,
+   "qs": 0.3,
+   "qw": 0.7,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4855,
+     "recall": 0.2411,
+     "shd_mean": 33.4,
+     "shd_median": 33.5,
+     "shd_cpdag_mean": 44.25,
+     "shd_dag_mean": 34.15,
+     "directed_mean": 22.35,
+     "wall_s": 0.081,
+     "peak_rss_mb": 109.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4855,
+     "recall": 0.2411,
+     "shd_mean": 33.4,
+     "shd_median": 33.5,
+     "shd_cpdag_mean": 44.25,
+     "shd_dag_mean": 34.15,
+     "directed_mean": 22.35,
+     "wall_s": 0.8263,
+     "peak_rss_mb": 209.3
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4831,
+     "recall": 0.2378,
+     "shd_mean": 33.35,
+     "shd_median": 33.0,
+     "shd_cpdag_mean": 44.05,
+     "shd_dag_mean": 34.3,
+     "directed_mean": 22.15,
+     "wall_s": 0.0277,
+     "peak_rss_mb": 109.4
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.46
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.6,
+     "bootstrap_95": [
+      -13.2,
+      -10.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -11.6,
+     "bootstrap_95": [
+      -13.2,
+      -10.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.97
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.1|n=100",
+   "mean_degree": 5.4,
+   "qs": 0.5,
+   "qw": 0.1,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3507,
+     "recall": 0.3131,
+     "shd_mean": 25.9,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 26.95,
+     "shd_dag_mean": 26.1,
+     "directed_mean": 24.95,
+     "wall_s": 0.0958,
+     "peak_rss_mb": 107.5
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3507,
+     "recall": 0.3131,
+     "shd_mean": 25.9,
+     "shd_median": 26.0,
+     "shd_cpdag_mean": 26.95,
+     "shd_dag_mean": 26.1,
+     "directed_mean": 24.95,
+     "wall_s": 0.7225,
+     "peak_rss_mb": 209.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3503,
+     "recall": 0.3077,
+     "shd_mean": 25.95,
+     "shd_median": 26.5,
+     "shd_cpdag_mean": 26.95,
+     "shd_dag_mean": 26.25,
+     "directed_mean": 24.55,
+     "wall_s": 0.0296,
+     "peak_rss_mb": 107.9
+    }
+   },
+   "empty_shd_mean": 27.95,
+   "empty_shd_median": 28.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.72
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.05,
+     "bootstrap_95": [
+      -4.25,
+      0.15
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.05,
+     "bootstrap_95": [
+      -4.25,
+      0.15
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.6
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.14
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.3|n=100",
+   "mean_degree": 7.2,
+   "qs": 0.5,
+   "qw": 0.3,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4498,
+     "recall": 0.3019,
+     "shd_mean": 29.25,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 31,
+     "shd_dag_mean": 29.5,
+     "directed_mean": 24.9,
+     "wall_s": 0.099,
+     "peak_rss_mb": 103.3
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4498,
+     "recall": 0.3019,
+     "shd_mean": 29.25,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 31,
+     "shd_dag_mean": 29.5,
+     "directed_mean": 24.9,
+     "wall_s": 0.685,
+     "peak_rss_mb": 208.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4485,
+     "recall": 0.2992,
+     "shd_mean": 29.3,
+     "shd_median": 29.0,
+     "shd_cpdag_mean": 31,
+     "shd_dag_mean": 29.6,
+     "directed_mean": 24.75,
+     "wall_s": 0.032,
+     "peak_rss_mb": 106.7
+    }
+   },
+   "empty_shd_mean": 37.1,
+   "empty_shd_median": 37.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.48
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.85,
+     "bootstrap_95": [
+      -9.6,
+      -6.05
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.85,
+     "bootstrap_95": [
+      -9.6,
+      -6.05
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.02
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.5|n=100",
+   "mean_degree": 9.0,
+   "qs": 0.5,
+   "qw": 0.5,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.5671,
+     "recall": 0.3333,
+     "shd_mean": 28.7,
+     "shd_median": 28.0,
+     "shd_cpdag_mean": 43.7,
+     "shd_dag_mean": 30,
+     "directed_mean": 26.45,
+     "wall_s": 0.0962,
+     "peak_rss_mb": 100.7
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.5671,
+     "recall": 0.3333,
+     "shd_mean": 28.7,
+     "shd_median": 28.0,
+     "shd_cpdag_mean": 43.7,
+     "shd_dag_mean": 30,
+     "directed_mean": 26.45,
+     "wall_s": 0.8863,
+     "peak_rss_mb": 213.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5655,
+     "recall": 0.3311,
+     "shd_mean": 28.7,
+     "shd_median": 28.0,
+     "shd_cpdag_mean": 43.6,
+     "shd_dag_mean": 30.1,
+     "directed_mean": 26.35,
+     "wall_s": 0.0282,
+     "peak_rss_mb": 108.0
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.24
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -16.3,
+     "bootstrap_95": [
+      -18.5,
+      -14.05
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -16.3,
+     "bootstrap_95": [
+      -18.5,
+      -14.05
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.37
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.1|n=100",
+   "mean_degree": 7.2,
+   "qs": 0.7,
+   "qw": 0.1,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4029,
+     "recall": 0.2997,
+     "shd_mean": 29.7,
+     "shd_median": 30.0,
+     "shd_cpdag_mean": 31.85,
+     "shd_dag_mean": 29.75,
+     "directed_mean": 27.3,
+     "wall_s": 0.0976,
+     "peak_rss_mb": 108.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4029,
+     "recall": 0.2997,
+     "shd_mean": 29.7,
+     "shd_median": 30.0,
+     "shd_cpdag_mean": 31.85,
+     "shd_dag_mean": 29.75,
+     "directed_mean": 27.3,
+     "wall_s": 0.914,
+     "peak_rss_mb": 211.2
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4026,
+     "recall": 0.2956,
+     "shd_mean": 29.7,
+     "shd_median": 30.0,
+     "shd_cpdag_mean": 31.75,
+     "shd_dag_mean": 29.9,
+     "directed_mean": 26.95,
+     "wall_s": 0.0297,
+     "peak_rss_mb": 109.8
+    }
+   },
+   "empty_shd_mean": 36.7,
+   "empty_shd_median": 37.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 9.1
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.0,
+     "bootstrap_95": [
+      -8.85,
+      -5.3
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -7.0,
+     "bootstrap_95": [
+      -8.85,
+      -5.3
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.28
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.3|n=100",
+   "mean_degree": 9.0,
+   "qs": 0.7,
+   "qw": 0.3,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4376,
+     "recall": 0.2689,
+     "shd_mean": 32.15,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 44.25,
+     "shd_dag_mean": 32.9,
+     "directed_mean": 27.65,
+     "wall_s": 0.0972,
+     "peak_rss_mb": 107.3
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4376,
+     "recall": 0.2689,
+     "shd_mean": 32.15,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 44.25,
+     "shd_dag_mean": 32.9,
+     "directed_mean": 27.65,
+     "wall_s": 0.9729,
+     "peak_rss_mb": 212.6
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4396,
+     "recall": 0.2667,
+     "shd_mean": 31.9,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 43.9,
+     "shd_dag_mean": 33,
+     "directed_mean": 27.3,
+     "wall_s": 0.0305,
+     "peak_rss_mb": 109.7
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.44
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.85,
+     "bootstrap_95": [
+      -14.5,
+      -11.25
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -12.85,
+     "bootstrap_95": [
+      -14.5,
+      -11.25
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.55
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.55
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.41
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.1|qw=0.0|n=100",
+   "mean_degree": 0.9,
+   "qs": 0.1,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4886,
+     "recall": 0.5,
+     "shd_mean": 2.95,
+     "shd_median": 3.0,
+     "shd_cpdag_mean": 3.85,
+     "shd_dag_mean": 4.4,
+     "directed_mean": 4.4,
+     "wall_s": 0.0156,
+     "peak_rss_mb": 100.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4886,
+     "recall": 0.5,
+     "shd_mean": 2.95,
+     "shd_median": 3.0,
+     "shd_cpdag_mean": 3.85,
+     "shd_dag_mean": 4.4,
+     "directed_mean": 4.4,
+     "wall_s": 0.177,
+     "peak_rss_mb": 169.5
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4767,
+     "recall": 0.4767,
+     "shd_mean": 3.05,
+     "shd_median": 3.0,
+     "shd_cpdag_mean": 3.95,
+     "shd_dag_mean": 4.5,
+     "directed_mean": 4.3,
+     "wall_s": 0.0083,
+     "peak_rss_mb": 105.9
+    }
+   },
+   "empty_shd_mean": 4.3,
+   "empty_shd_median": 4.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 11.21
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.3,
+      -0.4
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.3,
+      -0.4
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 19,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 1.84
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.2|qw=0.0|n=100",
+   "mean_degree": 1.8,
+   "qs": 0.2,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.559,
+     "recall": 0.5202,
+     "shd_mean": 4.55,
+     "shd_median": 4.0,
+     "shd_cpdag_mean": 4.9,
+     "shd_dag_mean": 6.35,
+     "directed_mean": 8.05,
+     "wall_s": 0.0261,
+     "peak_rss_mb": 104.2
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.559,
+     "recall": 0.5202,
+     "shd_mean": 4.55,
+     "shd_median": 4.0,
+     "shd_cpdag_mean": 4.9,
+     "shd_dag_mean": 6.35,
+     "directed_mean": 8.05,
+     "wall_s": 0.2666,
+     "peak_rss_mb": 170.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5506,
+     "recall": 0.5029,
+     "shd_mean": 4.7,
+     "shd_median": 4.0,
+     "shd_cpdag_mean": 5.05,
+     "shd_dag_mean": 6.5,
+     "directed_mean": 7.9,
+     "wall_s": 0.0115,
+     "peak_rss_mb": 106.8
+    }
+   },
+   "empty_shd_mean": 8.65,
+   "empty_shd_median": 8.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 10.03
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.1,
+     "bootstrap_95": [
+      -5.25,
+      -2.9
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -4.1,
+     "bootstrap_95": [
+      -5.25,
+      -2.9
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.4,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.22
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.3|qw=0.0|n=100",
+   "mean_degree": 2.7,
+   "qs": 0.3,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.552,
+     "recall": 0.5725,
+     "shd_mean": 8.15,
+     "shd_median": 7.0,
+     "shd_cpdag_mean": 8.95,
+     "shd_dag_mean": 9.45,
+     "directed_mean": 13.95,
+     "wall_s": 0.0449,
+     "peak_rss_mb": 104.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.552,
+     "recall": 0.5725,
+     "shd_mean": 8.15,
+     "shd_median": 7.0,
+     "shd_cpdag_mean": 8.95,
+     "shd_dag_mean": 9.45,
+     "directed_mean": 13.95,
+     "wall_s": 0.3825,
+     "peak_rss_mb": 170.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.5504,
+     "recall": 0.5688,
+     "shd_mean": 8.2,
+     "shd_median": 7.0,
+     "shd_cpdag_mean": 9,
+     "shd_dag_mean": 9.5,
+     "directed_mean": 13.9,
+     "wall_s": 0.0171,
+     "peak_rss_mb": 107.5
+    }
+   },
+   "empty_shd_mean": 13.45,
+   "empty_shd_median": 13.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.4
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.3,
+     "bootstrap_95": [
+      -8.05,
+      -2.45
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -5.3,
+     "bootstrap_95": [
+      -8.05,
+      -2.45
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 19,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.68
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.4|qw=0.0|n=100",
+   "mean_degree": 3.6,
+   "qs": 0.4,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4063,
+     "recall": 0.4266,
+     "shd_mean": 15.85,
+     "shd_median": 16.0,
+     "shd_cpdag_mean": 17.05,
+     "shd_dag_mean": 16.6,
+     "directed_mean": 18.95,
+     "wall_s": 0.0641,
+     "peak_rss_mb": 102.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4063,
+     "recall": 0.4266,
+     "shd_mean": 15.85,
+     "shd_median": 16.0,
+     "shd_cpdag_mean": 17.05,
+     "shd_dag_mean": 16.6,
+     "directed_mean": 18.95,
+     "wall_s": 0.5293,
+     "peak_rss_mb": 208.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4086,
+     "recall": 0.4211,
+     "shd_mean": 15.95,
+     "shd_median": 16.0,
+     "shd_cpdag_mean": 17.15,
+     "shd_dag_mean": 16.7,
+     "directed_mean": 18.6,
+     "wall_s": 0.0231,
+     "peak_rss_mb": 98.4
+    }
+   },
+   "empty_shd_mean": 18.05,
+   "empty_shd_median": 19.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.57
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.2,
+     "bootstrap_95": [
+      -4.9,
+      0.45
+     ],
+     "verdict": "tie"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.2,
+     "bootstrap_95": [
+      -4.9,
+      0.45
+     ],
+     "verdict": "tie"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.6
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 2.61
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.5|qw=0.0|n=100",
+   "mean_degree": 4.5,
+   "qs": 0.5,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3866,
+     "recall": 0.3908,
+     "shd_mean": 20.95,
+     "shd_median": 21.5,
+     "shd_cpdag_mean": 21.95,
+     "shd_dag_mean": 21.2,
+     "directed_mean": 23.15,
+     "wall_s": 0.079,
+     "peak_rss_mb": 106.8
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3866,
+     "recall": 0.3908,
+     "shd_mean": 20.95,
+     "shd_median": 21.5,
+     "shd_cpdag_mean": 21.95,
+     "shd_dag_mean": 21.2,
+     "directed_mean": 23.15,
+     "wall_s": 0.6912,
+     "peak_rss_mb": 213.8
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3886,
+     "recall": 0.3886,
+     "shd_mean": 20.9,
+     "shd_median": 21.5,
+     "shd_cpdag_mean": 21.85,
+     "shd_dag_mean": 21.25,
+     "directed_mean": 22.9,
+     "wall_s": 0.0258,
+     "peak_rss_mb": 102.5
+    }
+   },
+   "empty_shd_mean": 22.9,
+   "empty_shd_median": 23.5,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.16
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -1.95,
+     "bootstrap_95": [
+      -3.55,
+      -0.3
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -1.95,
+     "bootstrap_95": [
+      -3.55,
+      -0.3
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 18,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.55
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.19
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.6|qw=0.0|n=100",
+   "mean_degree": 5.4,
+   "qs": 0.6,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3765,
+     "recall": 0.3556,
+     "shd_mean": 24.7,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 25.85,
+     "shd_dag_mean": 25.05,
+     "directed_mean": 25.5,
+     "wall_s": 0.0836,
+     "peak_rss_mb": 102.3
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3765,
+     "recall": 0.3556,
+     "shd_mean": 24.7,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 25.85,
+     "shd_dag_mean": 25.05,
+     "directed_mean": 25.5,
+     "wall_s": 0.6955,
+     "peak_rss_mb": 209.1
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.3794,
+     "recall": 0.3556,
+     "shd_mean": 24.65,
+     "shd_median": 25.0,
+     "shd_cpdag_mean": 25.8,
+     "shd_dag_mean": 25.05,
+     "directed_mean": 25.3,
+     "wall_s": 0.028,
+     "peak_rss_mb": 108.0
+    }
+   },
+   "empty_shd_mean": 27,
+   "empty_shd_median": 27.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.88
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.3,
+     "bootstrap_95": [
+      -3.95,
+      -0.75
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -2.3,
+     "bootstrap_95": [
+      -3.95,
+      -0.75
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 17,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.08
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.7|qw=0.0|n=100",
+   "mean_degree": 6.3,
+   "qs": 0.7,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4125,
+     "recall": 0.3397,
+     "shd_mean": 25.2,
+     "shd_median": 28.0,
+     "shd_cpdag_mean": 26.55,
+     "shd_dag_mean": 25.65,
+     "directed_mean": 25.7,
+     "wall_s": 0.086,
+     "peak_rss_mb": 106.1
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4125,
+     "recall": 0.3397,
+     "shd_mean": 25.2,
+     "shd_median": 28.0,
+     "shd_cpdag_mean": 26.55,
+     "shd_dag_mean": 25.65,
+     "directed_mean": 25.7,
+     "wall_s": 0.6871,
+     "peak_rss_mb": 215.0
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.415,
+     "recall": 0.3365,
+     "shd_mean": 25.15,
+     "shd_median": 27.5,
+     "shd_cpdag_mean": 26.45,
+     "shd_dag_mean": 25.75,
+     "directed_mean": 25.3,
+     "wall_s": 0.0283,
+     "peak_rss_mb": 103.9
+    }
+   },
+   "empty_shd_mean": 31.2,
+   "empty_shd_median": 32.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.76
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.0,
+     "bootstrap_95": [
+      -8.3,
+      -4.0
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.0,
+     "bootstrap_95": [
+      -8.3,
+      -4.0
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 16,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       0.05,
+       0.6
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.09
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.8|qw=0.0|n=100",
+   "mean_degree": 7.2,
+   "qs": 0.8,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.3978,
+     "recall": 0.3058,
+     "shd_mean": 29.7,
+     "shd_median": 30.5,
+     "shd_cpdag_mean": 31.2,
+     "shd_dag_mean": 29.8,
+     "directed_mean": 27.9,
+     "wall_s": 0.1023,
+     "peak_rss_mb": 103.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.3978,
+     "recall": 0.3058,
+     "shd_mean": 29.7,
+     "shd_median": 30.5,
+     "shd_cpdag_mean": 31.2,
+     "shd_dag_mean": 29.8,
+     "directed_mean": 27.9,
+     "wall_s": 0.8228,
+     "peak_rss_mb": 212.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4004,
+     "recall": 0.2989,
+     "shd_mean": 29.75,
+     "shd_median": 30.0,
+     "shd_cpdag_mean": 31.2,
+     "shd_dag_mean": 30.05,
+     "directed_mean": 27.1,
+     "wall_s": 0.0306,
+     "peak_rss_mb": 103.1
+    }
+   },
+   "empty_shd_mean": 36.3,
+   "empty_shd_median": 36.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 8.02
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.6,
+     "bootstrap_95": [
+      -8.65,
+      -4.55
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -6.6,
+     "bootstrap_95": [
+      -8.65,
+      -4.55
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 14,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.35,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.05,
+       0.5
+      ],
+      "verdict": "better"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.55,
+      "bootstrap_95": [
+       0.1,
+       1.25
+      ],
+      "verdict": "worse"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.4
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=0.9|qw=0.0|n=100",
+   "mean_degree": 8.1,
+   "qs": 0.9,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4108,
+     "recall": 0.2905,
+     "shd_mean": 31.3,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 35.3,
+     "shd_dag_mean": 31.4,
+     "directed_mean": 28.6,
+     "wall_s": 0.1035,
+     "peak_rss_mb": 106.4
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4108,
+     "recall": 0.2905,
+     "shd_mean": 31.3,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 35.3,
+     "shd_dag_mean": 31.4,
+     "directed_mean": 28.6,
+     "wall_s": 0.8092,
+     "peak_rss_mb": 217.5
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4113,
+     "recall": 0.2868,
+     "shd_mean": 31.35,
+     "shd_median": 32.0,
+     "shd_cpdag_mean": 35.3,
+     "shd_dag_mean": 31.55,
+     "directed_mean": 28.2,
+     "wall_s": 0.0305,
+     "peak_rss_mb": 107.1
+    }
+   },
+   "empty_shd_mean": 40.45,
+   "empty_shd_median": 41.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.54
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.15,
+     "bootstrap_95": [
+      -10.95,
+      -7.4
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -9.15,
+     "bootstrap_95": [
+      -10.95,
+      -7.4
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 14,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.1
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.6
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.45
+   },
+   "verdict": "identical",
+   "result": "tie"
+  },
+  {
+   "cell": "ages|qs=1.0|qw=0.0|n=100",
+   "mean_degree": 9.0,
+   "qs": 1.0,
+   "qw": 0.0,
+   "d": 10,
+   "n": 100,
+   "seeds": [
+    0,
+    19
+   ],
+   "solutions": {
+    "andrey.ages.numpy": {
+     "fits": 20,
+     "precision": 0.4884,
+     "recall": 0.2811,
+     "shd_mean": 30.65,
+     "shd_median": 31.0,
+     "shd_cpdag_mean": 43.3,
+     "shd_dag_mean": 32.35,
+     "directed_mean": 25.9,
+     "wall_s": 0.0956,
+     "peak_rss_mb": 101.9
+    },
+    "pcalg.ages": {
+     "fits": 20,
+     "precision": 0.4884,
+     "recall": 0.2811,
+     "shd_mean": 30.65,
+     "shd_median": 31.0,
+     "shd_cpdag_mean": 43.3,
+     "shd_dag_mean": 32.35,
+     "directed_mean": 25.9,
+     "wall_s": 0.7671,
+     "peak_rss_mb": 215.7
+    },
+    "andrey.ges.numpy.bic": {
+     "fits": 20,
+     "precision": 0.4892,
+     "recall": 0.2778,
+     "shd_mean": 30.45,
+     "shd_median": 31.0,
+     "shd_cpdag_mean": 42.95,
+     "shd_dag_mean": 32.5,
+     "directed_mean": 25.55,
+     "wall_s": 0.03,
+     "peak_rss_mb": 105.6
+    }
+   },
+   "empty_shd_mean": 45,
+   "empty_shd_median": 45.0,
+   "reference": {
+    "paired": 20,
+    "same_graph": 20,
+    "verdict": "identical",
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "time_ratio": 7.66
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean_D": -14.35,
+     "bootstrap_95": [
+      -16.25,
+      -12.6
+     ],
+     "verdict": "better"
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean_D": -14.35,
+     "bootstrap_95": [
+      -16.25,
+      -12.6
+     ],
+     "verdict": "better"
+    }
+   },
+   "ges": {
+    "paired": 20,
+    "same_graph": 15,
+    "same_skeleton": 20,
+    "measures": {
+     "shd": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "correct": {
+      "paired": 20,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "wrong": {
+      "paired": 20,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "new_colliders": 0,
+    "datasets_with_new_colliders": 0,
+    "time_ratio": 3.18
+   },
+   "verdict": "identical",
+   "result": "tie"
+  }
+ ]
+}

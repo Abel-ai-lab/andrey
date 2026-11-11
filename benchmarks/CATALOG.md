@@ -16,6 +16,7 @@ whose Reproduce table lists the driver.
 | GES | `ges_cpu.py` | GES, serial and parallel | causal-learn | 0.1.0, 0.2.0, 0.7.0, 0.9.0 |
 | [GES parent limit](comparisons/ges-parent-limit.md) | `ges_cpu.py`, `xges_ges.py` | GES with `max_parents` | causal-learn, XGES | |
 | [XGES](comparisons/xges.md) | `xges_cpu.py` | XGES, with and without the extended search; GES | xges | 0.3.0, 0.9.0 |
+| [AGES](comparisons/ages.md) | `ages_cpu.py`, `ages_summary.py` | AGES; GES at the same penalty as the baseline of the method's paper | pcalg | 0.17.0 |
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | 0.14.0 |
@@ -111,7 +112,9 @@ on the datasets of the 0.16.0 record. Their [comparison page](comparisons/missin
 all three. The NOTEARS and DAGMA lane's rows are in
 [`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
 [comparison page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its
-authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental.
+authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental. The
+AGES lane's rows are in [`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
+[comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg.
 
 | Release | Release card | Summary |
 |---|---|---|

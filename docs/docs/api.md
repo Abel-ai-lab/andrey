@@ -466,6 +466,7 @@ variable.
    gies
    gnies
    xges
+   ages
    hc
    tabu
    exact_search
@@ -514,6 +515,18 @@ columns' units, and on standardized columns its result depends on the `l1` penal
 follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
 [0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
 the authors' code.
+
+AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
+{py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
+triangle or shields a collider can leave edges of the true CPDAG undirected that the graph without
+it directs. AGES computes the CPDAGs GES returns for every penalty from `penalty_discount` up, its
+solution path, from one forward phase and a backward phase per distinct forward result, and overlays
+their orientations on the CPDAG of the minimum penalty, so the graph keeps that CPDAG's skeleton
+and can direct more of its edges. It scores with the standard BIC only, as one penalty per edge
+defines the path, and takes no `knowledge`, `max_parents`, `missing`, or `env`. It returns a
+partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists the path. The
+[0.17.0](benchmarks/0.17.0.md#ages) release card measures it on the paper's 10-variable
+simulation against pcalg.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -685,7 +698,6 @@ in a process.
    :nosignatures:
 
    dagma
-   ages
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -696,16 +708,6 @@ the empty graph at its default settings, which is why it is experimental. The
 [0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
-{py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
-triangle or shields a collider can leave edges of the true CPDAG undirected that the graph without
-it directs. AGES computes the CPDAGs GES returns for every penalty from `penalty_discount` up, its
-solution path, from one forward phase and a backward phase per distinct forward result, and overlays
-their orientations on the CPDAG of the minimum penalty, so the graph keeps that CPDAG's skeleton
-and can direct more of its edges. It scores with the standard BIC only, as one penalty per edge
-defines the path, and takes no `knowledge`, `max_parents`, `missing`, or `env`. It returns a
-partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists the path.
 
 A method becomes supported once it has:
 

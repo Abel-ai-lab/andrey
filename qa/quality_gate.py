@@ -51,6 +51,7 @@ from qa import reference_parity
 # The regimes whose data is not one plain sample, the published settings, and the scores of the
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
+import ages_cpu  # noqa: E402
 import camuv_cpu  # noqa: E402
 import fci_jci_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
@@ -278,6 +279,18 @@ LINEAR_SEM_CELLS: dict[str, tuple[str, int]] = {
     "notears_paper_raw_d10": ("raw", 10),
 }
 
+#: AGES's published regime, drawn by its benchmark driver (``benchmarks/ages_cpu.py``) as two of
+#: its comparison's cells, as ``(qs, qw, n)``: the simulation of the AGES paper, a linear Gaussian
+#: model on 10 variables where each pair holds a strong edge with probability ``qs`` and a weak one
+#: with probability ``qw``. AGES directs edges beyond the CPDAG, so its graph is scored against the
+#: true DAG. Both cells leave pairs without an edge: on a complete graph, the paper's ``(0.3,
+#: 0.7)``, any complete DAG is about as close to the truth as the fit, so the gate could not tell a
+#: broken result from a good one there.
+WEAK_EDGE_CELLS: dict[str, tuple[float, float, int]] = {
+    "ages_paper_qs0.1_qw0.3_n10000": (0.1, 0.3, 10000),
+    "ages_paper_qs0.3_qw0.3_n10000": (0.3, 0.3, 10000),
+}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -442,6 +455,16 @@ def order_draws(regime: str, d: int, density: str) -> tuple[Draw, ...]:
     for key in stein_cpu.regime_keys(regime, d, stein_cpu.DENSITIES[density], SEEDS):
         x, marks, kind, _ = datasets.generate_one(key)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
+    return tuple(out)
+
+
+def weak_edge_draws(qs: float, qw: float, n: int) -> tuple[Draw, ...]:
+    """One dataset per seed of the AGES lane's setting ``(qs, qw)`` with ``n`` rows, with its true
+    DAG."""
+    out = []
+    for seed in SEEDS:
+        x, dag = ages_cpu.sample(qs, qw, n, seed)
+        out.append(Draw(x, GraphStructure.from_numpy(dag, kind="dag")))
     return tuple(out)
 
 
@@ -693,6 +716,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
     **{name: functools.partial(order_draws, *cell) for name, cell in ORDER_CELLS.items()},
     **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
     **{name: functools.partial(linear_sem_draws, *cell) for name, cell in LINEAR_SEM_CELLS.items()},
+    **{name: functools.partial(weak_edge_draws, *cell) for name, cell in WEAK_EDGE_CELLS.items()},
     **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
@@ -777,7 +801,9 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 # SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
-# fit reads the columns' units, so one cell has standardized columns and one raw.
+# fit reads the columns' units, so one cell has standardized columns and one raw. AGES runs on two
+# cells of its paper's simulation, where some edges are weak, and is scored against the true DAG,
+# whose directions it claims beyond the CPDAG's.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -914,6 +940,7 @@ SUPPORTED: dict[str, Method] = {
     "ICP": Method(icp_fit, "parents", tuple(f"icp_do_d{d}" for d, _ in INVARIANCE_SIZES)),
     "IGSP": Method(igsp_fit, "essential", KNOWN_TARGET_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
+    "AGES": Method(lambda x: andrey.ages(x), "dag", tuple(WEAK_EDGE_CELLS)),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
