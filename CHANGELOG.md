@@ -49,9 +49,9 @@ names its pull request.
 - An Ensemble of methods notebook, `examples/ensemble.ipynb`, in the gallery's Advanced section,
   builds a simple ensemble from parts Andrey already has: `pc`, `ges`, `boss`, and `direct_lingam`
   on the same data, a vote over their edges, and `andrey.bootstrap` to weigh each vote by how
-  stable it is. It is a recipe, not a method. On 20 simulated datasets under uniform noise and 20
-  under Gaussian noise, no ensemble had fewer errors than the best single method, and none was the
-  worst. ([#895])
+  stable it is. It is a recipe, not a method. On 20 simulated datasets under uniform noise, 20
+  under Gaussian noise, and 10 samples of categorical rows from the ALARM network, no ensemble had
+  fewer errors than the best single method, and none was the worst. ([#895])
 
 ### Changed
 
