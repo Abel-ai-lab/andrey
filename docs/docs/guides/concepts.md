@@ -62,7 +62,7 @@ Take three variables. Four DAGs share the skeleton $X_1 - X_2 - X_3$:
 
 | The DAGs of one class $[G]$ | Their independence | Their CPDAG |
 |---|---|---|
-| ${X_1 \to X_2 \to X_3}$, ${X_1 \leftarrow X_2 \leftarrow X_3}$, ${X_1 \leftarrow X_2 \to X_3}$ | ${X_1 \perp\!\!\!\perp X_3 \mid X_2}$ | ${X_1 - X_2 - X_3}$ |
+| ${X_1 \to X_2 \to X_3,}$ ${X_1 \leftarrow X_2 \leftarrow X_3,}$ and ${X_1 \leftarrow X_2 \to X_3}$ | ${X_1 \perp\!\!\!\perp X_3 \mid X_2}$ | ${X_1 - X_2 - X_3}$ |
 | ${X_1 \to X_2 \leftarrow X_3}$ | ${X_1 \perp\!\!\!\perp X_3}$ | ${X_1 \to X_2 \leftarrow X_3}$ |
 
 The chain, its reverse, and the fork in the first row imply the same independence and have no
