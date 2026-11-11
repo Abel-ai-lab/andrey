@@ -46,6 +46,12 @@ names its pull request.
   noise, a child of it in the true graph and shuffled with the other columns, with
   `measurements.parents` naming the column each one measures. Each option draws from its own stream
   and is off by default, so every seed drawn without them gives the data it gave before. ([#875])
+- An Ensemble of methods notebook, `examples/ensemble.ipynb`, in the gallery's Advanced section,
+  builds a simple ensemble from parts Andrey already has: `pc`, `ges`, `boss`, and `direct_lingam`
+  on the same data, a vote over their edges, and `andrey.bootstrap` to weigh each vote by how
+  stable it is. It is a recipe, not a method. On 20 simulated datasets under uniform noise, 20
+  under Gaussian noise, and 10 samples of categorical rows from the ALARM network, no ensemble had
+  fewer errors than the best single method, and none was the worst. ([#895])
 
 ### Changed
 
@@ -2416,6 +2422,7 @@ First alpha release.
 [#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
+[#895]: https://github.com/Abel-ai-lab/andrey/pull/895
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
