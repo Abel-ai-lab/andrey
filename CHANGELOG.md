@@ -8,6 +8,16 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- Benchmark lanes for the local methods that answer for one target, under hidden variables, or under
+  selection bias. `mmb_by_mmb_cpu.py` runs the authors' MMB-by-MMB code, pcalg's RFCI, and Andrey's
+  FCI on published networks as linear-Gaussian models with hidden nodes, and `y_structures_cpu.py`
+  runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
+  scores, and the contract that the adapter of an Andrey method fills. ([#912])
+
 ## [0.17.0] - 2026-11-11
 
 ### Highlights
@@ -2476,6 +2486,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
