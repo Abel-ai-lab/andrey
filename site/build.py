@@ -69,6 +69,7 @@ RELEASES = (
     "0.14.0",
     "0.15.0",
     "0.16.0",
+    "0.17.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -485,6 +486,29 @@ REGIMES |= {
         )
     },
 }
+# The 0.17.0 summary's cells: SCORE and NoGAM on the simulation of their papers, with Gaussian,
+# Laplace, or Gumbel noise, every column z-scored, or each variable rescaled to unit variance
+# before its children read it.
+STEIN_PAPER = "nonlinear data from the SCORE and NoGAM papers' simulation"
+REGIMES |= {
+    f"score_paper{key}{tail}": f"{STEIN_PAPER}, {noise} noise, {scale}"
+    for key, noise in (("", "Gaussian"), ("_laplace", "Laplace"), ("_gumbel", "Gumbel"))
+    for tail, scale in (("_standardized", "z-scored"), ("_rescaled", "each variable rescaled"))
+}
+# NOTEARS on the simulation of its paper, with Gaussian, exponential, or Gumbel noise and every
+# column z-scored, the cells its claim is judged in.
+REGIMES |= {
+    f"notears_paper{key}_standardized": "linear data from the NOTEARS paper's simulation, "
+    f"{noise} noise, z-scored"
+    for key, noise in (("", "Gaussian"), ("_exponential", "exponential"), ("_gumbel", "Gumbel"))
+}
+# AGES on the 10-variable simulation of its paper, by the share of variable pairs that hold a weak
+# edge. Its cells are at mean degrees from 0.9 to 9, so ``MEAN_DEGREE`` leaves them to the card.
+REGIMES |= {
+    f"ages_paper_weak{share}": "linear Gaussian data from the AGES paper's simulation, "
+    + (f"{share}% of the variable pairs a weak edge" if share else "no weak edges")
+    for share in (0, 10, 30, 50, 70)
+}
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other
@@ -542,6 +566,11 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
+# SCORE and NoGAM show their z-scored and rescaled cells and omit the cells in the simulation's
+# own units, where the references read those units and Andrey standardizes. NOTEARS omits its
+# cells in the simulation's own units and its rescaled cells, which its release card reports and
+# does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so ``MEAN_DEGREE``
+# leaves them to the card too.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -556,6 +585,10 @@ NOT_SHOWN_LANES = {
     "jpcmciplus.assumption_3_broken",
     "jpcmciplus.gpdc",
     "loci.likelihood",
+    "score_matching.raw",
+    "nogam.raw",
+    "notears.raw",
+    "notears.rescaled",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI
@@ -574,7 +607,11 @@ NOT_SHOWN_COMPARATORS = {
 # Comparators left out of the homepage's accuracy claim and its error bars, which speak of other
 # packages: a method's authors' research code that is not a package. Its rows stay in the speed
 # panel and on its release card.
-NOT_IN_ACCURACY_CLAIM = {"LOCI authors' code, LOCI-H"}
+NOT_IN_ACCURACY_CLAIM = {
+    "LOCI authors' code, LOCI-H",
+    "SCORE authors' code",
+    "NOTEARS authors' code",
+}
 # The package each comparator names in the speed panel's legend, without the version or setting
 # its release card gives; every other comparator is a package's name already.
 PACKAGE_NAMES = {
@@ -2949,10 +2986,10 @@ COMPARISON = (
 # Distinct methods per package, each a published algorithm that returns a whole graph, counted
 # once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
 # score or test in the same search, a wrapper, and a search that only orients a given graph count
-# with the method they extend, or not at all. Andrey's count follows its registry: gies runs ges's
-# search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a variant of iamb, and mmhc
-# is rsmax2 with its default phases, as bnlearn's are counted. The others are read from each
-# package's released code.
+# with the method they extend, or not at all. Andrey's count is the supported methods of its
+# registry: gies runs ges's search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a
+# variant of iamb, and mmhc is rsmax2 with its default phases, as bnlearn's are counted. The others
+# are read from each package's released code.
 COUNTED_WITH = {
     "gies": "ges",
     "multi_group_direct_lingam": "direct_lingam",
@@ -2960,7 +2997,7 @@ COUNTED_WITH = {
     "mmhc": "rsmax2",
 }
 METHOD_COUNTS = {
-    "Andrey": sum(s.name not in COUNTED_WITH for s in list_specs()),
+    "Andrey": sum(s.status != "experimental" and s.name not in COUNTED_WITH for s in list_specs()),
     "causal-learn": 21,
     "Tetrad": 21,
     "pcalg": 8,

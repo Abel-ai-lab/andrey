@@ -8,6 +8,225 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [0.17.0] - 2026-11-11
+
+### Highlights
+
+- `score_matching` is SCORE (Rolland et al., 2022) and `nogam` is NoGAM (Montagna et al., 2023), for
+  nonlinear data with additive noise. Each reads a causal order from the score of the data, the
+  gradient of its log density, and prunes it to a DAG. Both are supported: against the SCORE
+  authors' code and dodiscover on the simulation of their papers, neither made more errors in any
+  setting, `nogam` made fewer in 16 of 24, and the median fits were 4 to 9 and 1.6 to 3 times
+  faster. On sparse graphs, and on additive-noise data outside that simulation, `cam` is more
+  accurate. The [0.17.0 release
+  card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam) gives the numbers.
+  ([#872], [#874], [#879])
+- `notears` is supported: against its authors' code on the paper's simulation with standardized
+  columns, it made no more errors in any of the 24 settings. `dagma` stays experimental. Its fit now
+  leaves the diagonal of the weight matrix free, as the paper's algorithm does. ([#871], [#896])
+- `ages` is AGES (Eigenmann, Nandy, and Maathuis, 2017), for linear Gaussian data where some effects
+  are weak. It keeps the GES skeleton and can direct more of its edges. It is supported: on 1,378 of
+  1,380 datasets from the paper's simulation, it returned the same graph as pcalg's `ages`, the
+  authors' implementation. With 10,000 rows, it directed more edges correctly than `ges` at the same
+  precision: 49% of the true edges against 46%. With 100 rows, it directed almost no additional
+  edges correctly. ([#894], [#899])
+- Missing data: `missing="em"` runs the alternating structural EM of Friedman (1997) and is
+  supported in `ges`, `boss`, and `grasp`, as it already was in `notears`, `hc`, and `tabu`. Against
+  Tetrad's EM covariance policy, none was less accurate in a setting that repeated on fresh
+  datasets. A fit with `missing="em"` can return another graph than in 0.16.0 and takes about 1.5 to
+  5 times as long. ([#873], [#887])
+- Background knowledge: path and confounder claims are supported in 14 more methods, each in at
+  least one part. On a graph with no consistent extension, where a fit dropped every path claim, a
+  claim on a pair joined by an undirected edge now directs that edge. `mmhc` and `rsmax2` pass
+  background knowledge to their MMPC or PC restrict phase. ([#870], [#880], [#892])
+- `andrey.data` draws Student-t and Gaussian-mixture noise, functions from random Fourier features,
+  three more post-nonlinear transforms, and measurement columns. ([#875])
+- The Limitations of `grasp` say when one start is not enough, and those of `pc` say why
+  `missing="mvpc"` loses to test-wise deletion on larger graphs. ([#891], [#893])
+
+### Added
+
+- `ages` is aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis, 2017) for
+  linear-Gaussian data with weak edges. It computes the CPDAGs GES returns for every penalty from
+  `penalty_discount` up and overlays their orientations on the CPDAG of that minimum penalty, so
+  the graph keeps the GES skeleton and can direct more of its edges. It returns a partially
+  directed graph tagged `cpdag` and does not depend on the columns' units or order. It is
+  supported: on the paper's 10-variable simulation, 23 settings at 100, 1,000, and 10,000 rows, it
+  returned the graph of pcalg's `ages` on 1,378 of 1,380 datasets, was no less accurate in any
+  setting, and fit 7 to 12 times faster. With 10,000 rows it directed 49% of the true edges
+  correctly against 46% for GES at the same precision. The evidence is on the
+  [comparison page][ages-page]. ([#894], [#899])
+- `score_matching` is SCORE (Rolland et al., 2022) for nonlinear effects with additive Gaussian
+  noise. It finds a causal order from the leaf up, each leaf the variable whose second derivative of
+  the log density varies least over the rows, estimated by a Stein kernel estimator on the
+  standardized columns, and prunes the complete DAG of the order with the smooth-term tests of
+  `cam`. It returns a DAG and a causal order, takes `knowledge`, and does not depend on the columns'
+  units or order. It is supported: against its authors' code on the paper's simulation at 10, 20,
+  and 50 variables, z-scored and rescaled, its SHD tied in all 12 settings, its order was no less
+  accurate in any setting that repeated on fresh datasets, and its median fit was 4 to 9 times
+  faster. ([#872], [#879])
+- `nogam` is NoGAM (Montagna et al., 2023) for nonlinear effects with additive noise of any
+  distribution. It finds a causal order from the leaf up, each leaf the variable whose entry of the
+  Stein score estimate is best predicted from the variable's kernel-ridge residual on the others,
+  and prunes the complete DAG of the order as `score_matching` does. It returns a DAG and a causal
+  order, takes `knowledge`, and does not depend on the columns' units or order. It is supported:
+  against dodiscover on the paper's simulation at 10 and 20 variables under Gaussian, Laplace, and
+  Gumbel noise, z-scored and rescaled, its SHD was lower in 16 of 24 settings, on the first datasets
+  and again on fresh ones, and higher in none, and its median fit was 1.6 to 3 times faster.
+  ([#874], [#879])
+- `andrey.data` draws more kinds of data: Student-t and two-component Gaussian-mixture noise
+  (`noise.student_t(df=)`, `noise.gaussian_mixture(weight=, means=, sds=)`), each of mean 0 and
+  variance 1 like the other families; `functional.random_features(n_features=, length_scale=)`, an
+  additive-noise model whose functions are approximate Gaussian-process draws by random Fourier
+  features (Rahimi and Recht, 2007); `outer="cube"`, `"cube_root"`, and `"sigmoid"` on
+  `functional.post_nonlinear`; and `measurements=measurement.noisy_children(...)` on `SCM.sample`
+  and `sample_scm`, which adds for each selected variable a column that is it plus independent
+  noise, a child of it in the true graph and shuffled with the other columns, with
+  `measurements.parents` naming the column each one measures. Each option draws from its own stream
+  and is off by default, so every seed drawn without them gives the data it gave before. ([#875])
+
+### Changed
+
+- `notears` is supported. Against its authors' code on the paper's simulation with standardized
+  columns, Erdos-Renyi and scale-free graphs of 10 to 100 variables under Gaussian, exponential,
+  and Gumbel noise, it made no more errors (SHD) in any of the 24 settings, tied in 23 and with
+  fewer in 1 on the first datasets, and it made fewer errors than the empty graph in 15, where the
+  authors' code did in 16. Its Limitations give the numbers and where it is weak: the scale-free
+  graphs, where it was within 5% of the empty graph and below it in 3 of 12 settings; columns in
+  the data's own units, where most of its accuracy can be read from the columns' variances; the
+  cycle repair, which removed edges in 9 of its 20 fits on standardized columns at 20 variables and
+  which both sides of the comparison share; and graphs that can differ between machines while the
+  errors do not. `dagma` is measured the same way against its authors' package and stays
+  experimental: it made fewer errors than the empty graph in none of the 24 settings, as its
+  authors' package did, and its Limitations give the numbers. The evidence is on the
+  [comparison page][nd-page]. ([#871])
+- `dagma` states its scope and stays experimental. It is for data whose units are meaningful: its
+  accuracy on the usual simulated data comes from the columns' variances following the causal
+  order, and on standardized columns, or data whose units are arbitrary, it does no better than
+  the empty graph at its default settings (below it in none of 24 settings, above it in 16, as its
+  authors' package). At the penalty of its paper's experiments, `lambda1=0.05`, it was below the
+  empty graph in 6 of the 24 settings and above it in 6, and at the penalty of `notears` it matches
+  `notears`, whose result on standardized columns depends on that penalty. The docstrings say so
+  in a few sentences, the [0.17.0 release card][card-0170-dagma] has a short table, and the
+  [comparison page][nd-page] has the trace and the literature. The warning, the command-line help,
+  and the documentation now describe an experimental method as not supported, with the reason in
+  its Limitations, instead of as having no published benchmark. ([#896])
+- Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
+  in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
+  `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
+  `grasp_fci`. With true claims none measured worse than the same fit without them, or than
+  causal-learn, bnlearn, Tetrad, or lingam given the same knowledge, in a setting that repeated on
+  fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
+  knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
+  given the required edges those paths imply made fewer errors, and `forbidden_paths` stays
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at 50 variables often has
+  no consistent extension and most claims are dropped on it. The evidence is on the
+  [comparison page][kp-paths]. ([#870], [#892])
+- `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
+  them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
+  EM covariance policy, which estimates one covariance by EM before the search and is not structural
+  EM, on 132 settings of 10 to 50 variables with values missing completely at random or at random.
+  Against Tetrad's default, which counts every row as the sample size, none was less accurate in any
+  setting: `ges` had fewer errors in 111 and tied in 21, `boss` in 100 and 32, and `grasp` in 101
+  and 31. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges` had fewer errors
+  in 90 and tied in 42, `boss` had fewer in 72, tied in 59, and had more in 1, and `grasp` had fewer
+  in 68, tied in 61, and had more in 3; all four tied on fresh datasets. The 100-variable settings
+  and the default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm`
+  it stays experimental, with no reference implementation to compare with. The [comparison
+  page][em-tetrad] has the results. ([#873], [#887])
+- `missing="em"` gives other results: it now runs the alternating structural EM of Friedman (1997)
+  in every method that takes it (`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`,
+  `notears`, `dagma`, and `calm`). Before each search after the first, 5 parameter-only EM steps
+  refit the current graph's coefficients and noise variances; before, each round refit them once.
+  With one refit per round, the first search, on the expected covariance under the model with no
+  edge, returned many extra edges, the later rounds removed them slowly, and the graph was still
+  changing after the 10 rounds; `boss` and `grasp` then each had more errors than Tetrad's
+  `MEAN_PAIRWISE` reference in one setting on two sets of datasets, where `boss` now ties and
+  `grasp` has fewer. On the three benchmark lanes with a reference, the alternating scheme had fewer
+  errors than one refit per round in 64 settings and more in 16, which did not run again on fresh
+  datasets, and the mean errors over the settings fell in every search. `hc` and `tabu` stay no less
+  accurate than bnlearn's structural EM in every setting (fewer errors in 28 and 31 of 36, ties in
+  the others), and `notears` than MissDAG (fewer in 23 of 24). The 10 rounds and the sample size of
+  the BIC, every row, stay. `metadata["em"]` gains `parameter_steps` and `graph_changed`, whether
+  each round changed the graph, and a fit whose last round changed it logs a warning: 2 to 6% of the
+  benchmark's fits, and 20% of `grasp`'s. A fit runs 56 E-steps where it ran 11 and takes about 1.5
+  to 5 times as long. The comparison page's tables of the lanes without a reference were not run
+  again and say that they were measured with one refit per round. Results on complete data do not
+  change. ([#887])
+- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say how path claims fare on a graph with no
+  consistent extension, which stands for no DAG and which they found in 105 to 125 of 240 simulated
+  datasets, and in 19 or 20 of 20 with 50 variables, 2,000 rows, and mean degree 4: how many claims
+  direct an edge, are met by an edge the data directed, and are dropped, and why `forbidden_paths`
+  is experimental there. The Limitations of
+  `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
+  blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
+  graph at 50 variables and mean degree 4. ([#882], [#892])
+- `required_paths` and `forbidden_paths` act on a graph with no consistent extension, which `pc`,
+  `cdnod`, `iamb`, `inter_iamb`, and `mmpc` can return when their tests contradict each other on
+  finite data. Such a graph stands for no DAG, and a fit dropped every path claim on it. A claim on
+  a pair joined by an undirected edge now directs that edge, `a -> b` for a required path and
+  `b -> a` for a forbidden one (Fang and He, 2020; Fang et al., 2025), and Meek's rules follow
+  (Meek, 1995). A claim on a pair that is not adjacent, a claim against an edge the data directed,
+  and claims that conflict with each other, by asking for both directions of one edge or by closing
+  a directed cycle, are dropped and listed in `metadata["unmet_knowledge"]` as before, whatever the
+  order of the claims or the columns. `metadata["edge_claims"]` is new and lists the claims applied
+  to an edge. The result is not guaranteed to stand for a DAG, as the graph found did not, and
+  applying the reading to such a graph is Andrey's own choice. A fit without path claims, and a fit
+  whose graph has a consistent extension, return what they returned. On simulated linear-Gaussian
+  data (10 to 50 variables, 240 datasets a method) the graph found had no consistent extension in
+  49 datasets of `pc`, 71 of `cdnod`, and 105 to 125 of `iamb`, `inter_iamb`, and `mmpc`. Against
+  the fits that dropped every claim there, with the same true claims, no setting of any of the five
+  methods was farther from the true DAG or from the class of graphs the claims define, and 5 to 29
+  of 36 were closer. Most claims are still dropped on such a graph, 76 to 81% of the required and
+  96 to 97% of the forbidden paths, since most name a pair that is not adjacent. `required_paths`
+  is now supported in `iamb`, `inter_iamb`, and `mmpc`: with true required paths none was farther
+  from that class or from the true DAG than without them in any setting. `forbidden_paths` stays
+  experimental in the three: with forbidden paths alone at 50 variables and mean degree 2, the
+  CPDAG was 0.65 to 1.95 edges farther from the class in 3 or 4 of 6 settings over 40 datasets,
+  though in no setting on two separate sets of 20. `pc` and `cdnod` keep their status. The
+  [comparison page][kp-paths] has the results. ([#892])
+- The Limitations and the `n_starts` entry of `grasp` say when one search is not enough: on
+  simulated linear-Gaussian data with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+  one start's mean SHD over 40 datasets was 29.6 (median fit 1.3 s) against 18.8 with `n_starts=4`
+  (5.1 s) and 16.3 with `n_starts=8` (10.4 s), because it stops at a much worse order on some
+  datasets; at mean degree 2 one start is enough. `grasp` keeps its seeded random order of tucks,
+  which the paper leaves open: trying them from the front of the order to its back gave no more
+  accuracy for the time than more starts and took 9 to 20 times as long at 200 variables. ([#891])
+- The Limitations of `pc` and the missing-data comparison page say why `missing="mvpc"` is behind
+  test-wise deletion under quantile MNAR at 50 and 100 variables: the loss is true edges that the
+  correction removes, because a corrected test reads a median of 13% and 19% of the rows the
+  test-wise test reads when the parents of the missingness indicators have missing values
+  themselves, and because Step 3 re-tests pairs that share only an indicator, which falsely detected
+  indicator parents make candidates (44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true
+  edges). The regression's intercept, the direction a pair is tested in, the seed, orientation, and
+  the fallback to the test-wise test are not the cause. Use `missing="testwise"` in these settings.
+  ([#893])
+
+### Fixed
+
+- `dagma` leaves the diagonal of the weight matrix free in its least-squares fit, as the paper's
+  algorithm and its authors' package do; the fit held it at zero at every step, which sent the
+  central path to another solution. On the paper's simulation with standardized columns it now
+  ties its authors' package in all 24 settings, where it made 2 to 5 more errors (SHD, of 110 to
+  210) in 3 settings on the first datasets and again on fresh ones, and it returns the same graph
+  as that package in 57% to 100% of a size's datasets, against 0% to 80% of a setting's before. Its
+  graphs can differ from those of earlier releases; the graph and the returned weights still carry
+  no diagonal entry, and the likelihood steps of `robust=True` keep the diagonal at zero. ([#896])
+- `mmhc`, and `rsmax2` with `restrict="mmpc"` or `"pc"`, pass background knowledge to the restrict
+  phase, which reads it as `mmpc` and `pc` do on their own: the two ends of a required edge
+  condition the tests of the other pairs, and a pair the knowledge makes non-adjacent is never a
+  candidate. The restrict phase read the data alone, so a pair that only a required neighbor
+  separates stayed a candidate and the score search could join it. On simulated linear-Gaussian
+  graphs of mean degree 4 with 10 to 50 variables and required edges taken from the true graph,
+  `mmhc` now makes 1.0 to 1.5 fewer errors against the true DAG on average (a missing, extra, or
+  reversed edge counts 2, an undirected one 1), and `rsmax2(restrict="pc")` 0.9 to 1.9 fewer with
+  20 and 50 variables; at mean degree 2 the change is 0.2 or less. `restrict="iamb"` and
+  `"inter_iamb"` keep reading the data alone, with the pairs of the required edges added to their
+  skeleton: given the knowledge they made 0.3 to 0.5 more errors on the same graphs with up to
+  about four in ten of the true edges required, since larger blankets let the step that turns
+  blankets into a skeleton separate more true pairs. Fits without knowledge are unchanged.
+  ([#880])
+
 ## [0.16.0] - 2026-11-10
 
 ### Highlights
@@ -1981,6 +2200,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
@@ -2240,3 +2460,24 @@ First alpha release.
 [#854]: https://github.com/Abel-ai-lab/andrey/pull/854
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
+[#870]: https://github.com/Abel-ai-lab/andrey/pull/870
+[#871]: https://github.com/Abel-ai-lab/andrey/pull/871
+[#872]: https://github.com/Abel-ai-lab/andrey/pull/872
+[#873]: https://github.com/Abel-ai-lab/andrey/pull/873
+[#874]: https://github.com/Abel-ai-lab/andrey/pull/874
+[#875]: https://github.com/Abel-ai-lab/andrey/pull/875
+[#879]: https://github.com/Abel-ai-lab/andrey/pull/879
+[#880]: https://github.com/Abel-ai-lab/andrey/pull/880
+[#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#887]: https://github.com/Abel-ai-lab/andrey/pull/887
+[#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#892]: https://github.com/Abel-ai-lab/andrey/pull/892
+[#893]: https://github.com/Abel-ai-lab/andrey/pull/893
+[#894]: https://github.com/Abel-ai-lab/andrey/pull/894
+[#896]: https://github.com/Abel-ai-lab/andrey/pull/896
+[#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
+[kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
+[card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
+[nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
+[ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md

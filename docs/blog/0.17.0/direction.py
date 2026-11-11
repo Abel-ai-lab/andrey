@@ -1,4 +1,4 @@
-"""The 0.13.0 post's figure on why a functional causal model can tell cause from effect.
+"""The functional causal models post's figure: why such a model can tell cause from effect.
 
 Three pairs ``x -> y``, one per column: a straight line with Gaussian noise, a straight line with
 uniform noise, and a curve with Gaussian noise. The first row draws the data, the second the
@@ -9,7 +9,7 @@ column do both directions leave independent residuals, so only there the directi
 
 The figure is inline SVG written next to this script as ``direction.html``, whose colors are
 ``--andrey-*`` tokens, so it follows the page's light or dark theme. Run with
-``uv run python docs/blog/0.13.0/direction.py``.
+``uv run python docs/blog/0.17.0/direction.py``.
 """
 
 from __future__ import annotations

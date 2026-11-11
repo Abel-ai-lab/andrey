@@ -155,17 +155,19 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
-XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP,
-DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL,
-LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on
-the datasets whose assumptions each method needs, PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
-UT-IGSP learns:
+XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI,
+UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM,
+CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM,
+Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported
+nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the
+targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
+| `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
+| `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
@@ -179,6 +181,8 @@ UT-IGSP learns:
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
+| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE |
+| `score_paper_laplace_standardized` at `d = 10` with `d` edges, `score_paper_gumbel_standardized` at `d = 10` with `4 d`, `n = 1000` | 10 seeds each | NoGAM |
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
@@ -202,6 +206,15 @@ UT-IGSP learns:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Additive-noise orders.** SCORE's and NoGAM's published regime, drawn by their benchmark driver
+  (`benchmarks/stein_cpu.py`) as cells of its comparison in their claims: the papers' simulation,
+  Erdos-Renyi graphs with `d` edges or `4 d`, each link one draw of a Gaussian process over the
+  node's parents, noise variances uniform on [0.4, 0.8], 1,000 rows, every column z-scored. SCORE's
+  claim is Gaussian noise (`score_paper_standardized`), run at `d = 10` with `d` edges and at
+  `d = 20` with `4 d`. NoGAM's is additive noise of any distribution, run with Laplace noise
+  (`score_paper_laplace_standardized`) at `d = 10` with `d` edges and with Gumbel noise
+  (`score_paper_gumbel_standardized`) at `d = 10` with `4 d`; its fit time grows with `d`, so
+  `d = 20` is left out. Both run at their defaults.
 - **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
   (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
   graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
@@ -223,6 +236,23 @@ UT-IGSP learns:
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
+- **Linear models in the data's units.** NOTEARS's published regime, drawn by its benchmark driver
+  (`benchmarks/notears_cpu.py`) as two of its comparison's cells: the simulation of Zheng et al.
+  (2018), a linear model on an Erdos-Renyi graph with `2d` edges, weights from +/-[0.5, 2], Gaussian
+  noise of unit variance, and 1,000 rows. NOTEARS's least-squares fit reads the columns' units, so
+  one cell is standardized and one raw. `notears_paper_standardized` z-scores each column, the
+  scale of the comparison's decision cells, and runs at 50 variables, the published size where the
+  check has power: over the gate's seeds NOTEARS's median SHD is 18.5 against the empty graph's 20
+  at 10 variables and 40 against 40 at 20. `notears_paper_raw` keeps the columns as generated,
+  where the variances grow along the causal order and the fit reads the order from them, at 10
+  variables. A fit at 50 standardized variables takes about half a minute on one core.
+- **Linear Gaussian models with weak edges.** AGES's published regime, drawn by its benchmark
+  driver (`benchmarks/ages_cpu.py`) as two of its comparison's cells: the simulation of Eigenmann,
+  Nandy, and Maathuis (2017) on 10 variables with 10,000 rows, where each pair of variables holds a
+  strong edge (weight magnitude 0.8 to 1.2) or a weak one (0.1 to 0.3). One cell has 10%
+  strong and 30% weak edges, and one has 30% of each. AGES directs edges beyond the
+  CPDAG, so the gate scores its graph against the true DAG, where an edge left undirected counts
+  one.
 - **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,
   MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and the
   benchmark drivers of GIES and GnIES): `interventional_gauss_er` at `n = 50d`, with intervention
@@ -293,29 +323,30 @@ UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI,
-BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables. GIES is scored
-against the interventional essential graph of the true DAG under the rows' targets, IGSP against the
-one under the settings' targets, GnIES and UT-IGSP against the one under the true targets, and
-CD-NOD against the CPDAG in which the domain index orients the edges it reaches. FCI-JCI is scored
-by endpoint SHD over the variables and the environment against its PAG at the true distribution, the
-truth its benchmark driver builds. UT-IGSP's targets are scored apart, as
-`UT-IGSP targets`, by the target error: the false plus the missed targets over the settings,
-against the given targets alone in place of the empty graph. GIN's
-errors are the latents it misses: the true latents whose indicators it does not return as one
-cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the
-edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
-nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
-time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
-endpoint SHD over the window of lags, J-PCMCI+ by endpoint SHD over the window of lags of the
-system variables, LPCMCI by endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM
-and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the missing and extra
-lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
-scored by its directed edges against the edges between observed variables that no hidden causal or
-backdoor path joins, the edges it can identify as direct: an edge in one set and not the other
-counts 1, a reversed one 2. A method that estimates a set of variables is scored by the set's false
-members plus its missed ones, where the empty set makes as many errors as the true set has members:
-ICP by the target's parents. On each dataset, a method passes when its median SHD over the draws is:
+NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its
+groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed
+variables.
+GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
+IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
+targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
+FCI-JCI is scored by endpoint SHD over the variables and the environment against its PAG at the true
+distribution, the truth its benchmark driver builds. UT-IGSP's targets are scored apart, as
+`UT-IGSP targets`, by the target error: the false plus the missed targets over the settings, against
+the given targets alone in place of the empty graph. GIN's errors are the latents it misses: the
+true latents whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are
+scored by endpoint SHD against the latent projection, the edges and pairs their benchmark scores:
+`i -> j` for a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair
+that one hidden node reaches through hidden nodes only. The time-series methods are scored in their
+summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags,
+J-PCMCI+ by endpoint SHD over the window of lags of the system variables, LPCMCI by endpoint SHD
+against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and
+extra cross-links, Granger by the missing and extra lagged edges, and DYNOTEARS by the edge SHD over
+the window of lags. CAM-UV is scored by its directed edges against the edges between observed
+variables that no hidden causal or backdoor path joins, the edges it can identify as direct: an edge
+in one set and not the other counts 1, a reversed one 2. A method that estimates a set of variables
+is scored by the set's false members plus its missed ones, where the empty set makes as many errors
+as the true set has members: ICP by the target's parents. On each dataset, a method passes when its
+median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.

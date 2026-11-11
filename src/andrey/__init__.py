@@ -18,6 +18,7 @@ to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's 
 """
 
 from .api import (
+    ages,
     anm,
     boss,
     boss_fci,
@@ -53,6 +54,7 @@ from .api import (
     mmhc,
     mmpc,
     multi_group_direct_lingam,
+    nogam,
     notears,
     pc,
     pcmci,
@@ -61,6 +63,7 @@ from .api import (
     rcd,
     resit,
     rsmax2,
+    score_matching,
     tabu,
     ut_igsp,
     varma_lingam,
@@ -85,7 +88,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"
 
 __all__ = [
     "__version__",
@@ -129,6 +132,7 @@ __all__ = [
     "inter_iamb",
     "mmpc",
     "ges",
+    "ages",
     "gies",
     "gnies",
     "xges",
@@ -150,6 +154,8 @@ __all__ = [
     "ica_lingam",
     "cam",
     "resit",
+    "score_matching",
+    "nogam",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

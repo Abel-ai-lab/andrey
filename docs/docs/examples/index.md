@@ -70,8 +70,9 @@ several domains; and ICP's parents of one variable from several environments.
 :img-alt: The true graph of this notebook's data
 
 XGES, hill climbing, tabu search, and exact search look for the graph with the best score, by
-default the extended BIC; MMHC and RSMAX2 restrict the search with tests first; GIES also learns
-from interventions, and GnIES from environments whose changes it is not told.
+default the extended BIC; AGES directs more edges than GES when some effects are weak; MMHC and
+RSMAX2 restrict the search with tests first; GIES also learns from interventions, and GnIES from
+environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -82,7 +83,8 @@ from interventions, and GnIES from environments whose changes it is not told.
 :img-top: /_generated/thumbs/calm.svg
 :img-alt: The true graph of this notebook's data
 
-CALM learns a weighted DAG by gradient descent on a penalized likelihood; it runs on torch.
+CALM learns a weighted DAG by gradient descent on a penalized likelihood, on torch; NOTEARS by
+least squares with an `l1` penalty, where the result depends on the units of the columns.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -119,8 +121,9 @@ fits several datasets, and GIN finds latent variables.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM and RESIT learn a DAG, with every edge oriented, when each variable is a nonlinear function of
-its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they join.
+CAM, RESIT, SCORE, and NoGAM learn a DAG, with every edge oriented, when each variable is a
+nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
+pairs they join.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

@@ -73,8 +73,9 @@ them with their status.
 ### What is the difference between supported and experimental?
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
-method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process. A new method starts as experimental.
+method has recovery tests but is not supported: it has no published benchmark yet, or it did not
+pass one, and its **Limitations** say which. It warns with `andrey.ExperimentalWarning` the first
+time it runs in a process. A new method starts as experimental.
 
 ### Which method should I start with?
 
@@ -191,9 +192,11 @@ missing depends on the variables, a test can be biased. The [release cards](benc
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
 the data, sound when values are missing completely at random or at random given observed values. It
-is supported in NOTEARS, hill climbing, and Tabu search, and experimental in the others, which have
-no reference implementation to compare with; the
-[0.16.0 release card](benchmarks/0.16.0.md#what-we-measured-on-missing-data) has what we measured.
+is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
+alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
+experimental in the others, which have no reference implementation to compare with; the
+[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+has what we measured.
 The other methods refuse missing values with an error that says what to do
 instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
 
@@ -205,11 +208,11 @@ takes it except {{ no_knowledge_methods }}. It can also say that one variable ca
 directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
 honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
-are supported in PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM and experimental in
-the other methods, which we have not measured; a method given a part it does not honor raises an
-error naming the methods that do. A path claim says less than an edge, so when you know the edge
-itself, state it as `required`. [Background
-knowledge](guides/getting-started.md#background-knowledge) shows each part.
+are supported in every method that honors them except six: required paths are experimental in Tabu
+search, MMHC, and RSMAX2, and forbidden paths in IAMB, Inter-IAMB, and MMPC, where our measurements
+did not pass; a method given a part it does not honor raises an error naming the methods that do. A
+path claim says less than an edge, so when you know the edge itself, state it as `required`.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
 
@@ -314,7 +317,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.16.0},
+  version = {0.17.0},
   url = {https://andrey.abel.ai},
 }
 ```

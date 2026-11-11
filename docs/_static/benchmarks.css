@@ -169,12 +169,14 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
-/* A release without its own art: the navy ground, and on the cover the wordmark's image
+/* A release without its own art: the stipple ground, and on the cover the wordmark's image
    (`_static/wordmark-dark.svg`, in a `sd-card-text` paragraph) in the title's place. It has no
-   amber dot: the wordmark's amber stroke is the composition's one accent (`DESIGN.md`, "Node and
-   edge"). A tile shows the version alone, as the art tiles do. */
+   amber dot: the wordmark's amber stroke and the ground's amber corner are its accents
+   (`DESIGN.md`, "Node and edge"). A tile shows the version alone, as the art tiles do. */
 .bd-content .sd-card:is(.release-cover, .release-tile).release-default {
-  background: var(--andrey-ground-navy);
+  background:
+    url("release-ground.jpg") center / cover no-repeat,
+    var(--andrey-ground-cobalt);
 }
 
 .release-cover.release-default .sd-card-text:nth-of-type(2) img {

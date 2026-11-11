@@ -16,6 +16,7 @@ _GRAPH = (
     frozenset(
         {
             "PC",
+            "AGES",
             "FCI",
             "GFCI",
             "CDNOD",
@@ -39,7 +40,7 @@ _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
 # CAM-UV: candidate = the graph's marks and the marked pairs.
 _MARKED_PAIRS = frozenset({"CAMUV"})
 # DAG and causal-order algorithms: candidate = the DAG and the order.
-_ORDERED_DAG = frozenset({"CAM", "RESIT"})
+_ORDERED_DAG = frozenset({"CAM", "RESIT", "ScoreMatching", "NoGAM"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL", "LOCI"})
 # The recorded fields of the pairwise tests, by metadata key and direction.
@@ -62,6 +63,8 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 _INVARIANT = frozenset({"ICP"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
+# Weighted DAGs: candidate = the DAG and its weights, ``weighted_adjacency[i, j]`` for ``i -> j``.
+_WEIGHTED_DAG = frozenset({"NOTEARS"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
 
@@ -167,6 +170,11 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {
             "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
             "lag_weights": np.asarray(s.lag_weights),
+        }
+    if algorithm in _WEIGHTED_DAG:
+        return {
+            "graph": out.structure.to_numpy(),
+            "weighted_adjacency": np.asarray(out.weighted_adjacency),
         }
     if algorithm == "LongitudinalLiNGAM":
         return {

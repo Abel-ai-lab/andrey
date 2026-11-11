@@ -972,8 +972,9 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     # Only coverage is counted; speed has no pooled number, which would mix different methods.
     rows = build.measured_rows(build.release_summaries(SUMMARY))
     assert [(section, label) for section, label, _ in rows] == [("Coverage", "Distinct methods")]
-    # Andrey's count follows the registry; each method counted with another names two real ones.
-    names = {spec.name for spec in build.list_specs()}
+    # Andrey's count is the supported methods of the registry; each method counted with another
+    # names two supported ones.
+    names = {spec.name for spec in build.list_specs() if spec.status != "experimental"}
     assert set(build.COUNTED_WITH) | set(build.COUNTED_WITH.values()) <= names
     assert build.METHOD_COUNTS["Andrey"] == len(names) - len(build.COUNTED_WITH)
     # A partial mark has its own symbol, a half-filled circle.
@@ -1635,9 +1636,9 @@ def test_the_newest_release_post_is_the_latest_version(conf):
     # A later version breaks a tie in date, and the later file name a tie in both.
     assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
     assert newest(posts[:2]) == ("blog/20261008-why-andrey-is-fast", "0.1.0")
-    moved = [("blog/20261029-andrey-0-11-0", "2026-11-10", "0.16.0"), *posts]
-    moved.append(("blog/20261015-andrey-0-4-0", "2026-11-10", "0.16.0"))
-    assert newest(moved)[0] == "blog/20261029-andrey-0-11-0"
+    moved = [("blog/20261029-andrey-0-11-0", "2026-11-11", "0.17.0"), *posts]
+    moved.append(("blog/20261103-andrey-0-13-0", "2026-11-11", "0.17.0"))
+    assert newest(moved)[0] == "blog/20261103-andrey-0-13-0"
 
 
 def test_the_blog_lists_the_newest_post_first(conf):
@@ -1904,14 +1905,14 @@ def test_a_release_without_art_takes_the_default_cover_and_one_with_art_keeps_it
     assert defaults, "no default cover to check; DEVELOPMENT.md shows one"
 
 
-def test_the_default_cover_is_navy_with_no_amber_dot():
+def test_the_default_cover_is_the_stipple_ground_with_no_amber_dot():
     css = re.sub(
         r"/\*.*?\*/", "", (ROOT / "docs" / "_static" / "benchmarks.css").read_text(), flags=re.S
     )
     rules = [(" ".join(s.split()), body) for s, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)]
     grounds = [body for selector, body in rules if selector.endswith(".release-default")]
     assert len(grounds) == 1
-    assert "var(--andrey-ground-navy)" in grounds[0] and "url(" not in grounds[0]
+    assert 'url("release-ground.jpg")' in grounds[0]
     # The art covers' dot above the version, and the default's rule that removes it.
     dot = ".release-cover .sd-card-text:nth-of-type(3)::before"
     assert "var(--andrey-ground-amber)" in dict(rules)[dot]

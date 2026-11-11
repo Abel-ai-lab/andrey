@@ -190,6 +190,35 @@ def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> N
         assert qg.pair_kwargs("lsnm_pair", qg.PAIR_N, key.seed) == bench.generation_kwargs(key)
 
 
+@pytest.mark.parametrize("cell", sorted(qg.WEAK_EDGE_CELLS))
+def test_weak_edge_cells_are_settings_of_the_ages_driver(cell: str) -> None:
+    """AGES's cells are settings of its benchmark driver at one of its sample sizes, each draw with
+    its true DAG, which has weak edges."""
+    qs, qw, n = qg.WEAK_EDGE_CELLS[cell]
+    assert (qs, qw) in qg.ages_cpu.CELLS and n in qg.ages_cpu.ROWS and qw > 0
+    assert cell == f"ages_paper_qs{qs}_qw{qw}_n{n}"
+    for seed, draw in zip(qg.SEEDS, qg.draws(cell), strict=True):
+        x, dag = qg.ages_cpu.sample(qs, qw, n, seed)
+        assert draw.truth.kind == "dag" and np.array_equal(draw.truth.to_numpy(), dag)
+        assert np.array_equal(draw.data, x) and x.shape == (n, qg.ages_cpu.D)
+
+
+@pytest.mark.parametrize("cell", sorted(qg.ORDER_CELLS))
+def test_order_cells_are_the_papers_simulation_at_the_drivers_size(cell: str) -> None:
+    """SCORE's and NoGAM's cells are regimes of their benchmark driver, drawn with z-scored
+    columns, 1,000 rows, and ``d`` edges (``er1``) or ``4 d`` (``er4``)."""
+    regime, d, density = qg.ORDER_CELLS[cell]
+    assert regime in qg.stein_cpu.REGIMES
+    assert regime.endswith("_standardized")
+    assert cell == f"{regime}_d{d}_{density}"
+    edges = d * qg.stein_cpu.DENSITIES[density] / 2
+    for draw in qg.draws(cell):
+        assert draw.data.shape == (qg.stein_cpu.ROWS, d)
+        assert np.allclose(draw.data.mean(axis=0), 0, atol=1e-9)
+        assert np.allclose(draw.data.std(axis=0), 1)
+        assert len(draw.truth.oriented_edges()) == edges
+
+
 def test_time_series_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate's time-series regimes are the harness's, and its Granger draws its driver's."""
     pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
@@ -279,9 +308,12 @@ def _regime_draws(regime: str) -> list:
     return out
 
 
-@pytest.mark.parametrize("cell", [*qg.REGIMES, *qg.PAIRS, "asia"])
+@pytest.mark.parametrize(
+    "cell", [*qg.REGIMES, *qg.PAIRS, *qg.LINEAR_SEM_CELLS, *qg.WEAK_EDGE_CELLS, "asia"]
+)
 def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) -> None:
-    """The gate's regimes, pairs, and ASIA list their columns in an order drawn from the seed.
+    """The gate's regimes, pairs, NOTEARS cells, AGES cells, and ASIA list their columns in an order
+    drawn from the seed.
 
     The control: ASIA's unshuffled columns, which follow its file; for the regimes and pairs, the
     same draws sorted by causal depth, since an Erdos-Renyi draw already numbers its nodes at
@@ -300,7 +332,12 @@ def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) ->
         plain = [scm.sample(n=5, seed=s, shuffle=False, scale="raw") for s in _ORDER_SEEDS]
         control, _ = _correlations(qg.Draw(ds.data, ds.graph) for ds in plain)
     else:
-        draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)
+        if cell in qg.LINEAR_SEM_CELLS:
+            draws = qg.linear_sem_draws(*qg.LINEAR_SEM_CELLS[cell])
+        elif cell in qg.WEAK_EDGE_CELLS:
+            draws = qg.weak_edge_draws(*qg.WEAK_EDGE_CELLS[cell])
+        else:
+            draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)
         control, _ = _correlations(draws, by_depth=True)
     mean, bound = _correlations(draws)
     assert abs(mean) < bound

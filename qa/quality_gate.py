@@ -51,12 +51,15 @@ from qa import reference_parity
 # The regimes whose data is not one plain sample, the published settings, and the scores of the
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
+import ages_cpu  # noqa: E402
 import camuv_cpu  # noqa: E402
 import fci_jci_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
 import jpcmciplus_cpu  # noqa: E402
+import notears_cpu  # noqa: E402
+import stein_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
 from andrey_bench import (  # noqa: E402
@@ -236,6 +239,19 @@ HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
     "latent_anm_er_tenth_d22_n1000": ("latent_anm_er_tenth", 22, 1000),
 }
 
+#: SCORE's and NoGAM's published regimes, drawn by their benchmark driver
+#: (``benchmarks/stein_cpu.py``) as in-claim cells of the comparison: the papers' simulation, a
+#: Gaussian process for each link and noise variances uniform on [0.4, 0.8], z-scored, 1,000 rows,
+#: at ``d`` variables and ``d`` edges (``er1``) or ``4 d`` (``er4``). SCORE's claim is Gaussian
+#: noise, at 10 and 20 variables here; NoGAM's is any additive noise, shown with Laplace and Gumbel
+#: noise at 10 variables, where a fit takes seconds.
+ORDER_CELLS: dict[str, tuple[str, int, str]] = {
+    "score_paper_standardized_d10_er1": ("score_paper_standardized", 10, "er1"),
+    "score_paper_standardized_d20_er4": ("score_paper_standardized", 20, "er4"),
+    "score_paper_laplace_standardized_d10_er1": ("score_paper_laplace_standardized", 10, "er1"),
+    "score_paper_gumbel_standardized_d10_er4": ("score_paper_gumbel_standardized", 10, "er4"),
+}
+
 #: FCI-JCI's published regimes, drawn by its benchmark driver (``benchmarks/fci_jci_cpu.py``) at
 #: the two in-claim cells of mechanism changes: the paper's small setting, 4 variables, and its
 #: larger one, 10, each with one context variable and 500 rows per regime. The environment is the
@@ -249,6 +265,30 @@ INDEX_PAG_CELLS: dict[str, str] = {"fci_jci_s4": "S4", "fci_jci_l10": "L10"}
 CONTEXT_CELLS: dict[str, str] = {
     "jpcmciplus_all_m10_t100": "all-M10-T100",
     "jpcmciplus_half_m10_t100": "half-M10-T100",
+}
+
+#: NOTEARS's published regime, drawn by its benchmark driver (``benchmarks/notears_cpu.py``) as two
+#: of its comparison's cells, as ``(scale, d)``: the simulation of the NOTEARS paper, a linear model
+#: on an Erdos-Renyi graph with ``2 d`` edges, Gaussian noise of unit variance, and 1,000 rows. On
+#: standardized columns, the scale of the comparison's decision cells, the median SHD over the
+#: gate's seeds is below the empty graph's by a clear margin only at 50 variables: at 10 it is 18.5
+#: against 20, and at 20 it is 40 against 40. On raw columns the variances grow along the causal
+#: order, which the least-squares fit reads, so that cell holds the fit to a near-exact recovery.
+LINEAR_SEM_CELLS: dict[str, tuple[str, int]] = {
+    "notears_paper_standardized_d50": ("standardized", 50),
+    "notears_paper_raw_d10": ("raw", 10),
+}
+
+#: AGES's published regime, drawn by its benchmark driver (``benchmarks/ages_cpu.py``) as two of
+#: its comparison's cells, as ``(qs, qw, n)``: the simulation of the AGES paper, a linear Gaussian
+#: model on 10 variables where each pair holds a strong edge with probability ``qs`` and a weak one
+#: with probability ``qw``. AGES directs edges beyond the CPDAG, so its graph is scored against the
+#: true DAG. Both cells leave pairs without an edge: on a complete graph, the paper's ``(0.3,
+#: 0.7)``, any complete DAG is about as close to the truth as the fit, so the gate could not tell a
+#: broken result from a good one there.
+WEAK_EDGE_CELLS: dict[str, tuple[float, float, int]] = {
+    "ages_paper_qs0.1_qw0.3_n10000": (0.1, 0.3, 10000),
+    "ages_paper_qs0.3_qw0.3_n10000": (0.3, 0.3, 10000),
 }
 
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
@@ -405,6 +445,37 @@ def hidden_cause_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
         x, marks, kind, _ = datasets.generate_one(key)
         types = datasets.latent_node_types(len(marks), key.latents)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind, node_types=types)))
+    return tuple(out)
+
+
+def order_draws(regime: str, d: int, density: str) -> tuple[Draw, ...]:
+    """One dataset per seed of a SCORE and NoGAM regime, with its true DAG, as the benchmark driver
+    draws it."""
+    out = []
+    for key in stein_cpu.regime_keys(regime, d, stein_cpu.DENSITIES[density], SEEDS):
+        x, marks, kind, _ = datasets.generate_one(key)
+        out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
+    return tuple(out)
+
+
+def weak_edge_draws(qs: float, qw: float, n: int) -> tuple[Draw, ...]:
+    """One dataset per seed of the AGES lane's setting ``(qs, qw)`` with ``n`` rows, with its true
+    DAG."""
+    out = []
+    for seed in SEEDS:
+        x, dag = ages_cpu.sample(qs, qw, n, seed)
+        out.append(Draw(x, GraphStructure.from_numpy(dag, kind="dag")))
+    return tuple(out)
+
+
+def linear_sem_draws(scale: str, d: int) -> tuple[Draw, ...]:
+    """One dataset per seed of the NOTEARS lane's Erdos-Renyi cell with Gaussian noise at ``scale``
+    and ``d`` variables, with its true DAG."""
+    out = []
+    for seed in SEEDS:
+        key = notears_cpu.cell_key("er2", d, "gaussian", scale, seed)
+        x, marks, kind, _ = datasets.generate_one(key)
+        out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
     return tuple(out)
 
 
@@ -642,7 +713,10 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         name: functools.partial(hidden_cause_draws, *cell)
         for name, cell in HIDDEN_CAUSE_CELLS.items()
     },
+    **{name: functools.partial(order_draws, *cell) for name, cell in ORDER_CELLS.items()},
     **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
+    **{name: functools.partial(linear_sem_draws, *cell) for name, cell in LINEAR_SEM_CELLS.items()},
+    **{name: functools.partial(weak_edge_draws, *cell) for name, cell in WEAK_EDGE_CELLS.items()},
     **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
@@ -725,6 +799,11 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
 # have: interventions, environments that change noise variances, domains, groups, or latents
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
+# SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
+# NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
+# fit reads the columns' units, so one cell has standardized columns and one raw. AGES runs on two
+# cells of its paper's simulation, where some edges are weak, and is scored against the true DAG,
+# whose directions it claims beyond the CPDAG's.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -735,6 +814,12 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
+#: SCORE and NoGAM need additive-noise data; each runs on the cells of its claim.
+SCORE_DATA = ("score_paper_standardized_d10_er1", "score_paper_standardized_d20_er4")
+NOGAM_DATA = (
+    "score_paper_laplace_standardized_d10_er1",
+    "score_paper_gumbel_standardized_d10_er4",
+)
 #: FCI-JCI needs data pooled from an observational and an interventional regime.
 INDEX_PAG_DATA = tuple(INDEX_PAG_CELLS)
 #: J-PCMCI+ needs time series from several datasets that differ through context variables.
@@ -855,6 +940,7 @@ SUPPORTED: dict[str, Method] = {
     "ICP": Method(icp_fit, "parents", tuple(f"icp_do_d{d}" for d, _ in INVARIANCE_SIZES)),
     "IGSP": Method(igsp_fit, "essential", KNOWN_TARGET_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
+    "AGES": Method(lambda x: andrey.ages(x), "dag", tuple(WEAK_EDGE_CELLS)),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
@@ -862,8 +948,11 @@ SUPPORTED: dict[str, Method] = {
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
+    "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),
+    "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
+    "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
@@ -1209,10 +1298,13 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 #: The cells that take over 10 seconds on a CI runner, slowest first. With several jobs they start
 #: first, so no worker is left fitting one long cell after the others have finished.
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
+    ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
     ("CAM-UV", "latent_anm_er_tenth_d22_n1000"),
+    ("NoGAM", "score_paper_gumbel_standardized_d10_er4"),
+    ("NoGAM", "score_paper_laplace_standardized_d10_er1"),
     ("CMIknn", "nonmonotone_er_d5"),
     ("CALM", "asia_gauss"),
     ("DYNOTEARS", "dynotears_paper_d20_n500"),
@@ -1228,10 +1320,13 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("ANM", "anm_pair_n1000"),
     ("GnIES", "noise_interventional_gauss_er_d20"),
     ("GIN", "latent_measurement_d12"),
+    ("ScoreMatching", "score_paper_standardized_d20_er4"),
     ("GPDC", "anm_er_d5"),
     ("VARMA-LiNGAM", "varma_lingam_paper_d3_n300"),
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
+    ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("NOTEARS", "notears_paper_raw_d10"),
 )
 
 

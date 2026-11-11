@@ -3,7 +3,9 @@
 The oracle lists the DAGs of a small CPDAG's class, keeps those that meet the claims, and directs an
 edge when every kept DAG directs it the same way; the MPDAG :func:`restrict` returns must be that
 graph, and with its residual clauses it must keep exactly those DAGs, with no clause that follows
-from the others or that keeps a head it can drop.
+from the others or that keeps a head it can drop. A graph with no consistent extension stands for no
+DAG to list: there the claims on undirected edges direct them, checked on fixed graphs and, on
+random ones, against a reading of the rule that takes one claim at a time.
 """
 
 from __future__ import annotations
@@ -14,8 +16,8 @@ import numpy as np
 import pytest
 
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.ancestral import ChainGraph, clause_mpdag, restrict
-from andrey.core.orient import dag2cpdag, meek
+from andrey.core.ancestral import ChainGraph, clause_mpdag, direct_claimed_edges, restrict
+from andrey.core.orient import cpdag_of_pdag, dag2cpdag, meek
 
 # Fang, Zhao, Liu, and He (2025), Figure 7a: A, B, C, and X form a clique of undirected edges, D is
 # joined to A and X, and B -> Y <- C, Y <- E.
@@ -271,14 +273,243 @@ def test_a_claim_the_class_cannot_meet_is_dropped(part):
     assert np.array_equal(mpdag, cpdag)
 
 
-def test_a_graph_that_stands_for_no_dag_drops_every_claim():
-    # The undirected 4-cycle a - b - c - d - a has no extension without a new collider.
-    pdag = _graph(4, [(0, 1), (1, 2), (2, 3), (3, 0)])
+# The undirected 4-cycle a - b - c - d - a has no extension without a new collider, and neither has
+# it with the edge d - e added.
+SQUARE = [(0, 1), (1, 2), (2, 3), (3, 0)]
+
+
+def _masks(d: int, required=(), forbidden=()) -> tuple[np.ndarray, np.ndarray]:
+    required_paths, forbidden_paths = np.zeros((d, d), dtype=bool), np.zeros((d, d), dtype=bool)
+    for pair in required:
+        required_paths[pair] = True
+    for pair in forbidden:
+        forbidden_paths[pair] = True
+    return required_paths, forbidden_paths
+
+
+def _no_extension(pdag: np.ndarray) -> bool:
+    try:
+        cpdag_of_pdag(pdag)
+    except ValueError:
+        return True
+    return False
+
+
+def test_a_claim_on_a_pair_that_is_not_adjacent_is_dropped_without_an_extension():
+    pdag = _graph(4, SQUARE)
     claim = np.zeros((4, 4), dtype=bool)
     claim[0, 2] = True
-    mpdag, clauses, unmet = restrict(pdag, claim, claim.T)
-    assert np.array_equal(mpdag, pdag) and clauses == []
+    applied: list = []
+    mpdag, clauses, unmet = restrict(pdag, claim, claim.T, edge_claims=applied)
+    assert np.array_equal(mpdag, pdag) and clauses == [] and applied == []
     assert unmet == [("required_paths", 0, 2), ("forbidden_paths", 2, 0)]
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {"required": [(0, 1)]},
+        {"forbidden": [(1, 0)]},
+        {"required": [(0, 1)], "forbidden": [(1, 0)]},
+    ],
+)
+def test_a_claim_directs_its_undirected_edge_without_an_extension(claims):
+    # a is an ancestor of b, or b is none of a: a -> b. R1 then gives b -> c, c -> d, and d -> e;
+    # d -> a would close a directed cycle, so d - a stays.
+    pdag = _graph(5, [*SQUARE, (3, 4)])
+    assert _no_extension(pdag)
+    applied: list = []
+    mpdag, clauses, unmet = restrict(pdag, *_masks(5, **claims), edge_claims=applied)
+    assert np.array_equal(mpdag, _graph(5, [(3, 0)], [(0, 1), (1, 2), (2, 3), (3, 4)]))
+    assert clauses == [] and unmet == []
+    assert applied == [
+        *(("required_paths", *pair) for pair in claims.get("required", [])),
+        *(("forbidden_paths", *pair) for pair in claims.get("forbidden", [])),
+    ]
+
+
+def test_a_claim_against_a_directed_edge_is_dropped_and_one_with_it_is_met():
+    # The square with a -> b directed: the marks stay whatever the claims say.
+    pdag = _graph(4, SQUARE[1:], [(0, 1)])
+    assert _no_extension(pdag)
+    against = _masks(4, required=[(1, 0)], forbidden=[(0, 1)])
+    applied: list = []
+    mpdag, clauses, unmet = restrict(pdag, *against, edge_claims=applied)
+    assert np.array_equal(mpdag, pdag) and clauses == [] and applied == []
+    assert unmet == [("required_paths", 1, 0), ("forbidden_paths", 0, 1)]
+    mpdag, clauses, unmet = restrict(
+        pdag, *_masks(4, required=[(0, 1)], forbidden=[(1, 0)]), edge_claims=applied
+    )
+    assert np.array_equal(mpdag, pdag) and unmet == [] and applied == []
+
+
+def test_a_claim_on_a_bidirected_edge_is_dropped():
+    pdag = _graph(4, SQUARE[1:])
+    pdag[0, 1] = pdag[1, 0] = ARROW
+    assert _no_extension(pdag)
+    mpdag, _, unmet = restrict(pdag, *_masks(4, required=[(0, 1)], forbidden=[(0, 1)]))
+    assert np.array_equal(mpdag, pdag)
+    assert unmet == [("required_paths", 0, 1), ("forbidden_paths", 0, 1)]
+
+
+def test_meeks_rules_follow_the_claimed_edges():
+    # The square a - b - c - d - a, which leaves the graph without an extension, beside the
+    # triangle e - f - g with e - h, h adjacent to neither f nor g.
+    pdag = _graph(8, [*SQUARE, (4, 5), (5, 6), (4, 6), (4, 7)])
+    # R1: h -> e claimed, so e -> f and e -> g; f - g stays.
+    mpdag, _, unmet = restrict(pdag, *_masks(8, required=[(7, 4)]))
+    assert np.array_equal(mpdag, _graph(8, [*SQUARE, (5, 6)], [(7, 4), (4, 5), (4, 6)]))
+    assert unmet == []
+    # R2: e -> f and f -> g claimed, so e -> g.
+    mpdag, _, unmet = restrict(pdag, *_masks(8, required=[(4, 5), (5, 6)]))
+    assert _directed(mpdag) == {(4, 5), (5, 6), (4, 6)} and unmet == []
+    # R3: b - a, b - c, and b - d with a -> d <- c claimed and a, c not adjacent, so b -> d.
+    kite = _graph(8, [*SQUARE, (1, 3), (4, 5), (5, 6), (6, 7), (7, 4)])
+    mpdag, _, unmet = restrict(kite, *_masks(8, required=[(0, 3), (2, 3)]))
+    assert _directed(mpdag) == {(0, 3), (2, 3), (1, 3)} and unmet == []
+    # R4: a - d and a - b with b -> c -> d claimed, a adjacent to c, and b, d not adjacent, so
+    # a -> d.
+    four = _graph(8, [(0, 1), (0, 2), (0, 3), (1, 2), (2, 3), (4, 5), (5, 6), (6, 7), (7, 4)])
+    mpdag, _, unmet = restrict(four, *_masks(8, required=[(1, 2), (2, 3)]))
+    assert _directed(mpdag) == {(1, 2), (2, 3), (0, 3)} and unmet == []
+
+
+def test_claims_for_both_directions_of_an_edge_are_all_dropped():
+    pdag = _graph(5, [*SQUARE, (3, 4)])
+    applied: list = []
+    mpdag, _, unmet = restrict(
+        pdag, *_masks(5, required=[(0, 1), (1, 0), (3, 4)], forbidden=[(0, 1)]), edge_claims=applied
+    )
+    # a - b stays undirected; d -> e is applied, and R1 directs nothing from it.
+    assert np.array_equal(mpdag, _graph(5, SQUARE, [(3, 4)]))
+    assert unmet == [("required_paths", 0, 1), ("required_paths", 1, 0), ("forbidden_paths", 0, 1)]
+    assert applied == [("required_paths", 3, 4)]
+
+
+def test_claims_that_close_a_directed_cycle_are_all_dropped():
+    # Around the square, the four claims ask for a -> b -> c -> d -> a.
+    pdag = _graph(5, [*SQUARE, (3, 4)])
+    around = [(0, 1), (1, 2), (2, 3), (3, 0)]
+    applied: list = []
+    mpdag, _, unmet = restrict(pdag, *_masks(5, required=[*around, (3, 4)]), edge_claims=applied)
+    assert np.array_equal(mpdag, _graph(5, SQUARE, [(3, 4)]))
+    assert unmet == [("required_paths", *pair) for pair in around]
+    assert applied == [("required_paths", 3, 4)]
+    # With b -> c -> d directed by the data, the claims d -> a and a -> b close the cycle together;
+    # each alone is applied.
+    pdag = _graph(5, [(0, 1), (3, 0), (3, 4)], [(1, 2), (2, 3)])
+    assert _no_extension(pdag)
+    mpdag, _, unmet = restrict(pdag, *_masks(5, required=[(3, 0), (0, 1)]))
+    assert np.array_equal(mpdag, pdag)
+    assert unmet == [("required_paths", 0, 1), ("required_paths", 3, 0)]
+    mpdag, _, unmet = restrict(pdag, *_masks(5, required=[(3, 0)]))
+    assert (3, 0) in _directed(mpdag) and unmet == []
+
+
+def _random_pdag(rng: np.random.Generator, d: int) -> np.ndarray:
+    """A random mark matrix over ``d`` nodes: each pair is non-adjacent, undirected, or directed
+    one way, and now and then bidirected."""
+    marks = np.full((d, d), NULL, dtype=np.int8)
+    for i, j in itertools.combinations(range(d), 2):
+        kind = rng.choice(5, p=[0.5, 0.25, 0.11, 0.11, 0.03])
+        if kind:
+            marks[i, j] = ARROW if kind in (3, 4) else TAIL
+            marks[j, i] = ARROW if kind in (2, 4) else TAIL
+    return marks
+
+
+def _one_at_a_time(pdag: np.ndarray, claims: list) -> tuple[set, set, set]:
+    """The edges the claims direct and the claims applied and dropped, read off one claim at a
+    time: a claim is dropped when its pair has no undirected edge directed its way or to direct,
+    when another claim asks for the reverse, or when the edges every claim asks for, with the
+    directed edges of ``pdag``, lead from its head back to its tail."""
+    asks = {c: (c[1], c[2]) if c[0] == "required_paths" else (c[2], c[1]) for c in claims}
+    line = {c for c, (a, b) in asks.items() if pdag[a, b] == TAIL and pdag[b, a] == TAIL}
+    met = {c for c, (a, b) in asks.items() if pdag[a, b] == TAIL and pdag[b, a] == ARROW}
+    reverse = {c for c in line if asks[c][::-1] in {asks[o] for o in line}}
+    reach = (pdag == TAIL) & (pdag.T == ARROW)
+    for c in line - reverse:
+        reach[asks[c]] = True
+    for k in range(len(pdag)):
+        reach |= reach[:, k, None] & reach[None, k, :]
+    cyclic = {c for c in line - reverse if reach[asks[c][::-1]]}
+    applied = line - reverse - cyclic
+    return {asks[c] for c in applied}, applied, set(claims) - applied - met
+
+
+def test_claimed_edges_on_random_graphs_without_an_extension():
+    rng = np.random.default_rng(0)
+    checked = dropped_some = applied_some = conflicts = 0
+    while checked < 300:
+        d = int(rng.integers(4, 9))
+        pdag = _random_pdag(rng, d)
+        if not _no_extension(pdag):
+            continue
+        checked += 1
+        pairs = rng.permutation([(i, j) for i in range(d) for j in range(d) if i != j])
+        claims = [
+            ("required_paths" if rng.random() < 0.5 else "forbidden_paths", int(i), int(j))
+            for i, j in pairs[: rng.integers(1, 7)]
+        ]
+        edges, applied, dropped = _one_at_a_time(pdag, claims)
+        out, was_applied, was_dropped = direct_claimed_edges(pdag, claims)
+        assert was_applied == [c for c in claims if c in applied]
+        assert was_dropped == [c for c in claims if c in dropped]
+        # The skeleton and every mark the graph had stay; each applied claim's edge is directed.
+        assert np.array_equal(out != NULL, pdag != NULL)
+        lines = (pdag == TAIL) & (pdag.T == TAIL)
+        assert np.array_equal(out[~lines], pdag[~lines])
+        assert edges <= _directed(out)
+        if edges:
+            start = pdag.copy()
+            for a, b in edges:
+                start[a, b], start[b, a] = TAIL, ARROW
+            assert np.array_equal(out, meek(start, rule4=True))
+            assert np.array_equal(meek(out, rule4=True), out)
+        else:
+            assert np.array_equal(out, pdag)
+        # Neither the order of the claims nor that of the columns changes the result.
+        shuffled = [claims[k] for k in rng.permutation(len(claims))]
+        again, again_applied, again_dropped = direct_claimed_edges(pdag, shuffled)
+        assert np.array_equal(again, out)
+        assert set(again_applied) == applied and set(again_dropped) == dropped
+        perm = rng.permutation(d)  # column k of the relabeled graph is column perm[k]
+        where = np.argsort(perm)
+        moved = [(part, int(where[x]), int(where[y])) for part, x, y in claims]
+        relabeled, moved_applied, moved_dropped = direct_claimed_edges(
+            pdag[np.ix_(perm, perm)], moved
+        )
+        assert np.array_equal(relabeled, out[np.ix_(perm, perm)])
+        assert {(p, int(perm[x]), int(perm[y])) for p, x, y in moved_applied} == applied
+        assert {(p, int(perm[x]), int(perm[y])) for p, x, y in moved_dropped} == dropped
+        # restrict takes this branch, with the claims in the order of its masks.
+        required_paths, forbidden_paths = _masks(
+            d,
+            [c[1:] for c in claims if c[0] == "required_paths"],
+            [c[1:] for c in claims if c[0] == "forbidden_paths"],
+        )
+        listed: list = []
+        mpdag, clauses, unmet = restrict(pdag, required_paths, forbidden_paths, edge_claims=listed)
+        assert np.array_equal(mpdag, out) and clauses == []
+        assert set(unmet) == dropped and set(listed) == applied
+        dropped_some += bool(dropped)
+        applied_some += bool(applied)
+        conflicts += len(applied) + len(dropped) < len(claims) or bool(
+            {c for c in dropped if pdag[c[1], c[2]] == TAIL and pdag[c[2], c[1]] == TAIL}
+        )
+    assert min(dropped_some, applied_some, conflicts) >= 20, (dropped_some, applied_some, conflicts)
+
+
+def test_a_graph_with_an_extension_lists_no_edge_claim():
+    # Fang et al. (2025), Example 2 on Figure 7a: the published rule applies, as without the sink.
+    cpdag = _graph(7, FIGURE_7, FIGURE_7_ARROWS)
+    required_paths, forbidden_paths = _masks(7, required=[(D, Y)], forbidden=[(X, A)])
+    listed: list = []
+    with_sink = restrict(cpdag, required_paths, forbidden_paths, edge_claims=listed)
+    without = restrict(cpdag, required_paths, forbidden_paths)
+    assert listed == [] and np.array_equal(with_sink[0], without[0])
+    assert with_sink[1:] == without[1:]
+    assert _directed(with_sink[0]) > _directed(cpdag)
 
 
 def test_the_orientation_components_give_the_mpdag_of_clauses():

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import json
 import warnings
@@ -12,7 +13,7 @@ import pytest
 
 import andrey
 from andrey import Knowledge
-from andrey.api._method import structure_param
+from andrey.api._method import restrict_paths, structure_param
 from andrey.cli import main
 from andrey.constraint.fci import _remove_by_possible_dsep, fci_orient
 from andrey.core import ARROW, NULL, TAIL
@@ -25,7 +26,7 @@ from andrey.core.knowledge import (
     resolve,
     resolve_lagged,
 )
-from andrey.core.orient import dag2cpdag, from_structure, meek
+from andrey.core.orient import cpdag_of_pdag, dag2cpdag, from_structure, meek, to_structure
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
@@ -685,18 +686,28 @@ def test_an_undirected_result_refuses_the_path_parts(name, setting, part, data):
 def test_a_part_warns_exactly_where_it_is_experimental(data):
     required = Knowledge(required_paths=[("a", "f")])
     forbidden = Knowledge(forbidden_paths=[("f", "a")])
-    for part, knowledge in (("required_paths", required), ("forbidden_paths", forbidden)):
+    experimental = [
+        *((name, "forbidden_paths") for name in ("iamb", "inter_iamb")),
+        *((name, "required_paths") for name in ("tabu", "mmhc", "rsmax2")),
+    ]
+    for name, part in experimental:
+        knowledge = required if part == "required_paths" else forbidden
         with pytest.warns(
-            andrey.ExperimentalWarning, match=f"grasp: knowledge {part} is experimental"
+            andrey.ExperimentalWarning, match=f"{name}: knowledge {part} is experimental"
         ):
-            andrey.grasp(data, knowledge=knowledge)
+            getattr(andrey, name)(data, knowledge=knowledge)
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.KnowledgeWarning)
-        for name in ("pc", "ges", "boss", "fci", "gfci", "boss_fci", "direct_lingam"):
+        both = ("pc", "ges", "xges", "hc", "boss", "grasp", "exact_search")
+        for name in (*both, "fci", "gfci", "boss_fci", "grasp_fci", "direct_lingam"):
             getattr(andrey, name)(data, knowledge=required)
             getattr(andrey, name)(data, knowledge=forbidden)
-        for name in ("fci", "gfci", "boss_fci"):
+        for name in ("tabu", "mmhc", "rsmax2"):
+            getattr(andrey, name)(data, knowledge=forbidden)
+        for name in ("iamb", "inter_iamb"):
+            getattr(andrey, name)(data, knowledge=required)
+        for name in ("fci", "gfci", "boss_fci", "grasp_fci"):
             getattr(andrey, name)(data, knowledge=Knowledge(confounded=[("a", "f")]))
 
 
@@ -712,6 +723,59 @@ def test_a_path_the_result_cannot_have_is_dropped(data, name):
     alone = _fit(name, data, knowledge=met)
     assert out.structure == alone.structure and alone.metadata["unmet_knowledge"] == []
     assert out.metadata["ancestor_clauses"] == alone.metadata["ancestor_clauses"]
+
+
+def _square(out):
+    """``out`` with the CPDAG a - b - c - d - a, d - e, which has no consistent extension."""
+    marks = np.full((6, 6), NULL, dtype=np.int8)
+    for i, j in [(0, 1), (1, 2), (2, 3), (3, 0), (3, 4)]:
+        marks[i, j] = marks[j, i] = TAIL
+    return dataclasses.replace(out, _structure=to_structure(marks, kind="cpdag", labels=LABELS))
+
+
+def test_a_graph_with_no_extension_takes_the_claims_on_its_edges(data):
+    # a an ancestor of b directs a -> b, and Meek's rules then b -> c -> d -> e; d - a would close
+    # a cycle. a and c are not adjacent, so the claim on them is dropped.
+    out = _square(andrey.pc(data))
+    knowledge = Knowledge(required_paths=[("a", "b")], forbidden_paths=[("c", "a")])
+    paths = resolve(knowledge, 6, LABELS, method="pc")
+    with pytest.warns(andrey.KnowledgeWarning, match=r"andrey.pc: .*\('c', 'a'\)") as caught:
+        found = restrict_paths(out, paths, "pc")
+    assert len(caught) == 1 and "('a', 'b')" not in str(caught[0].message)
+    assert found.metadata["edge_claims"] == [["required_paths", "a", "b"]]
+    assert found.metadata["unmet_knowledge"] == [["forbidden_paths", "c", "a"]]
+    assert found.metadata["ancestor_clauses"] == []
+    marks = from_structure(found.structure)
+    directed = {
+        (LABELS[i], LABELS[j]) for i, j in np.argwhere((marks == TAIL) & (marks.T == ARROW))
+    }
+    assert directed == {("a", "b"), ("b", "c"), ("c", "d"), ("d", "e")}
+    assert marks[3, 0] == TAIL and marks[0, 3] == TAIL
+    # A claim against an edge directed already is dropped, and the graph stays.
+    against = resolve(Knowledge(required_paths=[("b", "a")]), 6, LABELS, method="pc")
+    with pytest.warns(andrey.KnowledgeWarning, match=r"\('b', 'a'\)"):
+        again = restrict_paths(found, against, "pc")
+    assert again.structure == found.structure and again.metadata["edge_claims"] == []
+    assert again.metadata["unmet_knowledge"] == [["required_paths", "b", "a"]]
+
+
+#: The methods that restrict a CPDAG whose search can return a graph with no consistent extension:
+#: they direct edges by tests, one collider at a time. The others return the CPDAG of a DAG.
+TEST_ORIENTED = ("pc", "cdnod", "iamb", "inter_iamb", "mmpc")
+
+
+@pytest.mark.parametrize("name", [m for m in PATH_METHODS if m not in TEST_ORIENTED])
+def test_a_search_over_dags_always_restricts_a_class(name):
+    # Short, noisy samples, where the tests of a constraint-based search contradict each other: a
+    # score-based or a permutation search still returns a graph with a consistent extension, so
+    # the claims restrict its class and none is read as an edge.
+    cpdag = {"structure": "cpdag"} if structure_param(REGISTRY[name]) else {}
+    knowledge = Knowledge(required_paths=[("a", "f"), ("c", "e")], forbidden_paths=[("f", "b")])
+    for seed in range(4):
+        sample = _sample(seed, n=60)
+        cpdag_of_pdag(_marks(_fit(name, sample, **cpdag))[0])  # raises without an extension
+        out = _fit(name, sample, knowledge=knowledge, **cpdag)
+        assert out.metadata["edge_claims"] == []
 
 
 def test_knowledge_no_dag_meets_raises_before_the_search(data):

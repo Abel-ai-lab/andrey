@@ -37,7 +37,11 @@ DRAWS = {
         "sample_cut": "CHAIN",
     },
     "rcd": {"sample": "EDGES"},
-    "score_search": {"sample_intervened": "CHAIN", "sample_noise_shift": "CHAIN"},
+    "score_search": {
+        "sample_intervened": "CHAIN",
+        "sample_noise_shift": "CHAIN",
+        "sample_triangle": "TRIANGLE",
+    },
     "time_series": {"sample_panel": "CHAIN"},
     "viz": {"sample": "EDGES"},
 }

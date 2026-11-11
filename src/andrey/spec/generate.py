@@ -57,8 +57,8 @@ MARKOV_CHECK_INVOCATION = (
 )
 
 EXPERIMENTAL_NOTE = (
-    "Methods marked experimental have no published benchmark, may change their API without "
-    "deprecation, and warn with `andrey.ExperimentalWarning` on their first call."
+    "Methods marked experimental are not supported (see each one's Limitations), may change their "
+    "API without deprecation, and warn with `andrey.ExperimentalWarning` on their first call."
 )
 
 _JSON_TYPES: dict[str, dict] = {
@@ -581,9 +581,11 @@ def render_skill() -> str:
         "reads only a covariance, "
         + ", ".join(f"`{name}`" for name in EM_METHODS)
         + ", refuse a missing value under `null` and take `em`: structural EM, which runs the "
-        "search on the expected covariance of the data 10 times and assumes values missing "
+        "search on the expected covariance of the data 10 times, with 5 parameter-only EM steps "
+        "on the current graph before each search after the first, and assumes values missing "
         "completely at random or at random given observed values; `metadata.em` records its "
-        "rounds and the observed-data log-likelihood after each. `em` is supported in "
+        "rounds, the observed-data log-likelihood after each, and whether each changed the "
+        "graph, and a fit whose last round changed it logs a warning. `em` is supported in "
         + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
         + ", where it measured no less accurate than a reference implementation, and "
         "experimental in the others, which have none to compare with. Every other method refuses "

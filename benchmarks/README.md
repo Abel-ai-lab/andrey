@@ -137,7 +137,8 @@ benchmarks/start_gnies.sh
 export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
-The references of the Stein-score screen, `stein_cpu.py`, need NumPy 1 and share an environment
+The references of [SCORE and NoGAM](comparisons/score-nogam.md), `stein_cpu.py`, need NumPy 1 and
+share an environment
 built from the lock file `requirements-stein.txt`: the authors' SCORE code, NoGAM in dodiscover at
 a pinned commit, and CausalDisco. SCORE has no package release, so `start_stein.sh` downloads its
 files at a pinned commit, checks each one's SHA-256, and keeps them in the git-ignored
@@ -148,6 +149,18 @@ so load R as `start_r.sh --env` prints before a run:
 benchmarks/start_stein.sh
 export ANDREY_BENCH_STEIN_PYTHON=$PWD/benchmarks/.venv-stein/bin/python
 export ANDREY_BENCH_SCORE=$PWD/benchmarks/.score
+```
+
+The references of the NOTEARS and DAGMA lane, `notears_cpu.py`, share an environment built from the
+lock file `requirements-notears.txt`: the authors' NOTEARS code, the authors' package dagma, and
+CausalDisco for the sortability controls. NOTEARS has no package release, so `start_notears.sh`
+downloads its file at a pinned commit, checks its SHA-256, and keeps it in the git-ignored
+`benchmarks/.notears`, from which the benchmark loads it:
+
+```shell
+benchmarks/start_notears.sh
+export ANDREY_BENCH_NOTEARS_PYTHON=$PWD/benchmarks/.venv-notears/bin/python
+export ANDREY_BENCH_NOTEARS=$PWD/benchmarks/.notears
 ```
 
 The authors' LOCI code, the reference for LOCI, has no license, so the harness runs it unmodified
@@ -173,6 +186,17 @@ export ANDREY_BENCH_MISSDAG=$PWD/benchmarks/.missdag/MissDAG-<commit>
 export ANDREY_BENCH_MISSDAG_PYTHON=$PWD/benchmarks/.venv-missdag/bin/python
 benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
+```
+
+The `m2-tetrad` lane runs Tetrad's FGES, BOSS, and GRaSP under its EM covariance policy, with its
+effective sample size at the number of rows and at the mean pairwise count, which tetrad-lib has
+from 8.0.0. `start_tetrad_missing.sh` downloads that release's shaded jar from Maven
+Central into the git-ignored `benchmarks/.tetrad-missing` and checks its SHA-256; the other Tetrad
+lanes keep the jars their pages name:
+
+```shell
+benchmarks/start_tetrad_missing.sh    # prints the export below
+export ANDREY_BENCH_TETRAD_MISSING_JAR=$PWD/benchmarks/.tetrad-missing/tetrad-lib-8.0.0-shaded.jar
 ```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that

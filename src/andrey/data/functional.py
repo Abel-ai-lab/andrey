@@ -4,8 +4,9 @@ A functional spec draws per-edge parameters and then evaluates the SCM in topolo
 sparse edge list -- no dense adjacency. ``linear`` is the causally-sufficient default;
 ``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families,
 ``nonmonotone`` an additive-noise family whose effects partial correlation does not see, and
-``location_scale`` (LSNM) a family whose noise scale is a function of the parents. All five share
-one topological-evaluation loop and differ only in the per-node combine rule.
+``location_scale`` (LSNM) a family whose noise scale is a function of the parents, and
+``random_features`` an additive-noise family whose functions are approximate Gaussian-process
+draws. All six share one topological-evaluation loop and differ only in the per-node combine rule.
 :meth:`Linear.draw_unitless` draws the weights and noise scales of ``scale="unitless"``.
 """
 
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
+from scipy.special import expit
 
 from .graphs import DAGDraw
 
@@ -52,6 +54,18 @@ class Functional:
     def draw_scale_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
         """Per-edge weights of the noise scale; empty, with no draws, unless a subclass has one."""
         return np.empty(0)
+
+    @property
+    def options(self) -> dict:
+        """The family's own settings, as a dataset's provenance records them; empty without."""
+        return {}
+
+    def scale_effect(self, weights: np.ndarray, factor: float) -> np.ndarray:
+        """Return ``weights`` with ``factor`` applied as ``soft(weight_scale=factor)`` applies it.
+
+        Every weight is multiplied by ``factor`` unless a subclass scales its own part.
+        """
+        return weights * factor
 
     def _node(
         self, parent_values: np.ndarray, weights: np.ndarray, noise_c: np.ndarray
@@ -241,15 +255,63 @@ class AdditiveNoise(Functional):
 class PostNonlinear(Functional):
     """Post-nonlinear model ``X_c = g2(sum_p w_{p,c} X_p + noise_c)`` with invertible ``g2``.
 
-    ``g2(z) = z + 0.5 tanh(z)`` is strictly increasing (invertible), the PNL requirement, with a
-    bounded nonlinear term so the transform does not amplify signal down the causal order into
-    overflow.
+    The outer transform ``g2`` is strictly increasing on the real line, the requirement of the
+    post-nonlinear model (Zhang and Hyvarinen 2009), and ``outer`` names it:
+
+    - ``"tanh"``, the default: ``g2(z) = z + 0.5 tanh(z)``, with a bounded nonlinear term so the
+      transform does not amplify signal down the causal order into overflow.
+    - ``"cube"``: ``g2(z) = z**3``, the transform of the post-nonlinear data of Montagna et al.
+      (2023). It triples the exponent at every generation, so under ``scale="standardize"`` and
+      ``scale="raw"``, which evaluate the model on raw values, a path of more than a few edges
+      overflows and the sample raises; ``scale="rescale"`` bounds it.
+    - ``"cube_root"``: ``g2(z) = z**(1/3)``, the inverse of ``"cube"``, which compresses large
+      values and has an unbounded slope at 0.
+    - ``"sigmoid"``: ``g2(z) = 1 / (1 + exp(-z))``, the logistic transform of the post-nonlinear
+      data of Lachapelle et al. (2020); the simulation of Zhang and Hyvarinen (2009) takes a
+      ``tanh``, the same shape. Its values lie in ``(0, 1)``, and in float64 it returns exactly
+      0 or 1 for an argument beyond about 37 in absolute value.
+
+    Parameters
+    ----------
+    weight_range : tuple of float, default=(0.5, 2.0)
+        Magnitude range of the edge weights, each drawn with a random sign.
+    outer : {"tanh", "cube", "cube_root", "sigmoid"}, default="tanh"
+        The outer transform ``g2``. It draws nothing, so the weights and the noise are those of
+        the default on the same seed.
+
+    Raises
+    ------
+    ValueError
+        If ``outer`` is not one of the transforms.
+
+    References
+    ----------
+    Zhang, K., and Hyvarinen, A. (2009). On the identifiability of the post-nonlinear causal
+    model. Proceedings of the 25th Conference on Uncertainty in Artificial Intelligence, 647-655.
+
+    Lachapelle, S., Brouillard, P., Deleu, T., and Lacoste-Julien, S. (2020). Gradient-based
+    neural DAG learning. International Conference on Learning Representations.
+
+    Montagna, F., Mastakouri, A. A., Eulig, E., Noceti, N., Rosasco, L., Janzing, D., Aragam, B.,
+    and Locatello, F. (2023). Assumption violations in causal discovery and the robustness of
+    score matching. Advances in Neural Information Processing Systems 36.
     """
 
     name: str = "post_nonlinear"
+    outer: str = "tanh"
+
+    def __post_init__(self) -> None:
+        """Check that ``outer`` names a transform."""
+        if self.outer not in OUTER_TRANSFORMS:
+            raise ValueError(f"outer must be one of {tuple(OUTER_TRANSFORMS)}, got {self.outer!r}")
+
+    @property
+    def options(self) -> dict:
+        """The outer transform, when it is not the default."""
+        return {} if self.outer == "tanh" else {"outer": self.outer}
 
     def _node(self, parent_values, weights, noise_c):
-        return _g2(parent_values @ weights + noise_c)
+        return OUTER_TRANSFORMS[self.outer](parent_values @ weights + noise_c)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -336,6 +398,93 @@ class LocationScale(Functional):
 
 
 @dataclass(frozen=True, kw_only=True)
+class RandomFeatures(Functional):
+    """Additive-noise model ``X_c = sum_p f_{p,c}(X_p) + noise_c`` with Gaussian-process links.
+
+    Each ``f_{p,c}`` is one approximate draw of a Gaussian process with mean 0 and the kernel
+    ``exp(-(u - v)**2 / (2 length_scale**2))``, built from ``n_features`` random Fourier features
+    (Rahimi and Recht 2007):
+    ``f(u) = sqrt(2 / n_features) sum_k a_k cos(omega_k u + b_k)`` with frequencies
+    ``omega_k ~ N(0, 1 / length_scale**2)``, phases ``b_k ~ U[0, 2 pi]``, and amplitudes
+    ``a_k ~ N(0, 1)``. Over the draws, ``f`` has mean 0, variance 1 at every point, and that
+    kernel as its covariance, and it approaches a Gaussian process as ``n_features`` grows. One
+    function per parent, summed, is the additive model of the simulations of Buhlmann, Peters,
+    and Ernest (2014), which draw each function from a Gaussian process of bandwidth 1; the cost is
+    ``n * n_features`` per edge where an exact draw costs ``n**3``. Each function is bounded, so no
+    variance accumulates down the causal order.
+
+    ``params.weights`` has shape ``(m, 3, n_features)``: for each edge its frequencies, phases,
+    and amplitudes. ``weight_range`` is not used. ``soft(weight_scale=...)`` multiplies the
+    amplitudes of the edges into its target, and ``soft(weights="redraw")`` draws their functions
+    anew. The length scale is in the units the parents have when their children read them: raw
+    values under ``scale="standardize"`` and ``scale="raw"``, unit variance under
+    ``scale="rescale"``.
+
+    Parameters
+    ----------
+    n_features : int, default=100
+        The number of random Fourier features of each function, at least 1.
+    length_scale : float, default=1.0
+        The length scale (bandwidth) of the kernel, finite and positive.
+
+    Raises
+    ------
+    ValueError
+        If ``n_features`` is not a whole number of at least 1 or ``length_scale`` is not finite
+        and positive.
+
+    References
+    ----------
+    Rahimi, A., and Recht, B. (2007). Random features for large-scale kernel machines. Advances
+    in Neural Information Processing Systems 20.
+
+    Buhlmann, P., Peters, J., and Ernest, J. (2014). CAM: Causal additive models,
+    high-dimensional order search and penalized regression. The Annals of Statistics 42(6),
+    2526-2556.
+    """
+
+    name: str = "random_features"
+    n_features: int = 100
+    length_scale: float = 1.0
+
+    def __post_init__(self) -> None:
+        """Check the number of features and the length scale."""
+        if isinstance(self.n_features, bool) or not isinstance(self.n_features, int | np.integer):
+            raise ValueError(f"n_features must be a whole number >= 1, got {self.n_features!r}")
+        if self.n_features < 1:
+            raise ValueError(f"n_features must be a whole number >= 1, got {self.n_features!r}")
+        if not (np.isfinite(self.length_scale) and self.length_scale > 0):
+            raise ValueError(f"length_scale must be finite and positive, got {self.length_scale!r}")
+        object.__setattr__(self, "n_features", int(self.n_features))
+        object.__setattr__(self, "length_scale", float(self.length_scale))
+
+    @property
+    def options(self) -> dict:
+        """The number of features and the length scale."""
+        return {"n_features": self.n_features, "length_scale": self.length_scale}
+
+    def draw_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
+        """Per-edge frequencies, phases, and amplitudes, shape ``(m, 3, n_features)``."""
+        shape = (draw.parents.shape[0], self.n_features)
+        frequencies = rng.standard_normal(shape) / self.length_scale
+        phases = rng.uniform(0.0, 2.0 * np.pi, size=shape)
+        amplitudes = rng.standard_normal(shape)
+        return np.stack([frequencies, phases, amplitudes], axis=1)
+
+    def scale_effect(self, weights: np.ndarray, factor: float) -> np.ndarray:
+        """Return ``weights`` with the amplitudes multiplied by ``factor``."""
+        scaled = weights.copy()
+        scaled[:, 2] *= factor
+        return scaled
+
+    def _node(self, parent_values, weights, noise_c):
+        signal = np.zeros(parent_values.shape[0])
+        for values, (frequencies, phases, amplitudes) in zip(parent_values.T, weights):
+            signal += np.cos(np.outer(values, frequencies) + phases) @ amplitudes
+        return noise_c + np.sqrt(2.0 / self.n_features) * signal
+
+
+@dataclass(frozen=True, kw_only=True)
 class VAR(Functional):
     """Vector-autoregressive temporal model: instantaneous DAG mixing ``B0`` plus lag matrices.
 
@@ -415,12 +564,31 @@ def additive_noise(weight_range: tuple[float, float] = (0.5, 2.0)) -> AdditiveNo
     return AdditiveNoise(weight_range=weight_range)
 
 
-def post_nonlinear(weight_range: tuple[float, float] = (0.5, 2.0)) -> PostNonlinear:
+def post_nonlinear(
+    weight_range: tuple[float, float] = (0.5, 2.0), *, outer: str = "tanh"
+) -> PostNonlinear:
     """Build a post-nonlinear (PNL) spec.
 
     An invertible nonlinearity of a linear combination plus noise.
+
+    Parameters
+    ----------
+    weight_range : tuple of float, default=(0.5, 2.0)
+        Magnitude range of the edge weights, each drawn with a random sign.
+    outer : {"tanh", "cube", "cube_root", "sigmoid"}, default="tanh"
+        The outer transform, strictly increasing on the real line; see :class:`PostNonlinear` for
+        each one and its source.
+
+    Returns
+    -------
+    PostNonlinear
+
+    Raises
+    ------
+    ValueError
+        If ``outer`` is not one of the transforms.
     """
-    return PostNonlinear(weight_range=weight_range)
+    return PostNonlinear(weight_range=weight_range, outer=outer)
 
 
 def nonmonotone(weight_range: tuple[float, float] = (0.5, 2.0)) -> NonMonotone:
@@ -437,6 +605,30 @@ def location_scale(
     See :class:`LocationScale` for the model, ``scale_range``, and the reference.
     """
     return LocationScale(weight_range=weight_range, scale_range=scale_range)
+
+
+def random_features(n_features: int = 100, length_scale: float = 1.0) -> RandomFeatures:
+    """Build an additive-noise spec whose functions are approximate Gaussian-process draws.
+
+    Parameters
+    ----------
+    n_features : int, default=100
+        The number of random Fourier features of each edge's function, at least 1.
+    length_scale : float, default=1.0
+        The length scale of the Gaussian-process kernel, finite and positive.
+
+    Returns
+    -------
+    RandomFeatures
+        See :class:`RandomFeatures` for the model, its parameters, and the references.
+
+    Raises
+    ------
+    ValueError
+        If ``n_features`` is not a whole number of at least 1 or ``length_scale`` is not finite
+        and positive.
+    """
+    return RandomFeatures(n_features=n_features, length_scale=length_scale)
 
 
 def var(n_lags: int = 1, lag_density: float = 0.3) -> VAR:
@@ -457,6 +649,16 @@ def _nl(z: np.ndarray) -> np.ndarray:
 def _g2(z: np.ndarray) -> np.ndarray:
     """Map the PNL outer nonlinearity: strictly increasing (invertible), bounded nonlinear term."""
     return z + 0.5 * np.tanh(z)
+
+
+def _cube(z: np.ndarray) -> np.ndarray:
+    """Map ``z`` to ``z**3``."""
+    return z * z * z
+
+
+#: The outer transforms of :class:`PostNonlinear` by name, each strictly increasing on the real
+#: line.
+OUTER_TRANSFORMS = {"tanh": _g2, "cube": _cube, "cube_root": np.cbrt, "sigmoid": expit}
 
 
 def _parents_by_child(

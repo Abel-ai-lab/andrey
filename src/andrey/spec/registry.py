@@ -787,6 +787,40 @@ _add(
 )
 _add(
     MethodSpec(
+        name="ages",
+        family="score",
+        summary="Aggregative greedy equivalence search for linear-Gaussian data with weak edges: "
+        "the CPDAGs GES returns for every penalty from penalty_discount up, overlaid on the CPDAG "
+        "of that minimum penalty, so the graph keeps the GES skeleton and can direct more of its "
+        "edges. Standard linear-Gaussian BIC only. Returns a partially directed graph, tagged "
+        "cpdag.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the aggregated partially directed graph (APDAG), a maximally oriented one, as a "
+            "CPDAG narrowed by background knowledge is; metadata['path_penalties'] lists the "
+            "penalty_discount of each CPDAG of the solution path and metadata['path_aggregated'] "
+            "whether its orientations were taken",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "penalty_discount",
+                doc="Multiplier on the BIC penalty of log(n) per parent, the minimum penalty of "
+                "the solution path: the result has the skeleton of the ges CPDAG with this "
+                "penalty_discount, ebic_gamma=0.0, and no gate on a node's parents. 1.0 is the "
+                "standard BIC, the paper's minimum.",
+            ),
+        ),
+        references=("Eigenmann, Nandy & Maathuis 2017", "Chickering 2002", "Meek 1995"),
+    )
+)
+_add(
+    MethodSpec(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
@@ -1132,7 +1166,7 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -1880,6 +1914,76 @@ _add(
             ),
         ),
         references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
+    )
+)
+_add(
+    MethodSpec(
+        name="score_matching",
+        family="functional",
+        summary="SCORE for nonlinear effects with additive Gaussian noise: a causal order from the "
+        "leaf up, each leaf the variable whose diagonal entry of the score's Jacobian, estimated "
+        "by a Stein kernel estimator on the standardized columns, varies least over the rows, then "
+        "the complete DAG of the order pruned by smooth-term tests. Returns a DAG and a causal "
+        "order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is the causal order of the leaf search.",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the value of the paper's experiments.",
+            ),
+        ),
+        references=(
+            "Rolland et al. 2022",
+            "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="nogam",
+        family="functional",
+        summary="NoGAM for nonlinear effects with additive noise of any distribution: a causal "
+        "order from the leaf up, each leaf the variable whose entry of the score, estimated by a "
+        "Stein kernel estimator, is best predicted from the variable's kernel-ridge residual on "
+        "the others, on the standardized columns, then the complete DAG of the order pruned by "
+        "smooth-term tests. Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is the causal order of the leaf search.",
+        ),
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the value of the paper's experiments.",
+            ),
+        ),
+        references=(
+            "Montagna et al. 2023",
+            "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
     )
 )
 
@@ -2792,9 +2896,16 @@ _MOVE_RULE = (
     "edges. "
 )
 _CANDIDATE_RULE = (
-    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
-    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
-    "alone. "
+    "The restrict phase keeps the pair of each required edge without a test and conditions the "
+    "tests of the other pairs on it, and never keeps a pair the knowledge makes non-adjacent; the "
+    "score search considers the pairs it keeps. "
+)
+_RESTRICT_RULE = (
+    "With restrict=mmpc or pc, the restrict phase keeps the pair of each required edge without a "
+    "test and conditions the tests of the other pairs on it, and never keeps a pair the knowledge "
+    "makes non-adjacent; with restrict=iamb or inter_iamb it reads the data alone. The score "
+    "search considers the pairs the restrict phase keeps and the pairs of the required edges, "
+    "less the pairs the knowledge makes non-adjacent. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
@@ -2851,7 +2962,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hc": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "tabu": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
-    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _RESTRICT_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE + " " + _ENV_FREE,
     **dict.fromkeys(
@@ -2878,6 +2989,16 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pairs outside the allowed set are in no regression and never in the result; each test still "
     "reads every remaining variable or predecessor. The edge removal never removes a required "
     "edge.",
+    "score_matching": "A variable is the next leaf only when no remaining variable is in a later "
+    "tier or is the effect of a required edge out of it. Forbidden edges, edges into an earlier "
+    "tier, and pairs outside the allowed set are in no pruning fit and never in the result; the "
+    "score estimate still reads every remaining variable. The pruning never removes a required "
+    "edge.",
+    "nogam": "A variable is the next leaf only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no pruning fit and never in the result; the score "
+    "estimate and the residual regressions still read every remaining variable. The pruning never "
+    "removes a required edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -2949,6 +3070,13 @@ _PATH_RULE = (
     "forbidden_paths, each claim is kept when some DAG meets it with those kept before it. "
     "metadata unmet_knowledge lists the dropped claims, and the fit warns with KnowledgeWarning."
 )
+#: The searches that direct edges by tests can return a graph with no consistent extension.
+_NO_EXTENSION_RULE = (
+    " A graph found with no consistent extension stands for no DAG: there a claim on a pair joined "
+    "by an undirected edge directs that edge (Fang and He 2020), Meek's rules follow (Meek 1995), "
+    "a claim on a pair that is not adjacent, against a directed edge, or in conflict with other "
+    "claims is dropped, and metadata edge_claims lists the claims applied to an edge."
+)
 _PAG_PATHS = (
     " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
     "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
@@ -3015,9 +3143,10 @@ _MISSING_EM = {
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
-        "the search on the expected covariance of the data with a linear-Gaussian fit of the "
-        "graph it returns, 10 times; it assumes values missing completely at random or at random "
-        "given observed values. null refuses missing values.",
+        "the search on the expected covariance of the data with linear-Gaussian fits of the "
+        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
+        "before each after the first; it assumes values missing completely at random or at "
+        "random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
@@ -3031,23 +3160,44 @@ for _name in EM_METHODS:
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
-#: and against the method's reference packages given the same knowledge. A part a method honors
-#: beyond the edge parts and does not list here is experimental.
+#: and, where a reference package takes the same knowledge, against it. A part a method honors
+#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
+#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
+#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
+#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
+#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
+#: edge and most claims are dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
+    "cdnod": PATH_PARTS,
     "ges": PATH_PARTS,
+    "xges": PATH_PARTS,
+    "hc": PATH_PARTS,
+    "tabu": ("forbidden_paths",),
+    "mmhc": ("forbidden_paths",),
+    "rsmax2": ("forbidden_paths",),
     "boss": PATH_PARTS,
+    "grasp": PATH_PARTS,
+    "exact_search": PATH_PARTS,
+    "iamb": ("required_paths",),
+    "inter_iamb": ("required_paths",),
+    "mmpc": ("required_paths",),
     "fci": _PAG_PARTS,
+    "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,
     "boss_fci": _PAG_PARTS,
+    "grasp_fci": _PAG_PARTS,
     "lpcmci": _PAG_PARTS,
     "direct_lingam": PATH_PARTS,
+    "multi_group_direct_lingam": PATH_PARTS,
 }
 
 for _name, _how in _KNOWLEDGE_HOW.items():
     _extra, _rule = (
         (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
     )
+    if _name in _PATH_METHODS and REGISTRY[_name].family == "constraint":
+        _rule += _NO_EXTENSION_RULE
     _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
@@ -3110,6 +3260,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     **dict.fromkeys(("gfci", "boss_fci", "grasp_fci"), ("index_edges",)),
     "gnies": ("score", "changing_variables", "environments"),
+    "ages": ("path_penalties", "path_aggregated"),
     "exact_search": ("dag",),
     "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
     "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
@@ -3157,7 +3308,7 @@ for _name, _spec in REGISTRY.items():
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
-        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})

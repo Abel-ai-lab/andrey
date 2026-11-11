@@ -146,7 +146,11 @@ def pc(
         the search kept into a directed cycle raises ``ValueError``. In a CPDAG, ``required_paths``
         and ``forbidden_paths`` keep the DAGs the graph stands for in which each listed path holds
         or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped
-        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when
+        the graph found has no consistent extension, and so stands for no DAG, a claim on a pair
+        joined by an undirected edge directs that edge, Meek's rules follow,
+        ``metadata["edge_claims"]`` lists the claims applied this way, and the result is not
+        guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -390,7 +394,24 @@ def pc(
     ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
     by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
     ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
-    is the better choice. The correction holds when no missingness indicator causes a
+    is the better choice. Traced under the quantile mask at 50 variables (mean degree 2, 30%
+    missing, 500 rows at ``alpha=0.05`` and 2,000 at 0.01) and at 100 (mean degree 4, 20% missing,
+    2,000 rows, ``alpha=0.05``), the loss is edges the correction removes, not orientation: 21 of
+    its 24 and 21 of its 25 changes at 50 variables, and 90 of its 121 at 100, removed a true edge.
+    One cause is the rows: when the parents of the indicators have missing values themselves, ``W``,
+    the indicator parents a corrected test reads, closed under the parents of their own indicators,
+    held a median of 7 to 8 columns at 50 variables, and there a corrected test read a median of 13%
+    and 19% of the rows the test-wise test read; a true edge it removed was tested on a median of 22
+    and 41 rows where the test-wise test read about 245 and 965. The other is Step 3, which re-tests
+    a pair that shares an indicator and no adjacent variable, and falsely detected indicator parents
+    make such pairs: 44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true edges, of which
+    the correction removed 16 and 8 (at 100 variables, 99 of 331, 94 of them true edges, of which
+    the correction removed 28); the code published with the paper corrects a pair only when it
+    shares an adjacent variable, so it corrects fewer pairs, and it still removes true edges (12 and
+    16 at 50 variables, against 21 and 21 here). Both follow the paper: its experiments with values
+    missing not at random use masks where ``W`` closes after one level, and it names the general
+    case and does not run it [13]_.
+    The correction holds when no missingness indicator causes a
     variable, every independence in the observed rows also holds in the missing ones, no indicator
     is a deterministic function of others, and no value causes its own missingness (self-masking)
     [13]_; the data cannot check these, and a violation voids the correction. PermC also needs
@@ -1481,7 +1502,10 @@ def cdnod(
         ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
         listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
         meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
-        ``metadata["unmet_knowledge"]``.
+        ``metadata["unmet_knowledge"]``; when the graph found has no consistent extension, and so
+        stands for no DAG, a claim on a pair joined by an undirected edge directs that edge, Meek's
+        rules follow, ``metadata["edge_claims"]`` lists the claims applied this way, and the result
+        is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -1639,9 +1663,18 @@ def cdnod(
     not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
     them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    20 variables with up to a fifth of the values missing completely at random. With true
+    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data from 4 domains whose means shift (10 to 50 variables, mean degree 2 or 4,
+    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 10.0% with required paths and 15.5% with forbidden paths
+    pointed against the true DAG, and the fits dropped 64% of the required and 40% of the forbidden
+    paths as claims their graph could not meet. A required path says less than a required edge and
+    directs less: it cannot restore an edge the search left out, and on simulated data a required
+    edge, which also states that the pair is adjacent, lowered the errors more. A known edge belongs
+    in ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1981,8 +2014,16 @@ def fci_jci(
     the number of variables. ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` can miss a
     shift in a middle domain of three or more, as above. Missing values are not benchmarked yet; the
     tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    random. With true ``required_paths``, ``forbidden_paths``, or ``confounded`` claims on 10 or 30%
+    of the pairs of simulated linear-Gaussian data from two domains with hidden common causes (10 or
+    20 variables, 500 or 2,000 rows per domain), its result had no more wrong marks than without
+    them in any setting, and fewer with required paths in every one. The fits dropped 9.8% of the
+    required paths and 0.4% of the forbidden paths as claims their graph could not meet, and no
+    confounded pair. No reference implementation takes these claims with a domain index, so they
+    were compared with the same fit without them. A required path says less than a required edge and
+    directs less: it cannot restore an edge the search left out. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

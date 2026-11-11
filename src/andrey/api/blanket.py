@@ -167,7 +167,10 @@ def iamb(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -280,10 +283,30 @@ def iamb(
     takes all of them, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
     tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
     smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
-    datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
-    tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    datasets, and learning the blankets 0.8 to 1.0 s. The skeleton step also separates true edges,
+    more often as the blankets grow: on simulated linear-Gaussian data of mean degree 4 (10 to 50
+    variables, 500 or 2,000 rows, 120 datasets) it separated 6% of the truly adjacent pairs whose
+    smaller blanket held 2 variables, 21% at 4, 43% at 6, and about half at 7 to 9. Required edges
+    enlarge the blankets: with true required edges on 5 or 10% of the variable pairs, the step
+    separated about one true pair per graph at 50 variables that the fit without them kept, and 0.4
+    averaged over 10, 20, and 50 variables, on 240 datasets. Missing values are not benchmarked yet;
+    the tests run them on up to 20 variables with up to a fifth of the values missing completely at
+    random. ``required_paths`` is supported and ``forbidden_paths`` is experimental. On simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows, true claims on
+    5 to 30% of the variable pairs) the graph found had no consistent extension, and so stood for no
+    DAG, in 106 of 240 datasets, and in 20 of 20 with 50 variables, 2,000 rows, and mean degree 4.
+    On such a graph a claim acts only on an edge, as :class:`~andrey.Knowledge` describes, and most
+    claims are dropped: of 70 required paths per fit, 4 directed an undirected edge, 13 were met by
+    an edge the data directed, and 53 were dropped, and of 86 forbidden paths, 1, 2, and 83. Over
+    every dataset the fits dropped 57% of the required and 51% of the forbidden paths. With true
+    required paths the CPDAG was no farther from the class of graphs that the truth and the claims
+    define than without them in any of the 36 settings, and closer in 25. With true forbidden paths
+    alone it was farther from that class in 3 of the 6 settings with 50 variables and mean degree 2,
+    by 0.65 to 1.35 edges per graph over 40 datasets, since the class is more directed than the
+    graph the dropped claims leave; no single setting was farther on two separate sets of 20
+    datasets. The CPDAG was closer to the true DAG in 35 of the 36 settings with required paths and
+    32 with forbidden paths, and farther in none. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -414,7 +437,10 @@ def inter_iamb(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -523,10 +549,31 @@ def inter_iamb(
     and each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
     holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
     variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
-    collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets 0.9 to 1.3 s.
-    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets 0.9 to 1.3 s. The
+    skeleton step also separates true edges, more often as the blankets grow: on simulated
+    linear-Gaussian data of mean degree 4 (10 to 50 variables, 500 or 2,000 rows, 120 datasets) it
+    separated 6% of the truly adjacent pairs whose smaller blanket held 2 variables, 21% at 4, 41%
+    at 6, and about half at 7 to 9. Required edges enlarge the blankets: with true required edges on
+    5 or 10% of the variable pairs, the step separated about one true pair per graph at 50 variables
+    that the fit without them kept, and 0.3 to 0.4 averaged over 10, 20, and 50 variables, on 240
+    datasets. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random. ``required_paths`` is supported and
+    ``forbidden_paths`` is experimental. On simulated linear-Gaussian data (10 to 50 variables, mean
+    degree 2 or 4, 500 or 2,000 rows, true claims on 5 to 30% of the variable pairs) the graph found
+    had no consistent extension, and so stood for no DAG, in 105 of 240 datasets, and in 20 of 20
+    with 50 variables, 2,000 rows, and mean degree 4. On such a graph a claim acts only on an edge,
+    as :class:`~andrey.Knowledge` describes, and most claims are dropped: of 71 required paths per
+    fit, 4 directed an undirected edge, 13 were met by an edge the data directed, and 54 were
+    dropped, and of 86 forbidden paths, 1, 2, and 83. Over every dataset the fits dropped 56% of the
+    required and 51% of the forbidden paths. With true required paths the CPDAG was no farther from
+    the class of graphs that the truth and the claims define than without them in any of the 36
+    settings, and closer in 24. With true forbidden paths alone it was farther from that class in 3
+    of the 6 settings with 50 variables and mean degree 2, by 0.65 to 1.35 edges per graph over 40
+    datasets, since the class is more directed than the graph the dropped claims leave; no single
+    setting was farther on two separate sets of 20 datasets. The CPDAG was closer to the true DAG in
+    35 of the 36 settings with required paths and 31 with forbidden paths, and farther in none. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -652,7 +699,10 @@ def mmpc(
         raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
         the DAGs the graph stands for in which each listed path holds or does not, as
         :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -776,8 +826,23 @@ def mmpc(
     mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose
     smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
     Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    fifth of the values missing completely at random. ``required_paths`` is supported and
+    ``forbidden_paths`` is experimental. On simulated linear-Gaussian data (10 to 50 variables, mean
+    degree 2 or 4, 500 or 2,000 rows, true claims on 5 to 30% of the variable pairs) the graph found
+    had no consistent extension, and so stood for no DAG, in 125 of 240 datasets, and in 19 of 20
+    with 50 variables, 2,000 rows, and mean degree 4. On such a graph a claim acts only on an edge,
+    as :class:`~andrey.Knowledge` describes, and most claims are dropped: of 69 required paths per
+    fit, 4 directed an undirected edge, 11 were met by an edge the data directed, and 54 were
+    dropped, and of 85 forbidden paths, 1, 2, and 82. Over every dataset the fits dropped 62% of the
+    required and 60% of the forbidden paths. With true required paths the CPDAG was no farther from
+    the class of graphs that the truth and the claims define than without them in any of the 36
+    settings, and closer in 26. With true forbidden paths alone it was farther from that class in 4
+    of the 6 settings with 50 variables and mean degree 2, by 0.72 to 1.95 edges per graph over 40
+    datasets, since the class is more directed than the graph the dropped claims leave; no single
+    setting was farther on two separate sets of 20 datasets. The CPDAG was closer to the true DAG in
+    35 of the 36 settings with required paths and 32 with forbidden paths, and farther in none. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

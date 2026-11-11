@@ -1,4 +1,4 @@
-"""Functional-causal-model facades: CAM, RESIT, and CAM-UV fit each variable from its causes."""
+"""Functional-causal-model facades: CAM, RESIT, SCORE, NoGAM, and CAM-UV."""
 
 from __future__ import annotations
 
@@ -524,6 +524,431 @@ def resit(
         forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
     with one_blas_thread():
         result = _resit(
+            X[:, order],
+            alpha=alpha,
+            forbidden=forbidden,
+            required=required,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    dag = result.dag[np.ix_(back, back)]
+    return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+@method_spec("score_matching")
+def score_matching(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.001,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with SCORE, a causal order from the Jacobian of the score (additive noise).
+
+    SCORE [1]_ models each variable as a nonlinear function of its parents plus Gaussian noise,
+    ``x_j = f_j(parents) + e_j``. Under that model the score of the joint density,
+    ``grad log p(x)``, marks the leaves: the derivative of its entry ``j`` in ``x_j`` is the same
+    at every point exactly when ``j`` has no children [1]_. SCORE estimates those derivatives at
+    the rows by a kernel estimator built on Stein's identity [2]_, takes the variable whose
+    derivative varies least as the next leaf, repeats on the others, and prunes the complete DAG
+    of the order by the smooth-term tests of CAM [3]_. It returns a DAG and a causal order.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.001
+        Significance level of the pruning test, in ``(0, 1)``: a parent stays when its smooth term's
+        p-value is at most ``alpha``. The causal order does not read it. ``0.001`` is the value of
+        the paper's experiments.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is the next leaf only
+        when no remaining variable is in a later tier or is the effect of a required edge out of
+        it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are in
+        no pruning fit and never in the result; the score estimate still reads every remaining
+        variable. The pruning never removes a required edge.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"score_matching"``. ``ordering`` is the causal order of the leaf search, as a tuple of
+        column indices, causes first. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than twice as many rows as
+        columns, or with a constant column, a column of fewer than 3 distinct values, or a column
+        that repeats another up to scale and shift, each named in the message; or if more than
+        half of the pairs of rows are equal on the remaining variables at a step, which leaves the
+        kernel no bandwidth. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** SCORE suits i.i.d. continuous observational data whose effects are nonlinear
+    in every parent, with additive Gaussian noise and no unmeasured common causes [1]_; under that
+    model the DAG is identified [4]_, and it returns the DAG with a causal order. Its order search
+    fits no regression: each step is one kernel estimate over all the remaining variables, so its
+    cost grows with the number of variables only linearly, and with the cube of the rows. The
+    paper shows it on 10 to 50 variables and 1,000 rows. A link that is linear in a parent leaves
+    that parent's derivative constant too, so it can be taken for a leaf: with linear effects and
+    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, which return the Markov
+    equivalence class. For additive noise that is not Gaussian use :func:`~andrey.resit`, and for
+    the same model searched by regressions, :func:`~andrey.cam`.
+
+    **The steps.** The paper's two phases [1]_:
+
+    1. *Causal order.* The score's Jacobian has the diagonal entries
+       ``d^2 log p(x) / d x_j^2``. They are estimated at every row of the remaining variables by
+       the paper's extension of the Stein gradient estimator [2]_ to second derivatives (its
+       Eq. 12), with the Gaussian kernel ``exp(-||x - y||^2 / (2 s^2))``, the bandwidth ``s`` the
+       median distance between the rows, and one ridge term for both of its regressions. The
+       variable whose entry has the smallest variance over the rows is the next leaf; it is
+       removed, and the estimate, bandwidth included, is made again on the others. The causal
+       order is the leaves in reverse.
+    2. *Pruning.* Each variable is fit on all the variables before it in the order, an additive
+       model of penalized thin plate regression splines with ten basis functions per parent and
+       smoothing chosen by GCV [5]_, with ``ceil(n_samples / (3 n_parents))`` functions per term,
+       at least 3, when there are fewer than 30 rows per term, and at most one per distinct
+       value. A parent stays when its smooth term's p-value is at most ``alpha``, the pruning of
+       :func:`~andrey.cam` [3]_.
+
+    The choices the paper leaves open. It states no value of the ridge term: it is ``0.001``, the
+    value in the code published with the paper, added to the kernel matrix as the paper's Eq. 12
+    writes it, a matrix with ones on its diagonal. The median distance is taken over the pairs of
+    distinct rows. The variances are compared as estimated, as the paper's Algorithm 1 states, not
+    divided by the entries' means.
+
+    One kernel reads all the remaining columns, so the estimate depends on their units, which the
+    model does not: a leaf's entry is constant in any units. The columns are therefore centered
+    and divided by their standard deviations before the order search, so rescaling or shifting a
+    column changes no step; the pruning reads each variable through an affine map to a fixed
+    interval. The paper's experiments run on the columns as simulated. The fit draws no random
+    numbers and runs on one BLAS thread.
+
+    **Ties.** The variances are compared rounded to 9 decimal places, as :func:`~andrey.hc`
+    compares its score changes per row, so two variances that differ only in their rounding tie. A
+    tie goes to the variable with the lower rank computed from the data, as for
+    :func:`~andrey.hc`; the fit runs on the columns in that rank order, so the result does not
+    depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The numbers below were measured on the paper's simulation with standardized
+    columns, Gaussian noise, and 1,000 rows, on one core, 20 graphs per setting: Erdos-Renyi graphs
+    with as many edges as variables or four times as many, each link one draw of a Gaussian process,
+    at 10, 20, and 50 variables. With as many edges as variables the order put 81%, 73%, and 65% of
+    the true edges in the true direction at 10, 20, and 50 variables, and the DAG was 2.8, 7.8, and
+    25.0 edges from the true one (SHD), where the empty graph is 10, 20, and 50 away; with four
+    times as many edges the order put 97%, 90%, and 85% in the true direction, and the SHD was 22.1,
+    51.9, and 142.7 against the empty graph's 40, 80, and 200. On the graphs with as many edges as
+    variables :func:`~andrey.cam` was more accurate on the same data: its order put 96% to 98% of
+    the true edges in the true direction and its SHD was 0.7, 2.1, and 5.5. At 50 variables with
+    four times as many edges, over 40 graphs, the order put 0.007 to 0.010 less of the true edges in
+    the true direction than the code published with the paper did (86% against 87%). The paper's
+    tables are on data as simulated, and the order search reads standardized columns, where it
+    orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
+    variables with as many edges, the same search put 99% of the true edges in the true direction
+    when it read the columns as simulated and 80% on standardized columns. On standardized columns
+    the error of the search's estimate for a variable grows with about the square of that variable's
+    variance-to-noise ratio (its variance over the variance of its noise term). Where links have a
+    strong linear part, variance builds up along the causal order, the sinks have the largest
+    ratios, and the search ranks them last: on additive-noise data with links ``z + sin z`` (1,000
+    rows, 10 and 20 variables, as many edges as variables), where a sink's ratio had a median of 10
+    to 13 against 1.6 to 1.7 in the paper's simulation, the order put 41% to 53% of the true edges
+    in the true direction, a random order's share, and 16,000 rows (52%), another ridge term, or
+    another bandwidth did not change that. Use :func:`~andrey.cam` on such data (76% to 94% on the
+    same datasets). One kernel bandwidth serves every variable, and links it does not resolve leave
+    a cause's entry as flat as a leaf's: on ``x0 -> x2 <- x1``, ``x2 -> x3`` with ``x2 = 2 x0 / (1 +
+    x0^2) + 2 / (1 + x1^2)``, ``x3 = x2^2 / 2``, and noise of standard deviation 0.7 or 1, over 400
+    and 800 rows, the search took ``x0`` and ``x1`` for the leaves in 24 of 24 fits. The leaf rule
+    is exact only for Gaussian noise: under other noise a leaf's entry changes with its residual,
+    and :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. A fit took 1.0 s at 10
+    variables, 3.0 s at 20, and 28 to 32 s at 50, within 0.16 GB. Each step factors a matrix with
+    one row and one column per sample, so the order search's time grows with the cube of
+    ``n_samples`` and its memory with the square. The pruning starts from the complete DAG of the
+    order, so its last fits have nearly ``n_variables`` smooth terms each: it needs at least twice
+    as many rows as columns, and it takes most of a fit's time as the variables grow. Binary
+    columns, and any column with fewer than 3 distinct values, are not supported: the pruning fits a
+    smooth term of each parent, and such a column raises ``ValueError`` before the fit. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Rolland, P., Cevher, V., Kleindessner, M., Russell, C., Janzing, D., Scholkopf, B., and
+       Locatello, F. (2022). Score matching enables causal discovery of nonlinear additive noise
+       models. ICML, PMLR 162, 18741-18753.
+    .. [2] Li, Y., and Turner, R. E. (2018). Gradient estimators for implicit models. ICLR.
+    .. [3] Buhlmann, P., Peters, J., and Ernest, J. (2014). CAM: Causal additive models,
+       high-dimensional order search and penalized regression. Annals of Statistics 42(6),
+       2526-2556.
+    .. [4] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. Journal of Machine Learning Research 15, 2009-2053.
+    .. [5] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society B 65(1), 95-114.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import score_matching
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
+    >>> out = score_matching(np.column_stack([x, y]))
+    >>> out.structure.kind, out.ordering
+    ('dag', (0, 1))
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.score_matching import score_matching as _score_matching
+
+    X = data_matrix(data, method="score_matching")
+    labels = column_labels(data)
+    _smooth_columns(X, labels, "score_matching")
+    _regression_rows(X, "score_matching")
+    constraints = resolve(knowledge, X.shape[1], labels, method="score_matching")
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    forbidden = required = precedence = None
+    if constraints is not None:
+        ranked = constraints.permuted(order)
+        forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
+    with one_blas_thread():
+        result = _score_matching(
+            X[:, order],
+            alpha=alpha,
+            forbidden=forbidden,
+            required=required,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    dag = result.dag[np.ix_(back, back)]
+    return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+@method_spec("nogam")
+def nogam(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.001,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with NoGAM, a causal order from the score and residuals (additive noise).
+
+    NoGAM [1]_ models each variable as a nonlinear function of its parents plus noise of any
+    distribution, ``x_j = f_j(parents) + e_j``. Under that model the entry ``j`` of the score of
+    the joint density, ``d log p(x) / d x_j``, is a function of the variable's noise alone exactly
+    when ``j`` has no children, and that noise is what a regression of ``x_j`` on all the other
+    variables leaves [1]_. NoGAM estimates the score at the rows by a kernel estimator built on
+    Stein's identity [2]_, predicts each entry from its variable's regression residual, takes the
+    variable predicted with the smallest error as the next leaf, repeats on the others, and prunes
+    the complete DAG of the order by the smooth-term tests of CAM [3]_. It returns a DAG and a
+    causal order.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.001
+        Significance level of the pruning test, in ``(0, 1)``: a parent stays when its smooth term's
+        p-value is at most ``alpha``. The causal order does not read it. ``0.001`` is the value of
+        the paper's experiments.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is the next leaf only
+        when no remaining variable is in a later tier or is the effect of a required edge out of
+        it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are in
+        no pruning fit and never in the result; the score estimate and the residual regressions
+        still read every remaining variable. The pruning never removes a required edge.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"nogam"``. ``ordering`` is the causal order of the leaf search, as a tuple of column
+        indices, causes first. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 5 rows or fewer than twice
+        as many rows as columns, or with a constant column, a column of fewer than 3 distinct
+        values, or a column that repeats another up to scale and shift, each named in the message;
+        or if more than half of the pairs of rows are equal on the remaining variables at a step,
+        which leaves the score estimate's kernel no bandwidth. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** NoGAM suits i.i.d. continuous observational data whose effects are nonlinear,
+    with additive noise of any distribution and no unmeasured common causes [1]_; under that model
+    the DAG is identified [4]_, and it returns the DAG with a causal order. It does not assume
+    Gaussian noise, as :func:`~andrey.score_matching` and :func:`~andrey.cam` do, and its order
+    search needs no independence test, as :func:`~andrey.resit`'s does. The paper shows it on 10
+    and 20 variables and 1,000 rows, with Gaussian, Laplace, Gumbel, Beta, exponential, and gamma
+    noise. With linear effects and Gaussian noise only the Markov equivalence class is identified:
+    use :func:`~andrey.pc` or :func:`~andrey.ges`.
+
+    **The steps.** The paper's two phases [1]_:
+
+    1. *Causal order.* On the remaining variables, three estimates are made at every row. The
+       score ``grad log p(x)``, by the Stein gradient estimator [2]_ with the Gaussian kernel
+       ``exp(-||x - y||^2 / (2 s^2))``, the bandwidth ``s`` the median distance between the rows.
+       Each variable's residual, from its kernel ridge regression on all the other remaining
+       variables. And each score entry's prediction from its own variable's residual, by another
+       kernel ridge regression. The variable whose score entry has the smallest mean squared
+       prediction error is the next leaf; it is removed, and the estimates are made again on the
+       others. The causal order is the leaves in reverse.
+    2. *Pruning.* Each variable is fit on all the variables before it in the order, an additive
+       model of penalized thin plate regression splines with ten basis functions per parent and
+       smoothing chosen by GCV [5]_, with ``ceil(n_samples / (3 n_parents))`` functions per term,
+       at least 3, when there are fewer than 30 rows per term, and at most one per distinct
+       value. A parent stays when its smooth term's p-value is at most ``alpha``, the pruning of
+       :func:`~andrey.cam` [3]_.
+
+    The kernel ridge regressions take the settings of the paper's experiments: the kernel
+    ``exp(-gamma ||x - y||^2)`` with ``gamma = 0.1``, the ridge term ``0.01``, no intercept, and
+    predictions by K-fold cross-validation, each row predicted by the model fit on the other
+    folds. ``gamma`` is the value the paper states; the authors' implementation sets it to the
+    ridge term's value, ``0.01``.
+
+    The choices the paper leaves open. It names no number of folds: there are 5, each a block of
+    consecutive rows, so the order of the rows can change the result. It states the
+    cross-validation for the score entries; the residuals are predicted across the same folds.
+    It states no ridge term for the score estimate: it is ``0.001``, the value in the authors'
+    implementation, added to the kernel matrix as the estimator's definition writes it, a matrix
+    with ones on its diagonal; the median distance is taken over the pairs of distinct rows. The
+    errors are compared as estimated, not divided by the entries' variances.
+
+    The score estimate and the kernel ridge regressions read the columns' units, which the model
+    does not. The columns are therefore centered and divided by their standard deviations before
+    the order search, so rescaling or shifting a column changes no step; the pruning reads each
+    variable through an affine map to a fixed interval. The paper's experiments run on the columns
+    as simulated. The fit draws no random numbers and runs on one BLAS thread.
+
+    **Ties.** The errors are compared rounded to 9 decimal places, as :func:`~andrey.hc` compares
+    its score changes per row, so two errors that differ only in their rounding tie. A tie goes to
+    the variable with the lower rank computed from the data, as for :func:`~andrey.hc`; the fit
+    runs on the columns in that rank order, so the result does not depend on the column order
+    unless two columns are identical. The :doc:`column-order guide </docs/guides/column-order>`
+    says what the rank keeps under a new column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The numbers below were measured on the paper's simulation with standardized
+    columns and 1,000 rows, on one core, 20 graphs per setting: Erdos-Renyi graphs with as many
+    edges as variables or four times as many, each link one draw of a Gaussian process, with
+    Gaussian, Laplace, or Gumbel noise, at 10 and 20 variables. With as many edges as variables the
+    order put 90% to 92% of the true edges in the true direction at 10 variables and 81% to 86% at
+    20, and the DAG was 1.2 to 1.7 and 4.2 to 6.0 edges from the true one (SHD), where the empty
+    graph is 10 and 20 away; with four times as many edges the order put 98% to 99% and 92% to 95%
+    in the true direction, and the SHD was 19.6 to 21.1 and 48.8 to 49.4 against the empty graph's
+    40 and 80. On the graphs with as many edges as variables :func:`~andrey.cam` was at least as
+    accurate on the same data, under every noise: its order put 90% to 98% of the true edges in the
+    true direction, and its SHD was 0.7 to 0.9 at 10 variables and 1.4 to 3.3 at 20. The paper's
+    tables are on data as simulated, and the order search reads standardized columns, where it
+    orders fewer edges of a sparse graph correctly: in a separate check on ten graphs of 10
+    variables with as many edges, the same search put 99% of the true edges in the true direction
+    under Gaussian noise and 98% under Laplace noise when it read the columns as simulated, and 87%
+    and 91% on standardized columns. The search compares the variables' prediction errors in
+    absolute terms on standardized columns, and a sink's error grows with its variance-to-noise
+    ratio (its variance over the variance of its noise term), since the same error in its residual
+    costs more where the noise is a small part of the variable. Where links have a strong linear
+    part that ratio is largest at the sinks: on additive-noise data with links ``z + sin z`` (10 and
+    20 variables, as many edges as variables; Gaussian, Laplace, and Gumbel noise) the order put 47%
+    to 62% of the true edges in the true direction at 1,000 rows, and 4,000 rows raised it only from
+    56% to 62% under Gaussian noise at 10 variables. Use :func:`~andrey.cam` on such data (76% to
+    94% on the same datasets). A fit took 7.5 to 9.7 s at 10 variables and 28 to 40 s at 20, within
+    0.16 GB; it was not measured in graphs of 50 variables, where a single fit took 194 s. Each step
+    fits ten kernel ridge regressions per remaining variable, each on four fifths of the rows, so
+    the order search's time grows with the square of ``n_variables`` and the cube of ``n_samples``,
+    and its memory with the square of ``n_samples``. The pruning starts from the complete DAG of the
+    order, so its last fits have nearly ``n_variables`` smooth terms each, and it needs at least
+    twice as many rows as columns. Binary columns, and any column with fewer than 3 distinct values,
+    are not supported: the pruning fits a smooth term of each parent, and such a column raises
+    ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Montagna, F., Noceti, N., Rosasco, L., Zhang, K., and Locatello, F. (2023). Causal
+       discovery with score matching on additive models with arbitrary noise. CLeaR, PMLR 213,
+       726-751.
+    .. [2] Li, Y., and Turner, R. E. (2018). Gradient estimators for implicit models. ICLR.
+    .. [3] Buhlmann, P., Peters, J., and Ernest, J. (2014). CAM: Causal additive models,
+       high-dimensional order search and penalized regression. Annals of Statistics 42(6),
+       2526-2556.
+    .. [4] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. Journal of Machine Learning Research 15, 2009-2053.
+    .. [5] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society B 65(1), 95-114.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import nogam
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.uniform(-2, 2, 300)
+    >>> y = np.sin(2 * x) + 0.3 * rng.uniform(-1, 1, 300)
+    >>> out = nogam(np.column_stack([x, y]))
+    >>> out.structure.kind, out.ordering
+    ('dag', (0, 1))
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.nogam import FOLDS
+    from andrey.fcm.nogam import nogam as _nogam
+
+    X = data_matrix(data, method="nogam", min_rows=FOLDS)
+    labels = column_labels(data)
+    _smooth_columns(X, labels, "nogam")
+    _regression_rows(X, "nogam")
+    constraints = resolve(knowledge, X.shape[1], labels, method="nogam")
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    forbidden = required = precedence = None
+    if constraints is not None:
+        ranked = constraints.permuted(order)
+        forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
+    with one_blas_thread():
+        result = _nogam(
             X[:, order],
             alpha=alpha,
             forbidden=forbidden,

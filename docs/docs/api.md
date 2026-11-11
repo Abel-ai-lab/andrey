@@ -127,11 +127,12 @@ you. Every method that takes `indep_test`, with a partial-correlation test, `"fi
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, and `camuv` reject copies the same way, and a column of fewer than 3 distinct values, such
-as a binary one, on which no smooth term can be fit; `resit` and `camuv` also need at least twice as
-many rows as columns, and `camuv` rejects a column that is a linear function of other columns, such
-as a total, as the BIC methods do. Other data raises a `ValueError` that names the argument and, for
-a bad cell, its row and column. A single column gives a one-node graph.
+`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
+than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
+rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
+single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
@@ -146,15 +147,23 @@ finds the parents of each missingness indicator and tests again the edges they c
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
-refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records the rounds
-and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
-takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
-random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
-`hc`, and `tabu`: in the
-[missing-data benchmark](benchmarks/0.16.0.md#what-we-measured-on-missing-data), none was less
-accurate than its reference implementation in any setting. In the other methods `missing="em"` is
-experimental, as no reference implementation exists to compare them with; the benchmark reports
-their results beside the baselines. A value a method does not list raises a `ValueError` that
+refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
+graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
+the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
+round changed it logs a warning. A row that observes no value is dropped first. It takes
+`score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
+`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
+[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
+none was less accurate than its reference implementation in a setting that repeated on fresh
+datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
+search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
+variables, at two settings of the sample size the reference's score counts. In the benchmark the
+last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
+50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
+reference implementation exists to compare them with; the benchmark reports their results beside the
+baselines. A value a method does not list raises a
+`ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
 for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
@@ -179,11 +188,12 @@ reports only p-values is ordered by its p-value, smallest first.
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`,
-`jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
-`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
-be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. Every
 required edge is in the result, whatever its weight, test, or score says. For the time-series
 methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
 time `t`. Three more parts state causal paths and hidden common causes: `required_paths` and
@@ -200,12 +210,17 @@ These marks and checks assume no selection bias. `lpcmci` takes each claim with 
 `direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the
 order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 
-These parts are supported in `pc`, `ges`, `boss`, `fci`, `gfci`, `boss_fci`, `lpcmci`, and
-`direct_lingam`, where [true claims measured no
-worse](benchmarks/0.16.0.md#path-and-confounder-claims) than the same fit without them and than
-reference packages given the same knowledge. In every other method that honors them they are
-experimental, as we have not measured them there: a fit warns with
-{py:class}`~andrey.ExperimentalWarning`, and their meaning may change without deprecation. A CPDAG
+These parts are supported wherever [true claims measured no
+worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+than the same fit without them and than a reference package given the same knowledge: in every
+method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
+`rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
+and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
+50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
+measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
+the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
+experimental part warns with
+{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
 says less than an edge and so directs less: when you know the edge itself, state it as `required`.
@@ -223,6 +238,22 @@ tiers deny on an adjacent pair before the rules, and then each claim the final P
 A method given a part it does not honor raises `NotImplementedError`, naming the methods that
 honor it, and so do `iamb`, `inter_iamb`, and `mmpc` given the paths with a `target` or an
 undirected `structure`.
+
+A search that directs edges by tests (`pc`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`) can return a
+CPDAG with no consistent extension when its tests contradict each other on finite data. Such a
+graph stands for no DAG, and no published result says how a path claim restricts it. A claim then
+acts on one edge: in any DAG that joins `a` and `b` by an edge, `a` causes `b` exactly when the
+edge is `a -> b` (Fang and He 2020; Fang et al. 2025). A claim on a pair joined by an undirected
+edge directs it, `a -> b` for a required path and `b -> a` for a forbidden one, and Meek's rules
+follow (Meek 1995). A claim is dropped, and listed in `metadata["unmet_knowledge"]`, when its pair
+is not adjacent, when its edge is directed the other way, and when it conflicts with other claims:
+claims that ask for both directions of one edge, and claims whose edges would lie on a directed
+cycle with the graph's directed edges and the edges the other claims ask for, are all dropped.
+The claims left are applied together, so neither their order nor the column order changes the
+result. `metadata["edge_claims"]` lists the claims applied to an edge this way, each
+`[part, a, b]`, and is empty when the graph has a consistent extension. The result is not
+guaranteed to stand for a DAG, as the graph found did not. The score-based and permutation searches
+return the CPDAG of a DAG, which always has a consistent extension.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -347,9 +378,12 @@ the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of s
 `igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
 of 87 groups and were worse in none, and tied with each other in every group; for `ut_igsp`, on 15
 groups of simulated datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors
-than 5 in 4 groups, 2 of them in that setting, and more in none. Each search builds its own caches
-and drops the previous one's, so more starts take more time but little more memory. `1`, the default
-for the others, runs one search.
+than 5 in 4 groups, 2 of them in that setting, and more in none. On dense graphs one `grasp` search
+can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
+`n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
+Each search builds its own caches and drops the previous one's, so more starts take more time but
+little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -364,11 +398,12 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
-`grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per
-parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the
-default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
-`metadata["penalty_discount"]` records the value the score used.
+`ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
+`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC
+penalty per parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and
+`1.0`, the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this
+penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as
+the lowest penalty of its solution path.
 
 % concept: ebic_gamma
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
@@ -431,10 +466,12 @@ variable.
    gies
    gnies
    xges
+   ages
    hc
    tabu
    exact_search
    calm
+   notears
    mmhc
    rsmax2
    boss
@@ -448,6 +485,8 @@ variable.
    multi_group_direct_lingam
    cam
    resit
+   score_matching
+   nogam
    camuv
    anm
    pnl
@@ -469,6 +508,26 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
+least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
+NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
+columns' units, and on standardized columns its result depends on the `l1` penalty. `robust=True`
+follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
+[0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
+the authors' code.
+
+AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
+{py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
+triangle or shields a collider can leave edges of the true CPDAG undirected that the graph without
+it directs. AGES computes the CPDAGs GES returns for every penalty from `penalty_discount` up, its
+solution path, from one forward phase and a backward phase per distinct forward result, and overlays
+their orientations on the CPDAG of the minimum penalty, so the graph keeps that CPDAG's skeleton
+and can direct more of its edges. It scores with the standard BIC only, as one penalty per edge
+defines the path, and takes no `knowledge`, `max_parents`, `missing`, or `env`. It returns a
+partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists the path. The
+[0.17.0](benchmarks/0.17.0.md#ages) release card measures it on the paper's 10-variable
+simulation against pcalg.
+
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
 variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
@@ -483,6 +542,23 @@ finds most independent of the remaining variables, then removes each parent whos
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
 causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
 variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
+SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
+effects with additive Gaussian noise, without a regression in its order search: under that model a
+variable is a leaf exactly when the second derivative of the log density in that variable is the
+same at every point. It estimates those derivatives at the rows with a Stein kernel estimator on the
+standardized columns, takes the variable whose derivative varies least as the next leaf, and prunes
+the complete DAG of the order with CAM's smooth-term tests at `alpha=0.001`. It returns a DAG and a
+causal order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it from 10 to
+50 variables against the authors' code.
+
+NoGAM (Montagna et al. 2023), {py:func}`~andrey.nogam`, drops SCORE's Gaussian noise: with additive
+noise of any distribution, a leaf's entry of the score is a function of the leaf's noise alone. It
+estimates the score with the same Stein estimator and each variable's residual by kernel ridge
+regression on all the others, takes as the next leaf the variable whose score entry its residual
+predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
+order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it at 10 and 20
+variables against dodiscover.
 
 LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
 location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
@@ -609,9 +685,10 @@ measures it against tigramite, the package of its authors.
 
 ### Experimental methods
 
-A new method ships as experimental: it passes recovery tests but has no published benchmark, its
-API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
-its first call in a process.
+A new method ships as experimental: it passes recovery tests but is not supported, because it has
+no published benchmark yet or did not pass one (its **Limitations** say which), its API may change
+without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on its first call
+in a process.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -620,13 +697,16 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   notears
    dagma
 ```
 
-NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
-under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
-with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
+DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
+weighted DAG by minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only.
+It is for data whose units are meaningful: on the usual simulated data its accuracy comes from the
+columns' variances following the causal order, and on standardized columns it does no better than
+the empty graph at its default settings, which is why it is experimental. The
+[0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
+fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
 
 A method becomes supported once it has:
@@ -990,6 +1070,46 @@ scale stays a smooth function of the parents at every depth of the graph.
 `andrey.data.functional.linear(positive=True)` makes every weight positive, and
 `variance_range=(lo, hi)` on a noise family draws each variable's noise variance from `U[lo, hi]`,
 as the simulations of GnIES (Gamella et al. 2022) do.
+
+`functional` names how a variable depends on its parents, by name in `sample_scm` or as a spec from
+`andrey.data.functional` in `SCM`, which also sets a family's parameters:
+
+| `functional` | Model of a variable given its parents | Parameters |
+|---|---|---|
+| `"linear"` (default) | a weighted sum of the parents plus noise | `weight_range`, `positive` |
+| `"additive_noise"` | a weighted sum of `z + sin(z)` of each parent, plus noise | `weight_range` |
+| `"nonmonotone"` | a weighted sum of `cos(z)` of each parent, plus noise | `weight_range` |
+| `"random_features"` | a sum of one function per parent plus noise, each function an approximate draw of a Gaussian process by random Fourier features (Rahimi and Recht, 2007), the additive model of the CAM simulations (Buhlmann, Peters, and Ernest, 2014) | `n_features` (100), `length_scale` (1.0) |
+| `"post_nonlinear"` | an invertible transform of a weighted sum of the parents plus noise | `weight_range`, `outer` |
+| `"location_scale"` | `additive_noise` with a noise scale that depends on the parents | `weight_range`, `scale_range` |
+| `"var"`, `"varma"` | a linear time series | `n_lags`, `lag_density`, `ma_lags` |
+
+`outer` on `andrey.data.functional.post_nonlinear` names the transform, each strictly increasing on
+the real line. It draws nothing, so the weights and the noise are the same for every one:
+
+| `outer` | Transform | Note |
+|---|---|---|
+| `"tanh"` (default) | `z + 0.5 tanh(z)` | grows as its argument does |
+| `"cube"` | `z**3` (Montagna et al., 2023) | use `scale="rescale"` on paths of more than a few edges, where raw values overflow |
+| `"cube_root"` | `z**(1/3)`, the inverse of `"cube"` | compresses large values |
+| `"sigmoid"` | `1 / (1 + exp(-z))` (Lachapelle et al., 2020) | values in (0, 1) |
+
+`noise` names the family of each variable's noise, by name or as a spec from `andrey.data.noise`.
+Every family has mean 0 and variance 1 before its scale, so the family changes the shape of the
+noise and never its size; `heteroscedastic` and `variance_range` set the scales for every family:
+
+| `noise` | Shape | Parameters |
+|---|---|---|
+| `"gaussian"` (default) | normal | |
+| `"uniform"` | flat, bounded | |
+| `"laplace"` | symmetric, heavier tails | |
+| `"exponential"`, `"gumbel"` | skewed | |
+| `"student_t"` | symmetric, tails heavier the smaller `df` is | `df` (5.0), greater than 2 |
+| `"gaussian_mixture"` | two Gaussian components: two modes by default (Marron and Wand, 1992, density 6), skewed with unequal components | `weight` (0.5), `means` ((-1, 1)), `sds` ((2/3, 2/3)) |
+
+A sample records its family parameters in `provenance["config"]`, under `functional_params` and
+`noise_params`.
+
 `andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
 scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
 for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
@@ -1023,6 +1143,9 @@ each context drives exactly one variable, so no hidden context is a common cause
    missingness.draw
    missingness.Mechanism
    missingness.Missingness
+   measurement.noisy_children
+   measurement.NoisyChildren
+   measurement.Measurements
 ```
 
 #### Scale
@@ -1130,6 +1253,38 @@ The mask is drawn after the scaling and the column shuffle, from the seed's own 
 seed without `missing` gives the complete data, and, for a sample drawn without `screen`,
 `missingness.draw(ds.data, mechanism, seed=)` draws its mask again. Every column keeps at least 2
 observed values.
+
+#### Measurement columns
+
+`measurements=` on `SCM.sample` and `sample_scm` adds measurement columns: for each variable you
+select, a new column that is the variable plus independent noise, the random measurement error
+model (Scheines and Ramsey, 2016). `andrey.data.measurement.noisy_children` selects the variables,
+by `columns` or by a `share` drawn from the seed, and sets the noise: `noise_scale` is its standard
+deviation as a multiple of the measured column's, so a measurement keeps `1 / (1 + noise_scale**2)`
+of its variance from the variable in any units, 0.8 at the default 0.5, and `noise` is its family,
+Gaussian by default. In the true graph a measurement column is a child of the column it measures:
+
+```python
+import andrey.data as data
+from andrey.data import measurement
+
+ds = data.sample_scm(d=20, n=2000, seed=0, density=2,
+                     measurements=measurement.noisy_children([3, 7], noise_scale=0.5))
+ds.data.shape            # (2000, 22): the 20 variables and 2 measurement columns
+ds.measurements.parents  # each measurement column: the column it measures
+ds.graph                 # the true graph, with an edge from each measured column to its measurement
+```
+
+The measurement columns are drawn over the values of the same seed without `measurements`, from the
+seed's own streams, and each is scaled as `scale` scales a variable. The columns are then shuffled
+once more, the measurement columns with all the others, so no position marks a measurement:
+`measurements.parents`, `targets`, and the graph name the columns of the returned data. The other
+columns hold the values of the sample without `measurements`, and `provenance["column_order"]`
+matches them: a column has the same entry there in the two samples, and a measurement column an
+entry of 20 or more here. With `shuffle=False` the measurement columns follow the others. To give a
+method a variable only through its measurement, drop the variable's column and its node; the
+variable is then a hidden parent of the measurement. `missing=` draws its mask over the measurement
+columns too.
 
 ## Metrics
 

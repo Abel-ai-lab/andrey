@@ -490,7 +490,7 @@ def test_per_method_help(capsys):
     assert "--config" in out  # run-level flags are listed in per-method help
     assert "Experimental" not in out
     experimental = REGISTRY["pc"].model_copy(update={"status": "experimental"})
-    assert "Experimental: no published benchmark" in render_method_help(experimental)
+    assert "Experimental: not supported" in render_method_help(experimental)
 
 
 # --- edge orientation + mark constants ------------------------------------------------------------

@@ -141,7 +141,7 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -181,13 +181,15 @@ _CONCEPTS = (
             *RESIDUAL,
             "cam",
             "resit",
+            "score_matching",
+            "nogam",
             "camuv",
             "icp",
             "igsp",
             "ut_igsp",
         ),
         exempt=(
-            *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies"),
+            *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
             *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
@@ -238,6 +240,20 @@ _CONCEPTS = (
                 default=0.001,
                 reason="0.001 is the paper's cutoff of the pruning tests, at every sample size "
                 "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
+            ),
+            Deviation(
+                method="score_matching",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the method's published "
+                "experiments (Rolland et al. 2022, Section 4.1).",
+            ),
+            Deviation(
+                method="nogam",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the method's published "
+                "experiments (Montagna et al. 2023, Section 6).",
             ),
             Deviation(
                 method="camuv",
@@ -291,11 +307,21 @@ _CONCEPTS = (
                 "camuv",
             ),
             *_exempt(
-                "No conditional-independence test.", *PURE_SCORE, "gnies", *CONTINUOUS, *LINGAM
+                "No conditional-independence test.",
+                *PURE_SCORE,
+                "gnies",
+                "ages",
+                *CONTINUOUS,
+                *LINGAM,
             ),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
-            *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
+            *_exempt(
+                "Its pruning tests the smooth terms of its own additive model.",
+                "cam",
+                "score_matching",
+                "nogam",
+            ),
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
                 "icp",
@@ -373,7 +399,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="BIC penalty",
-        suitable=(*SCORE_SEARCHES, "gnies"),
+        suitable=(*SCORE_SEARCHES, "gnies", "ages"),
         others_exempt="Does not score with BIC.",
     ),
     Concept(
@@ -530,9 +556,12 @@ _CONCEPTS = (
                 "No conditional-independence tests over growing conditioning sets.",
                 *PURE_SCORE,
                 "gnies",
+                "ages",
                 "calm",
                 "cam",
                 "resit",
+                "score_matching",
+                "nogam",
                 *CONTINUOUS,
                 *LINGAM,
                 "granger",
@@ -637,6 +666,11 @@ _CONCEPTS = (
                 *CONTINUOUS,
                 "dynotears",
             ),
+            *_exempt(
+                "The paper defines no cap, and the aggregation can direct edges into a node "
+                "beyond a cap its CPDAGs keep.",
+                "ages",
+            ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
             *_exempt(
                 "No search over parent sets.",
@@ -645,6 +679,12 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+            ),
+            *_exempt(
+                "An order search with no search over parent sets: the pruning starts from every "
+                "variable before a node in the order.",
+                "score_matching",
+                "nogam",
             ),
             *_exempt(
                 "The paper's search sets no cap on a variable's parents; max_depth caps the "
@@ -714,9 +754,12 @@ _CONCEPTS = (
                 "Deterministic.",
                 *(m for m in PURE_SCORE if m not in STARTS),
                 "gnies",
+                "ages",
                 *CONTINUOUS,
                 "cam",
                 "resit",
+                "score_matching",
+                "nogam",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -904,6 +947,11 @@ _CONCEPTS = (
                 "knowledge of edges enters an invariance test.",
                 "icp",
             ),
+            *_exempt(
+                "The paper defines the solution path and its aggregation without background "
+                "knowledge; ges takes knowledge.",
+                "ages",
+            ),
         ),
     ),
     Concept(
@@ -915,9 +963,9 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m != "icp"),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp"),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages"),
         ),
     ),
     Concept(
@@ -1002,9 +1050,16 @@ _CONCEPTS = (
                 "gnies",
             ),
             *_exempt(
+                "The paper defines the solution path for complete data; a path over the expected "
+                "covariance of structural EM, refit per penalty or not, is not published.",
+                "ages",
+            ),
+            *_exempt(
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
+                "score_matching",
+                "nogam",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1034,7 +1089,12 @@ _CONCEPTS = (
                     choices=(EM,),
                     reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
                     "et al. 2022), suits a fit that reads only a covariance and the row count; "
-                    "None refuses missing values.",
+                    "None refuses missing values. It is Friedman's alternating scheme with two "
+                    "constants: 10 rounds of one search each, the number Gao et al. run, and 5 "
+                    "parameter-only EM steps on the current graph before each search after the "
+                    "first, a count Friedman leaves open (until convergence or a largest count); "
+                    "with 5, the graph settled within the 10 rounds in most measured fits, and "
+                    "with none it was still changing.",
                 )
                 for m in EM_METHODS
             ),
@@ -1156,6 +1216,11 @@ _CONCEPTS = (
                 *("iamb", "inter_iamb", "mmpc"),
             ),
             *_exempt(
+                "The paper defines the aggregation for data from one environment; ges is the "
+                "score search that takes env.",
+                "ages",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1163,7 +1228,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),

@@ -162,7 +162,7 @@ def methods_block():
         rows.append(f"| {label} | {names} | {returns} |")
     footnote = [
         "\\* [Experimental](" + SITE_URL + "/docs/api.html#experimental-methods):",
-        "no published benchmark yet, and the API may change.",
+        "not supported yet (see its Limitations), and the API may change.",
         "",
     ]
     start, end = markers("METHODS")

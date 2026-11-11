@@ -19,6 +19,11 @@ import stein_cpu
 
 from andrey_bench import datasets, gp_models, runner, score_oracle
 from andrey_bench.adapters.andrey_cam import AndreyCAMOrder
+from andrey_bench.adapters.andrey_nogam import AndreyNoGAM, AndreyNoGAMOrder
+from andrey_bench.adapters.andrey_score_matching import (
+    AndreyScoreMatching,
+    AndreyScoreMatchingOrder,
+)
 from andrey_bench.adapters.causaldisco_r2sort import CausalDiscoR2Sort, CausalDiscoR2SortnRegress
 from andrey_bench.adapters.dodiscover_nogam import DodiscoverNoGAM, DodiscoverNoGAMOrder
 from andrey_bench.adapters.order_dag import order_dag
@@ -160,6 +165,31 @@ def test_andreys_cam_order_is_returned_as_endpoint_marks() -> None:
     assert np.count_nonzero(marks) == 2 * len(expected)
 
 
+@pytest.mark.parametrize(
+    ("graph", "order", "method"),
+    [
+        (AndreyScoreMatching, AndreyScoreMatchingOrder, "score_matching"),
+        (AndreyNoGAM, AndreyNoGAMOrder, "nogam"),
+    ],
+)
+def test_andreys_stein_arms_return_the_facades_dag_and_the_full_dag_of_its_order(
+    graph, order, method: str
+) -> None:
+    import andrey
+
+    data, _, _ = _sample(d=4, n=300, seed=1)
+    out = getattr(andrey, method)(data, alpha=0.001)
+    marks = graph().fit(data, {})
+    np.testing.assert_array_equal(marks, out.structure.to_numpy())
+    assert graph().params() == {"alpha": 0.001}
+    ordering = list(out.ordering)
+    expected = {(ordering[a], ordering[b]) for a in range(4) for b in range(a + 1, 4)}
+    order_marks = order().fit(data, {})
+    assert _edges(order_marks) == expected
+    assert np.count_nonzero(order_marks) == 2 * len(expected)
+    assert graph.name == f"andrey.{method}.numpy" and order.name == f"andrey.{method}.order.numpy"
+
+
 # --- the oracle arm --------------------------------------------------------------------------------
 
 
@@ -259,7 +289,12 @@ def test_the_driver_scores_every_solution_on_the_same_datasets(monkeypatch, tmp_
 
     monkeypatch.delenv(datasets.DATA_STORE_ENV, raising=False)
     monkeypatch.setenv("ANDREY_BENCH_CAM_PYTHON", sys.executable)
-    solutions = ["andrey.cam.numpy", "andrey.cam.order.numpy", "baseline.empty"]
+    pairs = [
+        ("andrey.cam.numpy", "andrey.cam.order.numpy"),
+        ("andrey.score_matching.numpy", "andrey.score_matching.order.numpy"),
+        ("andrey.nogam.numpy", "andrey.nogam.order.numpy"),
+    ]
+    solutions = [name for pair in pairs for name in pair] + ["baseline.empty"]
     argv = ["--out", str(tmp_path), "--regimes", "score_paper_standardized", "--ladder", "5"]
     code = stein_cpu.main([*argv, "--densities", "er1", "--seeds", "1", "--solutions", *solutions])
     assert code == 0
@@ -268,7 +303,8 @@ def test_the_driver_scores_every_solution_on_the_same_datasets(monkeypatch, tmp_
     assert table.loc["baseline.empty", "shd"] == 5
     # The pruned graph keeps edges of its order's full DAG only, so it orients no more true edges.
     recall = table["arrowhead_recall"]
-    assert recall["andrey.cam.numpy"] <= recall["andrey.cam.order.numpy"]
+    for graph, order in pairs:
+        assert recall[graph] <= recall[order]
     assert table["dataset_id"].nunique() == 1
 
 

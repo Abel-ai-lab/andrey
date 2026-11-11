@@ -138,8 +138,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
 def warn_experimental(name: str) -> None:
     """Warn on the first call of experimental method ``name`` in this process."""
     warn_once(
-        f"andrey.{name} is experimental: it has no published benchmark, and its API may change "
-        "without deprecation.",
+        f"andrey.{name} is experimental: it is not supported (see its Limitations), and its API "
+        "may change without deprecation.",
         ExperimentalWarning,
     )
 
@@ -250,8 +250,11 @@ def restrict_paths(out: StructureOutput, constraints: Constraints, method: str) 
     ``required_paths`` and ``forbidden_paths`` (:func:`~andrey.core.ancestral.restrict`), and
     ``metadata["ancestor_clauses"]`` lists the clauses the MPDAG cannot show, each
     ``[x, [c1, c2, ...]]``: ``x`` is a direct cause of at least one of ``c1, c2, ...``. A claim no
-    such DAG meets is dropped (:func:`drop_unmet`). An undirected structure, which the paths do not
-    orient, is returned as it is.
+    such DAG meets is dropped (:func:`drop_unmet`). A CPDAG with no consistent extension stands for
+    no DAG: there a claim on a pair joined by an undirected edge directs that edge, Meek's rules
+    follow, and ``metadata["edge_claims"]`` lists the claims applied this way, each
+    ``[part, a, b]``; the list is empty for a CPDAG with a consistent extension. An undirected
+    structure, which the paths do not orient, is returned as it is.
     """
     from andrey.core.ancestral import restrict
     from andrey.core.orient import from_structure, to_structure
@@ -263,14 +266,17 @@ def restrict_paths(out: StructureOutput, constraints: Constraints, method: str) 
     assert structure.n_nodes == constraints.d, (structure.n_nodes, constraints.d)
     labels = structure.labels
     name = label_of(labels)
+    edge_claims: list[tuple[str, int, int]] = []
     mpdag, clauses, unmet = restrict(
         from_structure(structure),  # ty: ignore[invalid-argument-type]  # a cpdag is a graph
         constraints.required_paths,
         constraints.forbidden_paths,
+        edge_claims=edge_claims,
     )
     metadata = {
         **out.metadata,
         "ancestor_clauses": [[name(t), [name(h) for h in sorted(heads)]] for t, heads in clauses],
+        "edge_claims": [[part, name(a), name(b)] for part, a, b in edge_claims],
     }
     out = dataclasses.replace(
         out, _structure=to_structure(mpdag, kind="cpdag", labels=labels), _metadata=metadata

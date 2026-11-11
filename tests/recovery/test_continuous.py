@@ -139,6 +139,21 @@ def test_h_tol_ends_the_dual_steps(tree) -> None:
     assert tight.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
 
 
+def test_dagma_recovers_a_chain_whose_variances_grow() -> None:
+    """Column variances from 1 to several hundred pull hardest on the free diagonal of the weight
+    matrix; the fit still returns the chain with its coefficients and no self-weight.
+    """
+    edges = {(j, j + 1): 1.8 for j in range(5)}
+    X = _sample(edges, [1.0] * 6, 1000, 0)
+    assert X.var(axis=0).max() > 100 * X.var(axis=0).min()
+    out = _fit("dagma", X)
+    assert _edges(out) == set(edges)
+    weights = out.weighted_adjacency
+    np.testing.assert_allclose([weights[edge] for edge in edges], 1.8, atol=0.1)
+    np.testing.assert_array_equal(np.diagonal(weights), 0.0)
+    assert out.metadata["h_final"] < 1e-6
+
+
 def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_variances() -> None:
     """The likelihood path reaches the CPDAG."""
     X, adjacency = _unequal_variances(8)

@@ -16,6 +16,7 @@ whose Reproduce table lists the driver.
 | GES | `ges_cpu.py` | GES, serial and parallel | causal-learn | 0.1.0, 0.2.0, 0.7.0, 0.9.0 |
 | [GES parent limit](comparisons/ges-parent-limit.md) | `ges_cpu.py`, `xges_ges.py` | GES with `max_parents` | causal-learn, XGES | |
 | [XGES](comparisons/xges.md) | `xges_cpu.py` | XGES, with and without the extended search; GES | xges | 0.3.0, 0.9.0 |
+| [AGES](comparisons/ages.md) | `ages_cpu.py`, `ages_summary.py` | AGES; GES at the same penalty as the baseline of the method's paper | pcalg | 0.17.0 |
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | 0.14.0 |
@@ -37,12 +38,13 @@ whose Reproduce table lists the driver.
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
-| Stein-score screen | `stein_cpu.py` | CAM as context; no Andrey SCORE or NoGAM | the authors' SCORE, NoGAM (dodiscover), CausalDisco (R2-SortnRegress) | |
+| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM; CAM as context | the authors' SCORE code, NoGAM in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
+| [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
-| [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em` | 0.16.0 |
-| [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | PC, GES, BOSS, FCI, GFCI, BOSS-FCI, LPCMCI, and DirectLiNGAM with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; lingam's DirectLiNGAM with `prior_knowledge` as context | |
+| [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
+| [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
 | [PCMCI on lagged series](comparisons/pcmci.md) | `pcmci_cpu.py` | PCMCI | tigramite | 0.5.0, 0.9.0 |
@@ -57,16 +59,17 @@ whose Reproduce table lists the driver.
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
-`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, and `start_stein.sh`
-build the separate environments some comparisons need ([setup](README.md#setup)).
+`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, `start_stein.sh`,
+and `start_notears.sh` build the separate environments some comparisons need
+([setup](README.md#setup)).
 
 ## Release cards
 
 Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
-hold measurements no card of their own presents:
-`published/0.2.0-small-fits/`, the faster small fits the 0.2.0 card links, and `published/0.4.1/`,
-DirectLiNGAM's causal-order search in the 0.4.1 fix. The 0.14.0 summary draws its rows from the lane
-files [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
+hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
+fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
+fix. The 0.14.0 summary draws its rows from the lane files
+[`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
 [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json), UT-IGSP with
 graphical-model-learning, [`published/0.14.0/igsp.json`](published/0.14.0/igsp.json), IGSP with
 graphical-model-learning, [`published/0.14.0/icp.json`](published/0.14.0/icp.json), ICP with
@@ -83,22 +86,39 @@ seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows 
 [comparison page](comparisons/fci-jci.md) presents; its median errors, fit times, and the counts and
 means of its floor intervals come from the runs behind the file. BOSS-FCI's and GRaSP-FCI's rows
 come from [`published/0.15.0/boss-fci-grasp-fci.json`](published/0.15.0/boss-fci-grasp-fci.json),
-both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md)
-presents, with the median errors and fit times from the runs behind the file. J-PCMCI+'s rows come
-from [`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with
-tigramite, which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors,
-fit times, link F1, and the counts and means of its floor intervals from the runs behind the file.
-The 0.16.0 summary draws LOCI's rows from [`published/0.16.0/loci.json`](published/0.16.0/loci.json),
-LOCI with its authors' code, which its [comparison page](comparisons/loci.md) presents, with the
-size ladder and the other pairwise methods on the same pairs. The path and confounder claims are in
-no release summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json)
-holds their rows, which their [comparison page](comparisons/knowledge-paths.md) presents. The
-missing-data lanes' rows are in
-[`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json), with their
-[comparison page](comparisons/missing-data.md).
+both hybrids with Tetrad, which their [comparison page](comparisons/boss-fci-grasp-fci.md) presents,
+with the median errors and fit times from the runs behind the file. J-PCMCI+'s rows come from
+[`published/0.15.0/jpcmciplus.json`](published/0.15.0/jpcmciplus.json), J-PCMCI+ with tigramite,
+which its [comparison page](comparisons/jpcmciplus.md) presents, with the median errors, fit times,
+link F1, and the counts and means of its floor intervals from the runs behind the file. The 0.16.0
+summary draws LOCI's rows from [`published/0.16.0/loci.json`](published/0.16.0/loci.json), LOCI with
+its authors' code, which its [comparison page](comparisons/loci.md) presents, with the size ladder
+and the other pairwise methods on the same pairs. The 0.17.0 summary draws SCORE's and NoGAM's rows
+from [`published/0.17.0/stein-score.json`](published/0.17.0/stein-score.json), SCORE with its
+authors' code and NoGAM with dodiscover, which their [comparison page](comparisons/score-nogam.md)
+presents, with `cam` and the floors on the same datasets, the fresh seeds, and the additive-noise
+check. The path and confounder claims are in no release
+summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
+rows of the first eight methods and
+[`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
+14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
+rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json) and, for GES,
+BOSS, and GRaSP with EM against Tetrad's EM covariance policy, in
+[`published/0.17.0/missing-data-em.json`](published/0.17.0/missing-data-em.json), which holds the
+rows of the alternating structural EM and, under `earlier_scheme`, those of one refit per round.
+[`published/0.17.0/missing-data-em-bnlearn-missdag.json`](published/0.17.0/missing-data-em-bnlearn-missdag.json)
+holds hill climbing, Tabu search, and NOTEARS with the alternating EM against bnlearn and MissDAG,
+on the datasets of the 0.16.0 record. Their [comparison page](comparisons/missing-data.md) presents
+all three. The NOTEARS and DAGMA lane's rows are in
+[`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
+[comparison page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its
+authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental. The
+AGES lane's rows are in [`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
+[comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg.
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.17.0 | [0.17.0 release card](../docs/docs/benchmarks/0.17.0.md) | [`published/0.17.0/summary.json`](published/0.17.0/summary.json) |
 | 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | [`published/0.16.0/summary.json`](published/0.16.0/summary.json) |
 | 0.15.0 | [Multi-domain data](../docs/docs/benchmarks/0.15.0.md) | [`published/0.15.0/summary.json`](published/0.15.0/summary.json) |
 | 0.14.0 | [Interventional data](../docs/docs/benchmarks/0.14.0.md) | [`published/0.14.0/summary.json`](published/0.14.0/summary.json) |
