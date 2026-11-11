@@ -138,8 +138,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
 def warn_experimental(name: str) -> None:
     """Warn on the first call of experimental method ``name`` in this process."""
     warn_once(
-        f"andrey.{name} is experimental: it has no published benchmark, and its API may change "
-        "without deprecation.",
+        f"andrey.{name} is experimental: it is not supported (see its Limitations), and its API "
+        "may change without deprecation.",
         ExperimentalWarning,
     )
 

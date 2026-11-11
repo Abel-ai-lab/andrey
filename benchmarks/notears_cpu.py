@@ -14,6 +14,9 @@ Every arm fits the same datasets in the same run:
 
 ``--robust`` adds ``andrey.notears.robust`` and ``andrey.dagma.robust``, the likelihood path of Deng
 et al. (2024), on the standardized cells of at most :data:`ROBUST_MAX_D` variables.
+``--paper-penalty`` adds ``andrey.dagma.paper`` and ``bello.dagma.paper`` on the standardized cells:
+both codes at ``lambda1 = 0.05``, the penalty of the experiments of Bello et al. (2022), where the
+default arms run the package default, 0.03.
 
 The datasets are the papers' simulation, drawn by ``andrey.data.sample_scm``: a linear model with
 weights from +/-[0.5, 2] and unit noise variances, ``n = 1000`` rows, Erdos-Renyi graphs with
@@ -51,7 +54,12 @@ from pathlib import Path
 from typing import Any
 
 from andrey_bench import datasets, rundir
-from andrey_bench.adapters.andrey_notears import METHODS, AndreyContinuous
+from andrey_bench.adapters.andrey_notears import (
+    METHODS,
+    PAPER,
+    PAPER_LAMBDA1,
+    AndreyContinuous,
+)
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bello_dagma import BelloDAGMA
 from andrey_bench.adapters.causaldisco_r2sort import (
@@ -104,7 +112,7 @@ def _control(adapter: Any) -> Any:
     return adapter
 
 
-def arms(scale: str, d: int, *, robust: bool = False) -> tuple[Any, ...]:
+def arms(scale: str, d: int, *, robust: bool = False, paper: bool = False) -> tuple[Any, ...]:
     """The arms of a dataset at `scale` with `d` variables, in the order they run."""
     out: list[Any] = []
     for method in METHODS:
@@ -113,6 +121,8 @@ def arms(scale: str, d: int, *, robust: bool = False) -> tuple[Any, ...]:
             out.append(AndreyContinuous(method, "standardize"))
         if robust and scale == DECISION_SCALE and d <= ROBUST_MAX_D:
             out.append(AndreyContinuous(method, "robust"))
+    if paper and scale == DECISION_SCALE:
+        out += [AndreyContinuous("dagma", PAPER), BelloDAGMA(PAPER_LAMBDA1)]
     out += [
         ZhengNOTEARS(),
         BelloDAGMA(),
@@ -147,6 +157,7 @@ def plan(
     first_seed: int = 0,
     *,
     robust: bool = False,
+    paper: bool = False,
     solutions: Any = None,
 ) -> list[Unit]:
     """Every unit of the grid, sizes in order; `solutions` keeps the arms with those names."""
@@ -155,7 +166,9 @@ def plan(
         sizes, graphs, noises, scales, range(first_seed, first_seed + seeds)
     ):
         kept = tuple(
-            a for a in arms(scale, d, robust=robust) if solutions is None or a.name in solutions
+            a
+            for a in arms(scale, d, robust=robust, paper=paper)
+            if solutions is None or a.name in solutions
         )
         if kept:
             units.append(Unit(cell_key(graph, d, noise, scale, seed), kept))
@@ -164,7 +177,7 @@ def plan(
 
 def solution_names() -> list[str]:
     """The name of every arm the lane can run."""
-    names = {a.name for scale in SCALES for a in arms(scale, ROBUST_MAX_D, robust=True)}
+    names = {a.name for scale in SCALES for a in arms(scale, ROBUST_MAX_D, robust=True, paper=True)}
     return sorted(names)
 
 
@@ -206,6 +219,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=f"add the robust=True arms on standardized cells of at most {ROBUST_MAX_D} variables",
     )
+    p.add_argument(
+        "--paper-penalty",
+        action="store_true",
+        help="add both DAGMA codes at lambda1 = 0.05, the paper's penalty, on standardized cells",
+    )
     p.add_argument("--seeds", type=int, default=20, help="datasets per cell (default: 20)")
     p.add_argument(
         "--first-seed", type=int, default=0, help="first seed; fresh seeds for a rerun (default: 0)"
@@ -236,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         args.seeds,
         args.first_seed,
         robust=args.robust,
+        paper=args.paper_penalty,
         solutions=args.solutions,
     )[args.part :: args.parts]
     names = sorted({a.name for u in units for a in u.arms})
@@ -254,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
         "noises": args.noises,
         "scales": args.scales,
         "robust": args.robust,
+        "paper_penalty": args.paper_penalty,
         "rows": ROWS,
         "seeds": args.seeds,
         "first_seed": args.first_seed,

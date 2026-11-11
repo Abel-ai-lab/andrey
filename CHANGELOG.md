@@ -66,6 +66,17 @@ names its pull request.
   experimental: it made fewer errors than the empty graph in none of the 24 settings, as its
   authors' package did, and its Limitations give the numbers. The evidence is on the
   [comparison page][nd-page]. ([#871])
+- `dagma` states its scope and stays experimental. It is for data whose units are meaningful: its
+  accuracy on the usual simulated data comes from the columns' variances following the causal
+  order, and on standardized columns, or data whose units are arbitrary, it does no better than
+  the empty graph at its default settings (below it in none of 24 settings, above it in 16, as its
+  authors' package). At the penalty of its paper's experiments, `lambda1=0.05`, it was below the
+  empty graph in 6 of the 24 settings and above it in 6, and at the penalty of `notears` it matches
+  `notears`, whose result on standardized columns depends on that penalty. The docstrings say so
+  in a few sentences, the [0.17.0 release card][card-0170-dagma] has a short table, and the
+  [comparison page][nd-page] has the trace and the literature. The warning, the command-line help,
+  and the documentation now describe an experimental method as not supported, with the reason in
+  its Limitations, instead of as having no published benchmark. ([#896])
 - Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
   in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
   `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
@@ -159,6 +170,14 @@ names its pull request.
 
 ### Fixed
 
+- `dagma` leaves the diagonal of the weight matrix free in its least-squares fit, as the paper's
+  algorithm and its authors' package do; the fit held it at zero at every step, which sent the
+  central path to another solution. On the paper's simulation with standardized columns it now
+  ties its authors' package in all 24 settings, where it made 2 to 5 more errors (SHD, of 110 to
+  210) in 3 settings on the first datasets and again on fresh ones, and it returns the same graph
+  as that package in 57% to 100% of a size's datasets, against 0% to 80% of a setting's before. Its
+  graphs can differ from those of earlier releases; the graph and the returned weights still carry
+  no diagonal entry, and the likelihood steps of `robust=True` keep the diagonal at zero. ([#896])
 - `mmhc`, and `rsmax2` with `restrict="mmpc"` or `"pc"`, pass background knowledge to the restrict
   phase, which reads it as `mmpc` and `pc` do on their own: the two ends of a required edge
   condition the tests of the other pairs, and a pair the knowledge makes non-adjacent is never a
@@ -2420,8 +2439,10 @@ First alpha release.
 [#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
+[#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
+[card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md

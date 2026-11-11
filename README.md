@@ -102,7 +102,7 @@ You install andrey-core and then `import andrey`.
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html) | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/api.html#experimental-methods):
-no published benchmark yet, and the API may change.
+not supported yet (see its Limitations), and the API may change.
 
 <!-- METHODS:END -->
 

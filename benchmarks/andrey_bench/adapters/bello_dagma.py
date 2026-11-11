@@ -8,7 +8,8 @@ NumPy, SciPy, and tqdm; PyTorch serves the nonlinear model alone and stays out o
 
 A fit is ``DagmaLinear(loss_type="l2").fit(X, lambda1=0.03)`` with the method's other defaults
 (``w_threshold=0.3``, ``T=5``, ``s=[1.0, 0.9, 0.8, 0.7, 0.6]``, ``warm_iter=3e4``, ``max_iter=6e4``,
-``lr=3e-4``). The thresholded weights can hold a cycle, which
+``lr=3e-4``); ``BelloDAGMA(lambda1=0.05)`` is ``bello.dagma.paper``, the same fit at the penalty of
+the paper's experiments. The thresholded weights can hold a cycle, which
 :func:`~andrey_bench.adapters.weights_dag.dag_of_weights` repairs outside the package; each repair
 is logged.
 """
@@ -35,6 +36,7 @@ class BelloDAGMA:
 
     Satisfies :class:`~andrey_bench.contracts.SolutionAdapter` and
     :class:`~andrey_bench.contracts.SetupAdapter`. Fits run in ``$ANDREY_BENCH_NOTEARS_PYTHON``.
+    `lambda1` other than the package default names the arm ``bello.dagma.paper``.
     """
 
     name: str = "bello.dagma"
@@ -46,13 +48,18 @@ class BelloDAGMA:
     output_type: str = "dag"
     python_env: str = "ANDREY_BENCH_NOTEARS_PYTHON"
 
+    def __init__(self, lambda1: float = _DEFAULTS["lambda1"]) -> None:
+        self.lambda1 = lambda1
+        if lambda1 != _DEFAULTS["lambda1"]:
+            self.name = "bello.dagma.paper"
+
     def setup(self) -> None:
         """Import the package outside fit timing."""
         from dagma.linear import DagmaLinear  # noqa: F401  # ty: ignore[unresolved-import]
 
     def params(self) -> dict[str, Any]:
         """The penalty, the loss, the threshold, and the pinned release."""
-        return {**_DEFAULTS, "version": VERSION}
+        return {**_DEFAULTS, "lambda1": self.lambda1, "version": VERSION}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run ``DagmaLinear.fit`` and return a 0/1 DAG adjacency. The only timed region."""

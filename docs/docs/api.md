@@ -511,9 +511,10 @@ acyclicity constraint, within an estimated moral graph.
 NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
 least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
 NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
-columns' units. `robust=True` follows the first fit with a refit under the Gaussian likelihood
-(Deng et al. 2024). The [0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to
-100 variables against the authors' code.
+columns' units, and on standardized columns its result depends on the `l1` penalty. `robust=True`
+follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
+[0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
+the authors' code.
 
 AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
 {py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
@@ -684,9 +685,10 @@ measures it against tigramite, the package of its authors.
 
 ### Experimental methods
 
-A new method ships as experimental: it passes recovery tests but has no published benchmark, its
-API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
-its first call in a process.
+A new method ships as experimental: it passes recovery tests but is not supported, because it has
+no published benchmark yet or did not pass one (its **Limitations** say which), its API may change
+without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on its first call
+in a process.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -698,10 +700,14 @@ its first call in a process.
    dagma
 ```
 
-DAGMA is a continuous-optimization learner in the line of NOTEARS: it fits a weighted DAG by
-minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True`
-follows the first fit with a refit under the Gaussian likelihood, which does not depend on the scale
-of the columns (Deng et al. 2024).
+DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
+weighted DAG by minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only.
+It is for data whose units are meaningful: on the usual simulated data its accuracy comes from the
+columns' variances following the causal order, and on standardized columns it does no better than
+the empty graph at its default settings, which is why it is experimental. The
+[0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
+fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
+(Deng et al. 2024).
 
 A method becomes supported once it has:
 
