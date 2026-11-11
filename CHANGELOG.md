@@ -10,6 +10,40 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `score_matching` is SCORE (Rolland et al., 2022) and `nogam` is NoGAM (Montagna et al., 2023), for
+  nonlinear data with additive noise. Each reads a causal order from the score of the data, the
+  gradient of its log density, and prunes it to a DAG. Both are supported: against the SCORE
+  authors' code and dodiscover on the simulation of their papers, neither made more errors in any
+  setting, `nogam` made fewer in 16 of 24, and the median fits were 4 to 9 and 1.6 to 3 times
+  faster. On sparse graphs, and on additive-noise data outside that simulation, `cam` is more
+  accurate. The [0.17.0 release
+  card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam) gives the numbers.
+  ([#872], [#874], [#879])
+- `notears` is supported: against its authors' code on the paper's simulation with standardized
+  columns, it made no more errors in any of the 24 settings. `dagma` stays experimental. Its fit now
+  leaves the diagonal of the weight matrix free, as the paper's algorithm does. ([#871], [#896])
+- `ages` is AGES (Eigenmann, Nandy, and Maathuis, 2017), for linear Gaussian data where some effects
+  are weak. It keeps the GES skeleton and can direct more of its edges. It is supported: on 1,378 of
+  1,380 datasets from the paper's simulation, it returned the same graph as pcalg's `ages`, the
+  authors' implementation. With 10,000 rows, it directed more edges correctly than `ges` at the same
+  precision: 49% of the true edges against 46%. With 100 rows, it directed almost no additional
+  edges correctly. ([#894], [#899])
+- Missing data: `missing="em"` runs the alternating structural EM of Friedman (1997) and is
+  supported in `ges`, `boss`, and `grasp`, as it already was in `notears`, `hc`, and `tabu`. Against
+  Tetrad's EM covariance policy, none was less accurate in a setting that repeated on fresh
+  datasets. A fit with `missing="em"` can return another graph than in 0.16.0 and takes about 1.5 to
+  5 times as long. ([#873], [#887])
+- Background knowledge: path and confounder claims are supported in 14 more methods, each in at
+  least one part. On a graph with no consistent extension, where a fit dropped every path claim, a
+  claim on a pair joined by an undirected edge now directs that edge. `mmhc` and `rsmax2` pass
+  background knowledge to their MMPC or PC restrict phase. ([#870], [#880], [#892])
+- `andrey.data` draws Student-t and Gaussian-mixture noise, functions from random Fourier features,
+  three more post-nonlinear transforms, and measurement columns. ([#875])
+- The Limitations of `grasp` say when one start is not enough, and those of `pc` say why
+  `missing="mvpc"` loses to test-wise deletion on larger graphs. ([#891], [#893])
+
 ### Added
 
 - `ages` is aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis, 2017) for

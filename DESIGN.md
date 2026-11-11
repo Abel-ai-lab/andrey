@@ -50,7 +50,7 @@ over art (SemiBold, white). Code uses the system's monospace font.
 ### Color
 
 The light theme is ink on paper and the dark theme pale ink on night. Cobalt marks links, selection,
-and the art's ground; navy is the art's deep ground, the footer's, and the default cover's; amber
+and the art's ground; navy is the art's deep ground and the footer's; amber
 is the sole accent. The website uses the `--andrey-ground-*` and `--andrey-*` custom properties
 (`site/grain.py`, `docs/palette_css.py`); no stylesheet specifies a hex value.
 
@@ -63,11 +63,12 @@ with fine stippling, modeled on Soviet space-age posters of 1958-1963. Each has 
 subject.
 
 A release without its own art takes the default cover (`release-default` in
-`docs/_static/benchmarks.css`) on its card and on the Release cards page: the navy ground, the
-masthead, the wordmark's image in the title's place, and the version. It has no dot above the
-version: the wordmark's amber stroke is the composition's one accent. Its tile among the earlier
-releases is the navy ground and the version. A post without art has the same link preview: the
-white wordmark and its line on navy, with no dot (`preview_svg` in `site/cards.py`).
+`docs/_static/benchmarks.css`) on its card and on the Release cards page: the stipple ground in the
+covers' tones, the masthead, the wordmark's image in the title's place, and the version. It has no
+dot above the version: the wordmark's amber stroke and the ground's amber corner are its accents.
+Its tile among the earlier releases is the stipple ground and the version. The link preview of a
+release or a post without art is the white wordmark and its line on navy, with no dot
+(`preview_svg` in `site/cards.py`).
 
 ## Figures
 
