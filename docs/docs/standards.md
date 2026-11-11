@@ -110,18 +110,22 @@ $R^2$-sortability as in the raw data, and the unitless regimes and the controls 
 columns by variance or by $R^2$ appear only in the campaigns whose cards name them, such as the
 0.17.0 comparisons of NOTEARS, DAGMA, SCORE, and NoGAM.
 
-**Monotone transforms and category codes.** Under a rank-based test, a strictly increasing transform
-of a column, such as a log, returns the same graph; under a categorical test or score, so does
-recoding the categories. `tests/unit/test_core_ci.py` checks that the p-values of
-`indep_test="normal_scores"` do not change under such transforms, and
-`tests/unit/test_core_discrete.py` that `"chisq"`, `"gsq"`, BDeu, and the categorical BIC do not
-depend on the codes. `tests/unit/test_column_transforms.py` refits every method that takes
-`"normal_scores"` and no score with each column through its own increasing map, and every method
-that takes `"chisq"` or `"gsq"` with each column's categories recoded in order, and requires the
-same graph. {{ test_and_score_names }} take `"normal_scores"` and also `score_func`, whose score
-reads the values, so a monotone transform can change their graph, and no test covers them. A method
-that scores categorical data without a test, such as `ges` with `score_func="bdeu"`, is checked
-through its score alone. `"normal_scores"` is experimental.
+**Monotone transforms and category codes.** Under a rank-based test or score, a strictly increasing
+transform of a column, such as a log, returns the same graph; under a categorical test or score, so
+does recoding the categories. `tests/unit/test_core_ci.py` checks that the p-values of
+`indep_test="normal_scores"` do not change under such transforms, `tests/unit/test_core_score.py`
+that the scores of `score_func="normal_scores"` do not, and `tests/unit/test_core_discrete.py` that
+`"chisq"`, `"gsq"`, BDeu, and the categorical BIC do not depend on the codes.
+`tests/unit/test_column_transforms.py` refits methods with each column through its own increasing
+map and requires the same graph: {{ rank_test_only_names }}, which read the data only through their
+test, with `indep_test="normal_scores"`; {{ rank_score_only_names }}, which read it only through
+their score, with `score_func="normal_scores"`; and {{ test_and_score_names }}, which take both,
+with both, each method that takes the score on ten datasets. With their default score, the methods
+that take both read the values, so a monotone transform can change their graph even under the
+rank-based test. The file also refits every method that takes `"chisq"` or `"gsq"` with each
+column's categories recoded in order. A method that scores categorical data without a test, such as
+`ges` with `score_func="bdeu"`, is checked through its score alone. Both `"normal_scores"` options
+are experimental, and the score takes no `env`.
 
 ## Faster paths, the same output
 
