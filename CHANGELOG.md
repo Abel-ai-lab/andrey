@@ -12,6 +12,11 @@ names its pull request.
 
 ### Added
 
+- `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
+  evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
+- `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
+  and `andrey.metrics.claim_scores` scores claims that an effect is or is not zero against the
+  true DAG. ([#917])
 - A benchmark lane for the Markov blanket and parents-and-children learners. `blanket_cpu.py` runs
   `iamb`, `inter_iamb`, and `mmpc` beside bnlearn 5.2.1's `iamb`, `inter.iamb`, and `mmpc`, and
   bnlearn's `pc.stable` read at a target, on discrete networks and linear-Gaussian graphs, for the
@@ -2488,6 +2493,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md

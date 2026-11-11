@@ -20,7 +20,7 @@ from scipy.stats import qmc
 from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
-from .ci import _canonical_ranked, per_query
+from .ci import _canonical_ranked, count_tests, per_query
 from .independence import hsic_statistic_log_p
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
@@ -224,6 +224,7 @@ class KCI:
     ) -> tuple[float, float]:
         """The statistic relative to its null mean, and the p-value, of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        count_tests()
         data, n = self._data, self._n
         if not (np.ptp(data[:, x_int]) > 0.0 and np.ptp(data[:, y_int]) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
@@ -580,6 +581,7 @@ class RCoT:
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        count_tests()
         if cond:
             self._warn_few_rows()
         n = self._n

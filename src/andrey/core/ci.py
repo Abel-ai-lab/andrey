@@ -78,9 +78,12 @@ graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import math
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
+from contextvars import ContextVar
+from dataclasses import dataclass
 from functools import lru_cache, partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
@@ -101,6 +104,8 @@ __all__ = [
     "register_indep_test",
     "available_indep_tests",
     "make_indep_test",
+    "counting_tests",
+    "count_tests",
 ]
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
@@ -113,6 +118,54 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+
+
+@dataclass(slots=True)
+class CountedTests:
+    """The running count of a :func:`counting_tests` block: ``n`` tests evaluated so far."""
+
+    n: int = 0
+
+    def add(self, k: int) -> None:
+        """Add ``k`` tests evaluated elsewhere, such as the count a worker process returns."""
+        self.n += k
+
+
+#: The count of the innermost :func:`counting_tests` block, or ``None`` outside every block.
+_TESTS: ContextVar[CountedTests | None] = ContextVar("andrey_counting_tests", default=None)
+
+
+@contextlib.contextmanager
+def counting_tests() -> Generator[CountedTests]:
+    """Count the conditional-independence tests evaluated inside the block.
+
+    One test is one query, ``x`` and ``y`` given a conditioning set, whose p-value a test computes.
+    A many-query call counts each of its queries, and a query a batch computes past the point where
+    the search stops reading, such as the sets after the first separating one, counts too. A query
+    answered from a kept answer, as the chi-square tests keep their marginal answers, counts
+    nothing, and so does a search step that reuses a run made before. A test-wise deletion test
+    counts each query once, as the test it runs on the query's rows counts it. The shipped tests
+    count themselves; a test added with :func:`register_indep_test` counts what it reports through
+    :func:`count_tests`. When the block ends, its count is added to the enclosing block's, so a
+    search run inside another counts in both. The count is the calling process's: tests run in
+    another process reach it only through :meth:`CountedTests.add`.
+    """
+    counter = CountedTests()
+    token = _TESTS.set(counter)
+    try:
+        yield counter
+    finally:
+        _TESTS.reset(token)
+        outer = _TESTS.get()
+        if outer is not None:
+            outer.n += counter.n
+
+
+def count_tests(k: int = 1) -> None:
+    """Add ``k`` evaluated tests to the running :func:`counting_tests` count, if one is running."""
+    counter = _TESTS.get()
+    if counter is not None:
+        counter.n += k
 
 
 class SingularCorrelationError(ValueError):
@@ -202,7 +255,9 @@ class PartialCorrelationTest:
         x_int, y_int, cond = _canonical(x, y, condition_set)
         df = self._degrees_of_freedom(len(cond))
         r = self._partial_correlation(x_int, y_int, cond)
-        return r, float(self._pvalue(r, df))
+        p = float(self._pvalue(r, df))
+        count_tests()
+        return r, p
 
     def _partial_correlation(self, x_int: int, y_int: int, cond: list[int]) -> float:
         """Partial correlation of columns ``x_int`` and ``y_int`` given ``cond``, clamped.
@@ -372,7 +427,9 @@ class PartialCorrelationTest:
             inv = self._invert(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        return r, np.asarray(self._pvalue(r, df))
+        p = np.asarray(self._pvalue(r, df))
+        count_tests(len(lo))
+        return r, p
 
     def residual_statistic_pvalues(
         self, data: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -416,7 +473,9 @@ class PartialCorrelationTest:
                 )
             r[k] = (residual[:, 0] @ residual[:, 1]) / math.sqrt(spread[0] * spread[1])
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        return r, np.asarray(self._pvalue(r, df))
+        p = np.asarray(self._pvalue(r, df))
+        count_tests(len(x))
+        return r, p
 
     def marginal_pvalues(self) -> np.ndarray:
         """All-pairs marginal (``|S| == 0``) p-values as a ``(d, d)`` matrix.
@@ -428,7 +487,10 @@ class PartialCorrelationTest:
         """
         df = self._degrees_of_freedom(0)
         r = np.clip(self._corr, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        return np.asarray(self._pvalue(r, df))
+        p = np.asarray(self._pvalue(r, df))
+        d = p.shape[0] if p.ndim else 1
+        count_tests(d * (d - 1) // 2)
+        return p
 
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
         """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
@@ -1060,6 +1122,7 @@ class ChiSquare:
                 statistic,
                 self._table_pvalue(statistic, bounds, per_table),
             )
+        count_tests(sum(len(block[0]) for block in counted))
 
     def _statistic_pvalue(
         self, x: int, y: int, condition_set: Iterable[int]
@@ -1108,6 +1171,7 @@ class ChiSquare:
             statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
         per_table = _null_means(n_sx, n_sy, n_s, self._g_square)
         dof = float(np.sum(per_table))
+        count_tests()
         if dof == 0.0:
             return statistic, 1.0
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
@@ -1309,7 +1373,9 @@ class ChiSquare:
         """
         statistic, margins = self._table_sums(tables, bounds)
         per_table = _null_means(*margins, self._g_square)
-        return statistic, self._table_pvalue(statistic, bounds, per_table)
+        p_values = self._table_pvalue(statistic, bounds, per_table)
+        count_tests(len(bounds) - 1)
+        return statistic, p_values
 
     def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
         """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
@@ -1437,7 +1503,9 @@ class DGTest:
             cs, basis, scale = regression
             cross = self._corr[both[:, None], cs] @ basis
             block = block - (cross / scale) @ cross.T
-        return self._block_statistic_pvalue(block, groups[x_int].size)
+        out = self._block_statistic_pvalue(block, groups[x_int].size)
+        count_tests()
+        return out
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -1542,6 +1610,7 @@ class DGTest:
         full = (values_x > _RANK_TOL).all(axis=1) & (values_y > _RANK_TOL).all(axis=1)
         for i in np.flatnonzero(~full).tolist():
             out[i] = self._block_pvalue(block[i], px)
+        count_tests(len(xs))
         if not full.any():
             return out
         # wx.T row-major and wy column-major, as _whitener's column-major whiteners give them.
@@ -1670,6 +1739,7 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
+        count_tests()
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1727,6 +1797,7 @@ class CGTest:
         quads = range(0, len(sets), 4)
         statistic = [2.0 * (ll[i] - ll[i + 1] - ll[i + 2] + ll[i + 3]) for i in quads]
         dof = [k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads]
+        count_tests(len(statistic))
         return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
 
 
@@ -1800,6 +1871,9 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     tests have, reports its own; for a test without one the family asks the call one query at a
     time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
     reports as the statistic ``-log10(p)``.
+
+    A fit's ``metadata["n_tests"]`` counts a registered test's queries only as the test reports
+    them, by calling :func:`count_tests` once per query it computes (:func:`counting_tests`).
     """
     _CI_REGISTRY[name] = factory
 

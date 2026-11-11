@@ -20,9 +20,11 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
+from andrey.api._local import TARGET_SETS
 from andrey.api._method import PENALTIES, SCORE_ONLY
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
+from andrey.core.effects import check_effects
 from andrey.core.removed import REMOVED, removal_hint
 from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
@@ -610,8 +612,50 @@ def keeps_the_required_edge(method: str) -> bool:
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
 
+def answers_for_the_target(method: str) -> bool:
+    """Whether a fit with a target holds only edges at it and lists its sets as columns."""
+    out = fit(method, codes=False, **REQUIRED.get(method, {"target": "y"}))[0]
+    labels = list(out.structure.labels or ())
+    target = out.metadata["target"]
+    target = labels[target] if isinstance(target, int) else target
+    marks = out.structure.to_numpy()
+    others = [i for i in range(len(labels)) if labels[i] != target]
+    sets = {key: out.metadata[key] for key in TARGET_SETS if key in out.metadata}
+    return (
+        bool(sets)
+        and not marks[np.ix_(others, others)].any()
+        and all(isinstance(v, list) and set(v) <= set(labels) - {target} for v in sets.values())
+    )
+
+
+def counts_its_tests(method: str) -> bool:
+    """Whether a fit records a positive count of the tests it evaluated."""
+    n_tests = coded_fit(method)[0].metadata.get("n_tests")
+    return isinstance(n_tests, int) and n_tests > 0
+
+
+def lists_its_effects(method: str) -> bool:
+    """Whether a fit lists one effects record or more, each as the record's rules say."""
+    out = coded_fit(method)[0]
+    records = out.metadata.get("effects")
+    check_effects(records, out.structure.labels)
+    return bool(records)
+
+
+def lists_the_blankets_it_learned(method: str) -> bool:
+    """Whether a fit lists one learned blanket or more, each by its column."""
+    out = coded_fit(method)[0]
+    learned = out.metadata.get("blankets_learned")
+    labels = list(out.structure.labels or ())
+    return isinstance(learned, list) and bool(learned) and set(learned) <= set(labels)
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
+    "blankets_learned": (lists_the_blankets_it_learned, True),
+    "target_answer": (answers_for_the_target, True),
+    "n_tests": (counts_its_tests, True),
+    "effects": (lists_its_effects, True),
     "env": (lambda m: env_kind(m) or False, "context"),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
     "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
