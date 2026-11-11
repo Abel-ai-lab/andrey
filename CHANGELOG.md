@@ -74,20 +74,37 @@ names its pull request.
   variables: the graph found often has no consistent extension, and the fit then drops every
   claim. The evidence is on the [comparison page][kp-paths].
   ([#870])
-- `missing="em"` is supported in `ges`. The benchmark lane `m2-tetrad` runs `ges`, `boss`, and
-  `grasp` at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under
-  its EM covariance policy, which estimates one covariance by EM before the search and is not
-  structural EM, on 132 settings of 10 to 50 variables with values missing completely at random or
-  at random. Against Tetrad's default, which counts every row as the sample size, none was less
-  accurate in any setting: `ges` had fewer errors in 107 and tied in 25, `boss` in 95 and 37, and
-  `grasp` in 89 and 43. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges`
-  had fewer errors in 81, tied in 50, and had more in 1, which tied on fresh datasets. `boss` (70,
-  58, and 4) and `grasp` (64, 62, and 6) each had more errors again on fresh datasets in one
-  setting, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, so in them
-  `missing="em"` stays experimental until the cause is known. The 100-variable settings and the
-  default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it
-  stays experimental, with no reference implementation to compare with. The
-  [comparison page][em-tetrad] has the results. ([#873])
+- `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
+  them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
+  EM covariance policy, which estimates one covariance by EM before the search and is not structural
+  EM, on 132 settings of 10 to 50 variables with values missing completely at random or at random.
+  Against Tetrad's default, which counts every row as the sample size, none was less accurate in any
+  setting: `ges` had fewer errors in 111 and tied in 21, `boss` in 100 and 32, and `grasp` in 101
+  and 31. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges` had fewer errors
+  in 90 and tied in 42, `boss` had fewer in 72, tied in 59, and had more in 1, and `grasp` had fewer
+  in 68, tied in 61, and had more in 3; all four tied on fresh datasets. The 100-variable settings
+  and the default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm`
+  it stays experimental, with no reference implementation to compare with. The [comparison
+  page][em-tetrad] has the results. ([#873], [#887])
+- `missing="em"` gives other results: it now runs the alternating structural EM of Friedman (1997)
+  in every method that takes it (`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`,
+  `notears`, `dagma`, and `calm`). Before each search after the first, 5 parameter-only EM steps
+  refit the current graph's coefficients and noise variances; before, each round refit them once.
+  With one refit per round, the first search, on the expected covariance under the model with no
+  edge, returned many extra edges, the later rounds removed them slowly, and the graph was still
+  changing after the 10 rounds; `boss` and `grasp` then each had more errors than Tetrad's
+  `MEAN_PAIRWISE` reference in one setting on two sets of datasets, where `boss` now ties and
+  `grasp` has fewer. On the three benchmark lanes with a reference, the alternating scheme had fewer
+  errors than one refit per round in 64 settings and more in 16, which did not run again on fresh
+  datasets, and the mean errors over the settings fell in every search. `hc` and `tabu` stay no less
+  accurate than bnlearn's structural EM in every setting (fewer errors in 28 and 31 of 36, ties in
+  the others), and `notears` than MissDAG (fewer in 23 of 24). The 10 rounds and the sample size of
+  the BIC, every row, stay. `metadata["em"]` gains `parameter_steps` and `graph_changed`, whether
+  each round changed the graph, and a fit whose last round changed it logs a warning: 2 to 6% of the
+  benchmark's fits, and 20% of `grasp`'s. A fit runs 56 E-steps where it ran 11 and takes about 1.5
+  to 5 times as long. The comparison page's tables of the lanes without a reference were not run
+  again and say that they were measured with one refit per round. Results on complete data do not
+  change. ([#887])
 - The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
   `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
   so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
@@ -2372,6 +2389,7 @@ First alpha release.
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
