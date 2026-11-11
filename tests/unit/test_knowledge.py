@@ -687,7 +687,7 @@ def test_a_part_warns_exactly_where_it_is_experimental(data):
     required = Knowledge(required_paths=[("a", "f")])
     forbidden = Knowledge(forbidden_paths=[("f", "a")])
     experimental = [
-        *((name, part) for name in ("iamb", "inter_iamb") for part in PATH_PARTS),
+        *((name, "forbidden_paths") for name in ("iamb", "inter_iamb")),
         *((name, "required_paths") for name in ("tabu", "mmhc", "rsmax2")),
     ]
     for name, part in experimental:
@@ -705,6 +705,8 @@ def test_a_part_warns_exactly_where_it_is_experimental(data):
             getattr(andrey, name)(data, knowledge=forbidden)
         for name in ("tabu", "mmhc", "rsmax2"):
             getattr(andrey, name)(data, knowledge=forbidden)
+        for name in ("iamb", "inter_iamb"):
+            getattr(andrey, name)(data, knowledge=required)
         for name in ("fci", "gfci", "boss_fci", "grasp_fci"):
             getattr(andrey, name)(data, knowledge=Knowledge(confounded=[("a", "f")]))
 
