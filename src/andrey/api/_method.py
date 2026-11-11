@@ -28,7 +28,7 @@ from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, availabl
 from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
-from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
+from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
 from andrey.core.seeding import resolve_seed
 from andrey.core.structure import ARROW, TAIL, column_labels
 from andrey.core.warning_policy import (
@@ -475,12 +475,12 @@ def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, st
 #: The scores each penalty concept weighs; the other scores ignore it.
 PENALTIES = {
     "penalty_discount": PENALIZED_SCORES,
-    "ebic_gamma": LINEAR_SCORES,
+    "ebic_gamma": (*LINEAR_SCORES, *RANK_SCORES),
     "equivalent_sample_size": ("bdeu",),
 }
-#: What each argument that only one score reads weighs; a call that passes it with another score
-#: raises. ``penalty_discount`` is not among them: every score but BDeu uses it, and BDeu ignores
-#: it.
+#: What each argument that only one kind of score reads weighs; a call that passes it with another
+#: score raises. ``penalty_discount`` is not among them: every score but BDeu uses it, and BDeu
+#: ignores it.
 SCORE_ONLY = {
     "ebic_gamma": "the extended-BIC term",
     "equivalent_sample_size": "the Dirichlet prior",
@@ -493,9 +493,9 @@ def used_penalties(
     """Return the penalties the score ``score`` used in a fit of ``spec``, by argument name.
 
     ``penalty_discount`` weighs every score but BDeu, ``ebic_gamma`` only the linear-Gaussian BIC,
-    and ``equivalent_sample_size`` only BDeu (:data:`PENALTIES`); a penalty the score ignores is
-    left out. A method without ``score_func`` has one score, which uses every penalty it takes. The
-    value is the call's, or the default.
+    on the values or on the normal scores, and ``equivalent_sample_size`` only BDeu
+    (:data:`PENALTIES`); a penalty the score ignores is left out. A method without ``score_func``
+    has one score, which uses every penalty it takes. The value is the call's, or the default.
     """
     one_score = not any(p.concept == "score_func" for p in spec.params)
     return {
@@ -508,10 +508,10 @@ def used_penalties(
 def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | None) -> None:
     """Raise ``ValueError`` when the call passes an argument that only one score reads with another.
 
-    ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
-    the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). ``score`` is the one the fit uses
-    (:func:`chosen_settings`). A method without ``score_func`` has one score, which reads every
-    argument it takes.
+    ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` and ``"normal_scores"`` alone, and
+    ``equivalent_sample_size`` the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`).
+    ``score`` is the one the fit uses (:func:`chosen_settings`). A method without ``score_func`` has
+    one score, which reads every argument it takes.
     """
     passed = [
         (p.name, p.concept) for p in spec.params if p.concept in SCORE_ONLY and p.name in arguments

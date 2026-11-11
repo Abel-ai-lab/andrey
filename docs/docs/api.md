@@ -413,9 +413,9 @@ the lowest penalty of its solution path.
 n_parents)` to each variable's score, a penalty that grows with the number of variables. `gfci`,
 `boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and the others to `1.0`;
 {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its default
-differs. Only `score_func="bic"` adds the term, so passing `ebic_gamma` with another score, named or
-picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a `"bic"` fit
-used. `gnies`, which has one score, always adds it.
+differs. Only `score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with
+another score, named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the
+value a `"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
@@ -793,6 +793,43 @@ query.
 
 .. currentmodule:: andrey
 ```
+
+### Rank-based score
+
+`score_func="normal_scores"` is experimental; {{ rank_score_names }} take it. It replaces each
+column by its normal scores, the transformation of `indep_test="normal_scores"`, and scores them
+with the linear-Gaussian BIC, `penalty_discount` and `ebic_gamma` included. Its model is the
+nonparanormal, or Gaussian copula: each column is an unknown strictly increasing function of a
+latent variable, and the latent variables follow a linear-Gaussian model of the graph. Use it for
+continuous data that are Gaussian only after such a transformation of each column. A column's
+normal scores depend on it only through its ranks, so a strictly increasing transformation of any
+column leaves the score, and so the graph, unchanged; on data that are Gaussian already, it ranks
+graphs almost as `"bic"` does. Neither option sets the other: `indep_test="normal_scores"` alone
+keeps the default score, `"bic"`. In a method that takes both, pass both, and the test and the
+score read one model; then a strictly increasing transformation of any column leaves the graph
+unchanged.
+
+We estimate the latent correlations by the correlations of the normal scores. Nandy, Hauser and
+Maathuis estimate them from Spearman's or Kendall's rank correlation, transformed, which estimates
+the same latent correlation under the model, and prove GES and its restricted hybrid ARGES
+consistent in high dimensions with that score; Harris and Drton prove the same for PC with a
+rank-based test. With `ges`, the score is a published variant, with our estimate in place of
+theirs. With the other searches and hybrids, it is the analogous construction, not a result those
+papers prove.
+
+Ties lose information: a column with few distinct values has few distinct scores, and a column
+whose ranks repeat another's, such as `x` and `exp(x)`, is a copy and raises a `ValueError`, as
+copies do. Ranks see a dependence only through its monotone part. The model is one distribution of
+continuous columns, so the score takes no `env`, which is why `gies` does not offer it, no
+`missing="em"`, and no column declared categorical; each raises a `ValueError` that says so.
+
+- Liu, Lafferty, and Wasserman (2009), The Nonparanormal: Semiparametric Estimation of High
+  Dimensional Undirected Graphs, Journal of Machine Learning Research 10: the model.
+- Harris and Drton (2013), PC Algorithm for Nonparanormal Graphical Models, Journal of Machine
+  Learning Research 14: the rank-based test in PC.
+- Nandy, Hauser, and Maathuis (2018), High-Dimensional Consistency in Score-Based and Hybrid
+  Structure Learning, The Annals of Statistics 46(6A), Section 7: the rank-based score in GES and
+  ARGES.
 
 ## Graph structures
 

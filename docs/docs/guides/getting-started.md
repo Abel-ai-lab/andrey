@@ -528,14 +528,16 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-{{ indep_test_names }} take the tests; {{ score_func_names }} take every score; `gies` scores each
-variable on the rows without an intervention on it. `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and
-`rsmax2` take a score and a test that read the same kind of data, such as
-`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
+{{ indep_test_names }} take the tests; {{ score_func_names }} take every score, except
+`normal_scores` in `gies`, which scores each variable on the rows without an intervention on it.
+`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take a score and a test that read the same
+kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`; with
+`score_func="normal_scores"` and `indep_test="normal_scores"`, both read each column's normal
+scores, so a strictly increasing transformation of any column leaves the graph unchanged.
 
 ### Categorical data
 
