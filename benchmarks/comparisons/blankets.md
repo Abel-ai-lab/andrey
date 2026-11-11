@@ -31,8 +31,8 @@ The default cells are three networks and two Gaussian sizes, each at two sample 
 | `fast_iamb` | `learn.mb(method = "fast.iamb")` | `fast.iamb` |
 | `hiton_pc` | `learn.nbr(method = "si.hiton.pc")`, kept as for `mmpc` | `si.hiton.pc` |
 
-The last three rows are for learners the lane is ready for: their bnlearn side runs now, and their
-Andrey side once the installed Andrey has them. `hiton_mb`, `mmmb`, and `pcmb` have
+The last three rows are for learners the lane is ready for: once a learner is named in `LEARNERS`
+and the installed Andrey has it, it runs beside the function in its row. `hiton_mb`, `mmmb`, and `pcmb` have
 no bnlearn function.
 
 bnlearn's `pc.stable` is read at a target as well, once per fit: `mb()` of its CPDAG for a

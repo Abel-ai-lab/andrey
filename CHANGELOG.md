@@ -13,12 +13,12 @@ names its pull request.
 ### Added
 
 - A benchmark lane for the Markov blanket and parents-and-children learners. `blanket_cpu.py` runs
-  `iamb`, `inter_iamb`, and `mmpc` beside bnlearn 5.2.1's `iamb`, `inter.iamb`, and `mmpc`, with its
-  `gs`, `fast.iamb`, `si.hiton.pc`, and `pc.stable` ready for the learners that follow, on discrete
-  networks and linear-Gaussian graphs, for the set of each target and for the moral graph, the
-  skeleton, and the CPDAG. Both sides get the same data, test, significance level, and
-  conditioning-set limit, and every row records the test, with bnlearn's sparse-table rule on or
-  off. ([#915])
+  `iamb`, `inter_iamb`, and `mmpc` beside bnlearn 5.2.1's `iamb`, `inter.iamb`, and `mmpc`, and
+  bnlearn's `pc.stable` read at a target, on discrete networks and linear-Gaussian graphs, for the
+  set of each target and for the moral graph, the skeleton, and the CPDAG. The adapters cover the
+  learners that follow, `gs`, `fast_iamb`, and `hiton_pc`, which join the lane when they are named.
+  Both sides get the same data, test, significance level, and conditioning-set limit, and every row
+  records the test, with bnlearn's sparse-table rule on or off. ([#915])
 
 ## [0.17.0] - 2026-11-11
 
