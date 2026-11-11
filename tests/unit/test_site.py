@@ -1476,3 +1476,16 @@ def test_amber_text_reads_on_the_paper_in_both_themes():
     css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
     fast = css[css.index(".andrey-home .fast {") :]
     assert "color: var(--andrey-amber-text);" in fast[: fast.index("}")]
+
+
+def test_the_word_fast_moves_only_without_reduced_motion_and_only_by_translate_and_opacity():
+    css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
+    frames = css[css.index("@keyframes fast-arrive") :]
+    frames = frames[: frames.index("\n}\n")]
+    assert set(re.findall(r"^\s+([a-z-]+):", frames, re.M)) <= {"opacity", "translate"}
+    # The page's one motion runs only for readers who have not asked for reduced motion.
+    assert css.count("animation:") == 1
+    use = css.index("animation: fast-arrive")
+    assert css.rfind("@media (prefers-reduced-motion: no-preference)", 0, use) > css.rfind(
+        "\n}\n", 0, use
+    )

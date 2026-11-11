@@ -20,7 +20,7 @@ names its pull request.
 - The homepage is about half as long and names one method per family: the supported method compared
   with the most packages, timed against every package on one axis, beside the outcome its release
   card records. The newest four release cards, the Sachs example, a band for agents, and five next
-  steps follow; every method list moves to the documentation. ([#919])
+  steps follow; the full list of methods is in the API reference. ([#919])
 
 ## [0.17.0] - 2026-11-11
 

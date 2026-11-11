@@ -172,8 +172,7 @@
   color: var(--andrey-ink);
 }
 
-/* The installer is a pair of radio buttons, so the line switches without script; the copy button
-   (sphinx-copybutton) sits at the line's end. */
+/* The installer is a pair of radio buttons, so the line switches without script. */
 .andrey-home .install {
   display: inline-flex;
   align-items: stretch;
@@ -396,10 +395,6 @@
 
   .andrey-home .hero :focus-visible {
     outline-color: var(--andrey-ground-ink);
-  }
-
-  .andrey-home .hero button.copybtn.success {
-    color: var(--andrey-ground-cobalt-light);
   }
 }
 
@@ -1093,69 +1088,6 @@
 }
 
 /* ---------- code ---------- */
-/* The small copy button every code block on the site has (sphinx-copybutton), placed and shown as
-   in the docs: at a block's corner while the pointer is over it, or always without a pointer. */
-.andrey-home .code-copy {
-  position: relative;
-}
-
-.andrey-home button.copybtn {
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background-color: var(--andrey-surface-2);
-  color: var(--andrey-muted);
-}
-
-.andrey-home button.copybtn:hover:not(.success) {
-  background-color: var(--andrey-line);
-  color: var(--andrey-ink);
-}
-
-.andrey-home .code-copy:hover button.copybtn,
-.andrey-home button.copybtn:focus-visible {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .andrey-home button.copybtn {
-    opacity: 1;
-  }
-}
-
-/* The copy button's own tooltip opens to its left, over the command it copies. The pointer's
-   tooltip already names the button and a check mark confirms the copy, so it stays hidden. */
-.andrey-home .copybtn.o-tooltip--left::after {
-  content: none;
-}
-
-/* A copy turns the icon into a tick, in cobalt, for the two seconds sphinx-copybutton keeps it. */
-.andrey-home button.copybtn.success {
-  color: var(--andrey-accent);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .andrey-home button.copybtn.success svg {
-    animation: copy-tick 180ms ease-out both;
-  }
-}
-
-@keyframes copy-tick {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-/* The install line's button stays in its row and in view. */
-.andrey-home .install-line button.copybtn {
-  position: relative;
-  inset: auto;
-  flex: none;
-  opacity: 1;
-}
-
-
 .andrey-home pre {
   margin: 0;
   padding: 1rem 1.2rem;

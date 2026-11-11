@@ -2209,7 +2209,7 @@ def abel_mark() -> str:
     )
 
 
-def lede(summaries: list[dict]) -> str:
+def lede() -> str:
     """The hero's paragraph: the claim, then the supported methods and the families from the
     registry."""
     specs = list_specs()
@@ -2251,7 +2251,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "description": page_description(summaries),
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
-        "lede": lede(summaries),
+        "lede": lede(),
         # The first screen's art, which the page asks for before its stylesheets load.
         "hero_image": f"_static/art-{HERO_ART}.avif",
         "hero_art": band_art(HERO_ART, priority=True),
