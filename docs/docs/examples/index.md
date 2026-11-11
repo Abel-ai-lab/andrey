@@ -228,6 +228,18 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
+
+:::{grid-item-card} Ensemble of methods
+:link: ensemble
+:link-type: doc
+:img-top: /_generated/thumbs/ensemble.svg
+:img-alt: The true graph of this notebook's simulated data
+
+Fit four methods on the same data, combine their edges by a vote, weigh each vote by how stable it
+is, and measure the result against each method.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
 ::::
 
 ```{toctree}
@@ -237,6 +249,7 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 bootstrap
 markov_check
 knowledge
+ensemble
 ```
 
 ## Interactive demos
