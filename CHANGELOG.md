@@ -12,6 +12,12 @@ names its pull request.
 
 ### Added
 
+- `ages`, experimental, is aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis,
+  2017) for linear-Gaussian data with weak edges. It computes the CPDAGs GES returns for every
+  penalty from `penalty_discount` up and overlays their orientations on the CPDAG of that minimum
+  penalty, so the graph keeps the GES skeleton and can direct more of its edges. It returns a
+  partially directed graph tagged `cpdag` and does not depend on the columns' units or order.
+  ([#894])
 - `score_matching` is SCORE (Rolland et al., 2022) for nonlinear effects with additive Gaussian
   noise. It finds a causal order from the leaf up, each leaf the variable whose second derivative of
   the log density varies least over the rows, estimated by a Stein kernel estimator on the
@@ -43,6 +49,19 @@ names its pull request.
 
 ### Changed
 
+- `notears` is supported. Against its authors' code on the paper's simulation with standardized
+  columns, Erdos-Renyi and scale-free graphs of 10 to 100 variables under Gaussian, exponential,
+  and Gumbel noise, it made no more errors (SHD) in any of the 24 settings, tied in 23 and with
+  fewer in 1 on the first datasets, and it made fewer errors than the empty graph in 15, where the
+  authors' code did in 16. Its Limitations give the numbers and where it is weak: the scale-free
+  graphs, where it was within 5% of the empty graph and below it in 3 of 12 settings; columns in
+  the data's own units, where most of its accuracy can be read from the columns' variances; the
+  cycle repair, which removed edges in 9 of its 20 fits on standardized columns at 20 variables and
+  which both sides of the comparison share; and graphs that can differ between machines while the
+  errors do not. `dagma` is measured the same way against its authors' package and stays
+  experimental: it made fewer errors than the empty graph in none of the 24 settings, as its
+  authors' package did, and its Limitations give the numbers. The evidence is on the
+  [comparison page][nd-page]. ([#871])
 - Path and confounder claims are supported in more methods: `required_paths` and `forbidden_paths`
   in `cdnod`, `xges`, `hc`, `grasp`, `exact_search`, and `multi_group_direct_lingam`,
   `forbidden_paths` in `tabu`, `mmhc`, and `rsmax2`, and all three parts in `fci_jci` and
@@ -78,6 +97,22 @@ names its pull request.
   `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
   blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
   graph at 50 variables and mean degree 4. ([#882])
+- The Limitations and the `n_starts` entry of `grasp` say when one search is not enough: on
+  simulated linear-Gaussian data with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+  one start's mean SHD over 40 datasets was 29.6 (median fit 1.3 s) against 18.8 with `n_starts=4`
+  (5.1 s) and 16.3 with `n_starts=8` (10.4 s), because it stops at a much worse order on some
+  datasets; at mean degree 2 one start is enough. `grasp` keeps its seeded random order of tucks,
+  which the paper leaves open: trying them from the front of the order to its back gave no more
+  accuracy for the time than more starts and took 9 to 20 times as long at 200 variables. ([#891])
+- The Limitations of `pc` and the missing-data comparison page say why `missing="mvpc"` is behind
+  test-wise deletion under quantile MNAR at 50 and 100 variables: the loss is true edges that the
+  correction removes, because a corrected test reads a median of 13% and 19% of the rows the
+  test-wise test reads when the parents of the missingness indicators have missing values
+  themselves, and because Step 3 re-tests pairs that share only an indicator, which falsely detected
+  indicator parents make candidates (44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true
+  edges). The regression's intercept, the direction a pair is tested in, the seed, orientation, and
+  the fallback to the test-wise test are not the cause. Use `missing="testwise"` in these settings.
+  ([#893])
 
 ### Fixed
 
@@ -2329,6 +2364,7 @@ First alpha release.
 [#856]: https://github.com/Abel-ai-lab/andrey/pull/856
 [#857]: https://github.com/Abel-ai-lab/andrey/pull/857
 [#870]: https://github.com/Abel-ai-lab/andrey/pull/870
+[#871]: https://github.com/Abel-ai-lab/andrey/pull/871
 [#872]: https://github.com/Abel-ai-lab/andrey/pull/872
 [#873]: https://github.com/Abel-ai-lab/andrey/pull/873
 [#874]: https://github.com/Abel-ai-lab/andrey/pull/874
@@ -2336,5 +2372,9 @@ First alpha release.
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#893]: https://github.com/Abel-ai-lab/andrey/pull/893
+[#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
+[nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md

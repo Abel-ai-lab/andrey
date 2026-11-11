@@ -29,6 +29,7 @@ SPEC: dict[str, dict] = {
         "numeric": {},
     },
     "XGES": GRAPH_SCORE,
+    "AGES": GRAPH_ONLY,
     "HC": GRAPH_SCORE,
     "Tabu": GRAPH_SCORE,
     "IAMB": GRAPH_ONLY,
@@ -130,6 +131,12 @@ SPEC: dict[str, dict] = {
     "DYNOTEARS": {
         "structural": ["graph"],
         "numeric": {"lag_weights": {"atol": 5e-3, "rtol": 0.0}},
+    },
+    # NOTEARS: the DAG exactly; the weights within what L-BFGS-B's stopping rule leaves open: a
+    # change of the input in its last bits moved them by up to 2.3e-3 over 100 refits.
+    "NOTEARS": {
+        "structural": ["graph"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-2, "rtol": 0.0}},
     },
     # Granger has no causal order: the per-lag graphs exactly, the weights within rounding.
     "Granger": {

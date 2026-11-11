@@ -6,8 +6,9 @@ categorical data with BDeu and the multinomial BIC, and mixed data with the dege
 conditional Gaussian BICs. With ``env``, ``ges``, ``hc``, and ``tabu`` append the environment index
 to the data as a last column no other column causes, and drop it from the result again, its edges
 listed in ``metadata`` (:func:`~andrey.api._adapt.cpdag_search`). ``gnies`` scores environments that
-differ in noise variances (:mod:`andrey.search.gnies`) and searches with the GIES engine. Reported
-objectives are stored in ``metadata``.
+differ in noise variances (:mod:`andrey.search.gnies`) and searches with the GIES engine. ``ages``
+aggregates the CPDAGs GES returns over a range of penalties, under the standard linear-Gaussian BIC
+(:mod:`andrey.search.ages`). Reported objectives are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -460,6 +461,187 @@ def ges(
         equivalent_sample_size=equivalent_sample_size,
         max_parents=max_parents,
     )
+
+
+@method_spec("ages")
+def ages(
+    data: npt.ArrayLike,
+    *,
+    penalty_discount: float = 1.0,
+) -> StructureOutput:
+    """Orient more edges than GES with aggregative greedy equivalence search (AGES).
+
+    GES returns one CPDAG for one penalty. AGES computes the CPDAGs GES returns for every penalty
+    from ``penalty_discount`` up, its solution path, and overlays their orientations on the CPDAG
+    of that minimum penalty [1]_. A higher penalty drops weak edges, and the sparser CPDAG can
+    direct edges that the denser one leaves undirected, so the result has the skeleton of the GES
+    CPDAG and can direct more of its edges.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parent, the minimum penalty of the
+        solution path: the result has the skeleton of the CPDAG that :func:`~andrey.ges` returns
+        with this ``penalty_discount``, ``ebic_gamma=0.0``, and ``max_parents=n_variables - 1``
+        (see Notes). Larger values give sparser graphs; ``1.0`` is the standard BIC, the minimum the
+        method's paper uses [1]_. Must be finite and non-negative.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"ages"``. The graph is partially directed and can direct edges that the CPDAG of the
+        minimum penalty leaves undirected, as a CPDAG narrowed by background knowledge does: the
+        paper's aggregated partially directed acyclic graph (APDAG), a maximally oriented one.
+        Directed marks (``->``) are oriented edges, undirected (``--``) the ones no CPDAG of the
+        path decides. Every edge the CPDAG of the minimum penalty directs keeps its direction.
+        ``metadata["path_penalties"]`` lists, in rising order, the ``penalty_discount`` of each
+        CPDAG of the solution path, the lowest one that gives it, and
+        ``metadata["path_aggregated"]`` whether the orientations of each were taken; the first
+        entries are the minimum penalty and ``True``. ``metadata["tie_break"]`` is the tie-break
+        rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records the
+        penalties its score used, under their parameter names.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` holds a missing
+        value, or a column declared categorical by its type. Also if a column repeats another up to
+        scale and shift given more than two rows or, with more rows than columns, is a linear
+        function of other columns. One message names every group of copies and says to keep one
+        column per group.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** AGES suits i.i.d. continuous observational data from a linear model with
+    Gaussian noise and no unmeasured common causes, when some effects are weak and the rows are
+    many enough for GES to find them [1]_. A weak edge that closes a triangle or shields a collider
+    can make the true CPDAG leave edges undirected that the graph without it directs; AGES keeps
+    the weak edge and takes those directions. The paper proves that it recovers its target graph
+    as the rows grow when, for each CPDAG of the path, every dependence in the true DAG restricted
+    to that CPDAG's skeleton is stronger than the partial correlation its penalty corresponds to
+    (path strong faithfulness), and shows it on 10 and 100 variables with 100 to 10,000 rows.
+    When no CPDAG of the path directs an edge the first leaves undirected, the result is the GES
+    CPDAG: use :func:`~andrey.ges` when only the equivalence class is wanted, and
+    :func:`~andrey.direct_lingam` when the noise is non-Gaussian and every edge should be oriented.
+
+    **The solution path.** The score is the linear-Gaussian BIC with one penalty per edge, ``n *
+    log(residual variance) + penalty_discount * log(n) * n_parents`` summed over the variables,
+    and GES is its forward phase then its backward phase, once, from the empty graph [2]_. Every
+    move changes the number of edges by one, so the best move on a graph does not depend on the
+    penalty; only the place where each phase stops does. The forward phase therefore runs once, at
+    the minimum penalty, and the backward phase once from each graph at which the forward phase
+    stops for some penalty, as Section 3.5 of the paper describes. The extended BIC that
+    :func:`~andrey.ges` uses by default charges an edge by the number of parents its target already
+    has, which is not one penalty per edge, so AGES uses the standard BIC, and ``ges(data)`` with
+    its defaults can return a sparser skeleton.
+
+    **The aggregation.** The graph starts as the CPDAG of the minimum penalty. The CPDAGs of the
+    path follow by rising penalty. One whose skeleton is not within the first's is left out. Any
+    other directs, as it does, every edge it directs that the graph leaves undirected, provided
+    the graph so directed can be completed to a DAG with no further unshielded collider and no
+    directed cycle; otherwise none of its orientations is taken. After the last CPDAG, Meek's
+    rules R1 to R4 [3]_ direct the edges that follow. This is Algorithm 1 of the paper. The code
+    published with the paper applies Meek's rules after every CPDAG it takes instead of once at
+    the end; the two give the same graph when the CPDAGs of the path do not conflict, as under the
+    paper's assumption.
+
+    The paper leaves two details open. Two penalties at which a phase stops count as equal when
+    they differ by less than the score change GES counts as an improvement, ``1e-9``. The path
+    includes the empty graph, which directs nothing.
+
+    GES here is the paper's: its forward phase has no gate. :func:`~andrey.ges` without
+    ``max_parents`` gives a variable with more than ``n_variables / 2`` directed parents no new
+    ones, which changes dense graphs such as the paper's 10-variable simulation; with
+    ``max_parents=n_variables - 1`` it has no gate and no cap that binds, and its CPDAG is the
+    first of the path.
+
+    The result does not depend on the column order: moves that tie are ordered by the columns'
+    values (:doc:`/docs/guides/column-order`), the CPDAGs are taken in the order of their
+    penalties, and Meek's rules read only the marks.
+
+    AGES takes no ``knowledge``, ``max_parents``, ``missing``, or ``env``: the paper defines the
+    aggregation for complete data from one environment, without background knowledge or a cap on
+    the parents.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet; the fit times below are the only measurements. An
+    orientation beyond the CPDAG is as reliable as the sparser CPDAG it comes from: when path strong
+    faithfulness fails, a CPDAG of the path can direct an edge against the true DAG, and the paper
+    reports a small loss of precision against GES on sparse graphs without weak edges. The skeleton
+    is that of GES at the minimum penalty, so its missing and extra edges stay, and with few rows,
+    where GES misses the weak edges, the result is the GES CPDAG: the paper finds almost no gain at
+    100 rows on 10 variables. A CPDAG of the path can hold an unshielded collider that the first
+    lacks, so the DAGs the result stands for need not be in the equivalence class of the GES CPDAG.
+    The backward phase runs once per forward result, in one process, so a fit costs several times
+    one of :func:`~andrey.ges`: on one core with 10,000 rows, the median of five fits took 0.19 s
+    against 0.03 s for ``ges`` at 10 variables, 0.31 s against 0.06 s at 20, and 1.2 s against
+    0.13 s at 50. The data were linear-Gaussian from the paper's simulation, with 30% of the
+    possible edges strong and 70% weak at 10 variables, and an average of 4 neighbors per variable,
+    half of them weak, at 20 and 50. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Eigenmann, M. F., Nandy, P., and Maathuis, M. H. (2017). Structure learning of linear
+       Gaussian structural equation models with weak edges. Proceedings of the 33rd Conference on
+       Uncertainty in Artificial Intelligence (UAI).
+    .. [2] Chickering, D. M. (2002). Optimal structure identification with greedy search. Journal
+       of Machine Learning Research 3, 507-554.
+    .. [3] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
+       Proceedings of the 11th Conference on Uncertainty in Artificial Intelligence (UAI),
+       403-410.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import ages, ges
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(1000)
+    >>> y = 0.1 * x + rng.standard_normal(1000)
+    >>> z = x + y + rng.standard_normal(1000)
+    >>> data = np.column_stack([x, y, z])
+    >>> ges(data, ebic_gamma=0.0).structure.oriented_edges()
+    [(0, 1, 'undirected'), (0, 2, 'undirected'), (1, 2, 'undirected')]
+    >>> ages(data).structure.oriented_edges()
+    [(0, 1, 'undirected'), (0, 2, 'directed'), (1, 2, 'directed')]
+    """
+    from andrey.search.ages import ages as _ages
+
+    labels = column_labels(data)
+    if (declared := declared_columns(data, None)) is not None:
+        name = column_namer(labels)
+        columns = ", ".join(name(int(j)) for j in np.flatnonzero(declared))
+        raise ValueError(
+            f"ages reads continuous data, but data columns {columns} are declared categorical by "
+            "a category, bool, or text type; pass them as numbers or leave them out"
+        )
+    X = data_matrix(data, method="ages")
+    with copies_named(labels):
+        graph, penalties, taken = _ages(X, penalty_discount=penalty_discount)
+    metadata = {"path_penalties": penalties, "path_aggregated": taken}
+    return structure_output(graph, labels=labels, metadata=metadata)
 
 
 @method_spec("gies")

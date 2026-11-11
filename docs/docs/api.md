@@ -360,9 +360,12 @@ the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of s
 `igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
 of 87 groups and were worse in none, and tied with each other in every group; for `ut_igsp`, on 15
 groups of simulated datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors
-than 5 in 4 groups, 2 of them in that setting, and more in none. Each search builds its own caches
-and drops the previous one's, so more starts take more time but little more memory. `1`, the default
-for the others, runs one search.
+than 5 in 4 groups, 2 of them in that setting, and more in none. On dense graphs one `grasp` search
+can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows at the standard BIC,
+its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
+`n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
+Each search builds its own caches and drops the previous one's, so more starts take more time but
+little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -377,11 +380,12 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
-`grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per
-parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the
-default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
-`metadata["penalty_discount"]` records the value the score used.
+`ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
+`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC
+penalty per parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and
+`1.0`, the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this
+penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as
+the lowest penalty of its solution path.
 
 % concept: ebic_gamma
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
@@ -448,6 +452,7 @@ variable.
    tabu
    exact_search
    calm
+   notears
    mmhc
    rsmax2
    boss
@@ -483,6 +488,13 @@ variable.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
+least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
+NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
+columns' units. `robust=True` follows the first fit with a refit under the Gaussian likelihood
+(Deng et al. 2024). The [0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to
+100 variables against the authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -652,14 +664,24 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   notears
    dagma
+   ages
 ```
 
-NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
-under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
-with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
-(Deng et al. 2024).
+DAGMA is a continuous-optimization learner in the line of NOTEARS: it fits a weighted DAG by
+minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True`
+follows the first fit with a refit under the Gaussian likelihood, which does not depend on the scale
+of the columns (Deng et al. 2024).
+
+AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
+{py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
+triangle or shields a collider can leave edges of the true CPDAG undirected that the graph without
+it directs. AGES computes the CPDAGs GES returns for every penalty from `penalty_discount` up, its
+solution path, from one forward phase and a backward phase per distinct forward result, and overlays
+their orientations on the CPDAG of the minimum penalty, so the graph keeps that CPDAG's skeleton
+and can direct more of its edges. It scores with the standard BIC only, as one penalty per edge
+defines the path, and takes no `knowledge`, `max_parents`, `missing`, or `env`. It returns a
+partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists the path.
 
 A method becomes supported once it has:
 

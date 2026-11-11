@@ -375,6 +375,7 @@ UNIT_CASES = {
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "score_matching": "rational_chain_4v",
+    "ages": "gauss_5v",
     "nogam": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
