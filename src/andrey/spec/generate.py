@@ -57,8 +57,8 @@ MARKOV_CHECK_INVOCATION = (
 )
 
 EXPERIMENTAL_NOTE = (
-    "Methods marked experimental have no published benchmark, may change their API without "
-    "deprecation, and warn with `andrey.ExperimentalWarning` on their first call."
+    "Methods marked experimental are not supported (see each one's Limitations), may change their "
+    "API without deprecation, and warn with `andrey.ExperimentalWarning` on their first call."
 )
 
 _JSON_TYPES: dict[str, dict] = {

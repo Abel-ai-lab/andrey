@@ -463,8 +463,8 @@ def dagma(
     Warns
     -----
     ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
     SearchLimitWarning
         When the last stage takes ``max_iter`` steps without converging, or, with ``robust``, when
         the path takes ``max_path`` steps.
@@ -493,9 +493,10 @@ def dagma(
     earlier when, at a multiple of 1000 steps, the objective has changed by at most a ``1e-6``
     fraction since the last such step. A step that leaves the domain where ``s * I - W * W`` is an
     M-matrix is undone and the step size halved; a stage that leaves it at its first step starts
-    again with half the step size and ``s`` raised by ``0.1``. The diagonal of ``W`` is held at
-    zero. Edges below ``w_threshold`` are then removed, and then the weakest remaining edges until
-    no cycle is left.
+    again with half the step size and ``s`` raised by ``0.1``. The diagonal of ``W`` is optimized
+    with the other entries, as in the algorithm of [1]_: ``h`` counts a self-weight as a cycle and
+    brings it back toward zero, and the result carries none. Edges below ``w_threshold`` are then
+    removed, and then the weakest remaining edges until no cycle is left.
 
     With ``robust=True`` the thresholded weights start a path of refits [2]_. Each step runs the
     central path again from the last accepted weights, with the Gaussian negative log-likelihood,
@@ -503,9 +504,9 @@ def dagma(
 
     ``0.5 * sum_j log(((I - W).T @ S @ (I - W))[j, j]) - log|det(I - W)|``,
 
-    in place of the loss, and the quasi-MCP in place of the ``l1`` penalty. The quasi-MCP of an
-    entry ``t`` is ``lam * (|t| - t**2 / (2 * delta))`` for ``|t| <= delta`` and ``lam * delta / 2``
-    above it. The result of a step is thresholded at ``w_threshold`` and its cycles repaired, and
+    in place of the loss, the quasi-MCP in place of the ``l1`` penalty, and the diagonal of ``W``
+    held at zero. The quasi-MCP of an entry ``t`` is ``lam * (|t| - t**2 / (2 * delta))`` for
+    ``|t| <= delta`` and ``lam * delta / 2`` above it. The result of a step is thresholded at ``w_threshold`` and its cycles repaired, and
     the step is accepted when the likelihood of that graph is lower than the last accepted one's by
     more than a ``1e-6`` fraction. ``lam`` and ``delta`` then shrink by ``mcp_decay``, and the path
     ends at the first step that does not lower the likelihood. [2]_ shows that, with a small enough
