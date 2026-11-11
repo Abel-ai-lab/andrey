@@ -21,7 +21,7 @@ names its pull request.
   returned the graph of pcalg's `ages` on 1,378 of 1,380 datasets, was no less accurate in any
   setting, and fit 7 to 12 times faster. With 10,000 rows it directed 49% of the true edges
   correctly against 46% for GES at the same precision. The evidence is on the
-  [comparison page][ages-page]. ([#894], [#PRNUM])
+  [comparison page][ages-page]. ([#894], [#899])
 - `score_matching` is SCORE (Rolland et al., 2022) for nonlinear effects with additive Gaussian
   noise. It finds a causal order from the leaf up, each leaf the variable whose second derivative of
   the log density varies least over the rows, estimated by a Stein kernel estimator on the
@@ -2420,6 +2420,7 @@ First alpha release.
 [#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
+[#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
