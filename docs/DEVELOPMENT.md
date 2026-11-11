@@ -10,10 +10,10 @@ meta:
 `andrey.abel.ai` is one Sphinx project, this folder: the homepage at `/`, the blog at `/blog/`, and
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
 configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
-pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
-Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
-the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
-the brand are in [`DESIGN.md`](../DESIGN.md).
+pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Methods,
+Examples, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API
+and the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art,
+and the brand are in [`DESIGN.md`](../DESIGN.md).
 
 ## Build
 
@@ -134,6 +134,25 @@ The page is then marked "not for release" and `noindex`; the fixture carries
 `"placeholder": true`, which the build refuses without `andrey_placeholder`. The examples on the page
 are [`site/example.py`](../site/example.py) and [`site/interface.py`](../site/interface.py), run at
 build time: the page shows what they print and draws the graphs they return.
+
+## The methods catalog
+
+[`docs/methods.md`](docs/methods.md), Methods in the navbar, opens with "What does your data look
+like?": an option per kind of data a method reads (`MethodSpec.data_kinds`), each a link to its
+panel, which `:target` shows without script. A panel names the method to start with, the code and
+the `andrey run` line that run it, the graph it returns, its comparisons, and every family's methods
+that read that kind. Below, a section per family (`family-<family>`) holds a row per method
+(`method-<name>`). `catalog_picker()` and `catalog_families()` in `site/build.py` write both from
+the registry and the published summaries into `_generated/`; `docs/_static/catalog.css` styles
+them and `catalog.js` shows one panel at a time and adds the filters. Choosing a kind presses its
+chip, so the picker and the filters are one mechanism.
+
+`featured()` is the one rule for the method to start with, which the homepage can call too
+(`featured_by_family()`): among the supported methods whose chart (`default_charts()`) reaches a
+size every package ran with a graph better than the empty one, the one compared with the most
+packages, then the largest such size, then registry order. For a kind of data, `start_with()`
+applies it in the first family that reads the kind, among the methods that need it (`needs()`),
+else among those that read it.
 
 ## The blog
 

@@ -53,6 +53,9 @@ A typed count goes stale without failing anything when a method is added or prom
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
   methods: the supported ones, where `COUNTED_WITH` names the methods that count with the one they
   extend.
+- `site/build.py` also writes the methods catalog (`docs/methods.md`): every method by family, and
+  the kinds of data each reads, `MethodSpec.data_kinds`, which the registry derives from the
+  method's inputs, tests and scores, `missing` argument, and result, so no kind is set by hand.
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
   markers; `--check-readme` and `tests/unit/test_launch_material.py` fail when a block drifts.
 

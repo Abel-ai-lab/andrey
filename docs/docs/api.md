@@ -1402,7 +1402,9 @@ In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum`
 `exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
 former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
 and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
-each method gives it. `andrey run` rejects a value out of range before the fit.
+each method gives it. `andrey run` rejects a value out of range before the fit. Each method's
+contract and its row of `andrey list` give `data_kinds`, the kinds of data it reads, as the
+[methods catalog](methods.md) lists them.
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

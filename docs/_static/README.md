@@ -22,6 +22,9 @@ so no color is transcribed here.
   Loaded on blog pages only.
 - **`column-order.js`** - shuffles the columns of the 0.7.0 post's column-order figure, which
   `docs/blog/0.7.0/figures.py` generates. Loaded on that post only.
+- **`catalog.css`**, **`catalog.js`** - the methods catalog's picker, filters, and tables. The
+  script shows one kind of data's panel at a time and adds the filters; without it, each option
+  links to its panel and the tables list every method. Loaded on that page only.
 - **`examples.css`** - the Examples gallery's cards and the frame an interactive example fills.
   Loaded on the gallery and the example pages only.
 - **`benchmarks.css`** - the Release cards page: the latest release's cover beside its TL;DR, and

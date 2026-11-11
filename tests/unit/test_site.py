@@ -26,7 +26,7 @@ import pytest
 import andrey.viz
 from andrey import GraphStructure
 from andrey.core.structure import TAIL
-from andrey.spec import get_spec, list_specs
+from andrey.spec import DATA_KINDS, get_spec, list_specs
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -910,6 +910,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("index") == ([], [])
     assert marks("docs/index") == (["Docs"], ["Docs"])
     assert marks("docs/guides/getting-started") == (["Docs"], [])
+    assert marks("docs/methods") == (["Methods"], ["Methods"])
     assert marks("docs/examples/index") == (["Examples"], ["Examples"])
     assert marks("docs/examples/quick_start") == (["Examples"], [])
     assert marks("docs/examples/pc-replay") == (["Examples"], [])
@@ -1735,7 +1736,12 @@ def test_the_homepage_shades_its_art_with_the_covers_fade(cards):
 def test_the_homepage_and_docs_styles_and_scripts_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
     assets = ("site.css", "figures.css", "why-fast.css", "why-fast.js")
-    docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
+    docs = (
+        "docs/_static/andrey.css",
+        "docs/_static/benchmarks.css",
+        "docs/_static/catalog.css",
+        "docs/_static/catalog.js",
+    )
     for path in [*(f"site/assets/{name}" for name in assets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
         if path.endswith(".js"):
@@ -1968,3 +1974,106 @@ def test_the_citation_title_is_the_tagline(cards):
     title = f"Andrey: {cards.TAGLINE}"
     assert f'title: "{title}"' in (ROOT / "CITATION.cff").read_text()
     assert f"title = {{{title}}}," in (ROOT / "README.md").read_text()
+
+
+# ---- the methods catalog ---------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def published():
+    """Every release's published summary, as the site build loads them."""
+    return build.release_summaries(build.load_summary(build.SUMMARY))
+
+
+@pytest.fixture(scope="module")
+def catalog(published, conf):
+    """The catalog's picker and table, built as docs/conf.py builds them."""
+    names = conf["PROSE_NAMES"]
+    return build.catalog_picker(published, names), build.catalog_families(published, names)
+
+
+def _read(spec_name: str, kind: str) -> bool:
+    return kind in get_spec(spec_name).data_kinds
+
+
+def test_the_catalog_lists_every_method_once_in_its_family(catalog):
+    _, table = catalog
+    rows = re.findall(r'<tr id="method-(\w+)" data-family="(\w+)"', table)
+    assert sorted(name for name, _ in rows) == sorted(s.name for s in list_specs())
+    assert all(get_spec(name).family == family for name, family in rows)
+    # Each row links its API entry, and its family is a section the page can link to.
+    for spec in list_specs():
+        assert f'href="api/andrey.{spec.name}.html"' in table
+    families = re.findall(r"^\(family-(\w+)\)=$", table, flags=re.M)
+    assert families == [f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())]
+
+
+def test_the_picker_offers_exactly_the_kinds_of_data_the_registry_uses(catalog):
+    picker, table = catalog
+    used = [k for k in DATA_KINDS if any(k in s.data_kinds for s in list_specs())]
+    assert re.findall(r'class="kind-opt" href="#[\w-]+" data-kind="(\w+)"', picker) == used
+    assert re.findall(r'class="kind-panel" id="[\w-]+" data-kind="(\w+)"', picker) == used
+    assert re.findall(r'data-filter="kinds" data-value="(\w+)"', table) == used
+    # Each kind has its words and glyph, and each graph a method returns says what it gives.
+    assert set(build.DATA_KIND_TEXT) == set(DATA_KINDS)
+    assert {build.returns_text(s) for s in list_specs()} <= set(build.GRAPH_TEXT)
+
+
+def test_a_kinds_panel_lists_exactly_the_methods_that_read_it(catalog):
+    picker, _ = catalog
+    for panel in picker.split('<div class="kind-panel"')[1:]:
+        kind = re.search(r'data-kind="(\w+)"', panel)[1]
+        listed = re.findall(r'href="#method-(\w+)"', panel.split('class="kp-all"')[1])
+        assert sorted(listed) == sorted(s.name for s in list_specs() if kind in s.data_kinds)
+
+
+def test_every_method_to_start_with_is_supported_and_reads_its_data(published):
+    starts = build.featured_by_family(published)
+    assert list(starts) == [
+        f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())
+    ]
+    for family, name in starts.items():
+        assert get_spec(name).family == family and get_spec(name).status == "supported"
+    ranks = build.start_ranks(published)
+    for kind in DATA_KINDS:
+        name = build.start_with(ranks, kind)
+        assert get_spec(name).status == "supported" and _read(name, kind), kind
+        # One that needs the kind goes before one that only reads it, within its family.
+        needing = [
+            s for s in list_specs() if s.family == get_spec(name).family and build.needs(s, kind)
+        ]
+        assert not any(s.name in ranks for s in needing) or build.needs(get_spec(name), kind)
+
+
+def test_the_method_to_start_with_has_the_most_packages_then_the_largest_reach():
+    ranks = {"ges": (2, 200), "hc": (2, 400), "boss": (3, 40), "pc": (3, 40)}
+    assert build.featured(ranks, ["ges", "hc"]) == "hc"  # more reach
+    assert build.featured(ranks, ["ges", "hc", "boss"]) == "boss"  # more packages
+    assert build.featured(ranks, ["boss", "pc"]) == "pc"  # registry order
+    assert build.featured(ranks, ["fci", "gin"]) is None  # unranked
+
+
+def test_a_methods_reach_needs_every_package_and_a_graph_better_than_empty():
+    def row(d, theirs=1.0, ours=3, empty=5, f1=None):
+        return {"d": d, "andrey_s": 1.0, "comparator_s": theirs, "andrey_errors": ours,
+                "empty_errors": empty, "andrey_f1": f1}  # fmt: skip
+
+    one = {"family": "constraint", "rows": [row(10), row(20), row(40, ours=6)]}
+    other = {"family": "constraint", "rows": [row(10), row(20, theirs=None), row(40)]}
+    assert build.reach([one]) == 20  # at 40, more errors than the empty graph
+    assert build.reach([one, other]) == 10  # the other package did not finish 20
+    assert build.reach([{"family": "constraint", "rows": [row(10, ours=5)]}]) is None
+    temporal = {"family": "temporal", "rows": [row(10, f1=0.4), row(20, f1=0.0)]}
+    assert build.reach([temporal]) == 10
+
+
+def test_the_catalog_calls_pass_the_kind_of_data_they_start_from(published):
+    ranks = build.start_ranks(published)
+    for kind in DATA_KINDS:
+        spec = get_spec(build.start_with(ranks, kind))
+        code = build.catalog_call(spec, kind)
+        compile(code, kind, "exec")
+        cli = shlex.split(build.agent_call(spec, kind))
+        assert cli[:3] == ["andrey", "run", spec.name]
+        if kind in ("categorical", "mixed"):
+            assert "categorical=" in code and any(a.startswith("categorical=") for a in cli)
+        if build.needs(spec, "environments"):
+            assert '"site"' in code and "--env" in cli
