@@ -3279,7 +3279,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
 # handled, the record of a structural EM, the triples a collider vote left ambiguous, the clauses
 # the path parts of knowledge leave, the claims a causal order search does not meet, the tests a
-# fit evaluated, and the answer for each treatment-outcome pair.
+# fit evaluated, the blankets a sequential search learned, and the answer for each
+# treatment-outcome pair.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -3301,7 +3302,11 @@ for _name, _spec in REGISTRY.items():
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
         *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
-        *(key for key in ("n_tests", "effects") if _name in CONCEPTS[key].suitable),
+        *(
+            key
+            for key in ("n_tests", "blankets_learned", "effects")
+            if _name in CONCEPTS[key].suitable
+        ),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

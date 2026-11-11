@@ -183,8 +183,9 @@ defines it, the existing implementations, and the setting the paper claims.
    `effect_record` in `src/andrey/core/effects.py`, which builds the `metadata["effects"]` record
    of a treatment-outcome answer. A method that tests conditional independence runs its search
    inside `counting_tests()` (`src/andrey/core/ci.py`) and records the count as
-   `metadata["n_tests"]`; listing it as suitable under the `n_tests` and `effects` concepts
-   declares those keys. `andrey.metrics.target_edge_scores` and `claim_scores` score such answers.
+   `metadata["n_tests"]`; listing it as suitable under the `n_tests`, `blankets_learned`, and
+   `effects` concepts declares those keys. `andrey.metrics.target_edge_scores` and
+   `claim_scores` score such answers.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"` until the method is supported. A
    method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`

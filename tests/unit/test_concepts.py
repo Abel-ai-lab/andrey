@@ -642,8 +642,17 @@ def lists_its_effects(method: str) -> bool:
     return bool(records)
 
 
+def lists_the_blankets_it_learned(method: str) -> bool:
+    """Whether a fit lists one learned blanket or more, each by its column."""
+    out = coded_fit(method)[0]
+    learned = out.metadata.get("blankets_learned")
+    labels = list(out.structure.labels or ())
+    return isinstance(learned, list) and bool(learned) and set(learned) <= set(labels)
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
+    "blankets_learned": (lists_the_blankets_it_learned, True),
     "target_answer": (answers_for_the_target, True),
     "n_tests": (counts_its_tests, True),
     "effects": (lists_its_effects, True),

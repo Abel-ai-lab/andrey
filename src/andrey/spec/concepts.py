@@ -1417,6 +1417,14 @@ _CONCEPTS = (
         others_exempt="Does not report its test count.",
     ),
     Concept(
+        key="blankets_learned",
+        summary="A method that learns the Markov blankets of several variables in turn lists them "
+        "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
+        "of blankets it needed is the list's length.",
+        suitable=(),
+        others_exempt="Learns no sequence of Markov blankets.",
+    ),
+    Concept(
         key="effects",
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
