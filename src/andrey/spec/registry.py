@@ -460,13 +460,10 @@ _add(
         column_order="relabels",
         order_note="The listing order of `metadata['accepted_sets']` follows the column order.",
         params=(
-            ParamSpec(
-                name="target",
-                type="str",
-                default=None,
+            concept_param(
+                "target",
                 doc="Required: the variable whose parents to find, a column name from the data "
                 "file's header or a 0-based position.",
-                nullable=True,
             ),
             ParamSpec(
                 name="targets",
@@ -507,14 +504,7 @@ _add(
 
 # --- local structure: one variable's Markov blanket or parents and children ----------------------
 
-_TARGET = ParamSpec(
-    name="target",
-    type="str",
-    default=None,
-    doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
-    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
-    nullable=True,
-)
+_TARGET = concept_param("target")
 _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
@@ -3288,7 +3278,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
 # handled, the record of a structural EM, the triples a collider vote left ambiguous, the clauses
-# the path parts of knowledge leave, and the claims a causal order search does not meet.
+# the path parts of knowledge leave, the claims a causal order search does not meet, the tests a
+# fit evaluated, and the answer for each treatment-outcome pair.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -3310,6 +3301,7 @@ for _name, _spec in REGISTRY.items():
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
         *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
+        *(key for key in ("n_tests", "effects") if _name in CONCEPTS[key].suitable),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

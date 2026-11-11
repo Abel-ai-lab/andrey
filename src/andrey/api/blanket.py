@@ -18,8 +18,10 @@ from andrey.api._adapt import (
     label_of,
     structure_output,
 )
+from andrey.api._local import target_metadata
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL
+from andrey.core.ci import counting_tests
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
@@ -68,7 +70,7 @@ def fit_blanket(
     }
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
-    with copies_named(labels), rows_tested() as rows:
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         if t is None:
             marks = local_structure(X, method, structure, **settings)
         else:
@@ -76,9 +78,8 @@ def fit_blanket(
             adjacent = np.zeros((d, d), dtype=bool)
             adjacent[t, members] = adjacent[members, t] = True
             marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-            name = label_of(labels)
-            metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
+            metadata |= target_metadata(t, {_SETS[method]: members}, label_of(labels))
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
 
 
@@ -185,7 +186,9 @@ def iamb(
         ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        tie-break rule the fit ran under, ``andrey.config.tie_break``. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again
+        from a kept answer is not a new test.
 
     Raises
     ------
@@ -455,7 +458,9 @@ def inter_iamb(
         ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        tie-break rule the fit ran under, ``andrey.config.tie_break``. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again
+        from a kept answer is not a new test.
 
     Raises
     ------
@@ -717,6 +722,8 @@ def mmpc(
         setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
         randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
         is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated;
+        a query answered again from a kept answer is not a new test.
 
     Raises
     ------

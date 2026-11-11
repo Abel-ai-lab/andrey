@@ -22,7 +22,9 @@ from typing import Any
 from pydantic import model_validator
 
 from andrey import api
+from andrey.api._local import TARGET_SETS
 from andrey.constraint._skeleton import COLLIDER_RULES
+from andrey.constraint.blanket import LEARNERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
@@ -33,6 +35,10 @@ from andrey.core.structure import Kind
 from andrey.search.gfci import EDGE_REMOVALS
 
 from .models import ParamSpec, ParamType, Spec
+
+#: The learners a method's ``blanket`` can name: every Markov blanket learner of
+#: :data:`~andrey.constraint.blanket.LEARNERS`, the parents-and-children learners left out.
+BLANKET_LEARNERS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if row.kind != "pc")
 
 #: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
 #: each.
@@ -1304,6 +1310,121 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="target",
+        summary="The one variable a target-centered method answers for, by column label or "
+        "0-based position. A set learner takes it optionally, null learning every variable's set; "
+        "a method that answers only for one variable takes it in its required form "
+        "(REQUIRED_TARGET) and raises ValueError without it. With a target, the fit returns the "
+        "answer of target_answer.",
+        param=_template(
+            "target",
+            "str",
+            None,
+            "The variable whose set to learn: a column name from the data file's header or a "
+            "0-based position. null learns every variable's set and keeps a pair when each is in "
+            "the other's set.",
+            nullable=True,
+        ),
+        fragment="a column label (a string) or a 0-based position (an integer)",
+        suitable=("iamb", "inter_iamb", "mmpc", "icp"),
+        others_exempt="Answers for every variable at once.",
+    ),
+    Concept(
+        key="treatment",
+        summary="The cause of the ordered pair a treatment-outcome method answers for, by column "
+        "label or 0-based position; required, as outcome is. The answer is the pair's effects "
+        "record.",
+        param=_template(
+            "treatment",
+            "str",
+            None,
+            "Required: the cause of the pair, a column name from the data file's header or a "
+            "0-based position.",
+            nullable=True,
+        ),
+        fragment="a column label (a string) or a 0-based position (an integer)",
+        suitable=(),
+        others_exempt="Answers for no ordered pair of variables.",
+    ),
+    Concept(
+        key="outcome",
+        summary="The effect of the ordered pair a treatment-outcome method answers for, by column "
+        "label or 0-based position; required, as treatment is.",
+        param=_template(
+            "outcome",
+            "str",
+            None,
+            "Required: the effect of the pair, a column name from the data file's header or a "
+            "0-based position.",
+            nullable=True,
+        ),
+        fragment="a column label (a string) or a 0-based position (an integer)",
+        suitable=(),
+        others_exempt="Answers for no ordered pair of variables.",
+    ),
+    Concept(
+        key="variables",
+        summary="The columns a method answers for in every ordered pair, given unordered, by "
+        "column label or 0-based position; required. Each method states how many it takes. The "
+        "name targets stays with the intervention targets of gies and icp.",
+        param=_template(
+            "variables",
+            "str_list",
+            None,
+            "Required: the variables to answer for, in any order: a list of column names from the "
+            "data file's header or 0-based positions. The method answers for every ordered pair "
+            "of them.",
+            nullable=True,
+        ),
+        fragment="in any order",
+        suitable=(),
+        others_exempt="Answers for no set of variables given together.",
+    ),
+    Concept(
+        key="blanket",
+        summary="The Markov blanket learner a method runs as one of its steps, by the name of its "
+        "public function. A method offers the learners its proof allows, so its choices may be "
+        "fewer than every learner's.",
+        param=_template(
+            "blanket",
+            "str",
+            "iamb",
+            "The Markov blanket learner run for each variable the method visits, by the name of "
+            "its function.",
+            choices=BLANKET_LEARNERS,
+        ),
+        fragment="markov blanket learner",
+        default_rule="Each method defaults to the learner its paper uses.",
+        suitable=(),
+        others_exempt="Runs no Markov blanket learner as a step.",
+    ),
+    Concept(
+        key="target_answer",
+        summary="With a target, a fit answers for that variable alone: a graph over every column "
+        "holding only the edges the method answers for at the target, in the kind it identifies, "
+        "undirected for a set, so an absent edge away from the target means nothing. "
+        "metadata['target'] names the target, and each set the fit learns is a list of columns "
+        "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
+        suitable=("iamb", "inter_iamb", "mmpc", "icp"),
+        others_exempt="Answers for every variable at once.",
+    ),
+    Concept(
+        key="n_tests",
+        summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
+        "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
+        "query whose p-value a test computed, none for a query answered from a kept answer.",
+        suitable=("iamb", "inter_iamb", "mmpc"),
+        others_exempt="Does not report its test count.",
+    ),
+    Concept(
+        key="effects",
+        summary="A method that answers for ordered treatment-outcome pairs lists one record per "
+        "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
+        "nonzero, identifiable, adjustment_sets, and set_kind.",
+        suitable=(),
+        others_exempt="Answers for no ordered pair of variables.",
+    ),
+    Concept(
         key="collider_rule",
         summary="How a separating-set search decides the colliders.",
         param=_template(
@@ -1434,6 +1555,16 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
     if param is None:
         raise KeyError(f"{key} is a behavior, not a parameter")
     return param.model_copy(update=update)
+
+
+#: ``target`` in its required form, for a method that answers only for one variable; the method
+#: raises ``ValueError`` without one (:func:`andrey.api._local.target_column`). A method states
+#: what it answers in its own ``doc``.
+REQUIRED_TARGET = concept_param(
+    "target",
+    doc="Required: the variable to answer for, a column name from the data file's header or a "
+    "0-based position.",
+)
 
 
 #: The resampling and averaging arguments of ``andrey.bootstrap``, the "bootstrap spec" it checks.

@@ -54,6 +54,7 @@ from .ci import (
     SingularCorrelationError,
     StudentT,
     _canonical,
+    count_tests,
     p_value_statistics,
     per_query,
 )
@@ -569,8 +570,10 @@ class GaussianDeletion(PartialCorrelationDeletion):
         ``query(k)`` is query ``k`` as ``(x, y, conditioning set)``. ``r`` and ``p`` hold the fast
         answers and take the exact ones in place; ``rows`` holds each query's row count. The
         queries are counted in order, so a query that raises does so after the queries before it,
-        as the exact path's loop does.
+        as the exact path's loop does. The fast answers count as tests here (:func:`count_tests`),
+        and the exact path's test counts its own.
         """
+        count_tests(len(flagged) - int(np.count_nonzero(flagged)))
         counter = _ROWS.get()
         start = 0
         for k in np.flatnonzero(flagged).tolist():

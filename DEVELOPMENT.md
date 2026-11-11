@@ -176,6 +176,15 @@ defines it, the existing implementations, and the setting the paper claims.
    paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and
    rows where they matter), and any known structural limit, such as an assumption on the data or
    a cost that grows fast with the size.
+   A method that answers for one variable or for pairs of variables uses the shared pieces: the
+   `target`, `treatment`, `outcome`, `variables`, and `blanket` concepts (`REQUIRED_TARGET` where
+   `target` is required); `src/andrey/api/_local.py`, which turns those arguments into column
+   positions and writes a target-centered answer's sets under the keys of `TARGET_SETS`; and
+   `effect_record` in `src/andrey/core/effects.py`, which builds the `metadata["effects"]` record
+   of a treatment-outcome answer. A method that tests conditional independence runs its search
+   inside `counting_tests()` (`src/andrey/core/ci.py`) and records the count as
+   `metadata["n_tests"]`; listing it as suitable under the `n_tests` and `effects` concepts
+   declares those keys. `andrey.metrics.target_edge_scores` and `claim_scores` score such answers.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"` until the method is supported. A
    method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
