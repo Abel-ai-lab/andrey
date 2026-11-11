@@ -192,9 +192,9 @@ missing depends on the variables, a test can be biased. The [release cards](benc
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
 the data, sound when values are missing completely at random or at random given observed values. It
-is supported in NOTEARS, hill climbing, Tabu search, and GES. It is experimental in BOSS and GRaSP,
-which were each less accurate than a reference implementation in one of the settings we measured,
-and in the others, which have no reference implementation to compare with; the
+is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
+alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
+experimental in the others, which have no reference implementation to compare with; the
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has what we measured.
 The other methods refuse missing values with an error that says what to do
@@ -209,7 +209,7 @@ directly or not (`required_paths`), that it does not (`forbidden_paths`), or tha
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
 honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
 are supported in every method that honors them except six: required paths are experimental in Tabu
-search, MMHC, and RSMAX2, and both path parts in IAMB, Inter-IAMB, and MMPC, where our measurements
+search, MMHC, and RSMAX2, and forbidden paths in IAMB, Inter-IAMB, and MMPC, where our measurements
 did not pass; a method given a part it does not honor raises an error naming the methods that do. A
 path claim says less than an edge, so when you know the edge itself, state it as `required`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows each part.

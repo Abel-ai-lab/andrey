@@ -115,7 +115,8 @@ SHARED = {
         "pairs allowed to be adjacent, and temporal tiers, all honored.",
         lambda m: takes(m, "knowledge") and REGISTRY[m].family != "temporal" and m != "gnies",
     ),
-    # The methods whose result can be a CPDAG honor the path parts of knowledge.
+    # The methods whose result can be a CPDAG honor the path parts of knowledge. A search over
+    # DAGs returns a CPDAG with a consistent extension.
     "knowledge_paths": Shared(
         "Parameters",
         "knowledge",
@@ -124,7 +125,21 @@ SHARED = {
         "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a "
         "claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in "
         '``metadata["unmet_knowledge"]``.',
-        lambda m: REGISTRY[m].restricts_paths,
+        lambda m: REGISTRY[m].restricts_paths and REGISTRY[m].family != "constraint",
+    ),
+    # A search that directs edges by tests can return a CPDAG with no consistent extension.
+    "knowledge_paths_tested": Shared(
+        "Parameters",
+        "knowledge",
+        "last",
+        "In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for "
+        "in which each listed path holds or does not, as :class:`~andrey.Knowledge` describes; a "
+        "claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in "
+        '``metadata["unmet_knowledge"]``; when the graph found has no consistent extension, and so '
+        "stands for no DAG, a claim on a pair joined by an undirected edge directs that edge, "
+        'Meek\'s rules follow, ``metadata["edge_claims"]`` lists the claims applied this way, and '
+        "the result is not guaranteed to stand for a DAG.",
+        lambda m: REGISTRY[m].restricts_paths and REGISTRY[m].family == "constraint",
     ),
     # The PAG methods read the path parts and confounded as marks and kept pairs.
     "knowledge_pag_paths": Shared(

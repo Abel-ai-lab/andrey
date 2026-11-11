@@ -1,14 +1,17 @@
 """Structural EM, ``missing="em"``: the E-step, the parameter fit, and the facades that take it.
 
 The E-step's expected mean and covariance on a fixed dataset and model are recorded from the E-step
-of the MissDAG authors' code (Gao et al. 2022), run once outside the tests. Every method that takes
-``missing="em"`` gives its complete-data result on complete data, refuses ``NaN`` under ``None``,
-and records the handling and the EM record on data with missing values.
+of the MissDAG authors' code (Gao et al. 2022), run once outside the tests. The rounds alternate
+parameter steps with the search (Friedman 1997): no parameter step lowers the observed-data
+log-likelihood, and the record tells the steps and whether each round changed the graph. Every
+method that takes ``missing="em"`` gives its complete-data result on complete data, refuses ``NaN``
+under ``None``, and records the handling and the EM record on data with missing values.
 """
 
 from __future__ import annotations
 
 import functools
+import logging
 import warnings
 
 import numpy as np
@@ -16,6 +19,7 @@ import pandas as pd
 import pytest
 
 import andrey
+import andrey.search.em as em_module
 from andrey import data
 from andrey.core import GraphStructure
 from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
@@ -23,6 +27,7 @@ from andrey.core.score import CopiedColumnsError
 from andrey.data import missingness
 from andrey.search.em import (
     ITERATIONS,
+    PARAMETER_STEPS,
     expected_moments,
     fit_dag,
     observed_copies,
@@ -141,6 +146,59 @@ def test_with_a_fixed_graph_each_iteration_raises_the_observed_data_log_likeliho
     assert record["iterations"] == 10 == len(loglik)
     assert all(b >= a - 1e-9 for a, b in zip(loglik, loglik[1:], strict=False))
     assert loglik[-1] > loglik[0] + 100.0  # 423 on these data
+
+
+def test_the_record_tells_the_steps_and_whether_each_round_changed_the_graph():
+    sample = data.sample_scm(d=6, n=300, seed=4, density=2.0, missing=missingness.mcar(0.3))
+    empty = GraphStructure.from_numpy(np.zeros((6, 6), dtype=np.int8), kind="dag")
+    graphs = iter([empty, sample.graph, sample.graph, empty])
+
+    _, record = structural_em(
+        np.asarray(sample.data), lambda cov: (None, next(graphs)), iterations=4
+    )
+    assert PARAMETER_STEPS == 5
+    assert list(record) == ["iterations", "parameter_steps", "log_likelihood", "graph_changed"]
+    assert record["iterations"] == 4 == len(record["log_likelihood"])
+    assert record["parameter_steps"] == 5
+    # The first round is compared with the graph with no edge, each later one with the round before.
+    assert record["graph_changed"] == [False, True, False, True]
+
+
+def test_a_last_round_that_changed_the_graph_logs_a_warning(caplog):
+    sample = data.sample_scm(d=6, n=300, seed=4, density=2.0, missing=missingness.mcar(0.3))
+    X, truth = np.asarray(sample.data), sample.graph
+    empty = GraphStructure.from_numpy(np.zeros((6, 6), dtype=np.int8), kind="dag")
+    with caplog.at_level(logging.WARNING, logger="andrey.search.em"):
+        structural_em(X, lambda cov: (None, truth), iterations=3)
+        assert not caplog.records
+        graphs = iter([empty, empty, truth])
+        structural_em(X, lambda cov: (None, next(graphs)), iterations=3)
+    (logged,) = caplog.records
+    assert logged.levelno == logging.WARNING
+    assert "still changed in the last of 3 rounds" in logged.getMessage()
+
+
+def test_no_parameter_step_lowers_the_observed_data_log_likelihood(monkeypatch):
+    # An EM step on a fixed graph never lowers the observed-data log-likelihood (Dempster, Laird,
+    # and Rubin 1977). A search can: it weighs the expected log-likelihood against the graph's size.
+    sample = data.sample_scm(d=8, n=300, seed=2, density=2.0, missing=missingness.mcar(0.3))
+    seen: list[float] = []
+
+    def e_step(*args):
+        moments = expected_moments(*args)
+        seen.append(moments[2])
+        return moments
+
+    monkeypatch.setattr(em_module, "expected_moments", e_step)
+    record = andrey.ges(np.asarray(sample.data), missing="em").metadata["em"]
+    # One E-step opens the first round, six each later round (after the search of the round
+    # before, then after each parameter step), and one closes the fit.
+    assert len(seen) == 1 + 9 * 6 + 1
+    rounds = [seen[1 + 6 * k : 7 + 6 * k] for k in range(9)]
+    assert record["log_likelihood"] == [*(steps[0] for steps in rounds), seen[-1]]
+    for steps in rounds:
+        assert all(b >= a - 1e-9 for a, b in zip(steps, steps[1:], strict=False))
+    assert rounds[0][-1] > rounds[0][0] + 1.0  # the steps after the first search gain the most
 
 
 def test_with_only_the_child_missing_em_reaches_the_complete_case_regression():

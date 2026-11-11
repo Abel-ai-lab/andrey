@@ -147,21 +147,22 @@ finds the parents of each missingness indicator and tests again the edges they c
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
-refitting a linear-Gaussian model of each graph it returns, and `metadata["em"]` records the rounds
-and the observed-data log-likelihood after each; a row that observes no value is dropped first. It
-takes `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
-random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `notears`,
-`hc`, `tabu`, and `ges`: in the
+refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
+graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
+the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
+round changed it logs a warning. A row that observes no value is dropped first. It takes
+`score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
+`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
 search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
-variables, at two settings of the sample size the reference's score counts. In `boss` and `grasp`,
-`missing="em"` is experimental: each was less accurate than the reference's stronger setting in one
-of the 132 settings, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, and
-the cause is not yet known; the comparison has both settings' numbers. In `xges`, `exact_search`,
-`dagma`, and `calm` it is experimental, as no reference implementation exists to compare them with;
-the benchmark reports their results beside the baselines. A value a method does not list raises a
+variables, at two settings of the sample size the reference's score counts. In the benchmark the
+last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
+50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
+reference implementation exists to compare them with; the benchmark reports their results beside the
+baselines. A value a method does not list raises a
 `ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
@@ -214,10 +215,11 @@ worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/kn
 than the same fit without them and than a reference package given the same knowledge: in every
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
-and `required_paths` and `forbidden_paths` are experimental in `iamb`, `inter_iamb`, and `mmpc`,
-where the claims are mostly not applied at 50 variables: the graph found often has no consistent
-extension, and the fit then drops every claim, lists them in `metadata["unmet_knowledge"]`, and
-returns the graph it finds without them. An experimental part warns with
+and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
+50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
+measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
+the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
+experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
@@ -236,6 +238,22 @@ tiers deny on an adjacent pair before the rules, and then each claim the final P
 A method given a part it does not honor raises `NotImplementedError`, naming the methods that
 honor it, and so do `iamb`, `inter_iamb`, and `mmpc` given the paths with a `target` or an
 undirected `structure`.
+
+A search that directs edges by tests (`pc`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`) can return a
+CPDAG with no consistent extension when its tests contradict each other on finite data. Such a
+graph stands for no DAG, and no published result says how a path claim restricts it. A claim then
+acts on one edge: in any DAG that joins `a` and `b` by an edge, `a` causes `b` exactly when the
+edge is `a -> b` (Fang and He 2020; Fang et al. 2025). A claim on a pair joined by an undirected
+edge directs it, `a -> b` for a required path and `b -> a` for a forbidden one, and Meek's rules
+follow (Meek 1995). A claim is dropped, and listed in `metadata["unmet_knowledge"]`, when its pair
+is not adjacent, when its edge is directed the other way, and when it conflicts with other claims:
+claims that ask for both directions of one edge, and claims whose edges would lie on a directed
+cycle with the graph's directed edges and the edges the other claims ask for, are all dropped.
+The claims left are applied together, so neither their order nor the column order changes the
+result. `metadata["edge_claims"]` lists the claims applied to an edge this way, each
+`[part, a, b]`, and is empty when the graph has a consistent extension. The result is not
+guaranteed to stand for a DAG, as the graph found did not. The score-based and permutation searches
+return the CPDAG of a DAG, which always has a consistent extension.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max

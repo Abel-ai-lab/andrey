@@ -209,14 +209,24 @@ def notears(
     fit on its expected covariance. ``standardize`` scales the expected covariance to unit
     variances. A row that observes no value is dropped first: it holds no information on the model.
     It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
-    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
-    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
-    fall in a round that changes the graph. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    its observed values, and it alternates as Friedman [7]_ describes: before each fit after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
+    open. The first fit reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each fit after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's fit returned another graph than
+    the round before. When the last round changed the graph, EM has not settled on one, which is
+    more common with few rows, and the fit logs a warning. EM holds when values are missing
+    completely at random or at random given observed values; when whether a value is missing depends
+    on the missing values themselves, the expected covariance is biased, and the data cannot show
+    it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
     magnitude 0.5 to 2 and unit noise variances, from Erdos-Renyi graphs with twice as many edges as
@@ -281,21 +291,24 @@ def notears(
     from Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs of mean degree 2, with 20
     variables and 100 rows, 20 datasets per setting, at the default settings on one core. With 10 to
     50% of the values missing completely at random or at random given observed values, its mean
-    errors (SHD) stayed below the empty graph's in 22 of the 24 settings. With 10% missing
-    completely at random they were 0.6, 1.8, and 3.25 on the three graphs, against 10, 20, and 19
-    for the empty graph and 0.2, 1.25, and 1.55 on the complete data; with 50% they were 8.65, 19.5,
-    and 18.7, not below the empty graph's on the two graphs of mean degree 2. It had fewer errors
-    than :func:`~andrey.pc`, whose tests delete rows per test, in 16 of the 24 settings and tied in
-    8, and fewer than the default fit on data with column means filled in in 22, with 2 ties;
-    dropping the incomplete rows left enough rows to compare in 6 settings, and it had fewer errors
-    in each. It runs the fit 10 times: the median fit took 8 to 42 s, against 1.9 to 3.8 s on the
-    complete data. On standardized columns (Erdos-Renyi, mean degree 2, 20 variables, 500 rows, 20%
-    missing), where the least-squares fit is weaker, its mean errors were 15.35 completely at random
-    and 16.0 at random, against 15.25 on the complete data and 20 for the empty graph; ``pc`` had
-    7.5 there, and the default fit on mean-filled data 13.55 with values missing completely at
-    random, a difference not rerun on fresh seeds. Under values missing not at random it has no
-    guarantee. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    errors (SHD) stayed below the empty graph's in all 24 settings. With 10% missing completely at
+    random they were 0.6, 1.8, and 2.4 on the three graphs, against 10, 20, and 19 for the empty
+    graph and 0.2, 1.25, and 1.55 on the complete data; with 50% they were 8.4, 18.05, and 17.2. A
+    reference implementation of the method of Gao et al. [8]_ ran on the same data: this fit had
+    fewer errors than it in 23 of the 24 settings and tied in 1. It had fewer errors than
+    :func:`~andrey.pc`, whose tests delete rows per test, in 18 of the 24 settings and tied in 6,
+    and fewer than the default fit on data with column means filled in in 22, with 2 ties; dropping
+    the incomplete rows left enough rows to compare in 6 settings, and it had fewer errors in each.
+    EM runs the fit 10 times and the E-step 56 times: the median fit took 8 to 41 s, against 1.9 to
+    3.8 s on the complete data. In 13 of the 660 fits the last round still changed the graph, and
+    each such fit logs a warning. On standardized columns (Erdos-Renyi, mean degree 2, 20 variables,
+    500 rows, 20% missing), where the least-squares fit is weaker, its mean errors were 15.35
+    completely at random and 16.0 at random, against 15.25 on the complete data and 20 for the empty
+    graph; ``pc`` had 7.5 there, and the default fit on mean-filled data 13.55 with values missing
+    completely at random, a difference not rerun on fresh seeds. The numbers on standardized columns
+    were measured with one parameter refit per round in place of the 5 parameter steps. Under values
+    missing not at random it has no guarantee. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -536,14 +549,24 @@ def dagma(
     round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
     variances. A row that observes no value is dropped first: it holds no information on the model.
     It runs 10 rounds, as Gao et al. [8]_ do, from no edges and each column's mean and variance over
-    its observed values, and ``metadata["em"]`` records ``iterations``, the rounds, and
-    ``log_likelihood``, the observed-data log-likelihood of the model after each round, which can
-    fall in a round that changes the graph. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    its observed values, and it alternates as Friedman [7]_ describes: before each fit after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
+    open. The first fit reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each fit after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's fit returned another graph than
+    the round before. When the last round changed the graph, EM has not settled on one, which is
+    more common with few rows, and the fit logs a warning. EM holds when values are missing
+    completely at random or at random given observed values; when whether a value is missing depends
+    on the missing values themselves, the expected covariance is biased, and the data cannot show
+    it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
     magnitude 0.5 to 2 and unit noise variances, from Erdos-Renyi graphs with twice as many edges as

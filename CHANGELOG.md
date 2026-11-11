@@ -80,34 +80,73 @@ names its pull request.
   causal-learn, bnlearn, Tetrad, or lingam given the same knowledge, in a setting that repeated on
   fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
   knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
-  given the required edges those paths imply made fewer errors, and both path parts stay
-  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the claims are mostly not applied at 50
-  variables: the graph found often has no consistent extension, and the fit then drops every
-  claim. The evidence is on the [comparison page][kp-paths].
-  ([#870])
-- `missing="em"` is supported in `ges`. The benchmark lane `m2-tetrad` runs `ges`, `boss`, and
-  `grasp` at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under
-  its EM covariance policy, which estimates one covariance by EM before the search and is not
-  structural EM, on 132 settings of 10 to 50 variables with values missing completely at random or
-  at random. Against Tetrad's default, which counts every row as the sample size, none was less
-  accurate in any setting: `ges` had fewer errors in 107 and tied in 25, `boss` in 95 and 37, and
-  `grasp` in 89 and 43. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges`
-  had fewer errors in 81, tied in 50, and had more in 1, which tied on fresh datasets. `boss` (70,
-  58, and 4) and `grasp` (64, 62, and 6) each had more errors again on fresh datasets in one
-  setting, at 2,000 rows on graphs of mean degree 4 with 30% of the values missing, so in them
-  `missing="em"` stays experimental until the cause is known. The 100-variable settings and the
-  default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm` it
-  stays experimental, with no reference implementation to compare with. The
-  [comparison page][em-tetrad] has the results. ([#873])
-- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
-  `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
-  so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
-  graph it finds without them. On simulated data with 50 variables, 2,000 rows, and mean degree 4
-  that happened in 38 to 40 of 40 fits; where the graph has a consistent extension, the claims were
-  applied and the CPDAG was 0.2 to 0.6 edges closer to the class they define. The Limitations of
+  given the required edges those paths imply made fewer errors, and `forbidden_paths` stays
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at 50 variables often has
+  no consistent extension and most claims are dropped on it. The evidence is on the
+  [comparison page][kp-paths]. ([#870], [#892])
+- `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
+  them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
+  EM covariance policy, which estimates one covariance by EM before the search and is not structural
+  EM, on 132 settings of 10 to 50 variables with values missing completely at random or at random.
+  Against Tetrad's default, which counts every row as the sample size, none was less accurate in any
+  setting: `ges` had fewer errors in 111 and tied in 21, `boss` in 100 and 32, and `grasp` in 101
+  and 31. Against Tetrad's `MEAN_PAIRWISE` sample size, a stronger reference, `ges` had fewer errors
+  in 90 and tied in 42, `boss` had fewer in 72, tied in 59, and had more in 1, and `grasp` had fewer
+  in 68, tied in 61, and had more in 3; all four tied on fresh datasets. The 100-variable settings
+  and the default `ebic_gamma=1.0` were not compared. In `xges`, `exact_search`, `dagma`, and `calm`
+  it stays experimental, with no reference implementation to compare with. The [comparison
+  page][em-tetrad] has the results. ([#873], [#887])
+- `missing="em"` gives other results: it now runs the alternating structural EM of Friedman (1997)
+  in every method that takes it (`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`,
+  `notears`, `dagma`, and `calm`). Before each search after the first, 5 parameter-only EM steps
+  refit the current graph's coefficients and noise variances; before, each round refit them once.
+  With one refit per round, the first search, on the expected covariance under the model with no
+  edge, returned many extra edges, the later rounds removed them slowly, and the graph was still
+  changing after the 10 rounds; `boss` and `grasp` then each had more errors than Tetrad's
+  `MEAN_PAIRWISE` reference in one setting on two sets of datasets, where `boss` now ties and
+  `grasp` has fewer. On the three benchmark lanes with a reference, the alternating scheme had fewer
+  errors than one refit per round in 64 settings and more in 16, which did not run again on fresh
+  datasets, and the mean errors over the settings fell in every search. `hc` and `tabu` stay no less
+  accurate than bnlearn's structural EM in every setting (fewer errors in 28 and 31 of 36, ties in
+  the others), and `notears` than MissDAG (fewer in 23 of 24). The 10 rounds and the sample size of
+  the BIC, every row, stay. `metadata["em"]` gains `parameter_steps` and `graph_changed`, whether
+  each round changed the graph, and a fit whose last round changed it logs a warning: 2 to 6% of the
+  benchmark's fits, and 20% of `grasp`'s. A fit runs 56 E-steps where it ran 11 and takes about 1.5
+  to 5 times as long. The comparison page's tables of the lanes without a reference were not run
+  again and say that they were measured with one refit per round. Results on complete data do not
+  change. ([#887])
+- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say how path claims fare on a graph with no
+  consistent extension, which stands for no DAG and which they found in 105 to 125 of 240 simulated
+  datasets, and in 19 or 20 of 20 with 50 variables, 2,000 rows, and mean degree 4: how many claims
+  direct an edge, are met by an edge the data directed, and are dropped, and why `forbidden_paths`
+  is experimental there. The Limitations of
   `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
   blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
-  graph at 50 variables and mean degree 4. ([#882])
+  graph at 50 variables and mean degree 4. ([#882], [#892])
+- `required_paths` and `forbidden_paths` act on a graph with no consistent extension, which `pc`,
+  `cdnod`, `iamb`, `inter_iamb`, and `mmpc` can return when their tests contradict each other on
+  finite data. Such a graph stands for no DAG, and a fit dropped every path claim on it. A claim on
+  a pair joined by an undirected edge now directs that edge, `a -> b` for a required path and
+  `b -> a` for a forbidden one (Fang and He, 2020; Fang et al., 2025), and Meek's rules follow
+  (Meek, 1995). A claim on a pair that is not adjacent, a claim against an edge the data directed,
+  and claims that conflict with each other, by asking for both directions of one edge or by closing
+  a directed cycle, are dropped and listed in `metadata["unmet_knowledge"]` as before, whatever the
+  order of the claims or the columns. `metadata["edge_claims"]` is new and lists the claims applied
+  to an edge. The result is not guaranteed to stand for a DAG, as the graph found did not, and
+  applying the reading to such a graph is Andrey's own choice. A fit without path claims, and a fit
+  whose graph has a consistent extension, return what they returned. On simulated linear-Gaussian
+  data (10 to 50 variables, 240 datasets a method) the graph found had no consistent extension in
+  49 datasets of `pc`, 71 of `cdnod`, and 105 to 125 of `iamb`, `inter_iamb`, and `mmpc`. Against
+  the fits that dropped every claim there, with the same true claims, no setting of any of the five
+  methods was farther from the true DAG or from the class of graphs the claims define, and 5 to 29
+  of 36 were closer. Most claims are still dropped on such a graph, 76 to 81% of the required and
+  96 to 97% of the forbidden paths, since most name a pair that is not adjacent. `required_paths`
+  is now supported in `iamb`, `inter_iamb`, and `mmpc`: with true required paths none was farther
+  from that class or from the true DAG than without them in any setting. `forbidden_paths` stays
+  experimental in the three: with forbidden paths alone at 50 variables and mean degree 2, the
+  CPDAG was 0.65 to 1.95 edges farther from the class in 3 or 4 of 6 settings over 40 datasets,
+  though in no setting on two separate sets of 20. `pc` and `cdnod` keep their status. The
+  [comparison page][kp-paths] has the results. ([#892])
 - The Limitations and the `n_starts` entry of `grasp` say when one search is not enough: on
   simulated linear-Gaussian data with 50 variables, mean degree 4, and 500 rows at the standard BIC,
   one start's mean SHD over 40 datasets was 29.6 (median fit 1.3 s) against 18.8 with `n_starts=4`
@@ -2391,7 +2430,9 @@ First alpha release.
 [#879]: https://github.com/Abel-ai-lab/andrey/pull/879
 [#880]: https://github.com/Abel-ai-lab/andrey/pull/880
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
+[#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
