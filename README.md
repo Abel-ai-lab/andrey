@@ -8,6 +8,8 @@ banner links the website's homepage. -->
 <p align="center">
   <a href="https://pypi.org/project/andrey-core/"><img alt="PyPI version"
     src="https://img.shields.io/pypi/v/andrey-core?label=PyPI&amp;color=3b5bdb"></a>
+  <a href="https://pepy.tech/projects/andrey-core"><img alt="PyPI downloads"
+    src="https://img.shields.io/pepy/dt/andrey-core?label=downloads&amp;color=3b5bdb"></a>
   <a href="https://github.com/Abel-ai-lab/andrey/actions/workflows/ci.yml"><img alt="CI status"
     src="https://img.shields.io/github/actions/workflow/status/Abel-ai-lab/andrey/ci.yml?branch=main&amp;label=CI"></a>
   <img alt="Python 3.11, 3.12, 3.13, 3.14"

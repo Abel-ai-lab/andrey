@@ -40,6 +40,7 @@ from tests.unit.methods import REQUIRED, SHORT, domains, environments
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
 UPGRADING = API_MD.parent / "guides" / "upgrading.md"
+GETTING_STARTED = API_MD.parent / "guides" / "getting-started.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -1257,10 +1258,11 @@ def test_every_warning_the_package_raises_is_an_andrey_warning():
     assert calls > 10
 
 
-def test_documented_method_lists_match_the_table():
-    """A paragraph of docs/docs/api.md marked ``% concept: <key>`` names exactly the methods that
-    take the concept today, under any name."""
-    lines = API_MD.read_text(encoding="utf-8").splitlines()
+@pytest.mark.parametrize("page", [API_MD, GETTING_STARTED], ids=lambda page: page.name)
+def test_documented_method_lists_match_the_table(page):
+    """A paragraph of the API reference or the getting-started guide marked ``% concept: <key>``
+    names exactly the methods that take the concept today, under any name."""
+    lines = page.read_text(encoding="utf-8").splitlines()
     marked = [
         (i, line.split(":", 1)[1].strip())
         for i, line in enumerate(lines)

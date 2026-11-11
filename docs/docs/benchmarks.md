@@ -12,6 +12,7 @@ Every release comes with a release card that keeps the record: the benchmarks fi
 methods the release adds or promotes, their known limits, and how to rerun the measurements. A
 release with a theme also comes with a post that announces it; a release without one updates the
 posts of the features it changes. A card keeps the numbers its release published.
+[Standards](standards.md) lists what every method must meet and how each requirement is checked.
 
 % The latest release: its cover, then its TL;DR. The next release replaces this block, and this
 % release moves to the top of "Earlier releases" (docs/DEVELOPMENT.md, "The release cards").
