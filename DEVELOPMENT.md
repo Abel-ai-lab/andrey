@@ -1,7 +1,7 @@
 # Development
 
-How the code fits together, the common changes, and how a method is tested.
-[`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup and the checks before a pull request,
+How the code fits together, the common changes, how a method is tested, and how a release is put
+together. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks a contributor from a fork to a pull request,
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the website, and [`AGENTS.md`](AGENTS.md) the
 repository's conventions.
 
@@ -378,6 +378,49 @@ them):
   card);
 - an example notebook in `examples/` that calls it;
 - the entries from steps 2 and 4.
+
+## Releases, labels, and the changelog
+
+A pull request targets the branch of the release it ships in, `release/<x.y.z>`, not `main`. The
+release pull request, from that branch to `main`, is the only one that merges to `main`; the
+release's tag follows it. A required check, `release-branch`, fails a pull request into `main` from
+any other branch, or from a release branch whose `pyproject.toml` version is not the branch's
+`<x.y.z>`, since the tag and the site take the package's version. A post release,
+`release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
+fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`. The release pull
+request runs the quality gate (`qa/README.md`), also required, once for the whole release.
+Dependabot's version updates target the active release branch (`target-branch` in
+`.github/dependabot.yml`), which each release moves to the next one.
+
+Every pull request has exactly one type label, which also gives its section in the release notes:
+
+| Label | For | Release-notes section |
+|---|---|---|
+| `feature` | a new method, option, or speed-up | Added |
+| `bug` | a fix | Fixed |
+| `docs` | docs, the website, and the blog | Documentation |
+| `chore` | CI, tests, build, and refactors | Chores |
+| `dependencies` | dependency updates; Dependabot sets it | Dependencies |
+
+Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
+Breaking. A third, `release`, marks a release's pull request and the issue that tracks its
+checklist; the release notes leave the release pull request out. Every pull request also has a
+milestone, the release it ships in. A maintainer sets the labels and the milestone when the pull
+request is opened or reviewed, and a `feature` or `bug` pull request adds a bullet under
+`## [Unreleased]` in `CHANGELOG.md` that ends with a link to it, `([#<number>])`, defined at the
+end of the file.
+
+`CHANGELOG.md` is the record of each release. Before the release pull request merges, the
+maintainer (or an agent) lists the milestone's pull requests with
+`gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
+CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
+the notes GitHub generates by label (`.github/release.yml`). The same pass refreshes the stored
+intersphinx inventories that the docs build falls back on (`docs/DEVELOPMENT.md`) and commits any
+that changed:
+
+```shell
+uv run --group docs python scripts/refresh_intersphinx.py
+```
 
 ## Command-line interface
 
