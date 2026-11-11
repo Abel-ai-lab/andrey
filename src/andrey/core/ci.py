@@ -120,7 +120,7 @@ SINGULAR_RTOL = 1e-12
 BOUND_MARGIN = 1e4
 
 
-@dataclass
+@dataclass(slots=True)
 class CountedTests:
     """The running count of a :func:`counting_tests` block: ``n`` tests evaluated so far."""
 
