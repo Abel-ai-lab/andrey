@@ -549,6 +549,7 @@ METHOD_LISTS = {
     ),
     "missing": lambda s: s.data.missing,
     "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
+    "reads_units": lambda s: s.reads_units,
 }
 
 
