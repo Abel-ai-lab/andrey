@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ci import count_tests
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 
 from .graphs import csr_from_endpoints
@@ -292,7 +293,8 @@ class DSepOracle:
 
     Returns ``1.0`` when the query is d-separated (a "p-value" above any alpha -> independent) and
     ``0.0`` otherwise, so it drops into the FCI orientation rules in place of a data CI test; alpha
-    is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly). Query index
+    is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly), and each query
+    answered afresh counts as one test (:func:`~andrey.core.ci.counting_tests`). Query index
     ``k`` names the DAG node ``nodes[k]``, or ``k`` itself when ``nodes`` is ``None``, and every
     query also conditions on the DAG nodes ``given``.
 
@@ -331,6 +333,7 @@ class DSepOracle:
             )
             value = 0.0 if joined else 1.0
             self._cache[key] = value
+            count_tests()
         return value
 
 

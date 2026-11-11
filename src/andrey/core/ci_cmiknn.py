@@ -18,7 +18,7 @@ from scipy.special import digamma
 from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
-from .ci import _canonical_ranked, per_query
+from .ci import _canonical_ranked, count_tests, per_query
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
@@ -322,6 +322,7 @@ class CMIknn:
         """
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         cond = tuple(cond)
+        count_tests()
         dev = backend.select_by_size(
             "cmiknn", env.CMIKNN_GPU_THRESHOLD, self._n * self._n, amortized=True
         )

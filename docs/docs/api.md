@@ -770,6 +770,13 @@ and gives that test's p-value exactly; `normal_scores` therefore ranks each colu
 its query reads; a registered test works the same way, built anew for each
 query.
 
+`iamb`, `inter_iamb`, and `mmpc` record in `metadata["n_tests"]` how many tests the fit evaluated:
+one for each query whose p-value a test computed, so a query answered again from a kept answer,
+as the chi-square tests keep their marginal answers, is not a new test. A query a test computes
+together with others counts as well, even when the search reads only some of the answers. To count
+the tests in your own code, run it inside {py:func}`~andrey.core.ci.counting_tests`; a test you
+register counts the queries it reports through {py:func}`~andrey.core.ci.count_tests`.
+
 ```{eval-rst}
 .. currentmodule:: andrey.core
 
@@ -789,6 +796,8 @@ query.
    ci.register_indep_test
    ci.available_indep_tests
    ci.make_indep_test
+   ci.counting_tests
+   ci.count_tests
 
 .. currentmodule:: andrey
 ```
@@ -1296,6 +1305,12 @@ matrix, where a nonzero `A[i, j]` means `i -> j`, over the same variables in the
 matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of endpoint marks with
 `GraphStructure.from_numpy(M, kind=...)` first.
 
+Two functions score a local answer. `target_edge_scores(output, truth, target)` scores only the
+edges at the target: its adjacencies, the edges with both marks right, and the missing, extra, and
+wrongly marked edges there, against the truth in the kind the answer identifies. `claim_scores`
+scores the claims in `metadata["effects"]`, each that a treatment's effect on an outcome is or is
+not zero, against the true DAG's ancestry.
+
 | `family` | When | `score` returns |
 |---|---|---|
 | `undirected` | either graph is `undirected` | the skeleton scores and `shd`, the skeleton SHD: the pairs adjacent in one graph and not in the other |
@@ -1330,6 +1345,8 @@ matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of 
    latent_cluster_ari
    adjusted_rand_index
    number_of_latents
+   target_edge_scores
+   claim_scores
 ```
 
 ## Visualization
