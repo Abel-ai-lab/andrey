@@ -1538,6 +1538,13 @@ code.literal {
   padding: 0.1em 0.35em;
 }
 
+/* ---------- math ---------- */
+/* KaTeX's hidden MathML copy is absolutely positioned; anchored to its formula, it cannot sit past
+   the right edge of a phone screen and widen the page. */
+.katex {
+  position: relative;
+}
+
 /* ---------- cards (sphinx-design) ---------- */
 .sd-card {
   border: 1px solid var(--andrey-line);

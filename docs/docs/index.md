@@ -62,6 +62,8 @@ What changed in each release.
 
 - [Install](guides/getting-started.md#install): the package and optional GPU acceleration.
 - [Get started](guides/getting-started.md#learn-a-graph): learn a causal graph from real data.
+- [Concepts](guides/concepts.md): the causal discovery problem stated formally, what each graph
+  claims, and which methods fit which assumptions.
 - [Examples](examples/index): notebooks that run one method or task each, and demos of methods to
   step through in your browser.
 - [Methods](methods.md): the method to start with for each kind of data, and every method by
@@ -77,6 +79,8 @@ What changed in each release.
 - [Contributing](guides/contributing.md): report a problem, set up a development environment, and
   run the checks before a pull request.
 - [Release cards](benchmarks.md): each release's timings, accuracy, and known limits.
+- [Standards](standards.md): what every method must meet, how each requirement is checked, and
+  where the exceptions are recorded.
 
 ## More
 

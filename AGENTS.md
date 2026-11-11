@@ -52,9 +52,9 @@ Concise and simple; describe current behavior only - no "this PR adds ..." comme
 numbers in prose. The CHANGELOG is the exception: each entry ends with a link to its pull request.
 Everything, code names included, is written in US English: color, behavior, neighbor, center.
 Code, docstrings, comments, and the developer docs (`AGENTS.md`,
-`DEVELOPMENT.md`, `CONTRIBUTING.md`) are written in the third person. Pages written for readers
-(the README, the blog, the homepage, and the pages under `docs/docs/`) keep their voice: they
-address the reader as "you" and speak for the project as "we". In code and tests, describe what
+`DEVELOPMENT.md`) are written in the third person. Pages written for readers (the README,
+`CONTRIBUTING.md`, the blog, the homepage, and the pages under `docs/docs/`) keep their voice:
+they address the reader as "you" and speak for the project as "we". In code and tests, describe what
 the code does, not how it came to be: no development-process narration, no plan step or decision
 labels, and no reviewer or session attribution. Cite method papers in `References` sections.
 Wrap Markdown at 100 characters. Use `->` not arrow unicode. Backticks for commands, code, and file

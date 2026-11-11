@@ -30,7 +30,7 @@ Every build, a rebuild into the same folder included, reads each intersphinx inv
 (`intersphinx_mapping` in `conf.py`) from its project's site, or from its stored copy in
 `_intersphinx/` when the site does not answer within `intersphinx_timeout` seconds, so an
 unreachable site costs the build a few seconds and no references. Each release refreshes the
-copies (`CONTRIBUTING.md`):
+copies (`DEVELOPMENT.md`):
 
 ```shell
 uv run --group docs python scripts/refresh_intersphinx.py

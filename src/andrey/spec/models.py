@@ -260,6 +260,10 @@ class MethodSpec(Spec):
     accel: Accel
     status: Status
     column_order: ColumnOrder
+    # The published algorithm reads the columns' units, so rescaling a column can change the
+    # default fit's graph; every other method returns the same graph whatever factor rescales each
+    # column.
+    reads_units: bool = False
     tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
     order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
