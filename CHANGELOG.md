@@ -18,6 +18,14 @@ names its pull request.
   opens with the shape of the API; the details of `env` and `targets` moved to the
   [getting-started guide](https://andrey.abel.ai/docs/guides/getting-started.html#environments-and-interventions).
   ([#904])
+- A [concepts guide](https://andrey.abel.ai/docs/guides/concepts.html) states causal discovery
+  formally: the model, what the data identify, what each kind of graph claims, and which methods
+  fit which assumptions. It opens the learning path, and the quick-start notebook states its model
+  in one equation. ([#904])
+
+### Fixed
+
+- A page with math no longer scrolls sideways on a phone. ([#904])
 
 ## [0.17.0] - 2026-11-11
 

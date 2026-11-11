@@ -62,6 +62,8 @@ What changed in each release.
 
 - [Install](guides/getting-started.md#install): the package and optional GPU acceleration.
 - [Get started](guides/getting-started.md#learn-a-graph): learn a causal graph from real data.
+- [Concepts](guides/concepts.md): the causal discovery problem stated formally, what each graph
+  claims, and which methods fit which assumptions.
 - [Examples](examples/index): notebooks that run one method or task each, and demos of methods to
   step through in your browser.
 - [API reference](api.md): methods, graph structures, and visualization.

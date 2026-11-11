@@ -243,6 +243,7 @@ LLMS_SECTIONS = (
         (
             "docs/index",
             "docs/guides/getting-started",
+            "docs/guides/concepts",
             "docs/faq",
             "docs/api",
             "docs/configuration",
@@ -550,6 +551,29 @@ METHOD_LISTS = {
     ),
     "missing": lambda s: s.data.missing,
     "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
+    # The rows of the concepts guide's table, by the assumptions and the graph returned.
+    "class_cpdag": lambda s: (
+        s.output.graph_kind in ("cpdag", "undirected")
+        and not any(p.type == "targets" for p in s.params)
+        and not any(i.name == "env" and i.required for i in s.data.inputs)
+    ),
+    "skeleton": lambda s: s.output.graph_kind == "undirected",
+    "class_pag": lambda s: (
+        s.output.graph_kind == "pag"
+        and s.family != "latent"
+        and not any(i.name == "env" and i.required for i in s.data.inputs)
+    ),
+    "identified_dag": lambda s: (
+        s.output.graph_kind == "dag" and s.family in ("functional", "pairwise")
+    ),
+    "optimized_dag": lambda s: s.output.graph_kind == "dag" and s.family == "score",
+    "latent": lambda s: s.family == "latent",
+    "latent_nodes": lambda s: s.output.has_latents,
+    "temporal": lambda s: s.output.structure_type == "temporal",
+    "env_index": lambda s: (
+        any(i.name == "env" for i in s.data.inputs)
+        and not any(p.type == "targets" for p in s.params)
+    ),
 }
 
 

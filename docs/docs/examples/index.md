@@ -11,32 +11,34 @@ html_theme.sidebar_secondary.remove: true
 
 New to Andrey? Work through the notebooks in this order; each part adds one step to the last.
 
-- **Part 1.** [Getting started](../guides/getting-started.md) and the
+- **Part 1.** [Concepts](../guides/concepts.md): the model behind every method, what the data
+  can identify, and what each kind of graph claims.
+- **Part 2.** [Getting started](../guides/getting-started.md) and the
   {doc}`quick start <quick_start>`: install Andrey, learn a graph from the Sachs protein
   measurements, and read the result.
-- **Part 2.** {doc}`Visualize a causal graph <viz>`: draw a result and read the mark at each end
+- **Part 3.** {doc}`Visualize a causal graph <viz>`: draw a result and read the mark at each end
   of an edge.
-- **Part 3.** {doc}`Constraint-based discovery <constraint_based>`: learn a graph from
+- **Part 4.** {doc}`Constraint-based discovery <constraint_based>`: learn a graph from
   conditional-independence tests, and allow hidden common causes with FCI.
-- **Part 4.** {doc}`Score-based search <score_search>` and
+- **Part 5.** {doc}`Score-based search <score_search>` and
   {doc}`permutation-based search <permutation_based>`: search for the graph with the best score,
   over graphs or over orderings of the variables.
-- **Part 5.** {doc}`Background knowledge <knowledge>`: pass what you already know, such as tiers
+- **Part 6.** {doc}`Background knowledge <knowledge>`: pass what you already know, such as tiers
   in time, to narrow the search.
-- **Part 6.** {doc}`Linear non-Gaussian models <lingam>`: orient every edge when the noise is
+- **Part 7.** {doc}`Linear non-Gaussian models <lingam>`: orient every edge when the noise is
   non-Gaussian.
-- **Part 7.** {doc}`Pairs that share a hidden cause <rcd>` and
+- **Part 8.** {doc}`Pairs that share a hidden cause <rcd>` and
   {doc}`causal order with hidden causes <bottom_up_parce_lingam>`: find the variables a hidden
   cause joins.
-- **Part 8.** {doc}`Nonlinear additive-noise models <functional>` and
+- **Part 9.** {doc}`Nonlinear additive-noise models <functional>` and
   {doc}`pairwise direction <pairwise>`: orient edges when each effect is a nonlinear function of
   its causes.
-- **Part 9.** {doc}`Continuous optimization <calm>`: fit a weighted DAG by gradient descent
+- **Part 10.** {doc}`Continuous optimization <calm>`: fit a weighted DAG by gradient descent
   instead of a search over graphs.
-- **Part 10.** {doc}`Time series <time_series>`: find the causes in data measured over time.
-- **Part 11.** {doc}`Bootstrap <bootstrap>`: refit on resamples of the rows to see how stable each
+- **Part 11.** {doc}`Time series <time_series>`: find the causes in data measured over time.
+- **Part 12.** {doc}`Bootstrap <bootstrap>`: refit on resamples of the rows to see how stable each
   edge is.
-- **Part 12.** {doc}`Markov check <markov_check>`: test whether the data contradict the graph you
+- **Part 13.** {doc}`Markov check <markov_check>`: test whether the data contradict the graph you
   learned.
 
 {doc}`Speed on your machine <speed_on_your_machine>` times PC on your own hardware at any point.

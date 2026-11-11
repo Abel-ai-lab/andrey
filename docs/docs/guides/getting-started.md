@@ -13,7 +13,7 @@ kernelspec:
 
 This guide learns a causal graph from real measurements, checks it against what biologists already
 know, and then tests how far to trust it. Every output on this page is computed when the site is
-built.
+built. [Concepts](concepts.md) states the problem formally and what each kind of graph claims.
 
 ## Install
 
