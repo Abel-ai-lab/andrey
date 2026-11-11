@@ -18,9 +18,9 @@ posts of the features it changes. A card keeps the numbers its release published
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.16.0
+:link: benchmarks/0.17.0
 :link-type: doc
-:link-alt: The 0.16.0 release card
+:link-alt: The 0.17.0 release card
 :class-card: release-cover release-default
 :shadow: none
 :margin: 0
@@ -30,26 +30,57 @@ Release card
 <p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
 width="190" height="40"></p>
 
-0.16.0
+0.17.0
 :::
 
 ::::{div} release-tldr
 
-0.16.0 is here. Simulate missing values with a known cause, and fit incomplete data with MVPC for
-PC and EM for the score searches. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
-Tabu search. State causal paths and hidden common causes in background knowledge. LOCI reads the
-direction of a pair whose noise changes with the cause, and made no more errors than its authors'
-code. Drawings mark intervened variables, and HSIC p-values stay precise far below 1e-16.
+0.17.0 is here. SCORE and NoGAM read a causal order from the score of nonlinear data with additive
+noise, and neither made more errors than its reference implementation. NOTEARS is supported, and so
+is EM for missing data in GES, BOSS, and GRaSP. Path and confounder claims are supported in more
+methods, and `andrey.data` draws more noise families and mechanisms.
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.16.0.md)
+[Read the release card](benchmarks/0.17.0.md)
+[Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
 [Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
-[Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.16.0
+:link-type: doc
+:link-alt: The 0.16.0 release card: missing data, path claims, and LOCI
+:class-card: release-tile release-default
+:shadow: none
+:margin: 0
+
+0.16.0
+:::
+
+:::{div} release-body
+<h3>Missing data, path claims, and LOCI</h3>
+
+MVPC against its authors' R code and EM against MissDAG and bnlearn on incomplete data, path and
+confounder claims in background knowledge, and LOCI against its authors' code.
+
+- MVPC better than its authors' R code in **28 of 32** cells, and worse in none
+- **0 of 39** judged comparisons where LOCI makes significantly more errors than its authors' code
+:::
+
+:::{div} release-meta
+Released November 10, 2026
+
+- [Release card<span class="visually-hidden"> 0.16.0</span>](benchmarks/0.16.0.md)
+- [Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+- [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
+:::
+::::
 
 ::::{div} release-row
 

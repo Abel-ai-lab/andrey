@@ -18,21 +18,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.16.0
+## ⭐ What's new in 0.17.0
 
-0.16.0 takes missing data, background knowledge, and pair direction further. Simulate missing values
-whose cause you know. Then fit incomplete data with MVPC, which corrects PC when missingness depends
-on other variables, or with EM for the score searches, NOTEARS, DAGMA, and CALM. Tell a method that
-one variable causes another by some path, that it does not, or that two variables share a hidden
-common cause. LOCI reads the direction of a pair whose noise changes with the cause, and made no
-more errors than its authors' code. MVPC is supported, and so is EM in NOTEARS, hill climbing, and
-Tabu search. EM in the other searches is experimental, as are a few of the new claims where our
-measurements did not pass. Drawings also mark intervened variables, and every HSIC p-value stays
-precise far below 1e-16.
+0.17.0 adds SCORE and NoGAM, which read the causal order of nonlinear data with additive noise from
+the score, the gradient of its log density. Neither made more errors than its reference
+implementation, and both are supported. NOTEARS is supported too. The release also follows up on
+0.16.0. EM for missing data follows Friedman's alternating scheme and is supported in GES, BOSS, and
+GRaSP, and path and confounder claims are supported in more methods. `andrey.data` draws more noise
+families and mechanisms.
 
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.16.0.html)** · Posts:
-**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
-**[Pairwise direction](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)**
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)** · Posts:
+**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
+**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)**
 
 ---
 

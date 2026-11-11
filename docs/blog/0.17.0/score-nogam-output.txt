@@ -1,0 +1,8 @@
+random_features: 10 edges
+  score_matching: errors  4, true edges in causal order  7
+  nogam:          errors  1, true edges in causal order  9
+  cam:            errors  0, true edges in causal order 10
+additive_noise: 10 edges
+  score_matching: errors 14, true edges in causal order  4
+  nogam:          errors 13, true edges in causal order  5
+  cam:            errors  0, true edges in causal order 10
