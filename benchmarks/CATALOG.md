@@ -103,8 +103,12 @@ rows of the first eight methods and
 14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
 rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json) and, for GES,
 BOSS, and GRaSP with EM against Tetrad's EM covariance policy, in
-[`published/0.17.0/missing-data-em.json`](published/0.17.0/missing-data-em.json), with their
-[comparison page](comparisons/missing-data.md). The NOTEARS and DAGMA lane's rows are in
+[`published/0.17.0/missing-data-em.json`](published/0.17.0/missing-data-em.json), which holds the
+rows of the alternating structural EM and, under `earlier_scheme`, those of one refit per round.
+[`published/0.17.0/missing-data-em-bnlearn-missdag.json`](published/0.17.0/missing-data-em-bnlearn-missdag.json)
+holds hill climbing, Tabu search, and NOTEARS with the alternating EM against bnlearn and MissDAG,
+on the datasets of the 0.16.0 record. Their [comparison page](comparisons/missing-data.md) presents
+all three. The NOTEARS and DAGMA lane's rows are in
 [`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
 [comparison page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its
 authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental.

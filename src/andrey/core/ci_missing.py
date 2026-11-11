@@ -91,9 +91,8 @@ EM_METHODS = (
 #: The methods in which ``missing="em"`` is supported: in the published comparison
 #: (benchmarks/comparisons/missing-data.md) none was less accurate than its reference
 #: implementation in a setting, on the first datasets and again on fresh ones. In the other
-#: :data:`EM_METHODS` it is experimental: ``boss`` and ``grasp`` were each less accurate than their
-#: reference in one such setting, and no reference implementation exists for the rest.
-EM_SUPPORTED = ("ges", "hc", "tabu", "notears")
+#: :data:`EM_METHODS` it is experimental: no reference implementation exists for them.
+EM_SUPPORTED = ("ges", "hc", "tabu", "boss", "grasp", "notears")
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"
