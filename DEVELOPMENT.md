@@ -186,6 +186,15 @@ defines it, the existing implementations, and the setting the paper claims.
    `metadata["n_tests"]`; listing it as suitable under the `n_tests`, `blankets_learned`, and
    `effects` concepts declares those keys. `andrey.metrics.target_edge_scores` and
    `claim_scores` score such answers.
+   Its search runs on the blanket engine (`src/andrey/constraint/blanket.py`): it asks its tests
+   through `LocalSearch.scan` (many candidates against one conditioning set, in one call where the
+   test can), `LocalSearch.weakest` (each candidate's weakest association over many sets), and
+   `LocalSearch.separating` (the sets of one size that separate a pair), and picks between
+   candidates with `LocalSearch.strongest`, which reads the tie-break ranks only when keys tie. It
+   never reads a test's internals, such as its correlation matrix, and never indexes the ranks, so
+   a faster scan or ranks computed on demand reach every local method at once.
+   `LocalSearch.counts` reports the queries issued, computed (the unit of `n_tests`), and distinct,
+   and the time spent in tests.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"` until the method is supported. A
    method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
@@ -207,10 +216,12 @@ defines it, the existing implementations, and the setting the paper claims.
 
 Dispatch numeric kernels through `andrey.core.backend` (`docs/docs/configuration.md` gives the
 selection rules) and, for the greedy score-based searches, use the shared worker pool in
-`src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
-Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
-shows the change returns the same bits and makes no more queries: write its manifest on the base
-commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
+`src/andrey/search/_parallel.py`. The local methods get faster in the blanket engine's query calls
+(`LocalSearch.scan` and its siblings), not one method at a time. Keep the recovery tests passing and
+the outputs equal across Andrey's execution paths, and measure the speedup with a benchmark
+campaign. `qa/identity.py` shows the change returns the same bits and makes no more queries: write
+its manifest on the base commit and on the change, and compare the two
+([`qa/README.md`](qa/README.md#identity)).
 
 ### Change a parameter or default
 

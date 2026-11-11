@@ -27,14 +27,14 @@ endpoints given the middle node and each subset of the smaller blanket
 completes the result by Meek's rules.
 
 A learner asks its tests through its :class:`LocalSearch`. :meth:`LocalSearch.scan` tests many
-candidates against one conditioning set, in one call where the test can;
-:meth:`LocalSearch.weakest` gives each candidate's weakest association over many sets (a max-min
-step); and :meth:`LocalSearch.separating` gives the sets of one size that separate a pair.
-:class:`SearchCounts` adds up the queries they ask and the time they take. Candidates are compared by the strength of their
-dependence on the target: the absolute partial correlation for a test that reports one
-(``statistic_pvalue``), else the p-value. Strengths that agree to ``KEY_DP`` decimals go to the
-candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, which :func:`strongest`
-reads only for candidates that tie, so the sets do not depend on the column order.
+candidates against one conditioning set, in one call where the test can; :meth:`LocalSearch.weakest`
+gives each candidate's weakest association over many sets (a max-min step); and
+:meth:`LocalSearch.separating` gives the sets of one size that separate a pair.
+:class:`SearchCounts` adds up the queries they ask and the time they take. Candidates are compared
+by the strength of their dependence on the target: the absolute partial correlation for a test that
+reports one (``statistic_pvalue``), else the p-value. Strengths that agree to ``KEY_DP`` decimals go
+to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, which
+:func:`strongest` reads only for candidates that tie, so the sets do not depend on the column order.
 """
 
 from __future__ import annotations
@@ -272,8 +272,8 @@ def _weakest(
     Returns ``(largest p-value, smallest strength)`` per entry of ``xs``. The strength is the
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
-    scalar test. With ``pvalues``, each candidate's p-values over ``conds``, in their order, are
-    appended to it as one array.
+    scalar test. With ``pvalues``, the p-values are appended to it as one ``(len(xs),
+    len(conds))`` array, a row per candidate and a column per set in the order of ``conds``.
     """
     if not xs:
         return []
@@ -281,6 +281,7 @@ def _weakest(
     if batch is None:
         batched = getattr(test, "batched_call", None)
         out = []
+        found = []
         for x in xs:
             ps = (
                 batched(target, x, conds)
@@ -289,8 +290,9 @@ def _weakest(
             )
             top = float(max(ps))
             out.append((top, -top))
-            if pvalues is not None:
-                pvalues.append(np.asarray(ps, dtype=np.float64))
+            found.append(ps)
+        if pvalues is not None:
+            pvalues.append(np.array(found, dtype=np.float64).reshape(len(xs), len(conds)))
         return out
     pmax = np.full(len(xs), -np.inf)
     rmin = np.full(len(xs), np.inf)
@@ -308,7 +310,7 @@ def _weakest(
         pmax = np.maximum(pmax, p.max(axis=1))
         rmin = np.minimum(rmin, np.abs(np.asarray(r)).reshape(len(xs), len(at)).min(axis=1))
     if pvalues is not None and rows is not None:
-        pvalues.extend(rows)
+        pvalues.append(rows)
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
 
 
@@ -405,12 +407,16 @@ def _max_min(search: LocalSearch, target: int, sepsets: Sepsets | None) -> list[
         xs = list(pool)
         for size in range(top + 1):  # none when max_depth is 0
             conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
-            rows: list[np.ndarray] = []
-            weakened = search.weakest(target, xs, conds, None if sepsets is None else rows)
+            found: list[np.ndarray] = []
+            weakened = search.weakest(target, xs, conds, None if sepsets is None else found)
+            separated = []
             for i, (x, (p, strength)) in enumerate(zip(xs, weakened, strict=True)):
                 pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
                 if sepsets is not None and pool[x][0] > alpha and x not in sepsets:
-                    sepsets[x] = search.largest_set(rows[i], conds)
+                    separated.append(i)
+            if sepsets is not None and separated:
+                sets = search.largest_sets(found[0][separated], conds)
+                sepsets.update(zip([xs[i] for i in separated], sets, strict=True))
             if not every:
                 xs = [x for x in xs if pool[x][0] <= alpha]
         members.append(new)
@@ -439,8 +445,8 @@ def _max_min(search: LocalSearch, target: int, sepsets: Sepsets | None) -> list[
             if separating:
                 members.remove(x)
                 if sepsets is not None:
-                    pvalues = np.array([p for _, p in separating])
-                    sepsets[x] = search.largest_set(pvalues, [given for given, _ in separating])
+                    pvalues = np.array([[p for _, p in separating]])
+                    [sepsets[x]] = search.largest_sets(pvalues, [s for s, _ in separating])
                 break
     return members
 
@@ -800,19 +806,22 @@ class LocalSearch:
 
         Here the strength is the absolute statistic for a test with ``statistic_pvalues``, every
         query of one conditioning-set size answered in one call, else the negated p-value. With
-        ``pvalues``, each candidate's p-values over ``conds`` are appended to it as one array, for
-        :meth:`largest_set`.
+        ``pvalues``, the p-values are appended to it as one array, a row per candidate and a column
+        per set, for :meth:`largest_sets`.
         """
         start = perf_counter()
         out = _weakest(self.test, target, list(xs), list(conds), pvalues)
         self._asked(start, target, xs, conds)
         return out
 
-    def largest_set(self, pvalues: np.ndarray, conds: Sequence[tuple[int, ...]]) -> tuple[int, ...]:
-        """The set of ``conds`` with the largest of ``pvalues``, one per set, at ``KEY_DP``
-        decimals; of sets that agree, the smaller, then the one whose members' ranks, ascending,
-        come first, so ``ranks`` is read only when sets tie (:func:`_largest_sets`)."""
-        return _largest_sets(np.asarray(pvalues)[None], list(conds), self.ranks)[0]
+    def largest_sets(
+        self, pvalues: np.ndarray, conds: Sequence[tuple[int, ...]]
+    ) -> list[tuple[int, ...]]:
+        """For each row of ``pvalues``, one p-value per set of ``conds``, the set with the largest
+        p-value at ``KEY_DP`` decimals; of sets that agree, the smaller, then the one whose members'
+        ranks, ascending, come first, so ``ranks`` is read only when sets tie
+        (:func:`_largest_sets`)."""
+        return _largest_sets(np.asarray(pvalues, dtype=np.float64), list(conds), self.ranks)
 
     def separating(
         self,
