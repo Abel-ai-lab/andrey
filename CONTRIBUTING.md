@@ -111,7 +111,7 @@ has a recipe for each common change.
 
 ### 5. Run the checks
 
-These are the checks a pull request must pass, so running them first saves a round trip:
+These are the checks CI runs on your pull request, so running them first saves a round trip:
 
 ```shell
 uv sync --all-extras                      # the optional methods' tests need the extras
@@ -122,7 +122,7 @@ uv run --no-sync pytest tests             # every test
 ```
 
 For a change to one page or one function, the tests next to it are enough to start with, for
-example `uv run pytest tests/unit -k <name>`; everything runs again before the merge.
+example `uv run pytest tests/unit -k <name>`; CI runs everything.
 
 `prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml` to your
 checkout, so formatting, lint, and a scan for secrets run on every commit.
@@ -147,7 +147,7 @@ label and the milestone.
 
 ### 7. Review and merge
 
-A maintainer reviews the pull request and runs the full checks on it. When it is approved, we
+CI runs on the pull request, from a fork too, and a maintainer reviews it. When it is approved, we
 squash-merge it into the release branch, and it ships with that release. Your first merged pull
 request is credited under New contributors in the release notes.
 
