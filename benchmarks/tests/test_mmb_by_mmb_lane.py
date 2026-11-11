@@ -304,6 +304,7 @@ def test_the_rfci_arm_counts_its_tests_and_returns_the_graph_rfci_returns():
     counted, plain = PcalgRFCICounted(), PcalgRFCI()
     assert not counted.local and counted.name == plain.name
     counted.setup()
+    plain.setup()
     answer = counted.fit(X, counted.params())
     marks, tests = L.unpack_answer(answer)
     assert tests > 0 and marks.shape == (4, 4)
