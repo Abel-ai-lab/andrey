@@ -64,8 +64,8 @@ density, at which it finishes within fixed time and memory caps and beats the em
 
 **Check.** The [0.10.0 release card](benchmarks/0.10.0.md#the-boundary) measured it, with a 1-hour
 and a 28 GB cap on 4 cores. `src/andrey/api/_boundary_table.py` holds the result, a fit past its
-method's boundary raises a {py:class}`~andrey.BoundaryWarning`, and `tests/unit/test_boundary.py`
-fails when the table and the newest published boundary differ.
+method's boundary warns with a {py:class}`~andrey.BoundaryWarning`, and
+`tests/unit/test_boundary.py` fails when the table and the newest published boundary differ.
 
 **Exceptions.** The map covers the methods Andrey had at 0.10.0. A method added since has no map and
 no warning; its **Limitations.** paragraph gives the sizes its campaign measured.
@@ -75,9 +75,9 @@ no warning; its **Limitations.** paragraph gives the sizes its campaign measured
 The order of the columns says nothing about the causal structure, so reordering them returns the
 same graph with its nodes relabeled.
 
-**Check.** `tests/unit/test_column_labels.py` refits every method that takes a table on other orders
-of three columns and compares the edges by name. Ties between equal scores go to a rank computed
-from the data, not to a column's position
+**Check.** `tests/unit/test_column_labels.py` refits every method whose registry entry says it
+relabels on other orders of three columns and compares the edges by name. Ties between equal scores
+go to a rank computed from the data, not to a column's position
 ([How Andrey breaks ties](guides/column-order.md#how-andrey-breaks-ties)).
 `qa/identity.py --shuffle K` refits each supported method on `K` column orders of its quality-gate
 datasets and lists every output that changes.
@@ -92,7 +92,8 @@ card that reports a run is [0.9.0](benchmarks/0.9.0.md)'s.
 **Rescaled columns.** Rescaling a column, a change of its units, returns the same graph unless the
 method's published algorithm reads the units. `tests/unit/test_column_transforms.py` fits every
 method that takes a table with each column multiplied by its own power of two, from `2**-10` to
-`2**10`, alone, with environments, and on mixed data, and requires the same graph, mark for mark.
+`2**10`, and again with environments and on mixed data where a method takes them, and requires the
+same graph, mark for mark.
 A method marked `reads_units` in the registry must change its graph there instead, so the mark
 cannot go stale; the [API reference](api.md#structure-learning-methods) names these methods, and
 their pages say how they read the units. `tests/unit/test_offset_invariance.py` shifts every column,
