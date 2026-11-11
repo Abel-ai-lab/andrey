@@ -1,11 +1,11 @@
 """A change of units, or a transform a test cannot see, changes no method's graph.
 
 Rescaling each column by its own positive factor is a change of units, and a method returns the
-same graph in any units unless its meaning requires otherwise: the methods whose registry entry sets
-``reads_units`` are those exceptions, and their graph changes here. The factors are powers of two
-from about ``1e-3`` to ``1e3``: a power of two rescales a float exactly, so both fits see the same
-values up to the units, and any difference comes from the method. A categorical column keeps its
-codes.
+same graph in any units unless its published algorithm reads them: the methods whose registry entry
+sets ``reads_units`` are those exceptions, and their graph changes here. The factors are powers of
+two from about ``1e-3`` to ``1e3``: a power of two rescales a float exactly, so both fits see the
+same values up to the units, and any difference comes from the method. A categorical column keeps
+its codes.
 
 A rank-based test reads each column only through its ranks, so under ``indep_test="normal_scores"``
 a strictly increasing transform of each column, each its own, gives the same graph. A method that

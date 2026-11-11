@@ -103,7 +103,8 @@ edges in any unit of the data. A step that would read the units only through a n
 such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
 units. Rescaling each column by its own positive factor changes the graph of no method but
-{{ reads_units_names }}, which read the units by design, as their pages describe.
+{{ reads_units_names }}, whose published algorithms read the units, as their pages describe. The
+causal order of `ica_lingam`, for example, reads the magnitudes of its unmixing matrix.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or
 `"discrete_bic"`, read text, boolean, and `category` columns as categories and need whole numbers in
 a column of numbers, each distinct value of a column one category. Every method that takes
