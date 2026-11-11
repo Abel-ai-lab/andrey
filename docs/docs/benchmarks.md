@@ -36,9 +36,9 @@ width="190" height="40"></p>
 ::::{div} release-tldr
 
 0.17.0 is here. SCORE and NoGAM read a causal order from the score of nonlinear data with additive
-noise, and neither made more errors than its reference implementation. NOTEARS is supported, and so
-is EM for missing data in GES, BOSS, and GRaSP. Path and confounder claims are supported in more
-methods, and `andrey.data` draws more noise families and mechanisms.
+noise, and neither made more errors than its reference implementation. NOTEARS and AGES are
+supported, and so is EM for missing data in GES, BOSS, and GRaSP. Path and confounder claims are
+supported in more methods, and `andrey.data` draws more noise families and mechanisms.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.17.0.md)

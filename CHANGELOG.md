@@ -22,7 +22,14 @@ names its pull request.
   card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam) gives the numbers.
   ([#872], [#874], [#879])
 - `notears` is supported: against its authors' code on the paper's simulation with standardized
-  columns, it made no more errors in any of the 24 settings. `dagma` stays experimental. ([#871])
+  columns, it made no more errors in any of the 24 settings. `dagma` stays experimental. Its fit now
+  leaves the diagonal of the weight matrix free, as the paper's algorithm does. ([#871], [#896])
+- `ages` is AGES (Eigenmann, Nandy, and Maathuis, 2017), for linear Gaussian data where some effects
+  are weak. It keeps the GES skeleton and can direct more of its edges. It is supported: on 1,378 of
+  1,380 datasets from the paper's simulation, it returned the same graph as pcalg's `ages`, the
+  authors' implementation. With 10,000 rows, it directed more edges correctly than `ges` at the same
+  precision: 49% of the true edges against 46%. With 100 rows, it directed almost no additional
+  edges correctly. ([#894], [#899])
 - Missing data: `missing="em"` runs the alternating structural EM of Friedman (1997) and is
   supported in `ges`, `boss`, and `grasp`, as it already was in `notears`, `hc`, and `tabu`. Against
   Tetrad's EM covariance policy, none was less accurate in a setting that repeated on fresh

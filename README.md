@@ -22,10 +22,10 @@ banner links the website's homepage. -->
 
 0.17.0 adds SCORE and NoGAM, which read the causal order of nonlinear data with additive noise from
 the score, the gradient of its log density. Neither made more errors than its reference
-implementation, and both are supported. NOTEARS is supported too. The release also continues the
-work from 0.16.0. EM for missing data follows Friedman's alternating scheme and is supported in GES,
-BOSS, and GRaSP. Path and confounder claims are supported in more methods. `andrey.data` draws more
-noise families and mechanisms.
+implementation, and both are supported. NOTEARS and AGES are supported too. The release also
+continues the work from 0.16.0. EM for missing data follows Friedman's alternating scheme and is
+supported in GES, BOSS, and GRaSP. Path and confounder claims are supported in more methods.
+`andrey.data` draws more noise families and mechanisms.
 
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)** · Posts:
 **[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
