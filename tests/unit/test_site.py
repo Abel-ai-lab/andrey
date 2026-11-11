@@ -1904,14 +1904,14 @@ def test_a_release_without_art_takes_the_default_cover_and_one_with_art_keeps_it
     assert defaults, "no default cover to check; DEVELOPMENT.md shows one"
 
 
-def test_the_default_cover_is_navy_with_no_amber_dot():
+def test_the_default_cover_is_the_stipple_ground_with_no_amber_dot():
     css = re.sub(
         r"/\*.*?\*/", "", (ROOT / "docs" / "_static" / "benchmarks.css").read_text(), flags=re.S
     )
     rules = [(" ".join(s.split()), body) for s, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)]
     grounds = [body for selector, body in rules if selector.endswith(".release-default")]
     assert len(grounds) == 1
-    assert "var(--andrey-ground-navy)" in grounds[0] and "url(" not in grounds[0]
+    assert 'url("release-ground.jpg")' in grounds[0]
     # The art covers' dot above the version, and the default's rule that removes it.
     dot = ".release-cover .sd-card-text:nth-of-type(3)::before"
     assert "var(--andrey-ground-amber)" in dict(rules)[dot]

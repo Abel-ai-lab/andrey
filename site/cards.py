@@ -315,7 +315,7 @@ def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
 # A release card's cover art, 8.5 x 11 at three times the cover's 288 px width: the art in the
 # brand's tones, with a soft navy shade where the card's text sits, the masthead and title across
 # the top and the version at the bottom left. A release without art takes the default cover, the
-# navy ground with the wordmark in the title's place, drawn in CSS (``release-default`` in
+# stipple ground with the wordmark in the title's place, drawn in CSS (``release-default`` in
 # ``docs/_static/benchmarks.css``); 0.1.0's tile, which names neither, shows the stipple ground
 # under the same shade (``release_ground_jpeg``).
 RELEASE_W, RELEASE_H = 864, 1119
