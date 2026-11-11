@@ -36,6 +36,7 @@ import andrey.data.mixed
 import andrey.data.real
 import andrey.data.scm
 import andrey.metrics
+import andrey.spec
 import andrey.viz
 import andrey.viz.mpl  # importable without matplotlib (it is imported lazily, inside the functions)
 
@@ -382,6 +383,11 @@ def test_every_link_in_the_methods_catalog_arrives(html):
         if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
             missing.append(href)
     assert not missing, missing
+    # Its count line gives the registry's supported and experimental methods apart.
+    statuses = [spec.status for spec in andrey.spec.list_specs()]
+    supported, experimental = statuses.count("supported"), statuses.count("experimental")
+    words = " ".join(re.sub(r"<[^>]+>", " ", text).split())
+    assert f"{supported} supported methods and {experimental} experimental" in words
 
 
 def test_every_page_has_a_built_favicon_and_link_preview_card(html):

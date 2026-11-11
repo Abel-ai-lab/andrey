@@ -3527,9 +3527,10 @@ def agent_call(spec, kind: str) -> str:  # noqa: ANN001 -- an andrey.spec Method
 
 def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
     """The catalog's picker: one option per kind of data a method reads, each opening a panel
-    with the method to start with (:func:`start_with`), the code that runs it, the graph it
-    returns, its comparisons, and every family's methods that read the kind, by the graph each
-    returns. Without script, each option is a link to its panel, which ``:target`` shows."""
+    with what the kind means, the method to start with (:func:`start_with`), the code that runs
+    it, the graph it returns, its comparisons, and every family's methods that read the kind, by
+    the graph each returns. Without script, each option is a link to its panel, which ``:target``
+    shows."""
     specs = {s.name: s for s in list_specs()}
     ranks = feature_ranks(summaries)
     found = compared(summaries)
@@ -3539,8 +3540,8 @@ def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
         label, hint, glyph = DATA_KIND_TEXT[kind]
         options.append(
             f'<li><a class="kind-opt" href="#{kind_anchor(kind)}" data-kind="{kind}">'
-            f'<svg viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.5" '
-            f'aria-hidden="true">{glyph}</svg><span><b>{label}</b><span>{hint}</span></span></a></li>'
+            f'<svg viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.75" '
+            f'aria-hidden="true">{glyph}</svg>{label}</a></li>'
         )
         start = specs[start_with(ranks, kind)]
         name = display_name(start.name, names)
@@ -3567,8 +3568,10 @@ def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
         readers = sum(kind in s.data_kinds for s in specs.values())
         panels.append(
             f'<div class="kind-panel" id="{kind_anchor(kind)}" data-kind="{kind}">'
-            f'<div class="kp-top"><h3>Start with <code>andrey.{start.name}</code></h3>'
-            f"<span>{escape(name)}, {SPEC_FAMILIES[start.family].lower()}</span></div>"
+            f'<p class="kp-kind">{label}: {hint[0].lower() + hint[1:]}</p>'
+            f'<div class="kp-top"><h3>Start with {escape(name)}</h3>'
+            f'<span><code class="docutils literal notranslate">andrey.{start.name}</code>, '
+            f"{SPEC_FAMILIES[start.family].lower()}</span></div>"
             '<div class="highlight-python notranslate"><div class="highlight"><pre>'
             f"{code_html(catalog_call(start, kind), 'python')}</pre></div></div>"
             '<div class="kp-grid">'
@@ -3577,15 +3580,15 @@ def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
             f"<div><h4>How it compares</h4><p>{escape(name)} against {escape(listed(packages))}, "
             f"on the {cards_text(releases)}.</p></div></div>"
             f'<div class="kp-all"><h4>{readers} method{"s read" if readers > 1 else " reads"} '
-            "it</h4>"
+            "this kind of data</h4>"
             f'<ul class="kp-fams">{"".join(families)}</ul></div>'
-            f'<p class="kp-agent">For an agent: <code>{escape(agent_call(start, kind))}</code></p>'
+            '<p class="kp-agent">For an agent: <code class="docutils literal notranslate">'
+            f"{escape(agent_call(start, kind))}</code></p>"
             "</div>"
         )
-    count = f"{len(specs)} methods in {len({s.family for s in specs.values()})} families"
     return (
-        f'<div class="kind-picker"><p class="kp-count">{count}</p>'
-        f'<ul class="kind-opts">{"".join(options)}</ul>'
+        '<div class="kind-picker"><ul class="kind-opts" aria-label="Kinds of data">'
+        f"{''.join(options)}</ul>"
         f'<div class="kind-panels">{"".join(panels)}</div></div>\n'
     )
 
@@ -3599,14 +3602,15 @@ def display_name(name: str, names: dict[str, str]) -> str:
 def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
     """The catalog's table, as MyST: the filters, which script shows, then one section per family
     (``family-<family>``), opening with the method it features (:func:`featured_methods`),
-    and one row per method (``method-<name>``): its name and status, what it is for, the kinds
-    of data it reads, the graph it returns, and its comparisons with other packages."""
+    and one row per method (``method-<name>``): its name, an Experimental badge where it is
+    experimental, and what it is for, then the kinds of data it reads, the graph it returns, and
+    its comparisons with other packages. Each table takes the documentation's table style."""
     specs = list_specs()
     starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
     found = compared(summaries)
     kinds = [k for k in DATA_KINDS if any(k in s.data_kinds for s in specs)]
     returns = list(dict.fromkeys(returns_text(s) for s in specs))
-    chips = [
+    menus = [
         (
             "Family",
             "family",
@@ -3615,32 +3619,31 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
         ("Reads", "kinds", [(k, DATA_KIND_TEXT[k][0]) for k in kinds]),
         ("Returns", "returns", [(r, r) for r in returns]),
     ]
-    groups = "".join(
-        f'<div class="cat-group" role="group" aria-label="{title}"><span>{title}</span>'
+    selects = "".join(
+        f'<label class="cat-menu"><span>{title}</span><select data-filter="{key}">'
+        '<option value="">Any</option>'
         + "".join(
-            f'<button type="button" class="cat-chip" data-filter="{key}" '
-            f'data-value="{escape(value)}" '
-            f'aria-pressed="false">{escape(text)}</button>'
-            for value, text in values
+            f'<option value="{escape(value)}">{escape(text)}</option>' for value, text in values
         )
-        + "</div>"
-        for title, key, values in chips
+        + "</select></label>"
+        for title, key, values in menus
     )
     out = [
         "```{raw} html",
-        '<div class="cat-filters" role="search" hidden><div class="cat-top">'
+        '<div class="cat-filters" role="search" hidden>'
         '<input type="search" placeholder="Search by name or purpose" aria-label="Search methods">'
-        '<label><input type="checkbox" checked> Show experimental methods</label>'
-        f'<span class="cat-count" aria-live="polite"><b>{len(specs)}</b> methods</span></div>'
-        f'{groups}<p class="cat-empty" hidden>No method matches every filter.</p></div>',
+        f"{selects}"
+        '<label class="cat-check"><input type="checkbox" checked> Show experimental methods</label>'
+        f'<span class="cat-count" aria-live="polite"><b>{len(specs)}</b> methods</span>'
+        '<p class="cat-empty" hidden>No method matches every filter.</p></div>',
         "```",
         "",
     ]
     head = (
-        '<thead><tr><th scope="col">Method</th><th scope="col">What it is for</th>'
-        '<th scope="col">Reads</th><th scope="col">Returns</th>'
-        '<th scope="col">Compared with</th></tr></thead>'
+        '<thead><tr><th scope="col">Method</th><th scope="col">Reads</th>'
+        '<th scope="col">Returns</th><th scope="col">Compared with</th></tr></thead>'
     )
+    badge = '<span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
     for family, label in SPEC_FAMILIES.items():
         members = [s for s in specs if s.family == family]
         if not members:
@@ -3648,23 +3651,24 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
         rows = []
         for s in members:
             name = display_name(s.name, names)
-            status = "Supported" if s.status == "supported" else "Experimental"
-            reads = "".join(f"<li>{DATA_KIND_TEXT[k][0]}</li>" for k in s.data_kinds)
+            labels = [DATA_KIND_TEXT[k][0] for k in s.data_kinds]
+            reads = ", ".join([labels[0], *(label.lower() for label in labels[1:])])
             if s.name in found:
                 packages, releases = found[s.name]
                 comp = f"{escape(listed(packages))}<span>{cards_text(releases)}</span>"
             else:
                 comp = '<span class="dim">Not compared yet</span>'
             search = " ".join((s.name, name, purpose(s))).lower()
+            call = s.name.replace("_", "_<wbr>")
             rows.append(
                 f'<tr id="method-{s.name}" data-family="{family}" data-status="{s.status}" '
                 f'data-kinds="{" ".join(s.data_kinds)}" data-returns="{returns_text(s)}" '
                 f'data-search="{escape(search)}">'
-                f'<th scope="row"><a class="m-name" href="api/andrey.{s.name}.html">'
-                f"{escape(name)}</a>"
-                f'<code>andrey.{s.name}</code><span class="st st--{s.status}">{status}</span></th>'
-                f'<td class="m-what">{escape(purpose(s))}</td>'
-                f'<td class="m-kinds"><ul>{reads}</ul></td>'
+                f'<td class="m-name"><a href="api/andrey.{s.name}.html">{escape(name)}</a> '
+                f'<code class="docutils literal notranslate">andrey.{call}</code>'
+                f"{badge if s.status == 'experimental' else ''}"
+                f'<span class="m-what">{escape(purpose(s))}</span></td>'
+                f'<td class="m-kinds">{reads}</td>'
                 f'<td class="m-returns">{returns_text(s)}</td>'
                 f'<td class="m-comp">{comp}</td></tr>'
             )
@@ -3683,7 +3687,8 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
             "",
             "```{raw} html",
             f'<p class="cat-fam">{count}.{start}</p>'
-            f'<div class="cat-scroll"><table class="cat-table">{head}'
+            '<div class="pst-scrollable-table-container">'
+            f'<table class="table cat-table">{head}'
             f"<tbody>{''.join(rows)}</tbody></table></div>",
             "```",
             "",

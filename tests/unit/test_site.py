@@ -2011,7 +2011,8 @@ def test_the_picker_offers_exactly_the_kinds_of_data_the_registry_uses(catalog):
     used = [k for k in DATA_KINDS if any(k in s.data_kinds for s in list_specs())]
     assert re.findall(r'class="kind-opt" href="#[\w-]+" data-kind="(\w+)"', picker) == used
     assert re.findall(r'class="kind-panel" id="[\w-]+" data-kind="(\w+)"', picker) == used
-    assert re.findall(r'data-filter="kinds" data-value="(\w+)"', table) == used
+    reads = re.search(r'<select data-filter="kinds">(.*?)</select>', table)[1]
+    assert re.findall(r'<option value="(\w+)">', reads) == used
     # Each kind has its words and glyph, and each graph a method returns says what it gives.
     assert set(build.DATA_KIND_TEXT) == set(DATA_KINDS)
     assert {build.returns_text(s) for s in list_specs()} <= set(build.GRAPH_TEXT)

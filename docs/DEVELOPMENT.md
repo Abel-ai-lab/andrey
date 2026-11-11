@@ -144,8 +144,13 @@ the `andrey run` line that run it, the graph it returns, its comparisons, and ev
 that read that kind. Below, a section per family (`family-<family>`) holds a row per method
 (`method-<name>`). `catalog_picker()` and `catalog_families()` in `site/build.py` write both from
 the registry and the published summaries into `_generated/`; `docs/_static/catalog.css` styles
-them and `catalog.js` shows one panel at a time and adds the filters. Choosing a kind presses its
-chip, so the picker and the filters are one mechanism.
+them and `catalog.js` shows one panel at a time and adds the filters. Choosing a kind sets the
+Reads filter, so the picker and the filters are one mechanism. The page uses the documentation's
+own components, so it reads like its neighbors: the options sit in the navbar's track with the
+chosen one raised as the navbar's current section is, the panel is a card with the theme's code
+block, and each family's table takes the documentation's table style. The outline lists every
+family. The count under the title, from `_methods_text()` in `docs/conf.py`, gives the supported
+and the experimental methods apart.
 
 The method to start with follows the homepage's featured rule (`featured_among()` over
 `feature_ranks()`; `featured_methods()` gives each family's): among the supported methods whose

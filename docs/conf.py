@@ -563,15 +563,18 @@ def _listed(items: list[str]) -> str:
 
 
 def _methods_text() -> dict[str, str]:
-    """The method count and tiers, for the FAQ, and the method lists of `METHOD_LISTS`."""
+    """The method count and tiers, for the FAQ and the methods catalog, and the method lists of
+    `METHOD_LISTS`."""
     specs = list_specs()
     stale = set(PROSE_NAMES) - {s.name for s in specs}
     if stale:
         raise ConfigError(f"PROSE_NAMES has names no method has: {sorted(stale)}")
     supported = [f"`{s.name}`" for s in specs if s.status == "supported"]
+    experimental = len(specs) - len(supported)
     text = {
         "method_count": f"{len(specs)} methods",
         "n_supported": str(len(supported)),
+        "experimental_count": f"{experimental} experimental method{'s' * (experimental != 1)}",
         "supported_methods": _listed(supported),
     }
     for key, selects in METHOD_LISTS.items():

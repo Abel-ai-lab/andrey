@@ -8,10 +8,11 @@ meta:
 
 # Methods
 
-Choose what your data look like to see the methods that read it, the one to start with, and the
-code that runs it. Below, every method sits with its family: the kinds of data it reads, the graph
-it returns, whether it is supported or experimental, and the release cards that compare it with
-other packages. Each name opens its entry in the [API reference](api.md).
+Andrey has {{ n_supported }} supported methods and {{ experimental_count }}. Choose what your data
+look like to see the methods that read it, the one to start with, and the code that runs it. Below,
+every method sits with its family: the kinds of data it reads, the graph it returns, and the
+release cards that compare it with other packages. Each name opens its entry in the
+[API reference](api.md).
 
 (your-data)=
 
