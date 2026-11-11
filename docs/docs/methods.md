@@ -8,18 +8,16 @@ meta:
 
 # Methods
 
-Andrey has {{ n_supported }} supported methods and {{ experimental_count }}. Choose what your data
-look like to see the methods that read it, the one to start with, and the code that runs it. Below,
-every method sits with its family: the kinds of data it reads, the graph it returns, and the
-release cards that compare it with other packages. Each name opens its entry in the
-[API reference](api.md).
+Andrey has {{ n_supported }} supported methods and {{ experimental_count }}. Start from the kind of
+data you have to find the method to begin with, or look a method up in its family below. Each name
+opens its entry in the [API reference](api.md).
 
 (your-data)=
 
-## What does your data look like?
+## Start from your data
 
 ```{raw} html
-:file: ../_generated/methods-picker.html
+:file: ../_generated/methods-start.html
 ```
 
 How we pick the method to start with: in the first family that reads your data, among the

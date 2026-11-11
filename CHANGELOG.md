@@ -12,9 +12,9 @@ names its pull request.
 
 ### Added
 
-- The methods catalog, Methods in the navbar: "What does your data look like?" leads from a kind
-  of data to the methods that read it, the one to start with, and the code that runs it, and every
-  method is listed by family with the data it reads, the graph it returns, its status, and the
+- The methods catalog, Methods in the navbar: "Start from your data" gives, for each kind of data,
+  the method to start with, the graph it returns, and how many methods of each family read it, and
+  every method is listed by family with the data it reads, the graph it returns, its status, and the
   release cards that compare it. Each method's `--help --json` contract and its `andrey list` row
   give `data_kinds`, the kinds of data it reads, which the registry derives from its tests and
   scores, its `missing` argument, its inputs, and its result. ([#920])

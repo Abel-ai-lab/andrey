@@ -137,20 +137,16 @@ build time: the page shows what they print and draws the graphs they return.
 
 ## The methods catalog
 
-[`docs/methods.md`](docs/methods.md), Methods in the navbar, opens with "What does your data look
-like?": an option per kind of data a method reads (`MethodSpec.data_kinds`), each a link to its
-panel, which `:target` shows without script. A panel names the method to start with, the code and
-the `andrey run` line that run it, the graph it returns, its comparisons, and every family's methods
-that read that kind. Below, a section per family (`family-<family>`) holds a row per method
-(`method-<name>`). `catalog_picker()` and `catalog_families()` in `site/build.py` write both from
-the registry and the published summaries into `_generated/`; `docs/_static/catalog.css` styles
-them and `catalog.js` shows one panel at a time and adds the filters. Choosing a kind sets the
-Reads filter, so the picker and the filters are one mechanism. The page uses the documentation's
-own components, so it reads like its neighbors: the options sit in the navbar's track with the
-chosen one raised as the navbar's current section is, the panel is a card with the theme's code
-block, and each family's table takes the documentation's table style. The outline lists every
-family. The count under the title, from `_methods_text()` in `docs/conf.py`, gives the supported
-and the experimental methods apart.
+[`docs/methods.md`](docs/methods.md), Methods in the navbar, is a plain documentation page: a
+title, the count of supported and experimental methods (from `_methods_text()` in
+`docs/conf.py`), and two tables. "Start from your data" (`your-data`) has a row per kind of data a
+method reads (`MethodSpec.data_kinds`, row `data-<kind>`): what the kind means, the method to
+start with, the graph it returns, and how many methods of each family read it, each family linked
+to its section. Below, a section per family (`family-<family>`) holds a row per method
+(`method-<name>`). `catalog_start()` and `catalog_families()` in `site/build.py` write both from
+the registry and the published summaries into `_generated/`. The tables take the documentation's
+table style, and their `stacked` class stacks each row on a phone, as the API reference's summary
+tables do (`andrey.css`). The page loads no script and no style of its own.
 
 The method to start with follows the homepage's featured rule (`featured_among()` over
 `feature_ranks()`; `featured_methods()` gives each family's): among the supported methods whose

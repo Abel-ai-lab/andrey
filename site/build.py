@@ -41,7 +41,7 @@ import andrey.viz
 from andrey import GraphStructure
 from andrey.cli import main as andrey_cli
 from andrey.core.structure import Kind
-from andrey.spec import DATA_KINDS, list_specs
+from andrey.spec import DATA_KINDS, get_spec, list_specs
 from andrey.spec.concepts import BLANKET_STRUCTURES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -3355,100 +3355,29 @@ def start_with(ranks: dict[str, tuple[int, int]], kind: str) -> str | None:
 
 
 # ---- the methods catalog (docs/methods.html; its links are relative to docs/) --------------------
-# Each kind of data (andrey.spec.DATA_KINDS): its label, the line under it in the picker, and its
-# glyph, drawn in a 44 x 30 box.
-_GRID = (
-    '<rect x="2" y="2" width="40" height="26" rx="3"/>'
-    '<path d="M2 10.7h40M2 19.3h40M15.3 2v26M28.7 2v26"/>'
-)
-_CELL = '<rect x="{x}" y="{y}" width="7" height="4.5" fill="currentColor" stroke="none"/>'
+# Each kind of data (andrey.spec.DATA_KINDS): its label and the line that says what it means.
 DATA_KIND_TEXT = {
-    "continuous": ("Continuous", "Numbers on a scale, one column per variable", _GRID),
-    "categorical": (
-        "Categorical",
-        "Labels, such as yes and no, coded as whole numbers",
-        _GRID + "".join(_CELL.format(x=x, y=y) for x, y in ((18.5, 13), (32, 4.3), (5, 21.5))),
-    ),
-    "mixed": (
-        "Mixed",
-        "Some columns numbers, some labels",
-        _GRID + "".join(_CELL.format(x=32, y=y) for y in (4.3, 13, 21.5)),
-    ),
-    "missing": (
-        "Missing values",
-        "Some cells are empty",
-        _GRID + '<path d="M19.5 13l5 4M24.5 13l-5 4"/>',
-    ),
+    "continuous": ("Continuous", "Numbers on a scale, one column per variable"),
+    "categorical": ("Categorical", "Labels, such as yes and no, coded as whole numbers"),
+    "mixed": ("Mixed", "Some columns numbers, some labels"),
+    "missing": ("Missing values", "Some cells are empty"),
     "environments": (
         "Several environments",
         "Rows from experiments, interventions, or sites, each labeled",
-        '<path d="M9 9V5q0-3 3-3h27q3 0 3 3v13q0 3-3 3h-4"/>'
-        '<rect x="2" y="9" width="33" height="19" rx="3"/><path d="M2 18.5h33M13 9v19M24 9v19"/>',
     ),
-    "datasets": (
-        "Several datasets",
-        "One table per group or time point, same columns",
-        '<rect x="2" y="5" width="18" height="20" rx="2.5"/><rect x="24" y="5" width="18" '
-        'height="20" rx="2.5"/>'
-        '<path d="M2 11.7h18M2 18.3h18M11 5v20M24 11.7h18M24 18.3h18M33 5v20"/>',
-    ),
-    "hidden_causes": (
-        "Hidden causes",
-        "Some common causes are not measured",
-        '<rect x="2" y="2" width="27" height="26" rx="3"/>'
-        '<path d="M2 10.7h27M2 19.3h27M15.5 2v26"/>'
-        '<rect x="33" y="2" width="9" height="26" rx="3" stroke-dasharray="2.5 2.5"/>',
-    ),
-    "time_series": (
-        "Time series",
-        "One row per time step",
-        '<path d="M2 27h40"/><path d="M2 18l5-6 5 4 5-9 5 7 5-3 5 6 5-8 5 5"/>'
-        '<path d="M2 24l5 1 5-4 5 2 5-3 5 2 5-1 5-3 5 2" opacity=".6"/>',
-    ),
-    "two_variables": (
-        "Two variables",
-        "Which one causes the other?",
-        '<rect x="8" y="2" width="11" height="26" rx="3"/>'
-        '<rect x="25" y="2" width="11" height="26" rx="3"/>'
-        '<path d="M8 10.7h11M8 19.3h11M25 10.7h11M25 19.3h11"/>',
-    ),
+    "datasets": ("Several datasets", "One table per group or time point, same columns"),
+    "hidden_causes": ("Hidden causes", "Some common causes are not measured"),
+    "time_series": ("Time series", "One row per time step"),
+    "two_variables": ("Two variables", "Which one causes the other?"),
 }
-# How a call passes each kind of data: an argument (``{missing}`` is the method's first way to
-# read missing values) and a comment on the placeholder it names.
-KIND_CALLS = {
-    "categorical": ('categorical=["a", "b"]', "a, b: the categorical columns"),
-    "mixed": ('categorical=["a"]', "a: the categorical columns"),
-    "missing": ('missing="{missing}"', "a missing value is NaN"),
-    "environments": ('"site"', "site: each row's environment"),
-    "datasets": ("", "data_a, data_b: one table per group"),
-    "time_series": ("", "one row per time step"),
-    "two_variables": ("", "x, y: the two variables"),
-}
-# The longest line a panel's code shows before its call breaks into one argument per line.
-CALL_WIDTH = 48
-# What each graph a method returns (returns_text) gives the reader, and its section of the graph
-# types guide.
-GRAPH_TEXT = {
-    "DAG": ("A DAG: every edge directed, from cause to effect.", "dag-a-directed-model"),
-    "CPDAG": (
-        "A CPDAG: an arrow where the data decide the direction, a plain edge where they cannot.",
-        "cpdag-an-equivalence-class",
-    ),
-    "PAG": (
-        "A PAG: a circle where the data leave an end open, and a two-headed edge where a hidden "
-        "common cause links two variables.",
-        "pag-uncertainty-with-hidden-variables",
-    ),
-    "Undirected graph": (
-        "An undirected graph: which variables are adjacent, with no direction.",
-        "undirected-graphs-adjacency-without-direction",
-    ),
-    "Temporal graph": (
-        "A graph over time: links from earlier steps, and links within a step where the method "
-        "finds them.",
-        "temporal-graphs",
-    ),
-    "Two-node DAG": ("Which of the two variables causes the other.", "dag-a-directed-model"),
+# Each graph a method returns (returns_text): its section of the graph types guide.
+GRAPH_SECTIONS = {
+    "DAG": "dag-a-directed-model",
+    "CPDAG": "cpdag-an-equivalence-class",
+    "PAG": "pag-uncertainty-with-hidden-variables",
+    "Undirected graph": "undirected-graphs-adjacency-without-direction",
+    "Temporal graph": "temporal-graphs",
+    "Two-node DAG": "dag-a-directed-model",
 }
 
 
@@ -3490,187 +3419,87 @@ def cards_text(releases: list[str]) -> str:
     return f"{listed(links)} release card{'s' if len(links) > 1 else ''}"
 
 
-def catalog_call(spec, kind: str) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """The Python that runs ``spec`` on data of ``kind``, with a comment on what the call names."""
-    panel = spec.data.inputs[0].kind == "panel"
-    args = [
-        "[data_a, data_b]" if panel else 'data[["x", "y"]]' if kind == "two_variables" else "data"
-    ]
-    # A required environment comes first, as the second positional argument.
-    needed = ["environments"] if needs(spec, "environments") and kind != "environments" else []
-    calls = [KIND_CALLS[k] for k in (*needed, kind) if k in KIND_CALLS]
-    missing = next((p.choices[0] for p in spec.params if p.name == "missing"), "")
-    args += [argument.format(missing=missing) for argument, _ in calls if argument]
-    call = f"out = andrey.{spec.name}({', '.join(args)})"
-    if len(call) > CALL_WIDTH:
-        call = f"out = andrey.{spec.name}(\n" + "".join(f"    {a},\n" for a in args) + ")"
-    lines = ["import andrey", "", *(f"# {comment}" for _, comment in calls), call, "print(out)"]
-    return "\n".join(lines)
-
-
-def agent_call(spec, kind: str) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """The ``andrey run`` line that runs ``spec`` on data of ``kind``."""
-    parts = ["andrey", "run", spec.name]
-    for inp in spec.data.inputs:
-        if inp.kind == "panel":
-            parts += ["--data", "a.csv", "--data", "b.csv"]
-        elif inp.name == "data":
-            parts += ["--data", "data.csv"]
-        elif inp.required or kind == "environments":
-            parts += [inp.flag, "site"]
-    if kind in ("categorical", "mixed"):
-        parts.append("'categorical=[a,b]'" if kind == "categorical" else "'categorical=[a]'")
-    if kind == "missing":
-        parts.append(f"missing={next(p.choices[0] for p in spec.params if p.name == 'missing')}")
-    return " ".join(parts)
-
-
-def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
-    """The catalog's picker: one option per kind of data a method reads, each opening a panel
-    with what the kind means, the method to start with (:func:`start_with`), the code that runs
-    it, the graph it returns, its comparisons, and every family's methods that read the kind, by
-    the graph each returns. Without script, each option is a link to its panel, which ``:target``
-    shows."""
-    specs = {s.name: s for s in list_specs()}
-    ranks = feature_ranks(summaries)
-    found = compared(summaries)
-    kinds = [k for k in DATA_KINDS if any(k in s.data_kinds for s in specs.values())]
-    options, panels = [], []
-    for kind in kinds:
-        label, hint, glyph = DATA_KIND_TEXT[kind]
-        options.append(
-            f'<li><a class="kind-opt" href="#{kind_anchor(kind)}" data-kind="{kind}">'
-            f'<svg viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.75" '
-            f'aria-hidden="true">{glyph}</svg>{label}</a></li>'
-        )
-        start = specs[start_with(ranks, kind)]
-        name = display_name(start.name, names)
-        meaning, section = GRAPH_TEXT[returns_text(start)]
-        packages, releases = found[start.name]
-        families = []
-        for family, family_label in SPEC_FAMILIES.items():
-            readers = [s for s in specs.values() if s.family == family and kind in s.data_kinds]
-            if not readers:
-                continue
-            by_graph: dict[str, list[str]] = {}
-            for s in readers:
-                by_graph.setdefault(returns_text(s), []).append(
-                    f'<a href="#method-{s.name}">{escape(display_name(s.name, names))}</a>'
-                )
-            graphs = "".join(
-                f"<li><span>{graph}</span> {', '.join(links)}</li>"
-                for graph, links in by_graph.items()
-            )
-            families.append(
-                f'<li><a class="kp-fam" href="#family-{family}">{family_label}</a>'
-                f"<ul>{graphs}</ul></li>"
-            )
-        readers = sum(kind in s.data_kinds for s in specs.values())
-        panels.append(
-            f'<div class="kind-panel" id="{kind_anchor(kind)}" data-kind="{kind}">'
-            f'<p class="kp-kind">{label}: {hint[0].lower() + hint[1:]}</p>'
-            f'<div class="kp-top"><h3>Start with {escape(name)}</h3>'
-            f'<span><code class="docutils literal notranslate">andrey.{start.name}</code>, '
-            f"{SPEC_FAMILIES[start.family].lower()}</span></div>"
-            '<div class="highlight-python notranslate"><div class="highlight"><pre>'
-            f"{code_html(catalog_call(start, kind), 'python')}</pre></div></div>"
-            '<div class="kp-grid">'
-            f"<div><h4>You get</h4><p>{escape(meaning)} "
-            f'<a href="guides/graph-types.html#{section}">Graph types</a></p></div>'
-            f"<div><h4>How it compares</h4><p>{escape(name)} against {escape(listed(packages))}, "
-            f"on the {cards_text(releases)}.</p></div></div>"
-            f'<div class="kp-all"><h4>{readers} method{"s read" if readers > 1 else " reads"} '
-            "this kind of data</h4>"
-            f'<ul class="kp-fams">{"".join(families)}</ul></div>'
-            '<p class="kp-agent">For an agent: <code class="docutils literal notranslate">'
-            f"{escape(agent_call(start, kind))}</code></p>"
-            "</div>"
-        )
-    return (
-        '<div class="kind-picker"><ul class="kind-opts" aria-label="Kinds of data">'
-        f"{''.join(options)}</ul>"
-        f'<div class="kind-panels">{"".join(panels)}</div></div>\n'
-    )
-
-
 def display_name(name: str, names: dict[str, str]) -> str:
     """A method's name as a table shows it: its prose name, capitalized ("Hill climbing")."""
     prose = names[name]
     return prose[0].upper() + prose[1:]
 
 
+def method_cell(spec, names: dict[str, str]) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """A method's name, linked to its API entry, and its function in code."""
+    call = spec.name.replace("_", "_<wbr>")
+    return (
+        f'<a href="api/andrey.{spec.name}.html">{escape(display_name(spec.name, names))}</a> '
+        f'<code class="docutils literal notranslate">andrey.{call}</code>'
+    )
+
+
+def table_html(head: list[str], rows: list[str]) -> str:
+    """A table in the documentation's style, which stacks each row on a phone."""
+    cells = "".join(f'<th scope="col">{label}</th>' for label in head)
+    return (
+        '<div class="pst-scrollable-table-container"><table class="table stacked">'
+        f"<thead><tr>{cells}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def catalog_start(summaries: list[dict], names: dict[str, str]) -> str:
+    """The catalog's start table: one row per kind of data a method reads (``data-<kind>``), with
+    what the kind means, the method to start with (:func:`start_with`), the graph it returns, and
+    how many methods of each family read the kind, one family a line."""
+    specs = list_specs()
+    ranks = feature_ranks(summaries)
+    rows = []
+    for kind in DATA_KINDS:
+        readers = [s for s in specs if kind in s.data_kinds]
+        if not readers:
+            continue
+        label, hint = DATA_KIND_TEXT[kind]
+        start = get_spec(start_with(ranks, kind))
+        graph = returns_text(start)
+        families = [
+            f'<span class="nowrap"><a href="#family-{family}">{family_label}</a> '
+            f"{sum(s.family == family for s in readers)}</span>"
+            for family, family_label in SPEC_FAMILIES.items()
+            if any(s.family == family for s in readers)
+        ]
+        rows.append(
+            f'<tr id="{kind_anchor(kind)}"><td><strong>{label}</strong><br>{hint}</td>'
+            f"<td>{method_cell(start, names)}</td>"
+            f'<td><a href="guides/graph-types.html#{GRAPH_SECTIONS[graph]}">{graph}</a></td>'
+            f"<td>{'<br>'.join(families)}</td></tr>"
+        )
+    return table_html(["Your data", "Start with", "Returns", "Methods that read it"], rows) + "\n"
+
+
 def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
-    """The catalog's table, as MyST: the filters, which script shows, then one section per family
-    (``family-<family>``), opening with the method it features (:func:`featured_methods`),
-    and one row per method (``method-<name>``): its name, an Experimental badge where it is
-    experimental, and what it is for, then the kinds of data it reads, the graph it returns, and
-    its comparisons with other packages. Each table takes the documentation's table style."""
+    """The catalog's family tables, as MyST: one section per family (``family-<family>``),
+    opening with the method it features (:func:`featured_methods`), and one row per method
+    (``method-<name>``): its name, an Experimental badge where it is experimental, and what it
+    is for, then the kinds of data it reads, the graph it returns, and its comparisons with other
+    packages."""
     specs = list_specs()
     starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
     found = compared(summaries)
-    kinds = [k for k in DATA_KINDS if any(k in s.data_kinds for s in specs)]
-    returns = list(dict.fromkeys(returns_text(s) for s in specs))
-    menus = [
-        (
-            "Family",
-            "family",
-            [(f, label) for f, label in SPEC_FAMILIES.items() if any(s.family == f for s in specs)],
-        ),
-        ("Reads", "kinds", [(k, DATA_KIND_TEXT[k][0]) for k in kinds]),
-        ("Returns", "returns", [(r, r) for r in returns]),
-    ]
-    selects = "".join(
-        f'<label class="cat-menu"><span>{title}</span><select data-filter="{key}">'
-        '<option value="">Any</option>'
-        + "".join(
-            f'<option value="{escape(value)}">{escape(text)}</option>' for value, text in values
-        )
-        + "</select></label>"
-        for title, key, values in menus
-    )
-    out = [
-        "```{raw} html",
-        '<div class="cat-filters" role="search" hidden>'
-        '<input type="search" placeholder="Search by name or purpose" aria-label="Search methods">'
-        f"{selects}"
-        '<label class="cat-check"><input type="checkbox" checked> Show experimental methods</label>'
-        f'<span class="cat-count" aria-live="polite"><b>{len(specs)}</b> methods</span>'
-        '<p class="cat-empty" hidden>No method matches every filter.</p></div>',
-        "```",
-        "",
-    ]
-    head = (
-        '<thead><tr><th scope="col">Method</th><th scope="col">Reads</th>'
-        '<th scope="col">Returns</th><th scope="col">Compared with</th></tr></thead>'
-    )
-    badge = '<span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
+    badge = ' <span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
+    out = []
     for family, label in SPEC_FAMILIES.items():
         members = [s for s in specs if s.family == family]
         if not members:
             continue
         rows = []
         for s in members:
-            name = display_name(s.name, names)
             labels = [DATA_KIND_TEXT[k][0] for k in s.data_kinds]
-            reads = ", ".join([labels[0], *(label.lower() for label in labels[1:])])
+            reads = ", ".join([labels[0], *(text.lower() for text in labels[1:])])
             if s.name in found:
                 packages, releases = found[s.name]
-                comp = f"{escape(listed(packages))}<span>{cards_text(releases)}</span>"
+                comp = f"{escape(listed(packages))}<br>{cards_text(releases)}"
             else:
-                comp = '<span class="dim">Not compared yet</span>'
-            search = " ".join((s.name, name, purpose(s))).lower()
-            call = s.name.replace("_", "_<wbr>")
+                comp = "Not compared yet"
             rows.append(
-                f'<tr id="method-{s.name}" data-family="{family}" data-status="{s.status}" '
-                f'data-kinds="{" ".join(s.data_kinds)}" data-returns="{returns_text(s)}" '
-                f'data-search="{escape(search)}">'
-                f'<td class="m-name"><a href="api/andrey.{s.name}.html">{escape(name)}</a> '
-                f'<code class="docutils literal notranslate">andrey.{call}</code>'
-                f"{badge if s.status == 'experimental' else ''}"
-                f'<span class="m-what">{escape(purpose(s))}</span></td>'
-                f'<td class="m-kinds">{reads}</td>'
-                f'<td class="m-returns">{returns_text(s)}</td>'
-                f'<td class="m-comp">{comp}</td></tr>'
+                f'<tr id="method-{s.name}"><td>{method_cell(s, names)}'
+                f"{badge if s.status == 'experimental' else ''}<br>{escape(purpose(s))}</td>"
+                f"<td>{reads}</td><td>{returns_text(s)}</td><td>{comp}</td></tr>"
             )
         experimental = sum(s.status == "experimental" for s in members)
         count = f"{len(members)} method{'s' if len(members) > 1 else ''}"
@@ -3686,10 +3515,8 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
             f"### {label}",
             "",
             "```{raw} html",
-            f'<p class="cat-fam">{count}.{start}</p>'
-            '<div class="pst-scrollable-table-container">'
-            f'<table class="table cat-table">{head}'
-            f"<tbody>{''.join(rows)}</tbody></table></div>",
+            f"<p>{count}.{start}</p>"
+            + table_html(["Method", "Reads", "Returns", "Compared with"], rows),
             "```",
             "",
         ]

@@ -1736,12 +1736,7 @@ def test_the_homepage_shades_its_art_with_the_covers_fade(cards):
 def test_the_homepage_and_docs_styles_and_scripts_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
     assets = ("site.css", "figures.css", "why-fast.css", "why-fast.js")
-    docs = (
-        "docs/_static/andrey.css",
-        "docs/_static/benchmarks.css",
-        "docs/_static/catalog.css",
-        "docs/_static/catalog.js",
-    )
+    docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
     for path in [*(f"site/assets/{name}" for name in assets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
         if path.endswith(".js"):
@@ -1985,9 +1980,9 @@ def published():
 
 @pytest.fixture(scope="module")
 def catalog(published, conf):
-    """The catalog's picker and table, built as docs/conf.py builds them."""
+    """The catalog's start table and family tables, built as docs/conf.py builds them."""
     names = conf["PROSE_NAMES"]
-    return build.catalog_picker(published, names), build.catalog_families(published, names)
+    return build.catalog_start(published, names), build.catalog_families(published, names)
 
 
 def _read(spec_name: str, kind: str) -> bool:
@@ -1996,34 +1991,40 @@ def _read(spec_name: str, kind: str) -> bool:
 
 def test_the_catalog_lists_every_method_once_in_its_family(catalog):
     _, table = catalog
-    rows = re.findall(r'<tr id="method-(\w+)" data-family="(\w+)"', table)
-    assert sorted(name for name, _ in rows) == sorted(s.name for s in list_specs())
-    assert all(get_spec(name).family == family for name, family in rows)
-    # Each row links its API entry, and its family is a section the page can link to.
+    _, *sections = re.split(r"^\(family-(\w+)\)=$", table, flags=re.M)
+    families = sections[::2]
+    assert families == [f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())]
+    rows = {
+        name: family
+        for family, section in zip(families, sections[1::2], strict=True)
+        for name in re.findall(r'<tr id="method-(\w+)">', section)
+    }
+    found = re.findall(r'<tr id="method-(\w+)">', table)
+    assert sorted(found) == sorted(s.name for s in list_specs())
+    assert all(get_spec(name).family == family for name, family in rows.items())
+    # Each row links its API entry.
     for spec in list_specs():
         assert f'href="api/andrey.{spec.name}.html"' in table
-    families = re.findall(r"^\(family-(\w+)\)=$", table, flags=re.M)
-    assert families == [f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())]
 
 
-def test_the_picker_offers_exactly_the_kinds_of_data_the_registry_uses(catalog):
-    picker, table = catalog
+def test_the_start_table_has_a_row_for_exactly_the_kinds_of_data_the_registry_uses(catalog):
+    start, _ = catalog
     used = [k for k in DATA_KINDS if any(k in s.data_kinds for s in list_specs())]
-    assert re.findall(r'class="kind-opt" href="#[\w-]+" data-kind="(\w+)"', picker) == used
-    assert re.findall(r'class="kind-panel" id="[\w-]+" data-kind="(\w+)"', picker) == used
-    reads = re.search(r'<select data-filter="kinds">(.*?)</select>', table)[1]
-    assert re.findall(r'<option value="(\w+)">', reads) == used
-    # Each kind has its words and glyph, and each graph a method returns says what it gives.
+    assert re.findall(r'<tr id="([\w-]+)">', start) == [build.kind_anchor(k) for k in used]
+    # Each kind has its words, and each graph a method returns its section of the guide.
     assert set(build.DATA_KIND_TEXT) == set(DATA_KINDS)
-    assert {build.returns_text(s) for s in list_specs()} <= set(build.GRAPH_TEXT)
+    assert {build.returns_text(s) for s in list_specs()} <= set(build.GRAPH_SECTIONS)
 
 
-def test_a_kinds_panel_lists_exactly_the_methods_that_read_it(catalog):
-    picker, _ = catalog
-    for panel in picker.split('<div class="kind-panel"')[1:]:
-        kind = re.search(r'data-kind="(\w+)"', panel)[1]
-        listed = re.findall(r'href="#method-(\w+)"', panel.split('class="kp-all"')[1])
-        assert sorted(listed) == sorted(s.name for s in list_specs() if kind in s.data_kinds)
+def test_each_kind_starts_with_its_method_and_counts_every_method_that_reads_it(catalog, published):
+    start, _ = catalog
+    ranks = build.feature_ranks(published)
+    for row in start.split("<tr id=")[1:]:
+        kind = next(k for k in DATA_KINDS if row.startswith(f'"{build.kind_anchor(k)}"'))
+        assert f'href="api/andrey.{build.start_with(ranks, kind)}.html"' in row
+        counts = {f: int(n) for f, n in re.findall(r'href="#family-(\w+)">[^<]+</a> (\d+)', row)}
+        readers = [s.family for s in list_specs() if kind in s.data_kinds]
+        assert counts == {f: readers.count(f) for f in set(readers)}, kind
 
 
 def test_every_method_to_start_with_is_supported_and_reads_its_data(published):
@@ -2050,17 +2051,3 @@ def test_a_kind_starts_with_the_featured_rule_in_the_first_family_that_reads_it(
         build.start_with(ranks, "environments") == "cdnod"
     )  # needs env; GFCI takes it as an option
     assert build.start_with({"ges": (2, 200)}, "environments") == "ges"  # the next family
-
-
-def test_the_catalog_calls_pass_the_kind_of_data_they_start_from(published):
-    ranks = build.feature_ranks(published)
-    for kind in DATA_KINDS:
-        spec = get_spec(build.start_with(ranks, kind))
-        code = build.catalog_call(spec, kind)
-        compile(code, kind, "exec")
-        cli = shlex.split(build.agent_call(spec, kind))
-        assert cli[:3] == ["andrey", "run", spec.name]
-        if kind in ("categorical", "mixed"):
-            assert "categorical=" in code and any(a.startswith("categorical=") for a in cli)
-        if build.needs(spec, "environments"):
-            assert '"site"' in code and "--env" in cli

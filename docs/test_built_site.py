@@ -375,7 +375,11 @@ def test_every_link_in_the_methods_catalog_arrives(html):
     links = _Links()
     links.feed(text[text.index("<article") : text.index("</article>")])
     hrefs = {href for _, href in links.found if not href.startswith(("http:", "https:"))}
-    assert any(href.startswith("#data-") for href in hrefs)
+    assert any(href.startswith("#family-") for href in hrefs)
+    # The homepage links the start table, and each kind of data's row can be linked.
+    kinds = {kind for spec in andrey.spec.list_specs() for kind in spec.data_kinds}
+    for anchor in ["your-data", *(f"data-{kind.replace('_', '-')}" for kind in kinds)]:
+        assert f'id="{anchor}"' in text, anchor
     missing = []
     for href in sorted(hrefs):
         target = _resolve(html, page, href)

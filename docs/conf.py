@@ -655,10 +655,10 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / "brand" / name, data)
     _write(GENERATED / "brand-colors.html", _brand_colors())
     _write(GENERATED / "column-order.md", _column_order_table())
-    # The methods catalog (docs/methods.md): its picker and its table, from the registry and the
-    # published comparisons.
+    # The methods catalog (docs/methods.md): its start table and its family tables, from the
+    # registry and the published comparisons.
     summaries = site.release_summaries(summary)
-    _write(GENERATED / "methods-picker.html", site.catalog_picker(summaries, PROSE_NAMES))
+    _write(GENERATED / "methods-start.html", site.catalog_start(summaries, PROSE_NAMES))
     _write(GENERATED / "methods-families.md", site.catalog_families(summaries, PROSE_NAMES))
 
 
@@ -1064,8 +1064,6 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         css, js = ["benchmarks.css", "figures.css"], ["figures.js"]
     elif pagename == "docs/guides/graph-representation":
         js = ["graph-guides.js"]
-    elif pagename == "docs/methods":
-        css, js = ["catalog.css"], ["catalog.js"]
     # The 0.7.0 post's column-order figure (docs/blog/0.7.0/order.html).
     if pagename == "blog/20261019-andrey-0-7-0":
         js = [*js, "column-order.js"]
