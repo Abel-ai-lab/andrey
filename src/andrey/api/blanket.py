@@ -185,10 +185,10 @@ def iamb(
         members in the order they joined, by column label or 0-based position.
         ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``. ``metadata["n_tests"]`` is
-        the number of conditional-independence tests the fit evaluated; a query answered again
-        from a kept answer is not a new test.
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
+        number of conditional-independence tests the fit evaluated; a query answered again from a
+        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -457,10 +457,10 @@ def inter_iamb(
         members in the order they joined, by column label or 0-based position.
         ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``. ``metadata["n_tests"]`` is
-        the number of conditional-independence tests the fit evaluated; a query answered again
-        from a kept answer is not a new test.
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
+        number of conditional-independence tests the fit evaluated; a query answered again from a
+        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -720,10 +720,10 @@ def mmpc(
         ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
         label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
-        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
-        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated;
-        a query answered again from a kept answer is not a new test.
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
+        is the number of conditional-independence tests the fit evaluated; a query answered again
+        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
+        fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
