@@ -385,6 +385,19 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.9, 0.0],
         ],
     },
+    # Linear-Gaussian triangle with one weak edge, x0 -> x1 (Eigenmann, Nandy and Maathuis 2017,
+    # Example 1.1): its CPDAG is undirected, and without the weak edge x0 -> x2 <- x1 is a
+    # collider.
+    "weak_triangle_3v": {
+        "noise": "gaussian",
+        "seed": 20170811,
+        "n_samples": 1000,
+        "weights": [
+            [0.0, 0.0, 0.0],
+            [0.1, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ],
+    },
     # Linear-Gaussian SEM whose CPDAG has every kind of edge, with strong weights: the collider
     # 0 -> 2 <- 1, the chain 2 -> 3 -> 4 it orients, and the pair 5 -- 6 no collider orients.
     "gauss_7v": {

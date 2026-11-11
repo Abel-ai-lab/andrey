@@ -256,9 +256,91 @@ the first row and 1 of the third. In these settings the correction does not help
 implementation. The R code's MVPC ties its own test-wise PC. Andrey's MVPC is behind Andrey's
 test-wise PC by 0.95 to 3.55 SHD and is still no less accurate than the R code's MVPC, a tie in
 one row and fewer errors in two, because Andrey's test-wise PC starts 3.05 to 14.6 SHD ahead of
-the R code's. So in these settings test-wise deletion is the better choice in Andrey. Why the
-correction costs Andrey more than it costs the R code is not traced. The median MVPC fit took 1.9,
-2.2, and 52 s in Andrey against 4.3, 10.9, and 419 s in the R code.
+the R code's. So in these settings test-wise deletion is the better choice in Andrey. The trace
+below says why the correction costs Andrey more than it costs the R code. The median MVPC fit took
+1.9, 2.2, and 52 s in Andrey against 4.3, 10.9, and 419 s in the R code.
+
+#### Why the correction removes true edges
+
+A trace of Andrey's fits on the datasets of these three rows, and of the R code's on those of the
+first two, compares every test the correction answers with the true graph. It reruns the fits and is
+not a new campaign: its mean SHD matches the table above in every row. The number of columns in `W`,
+defined below, and the rows each test read were recorded for the first two rows only. MVPC minus
+test-wise PC splits into extra edges, missing edges, and orientation errors (mean per dataset, 95%
+bootstrap interval), and the correction's removals into true and extra edges:
+
+| setting | extra edges | missing edges | orientation | true edges removed | extra edges removed |
+|---|---|---|---|---|---|
+| degree 2, 50 variables, 500 rows, `alpha` 0.05 | -0.15 [-0.30, +0.00] | +1.05 [+0.60, +1.55] | +0.15 [-0.15, +0.45] | 21 | 3 |
+| degree 2, 50 variables, 2,000 rows, `alpha` 0.01 | -0.20 [-0.45, +0.00] | +1.05 [+0.65, +1.55] | +0.10 [-0.30, +0.50] | 21 | 4 |
+| degree 4, 100 variables, 2,000 rows, `alpha` 0.05 | -1.55 [-2.20, -0.90] | +4.50 [+3.15, +5.90] | +0.60 [-0.30, +1.55] | 90 | 31 |
+
+The whole loss is true edges that the correction removes: 21 of its 24 changes in the first setting,
+21 of 25 in the second, and 90 of 121 in the third removed a true edge, and the orientation column
+is within noise of 0 in all three. Two things cause the removals, and both are the paper's method.
+
+**A corrected test reads few rows.** Under this mask every column that can go missing has an
+indicator with a parent that can go missing too, so `W`, the parents of the indicators of the tested
+pair and its conditioning set, closed under the parents of their own indicators (the paper's
+condition (i)), holds a median of 8 columns in the first setting and 7 in the second, and up to 15.
+A corrected test reads the rows where the pair, its conditioning set, and `W` are all observed: a
+median of 13% and 19% of the rows the test-wise test reads. The corrected test that removed a true
+edge read a median of 22 and 41 rows where the test-wise test read about 245 and 965, and 19 of 21
+and 18 of 21 of those edges had a test-wise p-value of at most 1e-4. A corrected test on a true edge
+separated it in 38% and 55% of the tests with under 30 rows, 11% and 12% with 30 to 100, and 8% and
+5% above 100. If a test below half the test-wise rows keeps its test-wise answer, the correction
+removes 1 true and 1 extra edge in the first setting, 0 and 1 in the second, and 0 and 0 in the
+third, where it removed 21 and 3, 21 and 4, and 90 and 31, so nearly every removal, right or wrong,
+comes from a test that read under half the rows. The paper has no such floor, and Andrey's is the
+smaller `max(|S| + 3, |W| + 2)` rows.
+
+**Step 3 re-tests pairs that falsely detected parents make candidates.** The paper's Step 3 marks an
+adjacent pair for the correction when it shares a common adjacent variable or a missingness
+indicator. Andrey applies both. The R code applies the first only, so on the same detected parents
+(identical in 38 of 38 datasets) and the same test-wise skeleton it corrected 26 pairs where Andrey
+corrected 68 in the first setting, and 44 where Andrey corrected 57 in the second. In the first two
+settings 44 of 79 and 13 of 57 re-tested pairs are candidates by a shared indicator alone. All 57
+are true edges, and in none are both columns true parents of that indicator: each pair exists
+because the detection named a neighbor of the true parent as a second parent (precision 0.878 and
+0.964, recall 0.99 and 1.00). The correction removed 16 and 8 of them. In the third setting the
+detection has precision 0.803 and recall 0.985, and 99 of the 331 re-tested pairs are candidates by
+a shared indicator alone: 94 are true edges, and the correction removed 28 of those. With the R
+code's rule Andrey's MVPC minus test-wise PC falls from +1.05, +0.95, and +3.55 to +0.10 [-0.20,
++0.45], +0.55 [+0.05, +1.10], and +1.90 [+0.35, +3.50]; with the true parents in place of the
+detected ones it falls to +0.05 [-0.20, +0.35] and +0.50 [-0.10, +1.15] in the first two. What
+remains is the rows above.
+
+The R code still removes true edges, 12 in 18 datasets of the first setting and 16 in 20 of the
+second, against Andrey's 21 and 21 on the same datasets; in the first, 7 of its 12 come from blocks
+of at most `|W| + 1` rows (a saturated or rank-deficient regression, or a p-value of 1), which
+Andrey answers with the test-wise test. Its SHD also hides part of the loss: its test-wise PC starts
+with 3 to 5 more orientation errors than Andrey's, and its orientation errors fall by 0.2 after the
+correction where Andrey's rise by 0.1 to 0.15.
+
+Each of the following was switched in Andrey on the first two settings and is not the cause (MVPC
+minus test-wise PC, against +1.05 and +0.95):
+
+- **The intercept.** Without it, as the paper's Eq. (2) has it: +0.90 [+0.40, +1.45] and +0.90
+  [+0.30, +1.55].
+- **One direction per pair.** Two independent shuffles per test, the edge going when either
+  separates it, as the R code's two orders do: +1.10 [+0.50, +1.75] and +0.95 [+0.30, +1.60].
+- **The seed.** Seeds 1 to 4 give +0.85, +1.15, +1.25, and +1.05, and +0.85, +0.90, +0.75, and
+  +0.90.
+- **Orientation.** The colliders over a removed pair read only the corrected separating set, and
+  ranking the removed pairs last among the colliders changes no graph.
+- **The fallback to the test-wise test.** It protects the fit: answering a test with too few rows
+  with a p-value of 1, as the R code does, gives +2.45 [+1.55, +3.40] and +1.40 [+0.70, +2.15], with
+  56 and 29 true edges removed.
+
+The paper's experiments with values missing not at random use "MNAR: MAR + MCAR": the parents of the
+chosen indicators go missing completely at random, so `W` closes after one level. It names the
+general case, "MNAR: no self-masking", and does not run it (Tu et al., 2019, Section 5.1 of the
+extended version, arXiv:1807.04010). Quantile MNAR here is that general case: 70% of the columns can
+go missing, and the indicator of each depends on another of them.
+
+The other six rows of quantile MNAR that repeat, and the three rows of logistic MAR, were not
+traced. A logistic mask gives each indicator many parents, so `W` is large there too, but that is
+inferred, not measured. In these settings use `missing="testwise"`.
 
 ### NOTEARS with EM against MissDAG
 
@@ -791,14 +873,19 @@ repeats, and below the empty graph in its claimed setting.
   keep an extra edge when the indicator of a variable it conditions on is a common effect of the
   tested pair. Under masks where every indicator has many weak parents (logistic MAR) it does not
   improve on test-wise PC.
-- **MVPC at 50 and 100 variables.** With 20 or 30% missing, MVPC is worse than test-wise PC on
-  the first seeds and again on fresh ones in 12 rows of the generic grid, by 0.7 to 3.6 SHD: 9
-  under quantile MNAR (mean degree 2 and 4; 50 and 100 variables; 500, 2,000, and 10,000 rows) and
-  3 under logistic MAR (100 variables, 30% missing; 2,000 and 10,000 rows). The table under "MVPC
-  on the generic grid" lists them. In three of them the MVPC authors' R code ran on the same fresh
+- **MVPC at 50 and 100 variables.** With 20 or 30% missing, MVPC is worse than test-wise PC on the
+  first seeds and again on fresh ones in 12 rows of the generic grid, by 0.7 to 3.6 SHD: 9 under
+  quantile MNAR (mean degree 2 and 4; 50 and 100 variables; 500, 2,000, and 10,000 rows) and 3 under
+  logistic MAR (100 variables, 30% missing; 2,000 and 10,000 rows). The table under "MVPC on the
+  generic grid" lists them. In three of them the MVPC authors' R code ran on the same fresh
   datasets: its MVPC ties its own test-wise PC, and Andrey's MVPC is no less accurate than the R
-  code's, so in these settings test-wise deletion is the better choice. In the paper's setting, at
-  20 and 50 variables, it is worse than test-wise PC in no cell.
+  code's, so in these settings test-wise deletion is the better choice. Traced in three of the nine
+  quantile-MNAR rows (see "Why the correction removes true edges"), the loss is true edges that the
+  correction removes, for two reasons: under this mask the parents of the indicators have missing
+  values too, so a corrected test reads a median of 13% and 19% of the rows the test-wise test reads
+  at 50 variables, and Step 3's shared-indicator rule re-tests true edges that falsely detected
+  parents make candidates. The other six quantile-MNAR rows and the three logistic-MAR rows were not
+  traced. In the paper's setting, at 20 and 50 variables, it is worse than test-wise PC in no cell.
 - **Too few rows.** A corrected test that lacks rows is answered by the test-wise test, so the
   pair keeps its test-wise result; `metadata["corrected_edges"]["uncorrected"]` lists it.
 - **MVPC's cost.** At 100 variables and 10,000 rows under logistic MAR, 77 fits ran past 30

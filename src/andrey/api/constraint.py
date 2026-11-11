@@ -390,7 +390,24 @@ def pc(
     ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
     by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
     ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
-    is the better choice. The correction holds when no missingness indicator causes a
+    is the better choice. Traced under the quantile mask at 50 variables (mean degree 2, 30%
+    missing, 500 rows at ``alpha=0.05`` and 2,000 at 0.01) and at 100 (mean degree 4, 20% missing,
+    2,000 rows, ``alpha=0.05``), the loss is edges the correction removes, not orientation: 21 of
+    its 24 and 21 of its 25 changes at 50 variables, and 90 of its 121 at 100, removed a true edge.
+    One cause is the rows: when the parents of the indicators have missing values themselves, ``W``,
+    the indicator parents a corrected test reads, closed under the parents of their own indicators,
+    held a median of 7 to 8 columns at 50 variables, and there a corrected test read a median of 13%
+    and 19% of the rows the test-wise test read; a true edge it removed was tested on a median of 22
+    and 41 rows where the test-wise test read about 245 and 965. The other is Step 3, which re-tests
+    a pair that shares an indicator and no adjacent variable, and falsely detected indicator parents
+    make such pairs: 44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true edges, of which
+    the correction removed 16 and 8 (at 100 variables, 99 of 331, 94 of them true edges, of which
+    the correction removed 28); the code published with the paper corrects a pair only when it
+    shares an adjacent variable, so it corrects fewer pairs, and it still removes true edges (12 and
+    16 at 50 variables, against 21 and 21 here). Both follow the paper: its experiments with values
+    missing not at random use masks where ``W`` closes after one level, and it names the general
+    case and does not run it [13]_.
+    The correction holds when no missingness indicator causes a
     variable, every independence in the observed rows also holds in the missing ones, no indicator
     is a deterministic function of others, and no value causes its own missingness (self-masking)
     [13]_; the data cannot check these, and a violation voids the correction. PermC also needs

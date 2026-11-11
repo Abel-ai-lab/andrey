@@ -497,6 +497,7 @@ PROSE_NAMES = {
     "gies": "GIES",
     "gnies": "GnIES",
     "xges": "XGES",
+    "ages": "AGES",
     "hc": "hill climbing",
     "tabu": "tabu search",
     "exact_search": "exact search",

@@ -69,6 +69,7 @@ SINGLE = {
     "ges": andrey.ges,
     "gies": andrey.gies,
     "xges": andrey.xges,
+    "ages": andrey.ages,
     "hc": andrey.hc,
     "tabu": andrey.tabu,
     "mmhc": andrey.mmhc,
@@ -165,7 +166,7 @@ def test_one_column_gives_a_one_node_graph(method):
     assert structure.oriented_edges() == []
 
 
-@pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
+@pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges", "ages"])
 def test_no_columns_give_an_empty_graph(method):
     assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
 
@@ -181,7 +182,7 @@ def test_the_score_searches_agree_on_the_score_of_no_column_or_one(d):
     assert np.allclose(list(scores.values()), scores["ges"]), scores
 
 
-BIC = ["ges", "gies", "gfci", "xges", "hc", "tabu", "boss", "grasp", "exact_search"]
+BIC = ["ges", "gies", "gfci", "xges", "ages", "hc", "tabu", "boss", "grasp", "exact_search"]
 
 
 def _sum_of_two_columns():
@@ -280,6 +281,9 @@ def test_bic_searches_fit_fewer_rows_than_columns(method):
     assert out.structure.n_nodes == 12
     if method == "gfci":  # a PAG, with no score in its metadata
         assert out.structure.kind == "pag"
+    elif method == "ages":  # a CPDAG, with the penalties of its path in its metadata
+        assert out.structure.kind == "cpdag"
+        assert out.metadata["path_penalties"][0] == 1.0
     else:
         assert np.isfinite(out.metadata["score"])
 
@@ -704,6 +708,41 @@ def test_xges_rejects_a_bad_setting(setting, value, error):
         andrey.xges(_data(), **{setting: value})
 
 
+@pytest.mark.parametrize(
+    ("value", "error"),
+    [
+        (-1.0, ValueError),
+        (float("inf"), ValueError),
+        (float("nan"), ValueError),
+        ("1.0", TypeError),
+        (True, TypeError),
+        (None, TypeError),
+    ],
+)
+def test_ages_rejects_a_bad_penalty_discount(value, error):
+    with pytest.raises(error, match="ages: penalty_discount must be a finite number at least 0"):
+        andrey.ages(_data(), penalty_discount=value)
+
+
+@pytest.mark.parametrize("setting", ["knowledge", "max_parents", "missing", "env", "score_func"])
+def test_ages_takes_no_such_argument(setting):
+    with pytest.raises(TypeError, match=f"unexpected keyword argument '{setting}'"):
+        andrey.ages(_data(), **{setting: None})
+
+
+@pytest.mark.parametrize("declare", ["category", "bool", "text"])
+def test_ages_rejects_a_column_declared_categorical_by_its_type(declare):
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_data(), columns=["a", "b", "c"])
+    frame["b"] = {
+        "category": pd.Categorical(np.arange(len(frame)) % 3),
+        "bool": np.arange(len(frame)) % 2 == 0,
+        "text": np.array(list("pqr"))[np.arange(len(frame)) % 3],
+    }[declare]
+    with pytest.raises(ValueError, match="ages reads continuous data, but data columns 'b' are"):
+        andrey.ages(frame)
+
+
 # Every mixed-data setting of each facade that takes one, called on one data matrix.
 MIXED = {
     ("pc", "degen_gauss"): lambda x, **kw: andrey.pc(x, indep_test="degen_gauss", **kw),
@@ -833,8 +872,9 @@ def test_a_mixed_setting_reads_the_typed_columns_and_warns_of_the_untyped_codes(
         lambda x: andrey.pc(x),
         lambda x: andrey.ges(x, score_func="bic"),
         lambda x: andrey.boss(x, score_func="bic"),
+        lambda x: andrey.ages(x),
     ],
-    ids=["pc", "ges", "boss"],
+    ids=["pc", "ges", "boss", "ages"],
 )
 def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
     with pytest.warns(andrey.DataTypeWarning, match="columns 0, 2 hold at most 10 distinct whole"):

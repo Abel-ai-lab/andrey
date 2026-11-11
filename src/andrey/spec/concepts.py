@@ -141,7 +141,7 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -189,7 +189,7 @@ _CONCEPTS = (
             "ut_igsp",
         ),
         exempt=(
-            *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies"),
+            *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
             *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
@@ -307,7 +307,12 @@ _CONCEPTS = (
                 "camuv",
             ),
             *_exempt(
-                "No conditional-independence test.", *PURE_SCORE, "gnies", *CONTINUOUS, *LINGAM
+                "No conditional-independence test.",
+                *PURE_SCORE,
+                "gnies",
+                "ages",
+                *CONTINUOUS,
+                *LINGAM,
             ),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
@@ -394,7 +399,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="BIC penalty",
-        suitable=(*SCORE_SEARCHES, "gnies"),
+        suitable=(*SCORE_SEARCHES, "gnies", "ages"),
         others_exempt="Does not score with BIC.",
     ),
     Concept(
@@ -551,6 +556,7 @@ _CONCEPTS = (
                 "No conditional-independence tests over growing conditioning sets.",
                 *PURE_SCORE,
                 "gnies",
+                "ages",
                 "calm",
                 "cam",
                 "resit",
@@ -660,6 +666,11 @@ _CONCEPTS = (
                 *CONTINUOUS,
                 "dynotears",
             ),
+            *_exempt(
+                "The paper defines no cap, and the aggregation can direct edges into a node "
+                "beyond a cap its CPDAGs keep.",
+                "ages",
+            ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
             *_exempt(
                 "No search over parent sets.",
@@ -743,6 +754,7 @@ _CONCEPTS = (
                 "Deterministic.",
                 *(m for m in PURE_SCORE if m not in STARTS),
                 "gnies",
+                "ages",
                 *CONTINUOUS,
                 "cam",
                 "resit",
@@ -935,6 +947,11 @@ _CONCEPTS = (
                 "knowledge of edges enters an invariance test.",
                 "icp",
             ),
+            *_exempt(
+                "The paper defines the solution path and its aggregation without background "
+                "knowledge; ges takes knowledge.",
+                "ages",
+            ),
         ),
     ),
     Concept(
@@ -946,9 +963,9 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m != "icp"),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp"),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages"),
         ),
     ),
     Concept(
@@ -1031,6 +1048,11 @@ _CONCEPTS = (
                 "Its score reads data from several environments, and no published EM covers them.",
                 "gies",
                 "gnies",
+            ),
+            *_exempt(
+                "The paper defines the solution path for complete data; a path over the expected "
+                "covariance of structural EM, refit per penalty or not, is not published.",
+                "ages",
             ),
             *_exempt(
                 "A score or a regression reads every column.",
@@ -1192,6 +1214,11 @@ _CONCEPTS = (
                 "A Markov-blanket search, with no place for a context variable; cdnod is the "
                 "test-based search that takes env.",
                 *("iamb", "inter_iamb", "mmpc"),
+            ),
+            *_exempt(
+                "The paper defines the aggregation for data from one environment; ges is the "
+                "score search that takes env.",
+                "ages",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
