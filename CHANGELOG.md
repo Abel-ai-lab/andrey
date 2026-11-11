@@ -25,6 +25,15 @@ names its pull request.
   Both sides get the same data, test, significance level, and conditioning-set limit, and every row
   records the test, with bnlearn's sparse-table rule on or off. ([#915])
 
+### Changed
+
+- `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
+  partial-correlation test. With Fisher-z, one grow step is 12 to 47 times faster on 400 to 12,800
+  variables with blankets of 2 to 10 members, a fit at one target 3.4 to 4.2 times faster on 200
+  to 400 variables, and a fit of the whole graph on 60 variables 3.7 to 4.6 times faster; the gain
+  falls as the blanket grows. Their graphs and `metadata["n_tests"]` do not change, bit for bit.
+  Fits with the chi-square tests, and `mmpc` fits, take the same time as before. ([#927])
+
 ## [0.17.0] - 2026-11-11
 
 ### Highlights
@@ -2493,6 +2502,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#927]: https://github.com/Abel-ai-lab/andrey/pull/927
 [#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
