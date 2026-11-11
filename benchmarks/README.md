@@ -30,6 +30,11 @@ Packages:
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' R code for RESIT, read from disk and never copied - see
   [CAM and RESIT](comparisons/cam-resit.md)
+- the authors' code for MMB-by-MMB, read from disk and never copied - see
+  [MMB-by-MMB](comparisons/mmb-by-mmb.md)
+- the authors' R code for Y-structures under selection bias
+  ([sbcd](https://github.com/philipversteeg/sbcd)), read from disk and never copied - see
+  [Y-structures](comparisons/y-structures.md)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](comparisons/categorical.md)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md),
@@ -187,6 +192,32 @@ export ANDREY_BENCH_MISSDAG_PYTHON=$PWD/benchmarks/.venv-missdag/bin/python
 benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
 ```
+
+The authors' MMB-by-MMB code, the reference for the hidden-variable lane (`mmb_by_mmb_cpu.py`),
+has no license, so the harness runs it unmodified and keeps it out of the repository:
+`start_mmb.sh` downloads the files of a pinned commit, checks each one's SHA-256, writes them to
+`benchmarks/.mmb`, and builds an environment of NumPy and SciPy from the lock file
+`requirements-mmb.txt` (see [MMB-by-MMB](comparisons/mmb-by-mmb.md)):
+
+```shell
+benchmarks/start_mmb.sh
+export ANDREY_BENCH_MMB_PYTHON=$PWD/benchmarks/.venv-mmb/bin/python
+export ANDREY_BENCH_MMB=$PWD/benchmarks/.mmb
+```
+
+The authors' R code for Y-structures, the reference of `y_structures_cpu.py`, is read from disk the
+same way: `start_sbcd_r.sh` downloads the repository at a pinned commit, checks the archive's
+SHA-256, extracts it into `benchmarks/.sbcd-r`, and adds the packages it lists to the R lane's
+library (see [Y-structures](comparisons/y-structures.md)):
+
+```shell
+benchmarks/start_sbcd_r.sh     # after start_r.sh; prints the export below
+export ANDREY_BENCH_SBCD_R=$PWD/benchmarks/.sbcd-r/sbcd-<commit>
+```
+
+The networks of these lanes that `andrey.data` does not ship (`mildew`, `win95pts`, `hailfinder`,
+and `pigs`) are fetched from the bnlearn repository on first use, checked against a SHA-256, and
+kept in the git-ignored `benchmarks/.networks`, or in `$ANDREY_BENCH_NETWORKS`.
 
 The `m2-tetrad` lane runs Tetrad's FGES, BOSS, and GRaSP under its EM covariance policy, with its
 effective sample size at the number of rows and at the mean pairwise count, which tetrad-lib has
@@ -573,6 +604,11 @@ Read `params` before comparing solutions because their defaults may optimize dif
   bytes.
 - `andrey_bench/regime_models.py` - the data of the domain, group, and latent-indicator regimes.
 - `andrey_bench/pair_models.py` - the synthetic cause-effect pair sets of Tagasovska et al. (2020).
+- `andrey_bench/networks.py` - the published networks the target and latent lanes read.
+- `andrey_bench/latent_networks.py` - the linear-Gaussian simulation with hidden nodes on them.
+- `andrey_bench/selection_models.py` - the simulation under selection bias.
+- `andrey_bench/local_lane.py` - how an adapter answers at a target or claims pairs, the scores of
+  both, and the contract of a local method's adapter ([MMB-by-MMB](comparisons/mmb-by-mmb.md)).
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
 - `andrey_bench/oracle.py` - a solution returning the true graph; a correct pipeline scores SHD 0.

@@ -73,3 +73,11 @@ docs/_static/graph-types-*.html
 .ipynb_checkpoints/
 apps/live-discovery/brand/
 apps/live-discovery/data/
+# The authors' MMB-by-MMB code that benchmarks/start_mmb.sh fetches, read from disk and never
+# committed.
+benchmarks/.mmb/
+# The authors' sbcd R code that benchmarks/start_sbcd_r.sh fetches, read from disk and never
+# committed.
+benchmarks/.sbcd-r/
+# The published networks' files that the network lanes fetch, read from disk and never committed.
+benchmarks/.networks/
