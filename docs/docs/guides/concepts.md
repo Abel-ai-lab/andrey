@@ -161,7 +161,7 @@ changes the equations of its targets $I_e \subseteq V$, setting each target or c
 and leaves the others as they are; an observational environment has $I_e = \emptyset$. The targets
 can be known or unknown. DAGs that also agree on every environment's distribution form an
 interventional equivalence class, which refines $[G]$ and directs more edges (Hauser and Bühlmann,
-2012). Methods that take `targets` return a CPDAG of that class, and those that learn unknown
+2012). The methods that search that class return a CPDAG of it, and those that learn unknown
 targets report them.
 
 ICP asks about one target variable $X_j$: it accepts each set $S$ for which $P(X_j \mid X_S)$ stays
