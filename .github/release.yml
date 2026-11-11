@@ -1,6 +1,6 @@
 # Sections of a GitHub release's generated notes, by pull request label. A pull request appears in
 # the first section whose label it has. The CHANGELOG section is the record; the generated notes
-# are checked against it. CONTRIBUTING.md lists the labels.
+# are checked against it. DEVELOPMENT.md lists the labels.
 changelog:
   # The release's own pull request is the release; its notes list what it ships.
   exclude:

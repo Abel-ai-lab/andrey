@@ -19,6 +19,20 @@ names its pull request.
   only through `indep_test="normal_scores"` keep their graph under a strictly increasing transform
   of each column, and those that take `"chisq"` or `"gsq"` under an order-preserving recoding of
   each column's categories. ([#910])
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method, how each requirement is checked, and where the exceptions are recorded. The
+  examples page opens with a numbered learning path through the notebooks, and the API reference
+  opens with the shape of the API; the details of `env` and `targets` moved to the
+  [getting-started guide](https://andrey.abel.ai/docs/guides/getting-started.html#environments-and-interventions).
+  ([#904])
+- A [concepts guide](https://andrey.abel.ai/docs/guides/concepts.html) states causal discovery
+  formally: the model, what the data identify, what each kind of graph claims, and which methods
+  fit which assumptions. It opens the learning path, and the quick-start notebook states its model
+  in one equation. ([#904])
+
+### Fixed
+
+- A page with math no longer scrolls sideways on a phone. ([#904])
 
 ## [0.17.0] - 2026-11-11
 
@@ -2489,6 +2503,7 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#910]: https://github.com/Abel-ai-lab/andrey/pull/910
+[#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
