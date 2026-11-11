@@ -29,10 +29,11 @@ names its pull request.
 
 - `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
   partial-correlation test. With Fisher-z, one grow step is 12 to 47 times faster on 400 to 12,800
-  variables with blankets of 2 to 10 members, a fit at one target 3.4 to 4.2 times faster on 200
-  to 400 variables, and a fit of the whole graph on 60 variables 3.7 to 4.6 times faster; the gain
-  falls as the blanket grows. Their graphs and `metadata["n_tests"]` do not change, bit for bit.
-  Fits with the chi-square tests, and `mmpc` fits, take the same time as before. ([#927])
+  variables with blankets of 2 to 10 members. A fit at one target is 1.3 to 4.2 times faster on
+  200 to 1,600 variables, less as the learned blanket grows (12 to 72 members), and a fit of the
+  whole graph on 60 variables 3.7 to 4.6 times faster. Their graphs and `metadata["n_tests"]` do
+  not change, bit for bit. Fits with the chi-square tests, and `mmpc` fits, take the same time as
+  before. ([#927])
 
 ## [0.17.0] - 2026-11-11
 
