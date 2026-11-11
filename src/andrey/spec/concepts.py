@@ -1089,7 +1089,12 @@ _CONCEPTS = (
                     choices=(EM,),
                     reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
                     "et al. 2022), suits a fit that reads only a covariance and the row count; "
-                    "None refuses missing values.",
+                    "None refuses missing values. It is Friedman's alternating scheme with two "
+                    "constants: 10 rounds of one search each, the number Gao et al. run, and 5 "
+                    "parameter-only EM steps on the current graph before each search after the "
+                    "first, a count Friedman leaves open (until convergence or a largest count); "
+                    "with 5, the graph settled within the 10 rounds in most measured fits, and "
+                    "with none it was still changing.",
                 )
                 for m in EM_METHODS
             ),

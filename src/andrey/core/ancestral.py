@@ -10,7 +10,10 @@ when every vertex of that set is a direct cause of ``x``. :func:`critical_set` f
 clauses against the class (Fang et al. 2025, Algorithm 1), :func:`clause_mpdag` gives the MPDAG of
 the DAGs that meet them (Algorithm 3 and Corollary 38), and :func:`residual_clauses` the clauses the
 MPDAG cannot show (Algorithm 4). :func:`restrict` applies the claims to a learned graph and drops
-those no DAG it stands for meets.
+those no DAG it stands for meets. A learned graph with no consistent extension stands for no DAG;
+there :func:`direct_claimed_edges` reads a claim on an adjacent pair as the direction of its edge
+(Fang and He 2020, Example 2), the case of Theorem 17 in which the critical set is the other end of
+the edge, and closes the directions under Meek's rules (Meek 1995).
 
 References
 ----------
@@ -19,6 +22,12 @@ knowledge and its applications in causal inference. Journal of Machine Learning 
 
 Fang, Z., Liu, Y., Geng, Z., and He, Y. (2022). A local method for identifying causal relations
 under Markov equivalence. Artificial Intelligence, 305, 103669.
+
+Fang, Z., and He, Y. (2020). IDA with background knowledge. Proceedings of the 36th Conference on
+Uncertainty in Artificial Intelligence, PMLR 124, 270-279.
+
+Meek, C. (1995). Causal inference and causal explanation with background knowledge. Proceedings of
+the 11th Conference on Uncertainty in Artificial Intelligence, 403-410.
 """
 
 from __future__ import annotations
@@ -28,6 +37,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.sparse.csgraph import connected_components
 
 from .structure import ARROW, TAIL
 
@@ -40,6 +50,7 @@ __all__ = [
     "clause_mpdag",
     "residual_clauses",
     "Claim",
+    "direct_claimed_edges",
     "restrict",
 ]
 
@@ -319,10 +330,77 @@ def residual_clauses(
 Claim = tuple[str, int, int]
 
 
+def direct_claimed_edges(
+    pdag: np.ndarray, claims: Iterable[Claim]
+) -> tuple[np.ndarray, list[Claim], list[Claim]]:
+    """Direct the undirected edges of ``pdag`` that ``claims`` decide, then apply Meek's rules:
+    the graph, the claims applied, and the claims dropped.
+
+    In any DAG that joins ``a`` and ``b`` by an edge, ``a`` is an ancestor of ``b`` exactly when
+    the edge is ``a -> b`` (Fang and He 2020, Example 2; Fang et al. 2025, Theorem 17, where the
+    critical set of ``a`` with respect to an adjacent ``b`` is ``{b}``). So a ``required_paths``
+    claim ``(a, b)`` asks for the edge ``a -> b`` and a ``forbidden_paths`` claim ``(a, b)`` for
+    ``b -> a``. A claim is
+
+    - applied, when its pair is joined by an undirected edge: the edge takes the direction asked;
+    - met already, when ``pdag`` directs the edge as asked: it is neither applied nor dropped;
+    - dropped, when its pair is not adjacent, or its edge has any other marks (directed the other
+      way, or an arrowhead at both ends): the marks of ``pdag`` stay.
+
+    Claims in conflict are all dropped, and their edges stay undirected: claims that ask for both
+    directions of one edge, and every claim whose edge would lie on a directed cycle of the
+    directed edges of ``pdag`` together with all the edges the other claims ask for. The claims
+    left are applied together, so neither the order of ``claims`` nor the column order changes
+    which are applied. When a claim is applied, Meek's rules R1 to R4
+    (:func:`~andrey.core.orient.meek` with ``rule4``) then run on the whole graph until none
+    directs an edge; they direct no edge both ways and close no directed cycle. When none is
+    applied, ``pdag`` is returned as it is.
+
+    The published results assume a graph with a consistent extension. This step is for one without,
+    where the rule for a pair still holds in any DAG with that edge; the graph returned is not
+    guaranteed to have a consistent extension either. Returns a new mark matrix, and the applied
+    and the dropped claims in the order of ``claims``.
+    """
+    from .orient import meek
+
+    claims = list(claims)
+    lines = (pdag == TAIL) & (pdag.T == TAIL)
+    directed = (pdag == TAIL) & (pdag.T == ARROW)
+    asked: dict[tuple[int, int], list[Claim]] = {}
+    unmet: set[Claim] = set()
+    for claim in claims:
+        part, x, y = claim
+        a, b = (x, y) if part == "required_paths" else (y, x)
+        if lines[a, b]:
+            asked.setdefault((a, b), []).append(claim)
+        elif not directed[a, b]:
+            unmet.add(claim)
+    edges = [edge for edge in asked if edge[::-1] not in asked]
+    if edges:
+        together = directed.copy()
+        tails, heads = zip(*edges)
+        together[tails, heads] = True
+        # An edge lies on a directed cycle iff its two ends share a strong component.
+        _, component = connected_components(together, directed=True, connection="strong")
+        edges = [(a, b) for a, b in edges if component[a] != component[b]]
+    kept = set(edges)
+    unmet.update(claim for edge, found in asked.items() if edge not in kept for claim in found)
+    applied = {claim for edge in edges for claim in asked[edge]}
+    out = pdag.copy()
+    if edges:
+        tails, heads = zip(*edges)
+        out[tails, heads] = TAIL
+        out[heads, tails] = ARROW
+        out = meek(out, rule4=True).astype(pdag.dtype, copy=False)
+    return out, [c for c in claims if c in applied], [c for c in claims if c in unmet]
+
+
 def restrict(
     pdag: np.ndarray,
     required_paths: np.ndarray | None,
     forbidden_paths: np.ndarray | None,
+    *,
+    edge_claims: list[Claim] | None = None,
 ) -> tuple[np.ndarray, list[Clause], list[Claim]]:
     """The DAGs ``pdag`` stands for in which the claims hold: their MPDAG, residual clauses, and
     the claims dropped because no such DAG meets them.
@@ -339,8 +417,14 @@ def restrict(
     is kept when some DAG meets it together with the directed edges and the claims kept before it,
     and dropped otherwise. A claim that no DAG meets alone is dropped in any order; only claims
     that each hold in some DAG but not together depend on it, and then the earlier ones are kept.
-    When ``pdag`` has no consistent extension, so that it stands for no DAG, every claim is dropped
-    and ``pdag`` is returned unchanged. The dropped claims come last, each ``(part, x, y)``.
+    The dropped claims come last, each ``(part, x, y)``.
+
+    When ``pdag`` has no consistent extension, so that it stands for no DAG, the result is that of
+    :func:`direct_claimed_edges`, with no residual clause: a claim on a pair joined by an
+    undirected edge directs that edge, Meek's rules follow, and a claim on a pair that is not
+    adjacent, one against the marks of its edge, and claims in conflict are dropped. The claims
+    applied to an edge this way are appended to ``edge_claims`` when it is given; it gets none
+    when ``pdag`` has a consistent extension.
     """
     from .orient import cpdag_of_pdag
 
@@ -353,7 +437,10 @@ def restrict(
     try:
         graph = ChainGraph.of(cpdag_of_pdag(pdag))
     except ValueError:
-        return pdag.copy(), [], claims
+        directed, applied, dropped = direct_claimed_edges(pdag, claims)
+        if edge_claims is not None:
+            edge_claims.extend(applied)
+        return directed, [], dropped
     edges = _directed(pdag, graph)
     each = {
         (part, x, y): claim_clauses(

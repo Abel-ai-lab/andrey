@@ -475,13 +475,13 @@ supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
-RSMAX2, where a reference package given the edges those paths imply made fewer errors. Both path
-parts are experimental in IAMB, Inter-IAMB, and MMPC, where the claims are mostly not applied at 50
-variables: the graph found often has no consistent extension, and the fit then drops every claim,
-lists them in `metadata["unmet_knowledge"]`, and returns the graph it finds without them. A path
-claim says less than an edge and so directs less:
-a required path cannot restore an edge the search left out. When you know the edge itself, state it
-as `required`.
+RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
+paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
+has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
+96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
+edges farther from the class the claims define. A path claim says less than an edge and so directs
+less: a required path cannot restore an edge the search left out. When you know the edge itself,
+state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -495,6 +495,15 @@ result.metadata["unmet_knowledge"]  # [] when every claim is met
 
 When only some claims hold together, a CPDAG method keeps them in order, `required_paths` and then
 `forbidden_paths`, each by column position.
+
+On finite data the tests of PC, CD-NOD, IAMB, Inter-IAMB, and MMPC can contradict each other and
+leave a graph with no consistent extension, one that stands for no DAG. A claim then acts on one
+edge: between two variables joined by an edge, `smoking` causes `tar` exactly when the edge is
+`smoking -> tar` (Fang and He, 2020). A claim on a pair joined by an undirected edge directs it,
+Meek's rules follow, and `metadata["edge_claims"]` lists the claims applied this way. A claim on a
+pair that is not adjacent, a claim against an edge the data directed, and claims that conflict with
+each other are dropped and listed in `metadata["unmet_knowledge"]`. The result is not guaranteed to
+stand for a DAG, as the graph found did not.
 
 The time-series methods read the knowledge as links between lagged variables. A third entry gives an
 edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
@@ -677,8 +686,11 @@ They take `missing="em"` instead: structural EM (Friedman, 1997; [Gao et al., 20
 alternates two steps. Under a linear-Gaussian model of the current graph, it replaces each row's
 missing values by their expected values given the row's observed ones and adds their uncertainty.
 This gives the expected covariance of the data. The search then runs on that covariance over every
-row, and the model is fit again to the graph it returns. It runs 10 rounds, and `metadata["em"]`
-records the observed-data log-likelihood after each:
+row, and the model is fit again to the graph it returns. It runs 10 rounds. Before each search after
+the first, 5 more steps refit the model on the graph it has, so the search reads a covariance that
+graph's fit has settled on (Friedman's alternating scheme). `metadata["em"]` records whether each
+round changed the graph (`graph_changed`; when the last round still did, the fit logs a warning) and
+the observed-data log-likelihood after each round:
 
 ```{code-cell} ipython3
 em = andrey.ges(gappy, missing="em")
@@ -689,21 +701,20 @@ EM is sound when values are missing completely at random or at random given obse
 whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
 the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
 
-`missing="em"` is supported in `notears`, `hc`, `tabu`, and `ges`, where no setting we measured was
-less accurate than a reference implementation on the first datasets and again on fresh ones. With
-about 100 rows, `hc` and `tabu` are often no better than the empty graph, both with EM and on
-complete data. From 500 rows on they were better in every setting. We measured `ges`, `boss`, and
-`grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one covariance
-by EM before its search, a simpler method than structural EM, at two settings of the sample size
-its score counts. On denser graphs (mean degree 4) `ges` at that penalty was rarely better than the
+`missing="em"` is supported in `ges`, `hc`, `tabu`, `boss`, `grasp`, and `notears`, where no setting
+we measured was less accurate than a reference implementation on the first datasets and again on
+fresh ones. With about 100 rows, `hc` and `tabu` are often no better than the empty graph, both with
+EM and on complete data. From 500 rows on they were better in every setting. We measured `ges`,
+`boss`, and `grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one
+covariance by EM before its search, a simpler method than structural EM, at two settings of the
+sample size its score counts. `boss` and `grasp` were better than the empty graph in 102 and 103 of
+108 settings. On denser graphs (mean degree 4) `ges` at that penalty was rarely better than the
 empty graph, with EM and on complete data alike.
 
-In `boss` and `grasp`, `missing="em"` is experimental. Against the reference's default setting they
-had fewer errors or tied in all 132 settings, and they were better than the empty graph in 101 and
-102 of 108 settings. Against the reference's stronger setting, each was less accurate in one
-setting, on the first datasets and again on fresh ones: 2,000 rows on graphs of mean degree 4 with
-30% of the values missing completely at random, at 20 variables for `boss` and 50 for `grasp`. We do
-not know the cause yet. The
+EM does not always settle within its 10 rounds. In our benchmark the last round still changed the
+graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with 50 variables and 100 rows.
+Such a fit logs a warning, and more rows help. EM also costs time: a fit runs the search 10 times
+and the E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
 reference implementation exists to compare them with, so the
@@ -779,6 +790,8 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
 - Fang, Zhao, Liu, and He (2025), On the Representation of Pairwise Causal Background Knowledge
   and Its Applications in Causal Inference, Journal of Machine Learning Research 26(229): path
   claims in a CPDAG.
+- Fang and He (2020), IDA with Background Knowledge, Proceedings of the 36th Conference on
+  Uncertainty in Artificial Intelligence, PMLR 124: a path claim on an adjacent pair.
 - Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
   Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
 - [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous

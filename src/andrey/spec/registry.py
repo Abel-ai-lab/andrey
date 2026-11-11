@@ -3070,6 +3070,13 @@ _PATH_RULE = (
     "forbidden_paths, each claim is kept when some DAG meets it with those kept before it. "
     "metadata unmet_knowledge lists the dropped claims, and the fit warns with KnowledgeWarning."
 )
+#: The searches that direct edges by tests can return a graph with no consistent extension.
+_NO_EXTENSION_RULE = (
+    " A graph found with no consistent extension stands for no DAG: there a claim on a pair joined "
+    "by an undirected edge directs that edge (Fang and He 2020), Meek's rules follow (Meek 1995), "
+    "a claim on a pair that is not adjacent, against a directed edge, or in conflict with other "
+    "claims is dropped, and metadata edge_claims lists the claims applied to an edge."
+)
 _PAG_PATHS = (
     " On an adjacent pair, required_paths (a, b) makes the edge a -> b and forbidden_paths (a, b) "
     "puts an arrowhead at a, before the rules; the tests can still remove the pair. No test "
@@ -3136,9 +3143,10 @@ _MISSING_EM = {
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
-        "the search on the expected covariance of the data with a linear-Gaussian fit of the "
-        "graph it returns, 10 times; it assumes values missing completely at random or at random "
-        "given observed values. null refuses missing values.",
+        "the search on the expected covariance of the data with linear-Gaussian fits of the "
+        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
+        "before each after the first; it assumes values missing completely at random or at "
+        "random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
@@ -3153,10 +3161,12 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc mostly
-#: did not apply the claims, since the graph they found often had no consistent extension, and tabu,
-#: mmhc, and rsmax2 made more errors than their reference given the required edges, each on repeated
-#: seeds.
+#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
+#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
+#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
+#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
+#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
+#: edge and most claims are dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
@@ -3169,6 +3179,9 @@ _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "boss": PATH_PARTS,
     "grasp": PATH_PARTS,
     "exact_search": PATH_PARTS,
+    "iamb": ("required_paths",),
+    "inter_iamb": ("required_paths",),
+    "mmpc": ("required_paths",),
     "fci": _PAG_PARTS,
     "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,
@@ -3183,6 +3196,8 @@ for _name, _how in _KNOWLEDGE_HOW.items():
     _extra, _rule = (
         (PATH_PARTS, _PATH_RULE) if _name in _PATH_METHODS else _ENGINE_PATHS.get(_name, ((), ""))
     )
+    if _name in _PATH_METHODS and REGISTRY[_name].family == "constraint":
+        _rule += _NO_EXTENSION_RULE
     _parts = (*EDGE_PARTS, *_extra)
     _knowledge = concept_param(
         "knowledge",
@@ -3293,7 +3308,7 @@ for _name, _spec in REGISTRY.items():
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
-        *(("ancestor_clauses",) if _spec.restricts_paths else ()),
+        *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
