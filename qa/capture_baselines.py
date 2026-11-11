@@ -117,6 +117,7 @@ ALGORITHMS = {
     "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
     "IGSP": (_run_igsp, "gauss_5v_noise_shift"),
     "XGES": (_facade("xges"), "gauss_5v"),
+    "AGES": (_facade("ages"), "weak_triangle_3v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
     "IAMB": (_facade("iamb"), "gauss_5v"),

@@ -12,6 +12,12 @@ names its pull request.
 
 ### Added
 
+- `ages`, experimental, is aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis,
+  2017) for linear-Gaussian data with weak edges. It computes the CPDAGs GES returns for every
+  penalty from `penalty_discount` up and overlays their orientations on the CPDAG of that minimum
+  penalty, so the graph keeps the GES skeleton and can direct more of its edges. It returns a
+  partially directed graph tagged `cpdag` and does not depend on the columns' units or order.
+  ([#894])
 - `score_matching` is SCORE (Rolland et al., 2022) for nonlinear effects with additive Gaussian
   noise. It finds a causal order from the leaf up, each leaf the variable whose second derivative of
   the log density varies least over the rows, estimated by a Stein kernel estimator on the
@@ -2368,6 +2374,7 @@ First alpha release.
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
+[#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
