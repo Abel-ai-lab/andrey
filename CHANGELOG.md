@@ -13,10 +13,10 @@ names its pull request.
 ### Added
 
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
-  evaluated in `metadata["n_tests"]`; their graphs do not change. ([#915])
+  evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
   and `andrey.metrics.claim_scores` scores claims that an effect is or is not zero against the
-  true DAG. ([#915])
+  true DAG. ([#917])
 
 ## [0.17.0] - 2026-11-11
 
@@ -2486,7 +2486,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#915]: https://github.com/Abel-ai-lab/andrey/pull/915
+[#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
