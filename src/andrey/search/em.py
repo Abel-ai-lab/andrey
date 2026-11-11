@@ -1,23 +1,39 @@
 """Structural expectation-maximization (EM) for searches whose fit reads only a covariance.
 
-On data with missing values (``NaN``), :func:`structural_em` alternates two steps over a
-linear-Gaussian model of the columns: a mean ``mu``, coefficients ``B`` (``B[i, j]`` the weight of
-edge ``i -> j``), and noise variances ``omega`` (Friedman 1997; Gao et al. 2022).
+On data with missing values (``NaN``), :func:`structural_em` runs the alternating structural EM of
+Friedman (1997) over a linear-Gaussian model of the columns: a mean ``mu``, coefficients ``B``
+(``B[i, j]`` the weight of edge ``i -> j``), and noise variances ``omega``. It is made of three
+steps:
 
 - **E-step** (:func:`expected_moments`): under the current model, each row's missing values have a
   Gaussian distribution given its observed ones. Their conditional means fill the row, and their
   conditional covariances add to the second moments, which give the expected mean and the expected
   covariance ``S`` about it.
-- **M-step**: the method's own search runs on ``(S, n)``, with ``n`` every row; then ``B`` and
-  ``omega`` are the least-squares fit on ``S`` of a DAG of the graph it returns
-  (:func:`fit_dag`). Every DAG of a CPDAG's class gives the same fitted covariance.
+- **Parameter step**: the graph stays, and ``B`` and ``omega`` are the least-squares fit on ``S``
+  of a DAG of it (:func:`fit_dag`), the parameters that maximize the expected log-likelihood of
+  that graph. Every DAG of a CPDAG's class gives the same fitted covariance.
+- **Structure step**: the method's own search runs on ``(S, n)``, with ``n`` every row, and a
+  parameter step fits the graph it returns on the same ``S``.
 
-The model starts from ``B = 0``, each column's mean and variance over its observed values (the
-available cases; Little and Rubin 2019), and runs :data:`ITERATIONS` rounds, the number Gao et al.
-(2022) run. The rows are grouped by which columns they observe, so each group takes one solve per
-E-step, and the E-step runs on the columns in order of their
-:func:`~andrey.core.ties.tie_ranks`, with BLAS on one thread, so a new column order or more
-threads move no bit of ``S``.
+The model starts from ``B = 0`` and each column's mean and variance over its observed values (the
+available cases; Little and Rubin 2019), which are the maximum-likelihood parameters of the graph
+with no edge, so the first round is an E-step and a structure step. Each later round runs an
+E-step, then :data:`PARAMETER_STEPS` times a parameter step and an E-step, then a structure step.
+:data:`ITERATIONS` rounds run, the number Gao et al. (2022) run.
+
+Friedman (1997) repeats the parameter steps "until convergence or" a largest count and the rounds
+"until convergence", and leaves the count open. The first search reads the expected covariance
+under the model with no edge, where every covariance is shrunk toward zero by the share of rows
+that observe both columns. Measured with ``ges``, ``boss``, and ``grasp`` at 20 and 50 variables
+and 2,000 rows with 30% of the values missing, that search returned many extra edges; with one
+parameter fit per round the later rounds removed them slowly and the graph was still changing
+after 10 rounds, and with :data:`PARAMETER_STEPS` parameter steps before each search the last
+round changed the graph in about 1 fit in 10. At 100 rows it did in about 4 in 10. The record
+tells whether each round changed the graph, and a fit whose last round did logs a warning.
+
+The rows are grouped by which columns they observe, so each group takes one solve per E-step, and
+the E-step runs on the columns in order of their :func:`~andrey.core.ties.tie_ranks`, with BLAS on
+one thread, so a new column order or more threads move no bit of ``S``.
 
 The missingness must be ignorable: missing completely at random or at random given observed
 values. Under values missing not at random the expected covariance is biased, and nothing in the
@@ -36,6 +52,7 @@ References
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
@@ -51,10 +68,25 @@ if TYPE_CHECKING:
 
     from andrey.core.structure import GraphStructure
 
-__all__ = ["ITERATIONS", "expected_moments", "fit_dag", "observed_copies", "structural_em"]
+__all__ = [
+    "ITERATIONS",
+    "PARAMETER_STEPS",
+    "expected_moments",
+    "fit_dag",
+    "observed_copies",
+    "structural_em",
+]
 
-#: The rounds of E-step and M-step, as Gao et al. (2022) run them.
+_log = logging.getLogger(__name__)
+
+#: The rounds, each with one structure step, as Gao et al. (2022) run them.
 ITERATIONS = 10
+#: The parameter steps on the current graph before each structure step after the first. Friedman
+#: (1997) leaves the count open ("until convergence or" a largest count, or "some specified number
+#: of steps"). With 5, the graph had settled within the 10 rounds in about 9 of 10 fits measured at
+#: 2,000 rows; with none it was still changing in most. Stopping the steps earlier, once a step
+#: gains less than 0.01 or 0.0001 in log-likelihood, returned another graph in 8 and 2 of 360 fits.
+PARAMETER_STEPS = 5
 
 # A node's noise variance is at least this share of its expected variance, so the precision stays
 # finite when a fitted node is a near copy of its parents.
@@ -167,15 +199,26 @@ def structural_em(
     *,
     iterations: int = ITERATIONS,
 ) -> tuple[R, dict[str, object]]:
-    """Run structural EM on ``X``, which holds ``NaN`` where a value is missing.
+    """Run alternating structural EM on ``X``, which holds ``NaN`` where a value is missing.
 
     ``m_step(cov)`` runs the method's search on the expected covariance ``cov`` (in the columns of
     ``X``, divided by the number of rows) and returns its result and the graph it learned, a DAG,
-    CPDAG, or a CPDAG narrowed by knowledge. Returns the last M-step's result and the record
-    ``{"iterations": iterations, "log_likelihood": [...]}``: the observed-data log-likelihood of
-    the model after each M-step, which can fall in a round that changes the graph. A row that
-    observes no value counts in the number of rows and adds the model's covariance to the expected
-    covariance, so the facades drop such rows first (:func:`~andrey.api._adapt.data_matrix`).
+    CPDAG, or a CPDAG narrowed by knowledge. ``iterations`` is the number of rounds, each with one
+    such structure step; every round after the first runs :data:`PARAMETER_STEPS` parameter steps
+    on its graph before it. Returns the last structure step's result and the record:
+
+    - ``"iterations"``: the rounds;
+    - ``"parameter_steps"``: the parameter steps before each structure step after the first;
+    - ``"log_likelihood"``: the observed-data log-likelihood of the model after each round's
+      structure step. A parameter step never lowers it; a structure step can, as the search
+      weighs the expected log-likelihood against the graph's size;
+    - ``"graph_changed"``: for each round, whether its structure step returned another graph than
+      the round before, the first round against the graph with no edge.
+
+    A last round that changed the graph logs a warning: the rounds ended before EM settled on a
+    graph. A row that observes no value counts in the number of rows and adds the model's
+    covariance to the expected covariance, so the facades drop such rows first
+    (:func:`~andrey.api._adapt.data_matrix`).
     """
     if iterations < 1:
         raise ValueError(f"iterations must be at least 1, got {iterations}")
@@ -184,15 +227,35 @@ def structural_em(
     ranked = np.ascontiguousarray(X[:, order])
     mean = np.nanmean(ranked, axis=0)
     precision = np.diag(1.0 / np.nanvar(ranked, axis=0))
+    adjacency = np.zeros((X.shape[1], X.shape[1]), dtype=bool)
+    marks = np.zeros_like(adjacency, dtype=np.int8)
     loglik: list[float] = []
+    changed: list[bool] = []
     for k in range(iterations):
         with backend.one_blas_thread():
             mean, cov, value = expected_moments(ranked, mean, precision)
-        if k:
-            loglik.append(value)  # the model after the previous M-step
+            if k:
+                loglik.append(value)  # the model after the previous structure step
+                for _ in range(PARAMETER_STEPS):
+                    precision = _precision(*fit_dag(adjacency, cov))
+                    mean, cov, _ = expected_moments(ranked, mean, precision)
         result, graph = m_step(cov[np.ix_(back, back)])
+        found = np.asarray(graph.to_numpy())
+        changed.append(not np.array_equal(found, marks))
+        marks = found
         adjacency = _dag_adjacency(graph)[np.ix_(order, order)]
         precision = _precision(*fit_dag(adjacency, cov))
     with backend.one_blas_thread():
         loglik.append(expected_moments(ranked, mean, precision)[2])
-    return result, {"iterations": iterations, "log_likelihood": loglik}
+    if changed[-1]:
+        _log.warning(
+            "structural EM: the graph still changed in the last of %d rounds, so EM has not "
+            "settled on a graph; the result is the last round's",
+            iterations,
+        )
+    return result, {
+        "iterations": iterations,
+        "parameter_steps": PARAMETER_STEPS,
+        "log_likelihood": loglik,
+        "graph_changed": changed,
+    }

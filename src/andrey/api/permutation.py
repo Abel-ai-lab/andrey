@@ -134,11 +134,11 @@ def boss(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -295,23 +295,33 @@ def boss(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score adds one term per variable, each over every row, and terms over different rows do not add
     up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [8]_
-    [9]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
-    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
-    observed ones, and their conditional means and covariances give the expected covariance of the
-    data (the E-step); the search runs on it over every row, with all of its settings, and the
-    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). A row that observes no value is dropped first: it holds no information on
-    the model. It runs 10 rounds, as Gao et al. [9]_ do, from no edges and each column's mean and
-    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
-    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
-    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
-    the last round's expected covariance. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    conditional-independence searches do. ``missing="em"`` runs structural EM [8]_ [9]_ with the
+    linear-Gaussian BIC, which reads the data only through their covariance: under a linear-Gaussian
+    model of the current graph, each row's missing values are Gaussian given its observed ones, and
+    their conditional means and covariances give the expected covariance of the data (the E-step);
+    the search runs on it over every row, with all of its settings, and the model's coefficients and
+    noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
+    row that observes no value is dropped first: it holds no information on the model. It runs 10
+    rounds, as Gao et al. [9]_ do, from no edges and each column's mean and variance over its
+    observed values, and it alternates as Friedman [8]_ describes: before each search after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [8]_ leaves the number of parameter steps
+    open. The first search reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's search returned another graph
+    than the round before. When the last round changed the graph, EM has not settled on one, which
+    is more common with few rows, and the fit logs a warning. ``metadata["score"]`` is the score of
+    the result on the last round's expected covariance. EM holds when values are missing completely
+    at random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -338,40 +348,37 @@ def boss(
     reads a numeric ``env`` as a number, so with three or more environments a shift that does not
     follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
     go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
-    a parent of each variable it points into. ``missing="em"`` is experimental: in one measured
-    setting it was less accurate than a reference implementation, on the first datasets and again on
-    fresh ones, and the cause is not yet known. It was measured on simulated linear-Gaussian data
-    with values missing completely at random or at random given observed values, 20 datasets per
-    setting, on one core. At the default ``ebic_gamma=1.0`` (Erdos-Renyi graphs of mean degree 2 and
-    4, 10 to 100 variables, 100 to 2,000 rows, 10 to 30% missing), its mean errors stayed below the
-    empty graph's in 214 of 216 settings. At the standard BIC, ``ebic_gamma=0.0``, with 10 to 50
-    variables, they stayed below it in 101 of 108 settings, with every miss at 100 rows. With 15
-    variables and 100 rows (10 to 50% missing) they stayed below it in 20 of 24 settings, with the 4
-    misses at 50% missing. The reference implementation estimates one covariance by EM and then runs
-    its search once; it ran at the standard BIC on those 132 settings, with two sample sizes in its
-    score. With every row counted, this search had fewer errors than it in 95 settings and tied in
-    37. With the mean number of rows on which a pair of variables is observed, where the reference
-    is more accurate, this search had fewer errors in 70, tied in 58, and had more in 4. On 20 fresh
-    datasets 3 of the 4 tied and one had more again: on graphs of mean degree 4 with 20 variables,
-    2,000 rows, and 30% of the values missing completely at random, its mean errors were 17.85
-    against 8.60, and 20.10 against 7.30 on the fresh datasets, with the empty graph at 40. In no
-    other setting did it have more errors than the reference on both sets of datasets, at either
-    sample size. :func:`~andrey.pc`, whose tests delete rows per test, had fewer errors than it at
-    the standard BIC in 13 of the 132 settings and more in 56, comparisons not rerun on fresh seeds.
-    It runs the search 10 times, and the median fit took 0.7 to 33 s. Under values missing not at
-    random it has no guarantee. Before EM, only a column that repeats another up to scale and shift
-    where both are observed raises; a column that is a linear function of several others, which
-    raises on complete data, is not caught, and the fit runs. With true ``required_paths`` or
-    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
-    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
-    DAG than without them in any setting. The claims direct edges of the graph the search found, as
-    their rules take the class as given: of the edges they directed, 1.7% with required paths and
-    4.1% with forbidden paths pointed against the true DAG, each in a fit whose graph had an edge
-    missing or extra or a collider wrong. A required path says less than a required edge and directs
-    less: it cannot restore an edge the search left out, and on simulated data a required edge,
-    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    a parent of each variable it points into. ``missing="em"`` was measured on simulated
+    linear-Gaussian data with values missing completely at random or at random given observed
+    values, 20 datasets per setting, on one core. At the default ``ebic_gamma=1.0`` (Erdos-Renyi
+    graphs of mean degree 2 and 4, 10 to 100 variables, 100 to 2,000 rows, 10 to 30% missing), its
+    mean errors stayed below the empty graph's in 214 of 216 settings, measured with one parameter
+    refit per round in place of the 5 parameter steps. At the standard BIC, ``ebic_gamma=0.0``, with
+    10 to 50 variables, they stayed below it in 102 of 108 settings, with every miss at 100 rows.
+    With 15 variables and 100 rows (10 to 50% missing) they stayed below it in 20 of 24 settings,
+    with the 4 misses at 50% missing. A reference implementation that estimates one covariance by EM
+    and then runs its search once ran at the standard BIC on those 132 settings, with two sample
+    sizes in its score. With every row counted, this search had fewer errors than it in 100 settings
+    and tied in 32. With the mean number of rows on which a pair of variables is observed, where the
+    reference is more accurate, this search had fewer errors in 72, tied in 59, and had more in 1,
+    which tied on 20 fresh datasets. :func:`~andrey.pc`, whose tests delete rows per test, had fewer
+    errors than it at the standard BIC in 12 of the 132 settings and more in 62, comparisons not
+    rerun on fresh seeds. EM runs the search 10 times and the E-step 56 times: the median fit took
+    1.5 to 44 s, against 0.4 to 2.3 s on the complete data. In 170 of the 2,640 fits the last round
+    still changed the graph (77 of 240 with 50 variables and 100 rows), and each such fit logs a
+    warning. Under values missing not at random it has no guarantee. Before EM, only a column that
+    repeats another up to scale and shift where both are observed raises; a column that is a linear
+    function of several others, which raises on complete data, is not caught, and the fit runs. With
+    true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
+    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
+    no farther from the true DAG than without them in any setting. The claims direct edges of the
+    graph the search found, as their rules take the class as given: of the edges they directed, 1.7%
+    with required paths and 4.1% with forbidden paths pointed against the true DAG, each in a fit
+    whose graph had an edge missing or extra or a collider wrong. A required path says less than a
+    required edge and directs less: it cannot restore an edge the search left out, and on simulated
+    data a required edge, which also states that the pair is adjacent, lowered the errors more. A
+    known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -532,11 +539,11 @@ def grasp(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -706,23 +713,33 @@ def grasp(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score adds one term per variable, each over every row, and terms over different rows do not add
     up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"``, experimental, runs structural EM [8]_
-    [9]_ with the linear-Gaussian BIC, which reads the data only through their covariance: under a
-    linear-Gaussian model of the current graph, each row's missing values are Gaussian given its
-    observed ones, and their conditional means and covariances give the expected covariance of the
-    data (the E-step); the search runs on it over every row, with all of its settings, and the
-    model's coefficients and noise variances are fit again by least squares on a DAG of the graph it
-    returns (the M-step). A row that observes no value is dropped first: it holds no information on
-    the model. It runs 10 rounds, as Gao et al. [9]_ do, from no edges and each column's mean and
-    variance over its observed values, and ``metadata["em"]`` records ``iterations``, the rounds,
-    and ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
-    can fall in a round that changes the graph. ``metadata["score"]`` is the score of the result on
-    the last round's expected covariance. EM holds when values are missing completely at random or
-    at random given observed values; when whether a value is missing depends on the missing values
-    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`,
-    whose tests delete rows per test.
+    conditional-independence searches do. ``missing="em"`` runs structural EM [8]_ [9]_ with the
+    linear-Gaussian BIC, which reads the data only through their covariance: under a linear-Gaussian
+    model of the current graph, each row's missing values are Gaussian given its observed ones, and
+    their conditional means and covariances give the expected covariance of the data (the E-step);
+    the search runs on it over every row, with all of its settings, and the model's coefficients and
+    noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
+    row that observes no value is dropped first: it holds no information on the model. It runs 10
+    rounds, as Gao et al. [9]_ do, from no edges and each column's mean and variance over its
+    observed values, and it alternates as Friedman [8]_ describes: before each search after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [8]_ leaves the number of parameter steps
+    open. The first search reads the expected covariance under the model with no edge, where every
+    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
+    the first search returned many extra edges; with one refit per round the later rounds removed
+    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
+    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether each round's search returned another graph
+    than the round before. When the last round changed the graph, EM has not settled on one, which
+    is more common with few rows, and the fit logs a warning. ``metadata["score"]`` is the score of
+    the result on the last round's expected covariance. EM holds when values are missing completely
+    at random or at random given observed values; when whether a value is missing depends on the
+    missing values themselves, the expected covariance is biased, and the data cannot show it. On
+    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
+    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -754,39 +771,36 @@ def grasp(
     environments a shift that does not follow the labels' values, such as one in the middle
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
     result. ``max_parents`` counts the index as a parent of each variable it points into.
-    ``missing="em"`` is experimental: in one measured setting it was less accurate than a reference
-    implementation, on the first datasets and again on fresh ones, and the cause is not yet known.
-    It was measured on simulated linear-Gaussian data with values missing completely at random or at
-    random given observed values, 20 datasets per setting, on one core. At the default
-    ``ebic_gamma=1.0`` (Erdos-Renyi graphs of mean degree 2 and 4, 10 to 100 variables, 100 to 2,000
-    rows, 10 to 30% missing), its mean errors stayed below the empty graph's in 213 of 216 settings.
-    At the standard BIC, ``ebic_gamma=0.0``, with 10 to 50 variables, they stayed below it in 102 of
-    108 settings, with 5 of the 6 misses at 100 rows. With 15 variables and 100 rows (10 to 50%
-    missing) they stayed below it in 20 of 24 settings, with the 4 misses at 50% missing. The
-    reference implementation estimates one covariance by EM and then runs its search once; it ran at
-    the standard BIC on those 132 settings, with two sample sizes in its score. With every row
-    counted, this search had fewer errors than it in 89 settings and tied in 43. With the mean
-    number of rows on which a pair of variables is observed, where the reference is more accurate,
-    this search had fewer errors in 64, tied in 62, and had more in 6. On 20 fresh datasets 5 of the
-    6 tied and one had more again: on graphs of mean degree 4 with 50 variables, 2,000 rows, and 30%
-    of the values missing completely at random, its mean errors were 42.00 against 17.60, and 43.80
-    against 19.80 on the fresh datasets, with the empty graph at 100. In no other setting did it
-    have more errors than the reference on both sets of datasets, at either sample size.
+    ``missing="em"`` was measured on simulated linear-Gaussian data with values missing completely
+    at random or at random given observed values, 20 datasets per setting, on one core. At the
+    default ``ebic_gamma=1.0`` (Erdos-Renyi graphs of mean degree 2 and 4, 10 to 100 variables, 100
+    to 2,000 rows, 10 to 30% missing), its mean errors stayed below the empty graph's in 213 of 216
+    settings, measured with one parameter refit per round in place of the 5 parameter steps. At the
+    standard BIC, ``ebic_gamma=0.0``, with 10 to 50 variables, they stayed below it in 103 of 108
+    settings, with every miss at 100 rows. With 15 variables and 100 rows (10 to 50% missing) they
+    stayed below it in 21 of 24 settings, with the 3 misses at 50% missing. A reference
+    implementation that estimates one covariance by EM and then runs its search once ran at the
+    standard BIC on those 132 settings, with two sample sizes in its score. With every row counted,
+    this search had fewer errors than it in 101 settings and tied in 31. With the mean number of
+    rows on which a pair of variables is observed, where the reference is more accurate, this search
+    had fewer errors in 68, tied in 61, and had more in 3, each of which tied on 20 fresh datasets.
     :func:`~andrey.pc`, whose tests delete rows per test, had fewer errors than it at the standard
-    BIC in 12 of the 132 settings and more in 68, comparisons not rerun on fresh seeds. It runs the
-    search 10 times, and the median fit took 0.8 to 34 s. Under values missing not at random it has
-    no guarantee. Before EM, only a column that repeats another up to scale and shift where both are
-    observed raises; a column that is a linear function of several others, which raises on complete
-    data, is not caught, and the fit runs. With true ``required_paths`` or ``forbidden_paths`` on 5
-    to 30% of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree
-    2 or 4, 500 or 2,000 rows), its result was no farther from the true DAG than without them in any
-    setting. The claims direct edges of the graph the search found, as their rules take the class as
-    given: of the edges they directed, 1.7% with required paths and 3.2% with forbidden paths
-    pointed against the true DAG. No reference implementation takes these claims for this search, so
-    they were compared with the same fit without them. A required path says less than a required
-    edge and directs less: it cannot restore an edge the search left out. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    BIC in 8 of the 132 settings and more in 74, comparisons not rerun on fresh seeds. EM runs the
+    search 10 times and the E-step 56 times: the median fit took 1.2 to 40 s, against 0.4 to 2.2 s
+    on the complete data. In 533 of the 2,640 fits the last round still changed the graph (210 of
+    240 with 50 variables and 100 rows), and each such fit logs a warning. Under values missing not
+    at random it has no guarantee. Before EM, only a column that repeats another up to scale and
+    shift where both are observed raises; a column that is a linear function of several others,
+    which raises on complete data, is not caught, and the fit runs. With true ``required_paths`` or
+    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
+    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
+    DAG than without them in any setting. The claims direct edges of the graph the search found, as
+    their rules take the class as given: of the edges they directed, 1.7% with required paths and
+    3.2% with forbidden paths pointed against the true DAG. No reference implementation takes these
+    claims for this search, so they were compared with the same fit without them. A required path
+    says less than a required edge and directs less: it cannot restore an edge the search left out.
+    A known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
