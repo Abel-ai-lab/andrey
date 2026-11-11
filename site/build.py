@@ -1596,7 +1596,9 @@ AGENT_QUERY = ".structure | .labels as $n | .edges[] | [$n[.source], $n[.target]
 # What an agent runs, in order: find a method, read its parameters, run it. The jq filters are
 # applied here, to the command line's own JSON; a test checks them against jq.
 AGENT_LIST = "andrey list | jq -r '.[] | [.name, .output, .status] | @tsv'"
-AGENT_HELP = "andrey run pc --help --json | jq -c '.method.params.properties.alpha'"
+AGENT_HELP = (
+    "andrey run pc --help --json | jq -c '.method.params.properties.alpha | {type, default}'"
+)
 AGENT_RUN = f"andrey run pc --data sachs.csv | jq -c '{AGENT_QUERY}'"
 AGENT_LISTED = 3  # the list's first rows; the rest are counted
 
@@ -1632,7 +1634,7 @@ def agent_frames() -> list[tuple[str, list[str], int]]:
     edges = [[names[e["source"]], names[e["target"]], e["type"]] for e in structure["edges"]]
     return [
         (AGENT_LIST, listed[:AGENT_LISTED], len(listed) - AGENT_LISTED),
-        (AGENT_HELP, [compact(alpha)], 0),
+        (AGENT_HELP, [compact({"type": alpha["type"], "default": alpha["default"]})], 0),
         (AGENT_RUN, [compact(edge) for edge in edges], 0),
     ]
 
@@ -1847,44 +1849,54 @@ def compared_packages(summaries: list[dict]) -> dict[str, set[str]]:
     return out
 
 
-def featured_methods(summaries: list[dict]) -> dict[str, dict]:
-    """The method each registry family features, in ``SPEC_FAMILIES`` order, as the homepage and
-    the methods catalog show it.
-
-    Per family, the supported method compared with the most packages (:func:`compared_packages`);
-    among equals, the one with the largest size at which every package in its shown setting
-    (:func:`default_settings`) ran and Andrey's graph beats the empty graph (:func:`beats_empty`);
-    then the first in registry order. A method with no such size is not featured, and a family
-    without a featured method is left out. The rule reads coverage, not the result of a
-    comparison. Each family's entry gives the method's registry name (``spec``), its shown
-    ``name``, its ``packages``, and the ``size``, ``unit``, ``release``, and the
-    ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row.
-    """
+def feature_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
+    """Each supported method that can be featured, by registry name: the packages it is compared
+    with (:func:`compared_packages`) and its reach, the largest size at which every package in its
+    shown setting (:func:`default_settings`) ran and Andrey's graph beats the empty graph
+    (:func:`beats_empty`). A method with no such size is left out."""
     packages = compared_packages(summaries)
-    order = {s.name: i for i, s in enumerate(list_specs())}
-    best: dict[str, tuple] = {}
-    for spec, (name, methods) in default_settings(summaries).items():
+    ranks = {}
+    for spec, (_, methods) in default_settings(summaries).items():
         family = methods[0]["family"]
         sizes = [d for d, rows in shared_rows(methods).items() if beats_empty(family, rows[0])]
-        if not sizes:
-            continue
-        rank = (-len(packages.get(spec, ())), -sizes[-1], order[spec])
-        if family not in best or rank < best[family][0]:
-            best[family] = (rank, spec, name, methods, sizes[-1])
+        if sizes:
+            ranks[spec] = (len(packages.get(spec, ())), sizes[-1])
+    return ranks
+
+
+def featured_among(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
+    """The method to feature among ``names``: of those ``ranks`` holds (:func:`feature_ranks`),
+    the one compared with the most packages, then the one with the largest reach, then the first
+    in registry order; None when ``ranks`` holds none. The rule reads coverage, not the result of
+    a comparison."""
+    order = {s.name: i for i, s in enumerate(list_specs())}
+    found = [name for name in names if name in ranks]
+    return min(found, key=lambda n: (-ranks[n][0], -ranks[n][1], order[n]), default=None)
+
+
+def featured_methods(summaries: list[dict]) -> dict[str, dict]:
+    """The method each registry family features (:func:`featured_among` over the family's
+    methods), in ``SPEC_FAMILIES`` order, as the homepage and the methods catalog show it; a family
+    without one is left out. Each entry gives the method's registry name (``spec``), its shown
+    ``name``, its ``packages``, and its reach as ``size`` in ``unit``, with the ``release`` and
+    the ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row."""
+    ranks = feature_ranks(summaries)
+    settings = default_settings(summaries)
     out = {}
     for family in SPEC_FAMILIES:
-        if family not in best:
+        spec = featured_among(ranks, [s.name for s in list_specs() if s.family == family])
+        if spec is None:
             continue
-        _, spec, name, methods, d = best[family]
-        rows = shared_rows(methods)[d]
+        name, methods = settings[spec]
+        packages, d = ranks[spec]
         out[family] = {
             "spec": spec,
             "name": name,
-            "packages": len(packages.get(spec, ())),
+            "packages": packages,
             "size": d,
             "unit": methods[0]["unit"],
             "release": max((m["release"] for m in methods), key=version_key),
-            "cells": list(zip(methods, rows, strict=True)),
+            "cells": list(zip(methods, shared_rows(methods)[d], strict=True)),
         }
     return out
 

@@ -58,7 +58,8 @@ never meet. It reads top to bottom, each value computed when the site is built:
   Andrey's graph beats the empty graph (`beats_empty()`; link F1 in `F1_FAMILIES`); then registry
   order. The row draws each package's fit time at that size and links the release card; its notes
   give the card's verdict (`card_verdict`), or where the card records none, the two error counts
-  compared (`outcome()`, `OUTCOME_WORDS`). The methods catalog calls the same `featured_methods()`.
+  compared (`outcome()`, `OUTCOME_WORDS`). The ranking is `feature_ranks()` and
+  `featured_among()`, which pick among any list of methods, so the methods catalog shares it.
 - The newest four release cards (`latest_cards()`): each card's cover from
   `docs/_static/release-cards/`, or the default tile for a release without art, then its theme and
   description from the card's own page.

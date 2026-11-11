@@ -739,9 +739,10 @@
   width: 100%;
   max-width: none;
   height: auto;
-  aspect-ratio: 2.4;
+  aspect-ratio: 2;
   object-fit: cover;
-  object-position: 50% 50%;
+  /* A cover's subject sits low on the right, under the card's title. */
+  object-position: 50% 75%;
 }
 
 /* A release without its own art: the release cards page's default tile, the stipple ground in the
@@ -992,6 +993,10 @@
   margin-top: 1.4rem;
   background: var(--andrey-ground-ink);
   color: var(--andrey-ground-navy);
+}
+
+.andrey-home .band .agent-pill {
+  color: var(--andrey-ground-ink);
 }
 
 .andrey-home .band :focus-visible {
