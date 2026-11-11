@@ -743,7 +743,8 @@ def fit(
     edges: dict | None = None,
     env: np.ndarray | None = None,
 ) -> dict:
-    """One fit: its status, its marks, and the clauses or unmet claims its metadata lists.
+    """One fit: its status, its marks, and the clauses, the unmet claims, and the claims applied
+    to an edge that its metadata lists.
 
     With ``edges`` (:func:`edge_claims`), the fit takes those required and forbidden edges and not
     the path ``claims``. ``env`` is the domain of each row, for the methods that take one.
@@ -814,6 +815,7 @@ def fit(
         result = {"status": "ok", "marks": marks}
         result["clauses"] = len(meta.get("ancestor_clauses", []))
         result["unmet"] = len(meta.get("unmet_knowledge", []))
+        result["edge_claims"] = len(meta.get("edge_claims", []))
     except KnowledgeError as exc:
         result = {"status": "knowledge_error", "message": str(exc)[:300]}
     except _Timeout:

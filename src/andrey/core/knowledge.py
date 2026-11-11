@@ -295,13 +295,29 @@ class Knowledge:
     ``lpcmci``; the list is empty when every claim is met. A CPDAG method takes the claims one at
     a time, ``required_paths`` and then ``forbidden_paths``, each in column order, and keeps a
     claim when some DAG of the class meets it together with those kept before it, so only claims
-    that each hold in some DAG but not together depend on that order; when the graph found stands
-    for no DAG, it drops every claim. A PAG method drops a required path that ``forbidden`` or the
-    tiers deny on a pair the tests keep adjacent, before the rules, in column order, and then
-    each claim the final PAG does not meet; a mark a claim set before the rules stays. A
-    ``confounded`` pair is never tested, so it is always met. Knowledge that no graph meets, such
-    as ``required_paths`` that form a cycle with the required edges, raises ``ValueError`` before
-    the search, as Raises describes.
+    that each hold in some DAG but not together depend on that order. A PAG method drops a required
+    path that ``forbidden`` or the tiers deny on a pair the tests keep adjacent, before the rules,
+    in column order, and then each claim the final PAG does not meet; a mark a claim set before the
+    rules stays. A ``confounded`` pair is never tested, so it is always met. Knowledge that no
+    graph meets, such as ``required_paths`` that form a cycle with the required edges, raises
+    ``ValueError`` before the search, as Raises describes.
+
+    A search that directs edges by tests can return a CPDAG with no consistent extension, a graph
+    that stands for no DAG, when its tests contradict each other on finite data. The rules above
+    take a class of DAGs as given [3]_, [4]_, and no published result covers such a graph. There a
+    claim acts on one edge: in any DAG that joins ``a`` and ``b`` by an edge, ``a`` is an ancestor
+    of ``b`` exactly when the edge is ``a -> b`` [8]_, [3]_. So a claim on a pair joined by an
+    undirected edge directs it, ``a -> b`` for a required path and ``b -> a`` for a forbidden one,
+    and Meek's rules R1-R4 [1]_ then run on the graph. A claim the directed edge of its pair
+    already meets changes nothing. A claim is dropped, and listed in
+    ``metadata["unmet_knowledge"]`` as above, when its pair is not adjacent or its edge is directed
+    the other way, and when it is in conflict with other claims: claims that ask for both
+    directions of one edge, and claims whose edges would lie on a directed cycle of the graph's
+    directed edges and the edges every claim asks for, are all dropped. The claims left are applied
+    together, so neither the order in which they are listed nor the column order changes the
+    result. ``metadata["edge_claims"]`` lists the claims applied to an edge this way, each
+    ``[part, a, b]``; it is empty when the graph found has a consistent extension. The result is
+    not guaranteed to stand for a DAG, as the graph found did not.
 
     References
     ----------
@@ -323,6 +339,8 @@ class Knowledge:
        P. O., and Bollen, K. (2011). DirectLiNGAM: a direct method for learning a linear
        non-Gaussian structural equation model. Journal of Machine Learning Research, 12,
        1225-1248.
+    .. [8] Fang, Z., and He, Y. (2020). IDA with background knowledge. Proceedings of the 36th
+       Conference on Uncertainty in Artificial Intelligence, PMLR 124, 270-279.
 
     Examples
     --------

@@ -146,7 +146,11 @@ def pc(
         the search kept into a directed cycle raises ``ValueError``. In a CPDAG, ``required_paths``
         and ``forbidden_paths`` keep the DAGs the graph stands for in which each listed path holds
         or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped
-        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        with a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when
+        the graph found has no consistent extension, and so stands for no DAG, a claim on a pair
+        joined by an undirected edge directs that edge, Meek's rules follow,
+        ``metadata["edge_claims"]`` lists the claims applied this way, and the result is not
+        guaranteed to stand for a DAG.
 
     Returns
     -------
@@ -1498,7 +1502,10 @@ def cdnod(
         ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
         listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
         meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
-        ``metadata["unmet_knowledge"]``.
+        ``metadata["unmet_knowledge"]``; when the graph found has no consistent extension, and so
+        stands for no DAG, a claim on a pair joined by an undirected edge directs that edge, Meek's
+        rules follow, ``metadata["edge_claims"]`` lists the claims applied this way, and the result
+        is not guaranteed to stand for a DAG.
 
     Returns
     -------
