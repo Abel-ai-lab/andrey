@@ -761,7 +761,8 @@ class LocalSearch:
         each variable outside ``pc``, or outside ``mb`` for a ``"blanket"`` learner, that a test
         separated from ``target`` to a set that did: the one ``target``'s run recorded or, for a
         member the symmetry check dropped, the one that member's run recorded for ``target``. A
-        variable no test separated, as one the knowledge makes non-adjacent, has no entry.
+        variable no test separated has no entry, as one a ``"pc"`` learner never tests because
+        the knowledge makes it non-adjacent to ``target``.
         """
         learner = LEARNERS[method]
         if learner.kind == "blanket":
