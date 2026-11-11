@@ -2944,6 +2944,8 @@ def calm(
     75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
     local optimum: on a collider whose two parents are independent, it can return both edges
     reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
+    The weights, ``w_threshold``, and the optimizer's steps are in the data's units, so rescaling a
+    column can change the graph; with ``standardize=True`` the graph does not depend on the units.
     ``missing="em"`` is experimental and not benchmarked yet; its tests run it on a collider of 3
     variables with 1,000 rows and 30% of one variable's values missing at random, where a fit took
     about 95 s, and on 5 variables with a shortened schedule. It runs the fit 10 times, so it takes

@@ -574,6 +574,7 @@ METHOD_LISTS = {
         any(i.name == "env" for i in s.data.inputs)
         and not any(p.type == "targets" for p in s.params)
     ),
+    "reads_units": lambda s: s.reads_units,
 }
 
 

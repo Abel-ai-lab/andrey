@@ -12,6 +12,13 @@ names its pull request.
 
 ### Added
 
+- `MethodSpec.reads_units` marks the methods whose default fit reads the columns' units: `calm`,
+  `dagma`, `dynotears`, `ica_lingam`, and `notears`. The tests now fit every method on data with
+  each column rescaled by its own factor, with environments, interventions, mixed data, time series,
+  and panels, and require the same graph from every other method; the methods that read the data
+  only through `indep_test="normal_scores"` keep their graph under a strictly increasing transform
+  of each column, and those that take `"chisq"` or `"gsq"` under an order-preserving recoding of
+  each column's categories. ([#910])
 - A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
   every method, how each requirement is checked, and where the exceptions are recorded. The
   examples page opens with a numbered learning path through the notebooks, and the API reference
@@ -2495,6 +2502,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#910]: https://github.com/Abel-ai-lab/andrey/pull/910
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md

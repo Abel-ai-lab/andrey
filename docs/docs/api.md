@@ -66,8 +66,9 @@ picks the edges by BIC over the whole Lasso path, so for a given causal order it
 edges in any unit of the data. A step that would read the units only through a numerical shortcut,
 such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
-units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
-least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as their pages describe.
+units. Rescaling each column by its own positive factor changes the graph of no method but
+{{ reads_units_names }}, whose published algorithms read the units, as their pages describe. The
+causal order of `ica_lingam`, for example, reads the magnitudes of its unmixing matrix.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or
 `"discrete_bic"`, read text, boolean, and `category` columns as categories and need whole numbers in
 a column of numbers, each distinct value of a column one category. Every method that takes

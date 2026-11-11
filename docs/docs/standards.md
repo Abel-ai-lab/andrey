@@ -93,12 +93,11 @@ card that reports a run is [0.9.0](benchmarks/0.9.0.md)'s.
 method's published algorithm reads the units. `tests/unit/test_column_transforms.py` fits every
 method that takes a table with each column multiplied by its own power of two, from `2**-10` to
 `2**10`, and again with environments and on mixed data where a method takes them, and requires the
-same graph, mark for mark.
-A method marked `reads_units` in the registry must change its graph there instead, so the mark
-cannot go stale; the [API reference](api.md#structure-learning-methods) names these methods, and
-their pages say how they read the units. `tests/unit/test_offset_invariance.py` shifts every column,
-or scales and shifts them all alike, and requires the same graph from every method. Each check runs
-on one small dataset per kind of input, so it covers the code those data reach.
+same graph, mark for mark. The registry marks {{ reads_units_names }} as `reads_units`: each must
+change its graph there instead, so the mark cannot go stale, and its page says how it reads the
+units. `tests/unit/test_offset_invariance.py` shifts every column, or scales and shifts them all
+alike, and requires the same graph from every method. Each check runs on one small dataset per kind
+of input, so it covers the code those data reach.
 
 **Benchmark data.** A benchmark must not reward a method for reading the simulation's units: in
 linear data drawn with the usual weights, a variable's variance, and the share of it the other
