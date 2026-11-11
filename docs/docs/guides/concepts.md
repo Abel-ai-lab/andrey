@@ -199,8 +199,8 @@ where it stops working in a **Limitations.** paragraph.
   Journal of Machine Learning Research 2.
 - [Richardson and Spirtes (2002), Ancestral Graph Markov Models][richardson], The Annals of
   Statistics 30(4).
-- [Zhang (2008), Causal Reasoning with Ancestral Graphs][zhang], Journal of Machine Learning
-  Research 9.
+- [Zhang (2008), On the Completeness of Orientation Rules for Causal Discovery in the Presence of
+  Latent Confounders and Selection Bias][zhang], Artificial Intelligence 172(16-17).
 - [Shimizu, Hoyer, Hyvärinen, and Kerminen (2006), A Linear Non-Gaussian Acyclic Model for Causal
   Discovery][shimizu], Journal of Machine Learning Research 7.
 - [Hoyer, Janzing, Mooij, Peters, and Schölkopf (2008), Nonlinear Causal Discovery with Additive
@@ -224,7 +224,7 @@ where it stops working in a **Limitations.** paragraph.
 [meek]: https://arxiv.org/abs/1302.4972
 [chickering]: https://jmlr.org/papers/v2/chickering02a.html
 [richardson]: https://doi.org/10.1214/aos/1031689015
-[zhang]: https://www.jmlr.org/papers/v9/zhang08a.html
+[zhang]: https://doi.org/10.1016/j.artint.2008.08.001
 [shimizu]: https://www.jmlr.org/papers/v7/shimizu06a.html
 [hoyer]: https://papers.nips.cc/paper/3548-nonlinear-causal-discovery-with-additive-noise-models
 [peters2014]: https://jmlr.org/papers/v15/peters14a.html
