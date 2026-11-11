@@ -50,9 +50,9 @@ A typed count goes stale without failing anything when a method is added or prom
   `{{ indep_test_methods }}` in prose names and `{{ indep_test_names }}` in code names. A page
   that lists such methods uses the substitution; a method without a prose name in `PROSE_NAMES`
   stops the build.
-- `site/build.py` computes the homepage's counts, including the comparison table's distinct
-  methods: the supported ones, where `COUNTED_WITH` names the methods that count with the one they
-  extend.
+- `site/build.py` computes the homepage's counts (the supported methods, the families, and the
+  supported methods the release cards compare) and its featured method per family
+  (`featured_methods()`, which the methods catalog shares).
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
   markers; `--check-readme` and `tests/unit/test_launch_material.py` fail when a block drifts.
 

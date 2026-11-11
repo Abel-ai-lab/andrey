@@ -8,7 +8,6 @@
 {{ home.robots }}
 <link rel="preload" as="font" type="font/woff2" href="_static/fonts/inter-latin.woff2" crossorigin>
 <link rel="preload" as="image" type="image/avif" href="{{ home.hero_image }}" fetchpriority="high">
-<noscript><style>.andrey-home .tile-dialog { display: block; position: static; margin: 2rem auto; } .andrey-home .tile-dialog .wf-close { display: none; }</style></noscript>
 <style>{{ home.style }}</style>
 {%- endblock extrahead %}
 {%- block content %}
@@ -23,54 +22,70 @@
   </div>
 <div class="andrey-home">
 <main id="main-content">
-  {#- The hero and the first section share one art, the fast lanes: it stays on the screen while
-      the hero's type scrolls away and the section's title comes up over it with the four ideas
-      behind the speed, until the section's tiles rise over it on the page's paper. #}
-  <div class="run">
-    <div class="run-art" aria-hidden="true">{{ home.hero_art }}</div>
-    <section class="hero" aria-labelledby="headline">
-      <div class="hero-ground">
-        <div class="hero-intro">
-          {{ home.agent_pill }}
-          <h1 id="headline"><span class="word">Accelerated, accurate, agentic</span> causal discovery.</h1>
-          <div class="hero-actions">
-            <div class="install-line">
-              <code>uv add andrey-core</code>
-            </div>
-            <div class="install-line">
-              <code>pip install andrey-core</code>
-            </div>
-            {{ home.hero_chips }}
-          </div>
-          <ul class="act-cards" aria-label="On this page">{{ home.act_cards }}</ul>
+  {#- The hero lies on the fast lanes, under the glass navbar; on a phone the art is a strip above
+      the type, which sits on the paper. #}
+  <section class="hero" aria-labelledby="headline">
+    <div class="hero-art">{{ home.hero_art }}</div>
+    <div class="wrap hero-body">
+      <h1 id="headline"><span class="fast" data-word="Fast">Fast</span> causal discovery in Python,
+        built for agents.</h1>
+      <p class="lede">{{ home.lede }}</p>
+      <div class="actions">
+        <div class="install" role="group" aria-label="Install">
+          <input class="visually-hidden" type="radio" name="installer" id="installer-pip" checked>
+          <label for="installer-pip">pip</label>
+          <input class="visually-hidden" type="radio" name="installer" id="installer-uv">
+          <label for="installer-uv">uv</label>
+          <div class="install-line install-line--pip"><code>pip install andrey-core</code></div>
+          <div class="install-line install-line--uv"><code>uv add andrey-core</code></div>
         </div>
+        <a class="btn btn--primary" href="docs/guides/getting-started.html">Get started</a>
+        <a class="btn btn--quiet" href="{{ home.catalog }}">Browse the methods</a>
       </div>
-    </section>
-
-    {#- Each section opens on its art with its claim, then shows the evidence. #}
-    <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
-      {{ home.act_covers["accelerated"] }}
-      <div class="run-sheet">{{ home.speed_panel }}
-        <p class="run-more"><a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is
-          so fast</a></p></div>
-    </section>
-  </div>
-
-  <section class="section wrap act" id="accurate" aria-labelledby="accurate-title">
-    {{ home.act_covers["accurate"] }}
-    <ul class="bento-grid">{{ home.accuracy_tiles }}</ul>
+    </div>
   </section>
 
-  <section class="section wrap act" id="agentic" aria-labelledby="agentic-title">
-    {{ home.act_covers["agentic"] }}
-    <ul class="bento-grid">{{ home.agent_tile }}</ul>
+  {#- One featured method per family on one axis of seconds, then the release cards they come
+      from. #}
+  <section class="record wrap" id="record" aria-labelledby="record-title">
+    <div class="sheet">
+      <h2 id="record-title">One method from each family, timed against every package that runs
+        it</h2>
+      <p class="sub">Fit time at the largest size every package ran, on one log scale. Andrey is
+        the filled dot; the band runs to the slowest package.</p>
+      <div class="ledger">{{ home.ledger }}</div>
+      <div class="l-foot">
+        <p>{{ home.ledger_note }}</p>
+        <ul><li><a href="blog/20261008-why-andrey-is-fast.html">Why Andrey is fast</a></li></ul>
+      </div>
+    </div>
+    <div class="cards-head">
+      <div>
+        <h3>Measured in every release</h3>
+        <p class="sub">{{ home.cards_intro }}</p>
+      </div>
+      <a href="docs/benchmarks.html">All {{ home.card_count }} release cards</a>
+    </div>
+    <ul class="cards">{{ home.cards }}</ul>
   </section>
 
-  <section class="section wrap act" id="all-in-one" aria-labelledby="all-in-one-title">
-    {{ home.act_covers["all-in-one"] }}
-    <ul class="bento-grid">{{ home.coverage_tiles }}</ul>
-    {{ home.example_cover }}
-    <div class="step" id="example">
+  <section class="sec wrap" id="families" aria-labelledby="families-title">
+    <h2 id="families-title">The families, by the data they read</h2>
+    {{ home.families }}
+    <div class="band band--methods">
+      {{ home.methods_art }}
+      <div class="band-body">
+        <h3>Start from your data</h3>
+        <p>The methods catalog starts from the kind of data you have: see where to start, the
+          graph you get, and the code to run.</p>
+        <a class="btn" href="{{ home.catalog }}">Open the methods catalog</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="example" aria-labelledby="example-title">
+    <h2 id="example-title">From data to graph</h2>
+    <div class="example">
       <div>
         <p>Sachs and colleagues measured 11 proteins and phospholipids in 853 human immune cells.
           PC finds 8 of the 17 links in the known signaling network, and none outside it.</p>
@@ -78,7 +93,6 @@
           {{ home.example_figure }}
           <figcaption>The recovered graph, drawn with <code>andrey.viz.draw</code>.</figcaption>
         </figure>
-        <p><a href="docs/examples/index.html">More examples</a></p>
       </div>
       <div>
         <div class="window">
@@ -93,34 +107,36 @@
     </div>
   </section>
 
-  <div class="tile-details">
-    {{ home.dialog_head("graphs", home.graph_title) }}
-    <p>A causal graph says which variables drive which, and how much the data can tell decides its
-      kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of
-      measurements, and VARMA-LiNGAM on the same lawn day by day.</p>
-    <div class="interface-figures">{{ home.interface_figures }}</div>
-    <p class="tile-more"><a href="docs/guides/graph-types.html">What each kind of graph means</a></p>
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("agents", "Agent support") }}
-    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
-      method's parameters, so an agent can use it with no person watching.
-      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
-    {{ home.agent_demo }}
-    <p><a href="docs/api.html#command-line-interface">Command-line reference</a></p>
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("methods", "Methods for every kind of data") }}
-    <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
-      experimental method is not supported yet (see its Limitations), and its API may change
-      without deprecation.</p>
-    {{ home.methods }}
-    {{ home.dialog_tail }}
-  </div>
+  <section class="sec wrap" id="agents" aria-labelledby="agents-title">
+    <div class="band band--agents">
+      {{ home.agents_art }}
+      <div class="band-body">
+        <h2 id="agents-title">Built for agents</h2>
+        <p>The <code>andrey</code> command never prompts and answers in JSON. It describes every
+          method's parameters, so an agent can pick a method and run it with no person watching.
+          <code>andrey --skill</code> prints a guide the agent loads as a skill.
+          <a href="docs/api.html#command-line-interface">Command-line reference</a></p>
+        {{ home.agent_pill }}
+        {{ home.terminal }}
+      </div>
+    </div>
+  </section>
 
-  <section class="section wrap docs-section" id="docs" aria-labelledby="docs-title">
-    {{ home.docs_cover }}
-    <div class="band-row">
-      {{ newest_post }}
-      <ul class="docs-grid">{{ home.docs_grid }}</ul>
+  <section class="sec wrap" id="next" aria-labelledby="next-title">
+    <h2 id="next-title">Where to next</h2>
+    <div class="routes">
+      <a class="route" href="docs/guides/getting-started.html"><b>Start</b><span>Install Andrey
+        and recover your first graph in five minutes.</span><em>Getting started</em></a>
+      <a class="route" href="docs/examples/index.html"><b>Learn</b><span>The example notebooks
+        in order, from your first graph to checking a result.</span><em>Learning path</em></a>
+      <a class="route" href="{{ home.catalog }}"><b>Find a method</b><span>Every method,
+        supported or experimental, by your data and the graph you need.</span><em>Methods
+        catalog</em></a>
+      <a class="route" href="docs/benchmarks.html"><b>See the evidence</b><span>Every release
+        timed and scored against other packages, with how to rerun it.</span><em>Release
+        cards</em></a>
+      <a class="route" href="docs/guides/contributing.html"><b>Help</b><span>Report a bug, add a
+        dataset, compare a method, or improve a page.</span><em>Ways to help</em></a>
     </div>
   </section>
 </main>
