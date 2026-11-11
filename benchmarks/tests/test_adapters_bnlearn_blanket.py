@@ -169,7 +169,7 @@ def test_every_function_runs_per_target_and_for_the_whole_graph():
 def test_discrete_columns_are_read_as_factors_with_the_discrete_tests():
     rng = np.random.default_rng(3)
     a, b = rng.integers(0, 3, size=(2, 1500))
-    c = (a + b + rng.integers(0, 2, size=1500)) % 3
+    c = np.where(rng.random(1500) < 0.5, a, b)  # each of a and b alone moves c
     X = np.column_stack([a, b, c]).astype(float)
     for test in ("gsq", "chisq"):
         for rule in (True, False):

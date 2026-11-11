@@ -263,7 +263,12 @@ def make_record(base: dict, measure: dict) -> dict:
         "wall_s": measure.get("wall_s"),
         "cpu_s": measure.get("cpu_s"),
         "peak_rss_mb": measure.get("peak_rss_mb"),
-        "error_text": measure.get("error_text") or measure.get("stderr"),
+        # The text of a finished fit is the packages' own warnings; only a failure is worth keeping.
+        "error_text": (
+            None
+            if measure.get("status") == "ok"
+            else measure.get("error_text") or measure.get("stderr")
+        ),
     }
 
 
