@@ -987,6 +987,7 @@ _add(
         accel="torch",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "Repeats on one machine with one torch version; on another platform the graph "
@@ -1168,6 +1169,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1227,6 +1229,7 @@ _add(
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1788,6 +1791,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels_if_converged",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "At few rows per variable, FastICA can reach another solution under a new "
@@ -2483,6 +2487,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
