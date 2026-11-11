@@ -188,7 +188,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.16.0},
+  version = {0.17.0},
   url = {https://andrey.abel.ai},
 }
 ```
