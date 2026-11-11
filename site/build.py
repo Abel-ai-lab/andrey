@@ -3221,8 +3221,8 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
 
 
 # ---- the method to start with ------------------------------------------------------------------
-# The kinds of data a method reads only: one its result implies, or a list of datasets. A required
-# ``env`` input is the other way to need a kind (:func:`needs`).
+# The kinds of data a method that reads them cannot do without: one its result implies, or a list
+# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
 NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
 
 
@@ -3284,8 +3284,8 @@ def featured_by_family(summaries: list[dict]) -> dict[str, str]:
 
 
 def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """Whether ``spec`` reads ``kind`` of data only: a required ``env`` input, or a kind in
-    ``NEEDED_KINDS`` that it reads."""
+    """Whether ``spec`` cannot run without data of ``kind``: a required ``env`` input, or a kind
+    in ``NEEDED_KINDS`` that it reads."""
     if kind == "environments":
         return any(i.name == "env" and i.required for i in spec.data.inputs)
     return kind in NEEDED_KINDS and kind in spec.data_kinds

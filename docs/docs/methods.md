@@ -14,6 +14,7 @@ it returns, whether it is supported or experimental, and the release cards that 
 other packages. Each name opens its entry in the [API reference](api.md).
 
 (your-data)=
+
 ## What does your data look like?
 
 ```{raw} html
@@ -28,6 +29,7 @@ comes before one that only accepts it. A method reads missing values when it del
 test, or fills them by structural EM where EM is supported for it.
 
 (by-family)=
+
 ## Every method by family
 
 ```{include} ../_generated/methods-families.md
