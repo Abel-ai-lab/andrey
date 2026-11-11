@@ -64,9 +64,10 @@ import numpy as np
 
 from andrey.constraint._skeleton import check_collider_rule
 from andrey.core import backend
-from andrey.core.ci import SingularCorrelationError, normal_scores
+from andrey.core.ci import SingularCorrelationError
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import LaggedConstraints
+from andrey.core.stats import normal_scores
 from andrey.core.ties import tie_ranks
 from andrey.temporal.pcmci import DesignTest, Link, LinkTest, column_test, lagged_design, pc1
 from andrey.temporal.pcmciplus import PCMCIPlusResult, Recorder, colliders, orient, skeleton

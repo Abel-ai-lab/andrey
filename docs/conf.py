@@ -535,11 +535,27 @@ PROSE_NAMES = {
     "camuv": "CAM-UV",
 }
 
+
+def _takes(spec, name: str, choice: str) -> bool:
+    """Whether the method's parameter ``name`` takes ``choice``."""
+    return any(p.name == name and choice in (p.choices or ()) for p in spec.params)
+
+
 # The method lists the pages print, each the methods a registry predicate selects:
 # ``{{ <key>_methods }}`` in prose names and ``{{ <key>_names }}`` in code names.
 METHOD_LISTS = {
     "indep_test": lambda s: any(p.name == "indep_test" for p in s.params),
     "score_func": lambda s: any(p.name == "score_func" for p in s.params),
+    "rank_score": lambda s: _takes(s, "score_func", "normal_scores"),
+    # The rank-based test with no score, and the rank-based score with no test.
+    "rank_test_only": lambda s: (
+        _takes(s, "indep_test", "normal_scores")
+        and not any(p.name == "score_func" for p in s.params)
+    ),
+    "rank_score_only": lambda s: (
+        _takes(s, "score_func", "normal_scores")
+        and not any(p.name == "indep_test" for p in s.params)
+    ),
     "test_and_score": lambda s: {"indep_test", "score_func"} <= {p.name for p in s.params},
     "no_knowledge": lambda s: not s.knowledge,
     "ordering": lambda s: s.output.has_ordering,

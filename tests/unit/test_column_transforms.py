@@ -9,10 +9,13 @@ its codes.
 
 A rank-based test reads each column only through its ranks, so under ``indep_test="normal_scores"``
 a strictly increasing transform of each column, each its own, gives the same graph. A method that
-also scores the data with ``score_func`` reads the values through its score, so the check covers the
-methods whose only reading of the data is the test. A categorical test, and a categorical score,
-read a column only through which rows share a category, so recoding each column's categories with
-other whole numbers in the same order gives the same graph under ``"chisq"`` and ``"gsq"``.
+also scores the data with ``score_func`` reads the values through its default score, so that check
+covers the methods whose only reading of the data is the test; the rank-based score,
+``score_func="normal_scores"``, reads each column only through its ranks too, and a method that
+takes it keeps its graph with it, and with the rank-based test where it also takes a test. A
+categorical test, and a categorical score, read a column only through which rows share a category,
+so recoding each column's categories with other whole numbers in the same order gives the same graph
+under ``"chisq"`` and ``"gsq"``.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ import pytest
 
 import andrey
 from andrey.core import TemporalStructure
+from andrey.core.stats import normal_scores
 from andrey.spec import list_specs
 from tests.unit.methods import fit_settings
 
@@ -134,10 +138,18 @@ def always_env(spec) -> bool:
     return required or spec.name in ("gnies", "igsp", "ut_igsp")
 
 
-def fit(spec, change: Callable[[np.ndarray], np.ndarray], *, env: bool = False, **settings):
+def fit(
+    spec,
+    change: Callable[[np.ndarray], np.ndarray],
+    *,
+    env: bool = False,
+    seed: int = 0,
+    **settings,
+):
     """The method's fit on its inputs, each data matrix passed through ``change``: a series for a
-    time-series method, a pair of columns for a pairwise one, and the DAG otherwise. With ``env``,
-    or when the method always reads them, the fit also reads the environments."""
+    time-series method, a pair of columns for a pairwise one, and the DAG otherwise, each drawn
+    with ``seed``. With ``env``, or when the method always reads them, the fit also reads the
+    environments."""
     env = env or always_env(spec)
     data = series if spec.family == "temporal" else dag
     args = []
@@ -145,7 +157,7 @@ def fit(spec, change: Callable[[np.ndarray], np.ndarray], *, env: bool = False, 
         if inp.kind == "context" and env:
             args.append(ENV)
         elif inp.kind == "matrix":
-            args.append(change(data(0)[:, :2] if spec.family == "pairwise" else data(0)))
+            args.append(change(data(seed)[:, :2] if spec.family == "pairwise" else data(seed)))
         elif inp.kind == "panel":
             args.append([change(data(seed)) for seed in range(3)])
     extra = ENV_SETTINGS.get(spec.name, {}) if env else {}
@@ -218,8 +230,9 @@ def monotone(x: np.ndarray) -> np.ndarray:
 
 
 #: The methods that take ``normal_scores`` and read the data only through their test; the others
-#: that take it, gfci, mmhc, rsmax2, boss_fci, and grasp_fci, also take ``score_func``, whose score
-#: reads the values, so a monotone transform can change their graph.
+#: that take it, gfci, mmhc, rsmax2, boss_fci, and grasp_fci, also take ``score_func``, whose
+#: default score reads the values, so a monotone transform can change their graph unless the call
+#: also passes ``score_func="normal_scores"`` (:data:`RANK_SCORED`).
 RANK_TESTED = [spec for spec in TABLE_SPECS if accepts(spec, "normal_scores") and not scores(spec)]
 
 
@@ -228,6 +241,96 @@ def test_a_monotone_transform_of_each_column_keeps_the_normal_scores_graph(spec)
     want = fit(spec, lambda x: x, indep_test="normal_scores")
     assert found(want)
     assert same(fit(spec, monotone, indep_test="normal_scores"), want)
+
+
+def accepts_score(spec, score: str) -> bool:
+    return any(p.name == "score_func" and score in (p.choices or ()) for p in spec.params)
+
+
+#: The methods that take the rank-based score. Each is fitted with it, and with the rank-based test
+#: where it takes a test, on ten seeds of the DAG, which hold every seed on which a hybrid's graph
+#: changed under a monotone transform with the rank-based test and the default score.
+RANK_SCORED = [spec for spec in TABLE_SPECS if accepts_score(spec, "normal_scores")]
+
+
+def rank_settings(spec) -> dict:
+    test = {"indep_test": "normal_scores"} if accepts(spec, "normal_scores") else {}
+    return {"score_func": "normal_scores", **test}
+
+
+@pytest.mark.parametrize("seed", range(10))
+@pytest.mark.parametrize("change", [rescale, monotone], ids=["rescale", "monotone"])
+@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+def test_the_rank_based_score_keeps_the_graph_under_a_monotone_transform(spec, change, seed):
+    want = fit(spec, lambda x: x, seed=seed, **rank_settings(spec))
+    assert found(want)
+    assert same(fit(spec, change, seed=seed, **rank_settings(spec)), want)
+
+
+def test_the_rank_based_score_is_offered_by_the_searches_that_take_the_linear_gaussian_bic():
+    takes_bic = {s.name for s in TABLE_SPECS if scores(s) and accepts_score(s, "bic")}
+    assert {s.name for s in RANK_SCORED} == takes_bic - {"gies"}
+
+
+@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+def test_the_rank_based_score_is_the_bic_of_each_columns_normal_scores(spec):
+    test = {"indep_test": "normal_scores"} if accepts(spec, "normal_scores") else {}
+    got = fit(spec, lambda x: x, **rank_settings(spec))
+    # The covariance sums in an order that follows the memory layout; the score reads C order.
+    want = fit(spec, lambda x: np.ascontiguousarray(normal_scores(x)), score_func="bic", **test)
+    assert same(got, want)
+    assert got.metadata.get("score") == want.metadata.get("score")
+    assert got.metadata["score_func"] == "normal_scores"
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in RANK_SCORED if accepts(spec, "normal_scores")],
+    ids=lambda spec: spec.name,
+)
+def test_the_rank_based_test_alone_keeps_the_default_score(spec):
+    assert fit(spec, lambda x: x, indep_test="normal_scores").metadata["score_func"] == "bic"
+
+
+#: A column order that moves every column.
+ORDER = np.array([3, 5, 0, 4, 1, 2])
+
+
+@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+def test_reordering_the_columns_relabels_the_rank_based_score_graph(spec):
+    want = fit(spec, lambda x: x, **rank_settings(spec)).structure.to_numpy()
+    got = fit(spec, lambda x: x[:, ORDER], **rank_settings(spec)).structure.to_numpy()
+    np.testing.assert_array_equal(got, want[np.ix_(ORDER, ORDER)])
+
+
+@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+def test_the_rank_based_score_honors_a_required_edge(spec):
+    knowledge = andrey.Knowledge(required=[(0, 5)])
+    assert not fit(spec, lambda x: x, **rank_settings(spec)).structure.to_numpy()[0, 5]
+    got = fit(spec, lambda x: x, knowledge=knowledge, **rank_settings(spec))
+    assert got.structure.to_numpy()[0, 5]
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in RANK_SCORED if any(i.kind == "context" for i in spec.data.inputs)],
+    ids=lambda spec: spec.name,
+)
+def test_the_rank_based_score_takes_no_environments(spec):
+    with pytest.raises(ValueError, match=rf'^{spec.name}: score_func="normal_scores" .*no env'):
+        fit(spec, lambda x: x, env=True, **rank_settings(spec))
+
+
+def test_gies_does_not_offer_the_rank_based_score():
+    gies = next(spec for spec in TABLE_SPECS if spec.name == "gies")
+    with pytest.raises(ValueError, match="score_func must be one of"):
+        fit(gies, lambda x: x, score_func="normal_scores")
+
+
+@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+def test_the_rank_based_score_refuses_a_categorical_column(spec):
+    with pytest.raises(ValueError, match="declared categorical"):
+        fit(spec, with_category, categorical=[P - 1], **rank_settings(spec))
 
 
 def recoded(x: np.ndarray) -> np.ndarray:

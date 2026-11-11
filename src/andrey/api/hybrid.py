@@ -130,8 +130,14 @@ def mmhc(
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``None`` picks from the declared
-        column types, as for :func:`~andrey.ges`.
+        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``"normal_scores"``, experimental, is
+        ``"bic"`` on each column's normal scores, for continuous data that are Gaussian only after
+        an unknown increasing transformation of each column, as :func:`~andrey.ges` describes, with
+        its limits. With ``indep_test="normal_scores"`` both phases read one nonparanormal model,
+        and a strictly increasing transformation of any column leaves the graph unchanged; the
+        consistency results for the rank-based test and score cover PC, GES, and ARGES, so with this
+        search it is the analogous construction, not a proven result. ``None`` picks from the
+        declared column types, as for :func:`~andrey.ges`.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
@@ -140,8 +146,8 @@ def mmhc(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
-        raises ``ValueError``. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -370,8 +376,14 @@ def rsmax2(
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     score_func : str or None, default=None
-        Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``None`` picks from the
-        declared column types, as for :func:`~andrey.ges`.
+        Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
+        experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
+        Gaussian only after an unknown increasing transformation of each column, as
+        :func:`~andrey.ges` describes, with its limits. With ``indep_test="normal_scores"`` both
+        phases read one nonparanormal model, and a strictly increasing transformation of any column
+        leaves the graph unchanged; the consistency results for the rank-based test and score cover
+        PC, GES, and ARGES, so with this search it is the analogous construction, not a proven
+        result. ``None`` picks from the declared column types, as for :func:`~andrey.ges`.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
@@ -380,8 +392,8 @@ def rsmax2(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
-        raises ``ValueError``. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
