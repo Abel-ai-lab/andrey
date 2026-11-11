@@ -3160,10 +3160,12 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: iamb, inter_iamb, and mmpc mostly
-#: did not apply the claims, since the graph they found often had no consistent extension, and tabu,
-#: mmhc, and rsmax2 made more errors than their reference given the required edges, each on repeated
-#: seeds.
+#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
+#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
+#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
+#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
+#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
+#: edge and most claims are dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
@@ -3176,6 +3178,9 @@ _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "boss": PATH_PARTS,
     "grasp": PATH_PARTS,
     "exact_search": PATH_PARTS,
+    "iamb": ("required_paths",),
+    "inter_iamb": ("required_paths",),
+    "mmpc": ("required_paths",),
     "fci": _PAG_PARTS,
     "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,

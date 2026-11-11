@@ -475,11 +475,11 @@ supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
-RSMAX2, where a reference package given the edges those paths imply made fewer errors. Both path
-parts are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
-has no consistent extension: the fits we measured then dropped every claim and returned the graph
-they found without them, so the claims were mostly not applied, and the rule that now applies claims
-to the edges of such a graph is not measured yet. A path claim says less than an edge and so directs
+RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
+paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
+has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
+96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
+edges farther from the class the claims define. A path claim says less than an edge and so directs
 less: a required path cannot restore an edge the search left out. When you know the edge itself,
 state it as `required`.
 

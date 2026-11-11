@@ -214,10 +214,10 @@ worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/kn
 than the same fit without them and than a reference package given the same knowledge: in every
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
-and `required_paths` and `forbidden_paths` are experimental in `iamb`, `inter_iamb`, and `mmpc`,
-where the graph found at 50 variables often has no consistent extension: the fits we measured then
-dropped every claim and returned the graph they found without them, so the claims were mostly not
-applied, and the rule that now applies claims to the edges of such a graph is not measured yet. An
+and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
+50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
+measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
+the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
 experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
