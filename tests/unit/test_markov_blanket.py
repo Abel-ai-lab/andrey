@@ -4,13 +4,15 @@ Under a d-separation oracle each search returns the true set, each recorded sepa
 separates, and the spouse step completes the parents and children into the Markov blanket. With a
 Fisher-Z test, IAMB returns, bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph
 is built from. A memoized run is the run made afresh, and the local search gives the sets the
-methods return, whatever the column order.
+methods return, whatever the column order. A scan of many candidates gives each the bits of its own
+query, the ranks are read only when keys tie, and the counts follow their definitions.
 """
 
 from __future__ import annotations
 
 from itertools import combinations
 
+import networkx as nx
 import numpy as np
 import pytest
 
@@ -29,12 +31,14 @@ from andrey.constraint.blanket import (
     mmpc_sets,
     parents_children,
     reach,
+    strongest,
     table_size,
 )
 from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
 from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.data.latent import DSepOracle
 from andrey.search.calm import moral_graph
 from tests.recovery.helpers.oracle import DSeparation
 
@@ -412,6 +416,146 @@ def test_a_column_shuffle_leaves_every_recorded_set(method, kind):
         assert (back(spc), back(smb)) == (pc, mb), t
         moved = {int(perm[v]): tuple(sorted(int(perm[u]) for u in g)) for v, g in ssepsets.items()}
         assert moved == sepsets, t
+
+
+#: The tests whose scan answers many candidates in one call, by the data each reads.
+_BATCHED = {
+    "fisherz": "gaussian",
+    "student_t": "gaussian",
+    "normal_scores": "gaussian",
+    "fisherz-missing": "gaussian",
+    "normal_scores-missing": "gaussian",
+    "chisq": "discrete",
+    "gsq": "discrete",
+}
+
+
+def _scan_data(kind: str, seed: int = 3) -> np.ndarray:
+    """Twelve columns of the data ``kind`` reads, a twentieth of the values missing for a
+    ``-missing`` kind."""
+    if _BATCHED[kind] == "gaussian":
+        x = data.sample_scm(graph="erdos_renyi", d=12, n=400, seed=seed, density=3.0).data
+    else:
+        x = data.sample_discrete(d=12, n=1500, seed=seed, density=3.0).data
+    if kind.endswith("-missing"):
+        x = x.copy()
+        x[np.random.default_rng(seed).random(x.shape) < 0.05] = np.nan
+    return x
+
+
+@pytest.mark.parametrize("kind", list(_BATCHED))
+def test_a_scan_is_its_candidates_asked_one_at_a_time_bit_for_bit(kind):
+    """The scan of many candidates, answered in one call, gives each candidate the bits of the scan
+    of that candidate alone and of the test's own answer, in the order of the candidates."""
+    x = _scan_data(kind)
+    test = make_indep_test(kind.removesuffix("-missing"), x)
+    assert hasattr(test, "statistic_pvalues" if _BATCHED[kind] == "gaussian" else "pvalues_given")
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    target = 4
+    for cond in [(), (7,), (2, 9), (0, 3, 8, 11)]:
+        xs = [v for v in range(12) if v != target and v not in cond]
+        strengths, pvalues = search.scan(target, xs, cond)
+        alone = [search.scan(target, [v], cond) for v in xs]
+        assert strengths.tobytes() == np.concatenate([s for s, _ in alone]).tobytes(), cond
+        assert pvalues.tobytes() == np.concatenate([p for _, p in alone]).tobytes(), cond
+        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
+        backward = search.scan(target, xs[::-1], cond)
+        assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+def test_a_scan_does_not_depend_on_the_column_order(kind):
+    """On the columns shuffled, each candidate's strength and p-value agree to rounding and fall on
+    the same side of alpha, and the strongest candidate is the same column."""
+    x = _scan_data(kind)
+    perm = np.random.default_rng(5).permutation(12)
+    where = np.argsort(perm)  # where[v]: the shuffled position of column v
+    search = local_search(x, alpha=0.05, indep_test=kind)
+    shuffled = local_search(x[:, perm], alpha=0.05, indep_test=kind)
+    target = 4
+    for cond in [(), (7,), (2, 9), (0, 3, 8, 11)]:
+        xs = [v for v in range(12) if v != target and v not in cond]
+        strengths, pvalues = search.scan(target, xs, cond)
+        moved = shuffled.scan(int(where[target]), where[xs].tolist(), where[list(cond)].tolist())
+        np.testing.assert_allclose(moved[0], strengths, rtol=1e-9, atol=1e-300)
+        np.testing.assert_allclose(moved[1], pvalues, rtol=1e-9, atol=1e-300)
+        assert ((moved[1] <= 0.05) == (pvalues <= 0.05)).all(), cond
+        keys = {v: -round(s, KEY_DP) for v, s in zip(xs, strengths.tolist(), strict=True)}
+        keys_moved = {
+            int(where[v]): -round(s, KEY_DP) for v, s in zip(xs, moved[0].tolist(), strict=True)
+        }
+        assert perm[shuffled.strongest(keys_moved)] == search.strongest(keys), cond
+
+
+class _Recorded(list):
+    """Ranks that record each position read."""
+
+    def __init__(self, ranks):
+        super().__init__(ranks)
+        self.read: list[int] = []
+
+    def __getitem__(self, i):
+        self.read.append(i)
+        return super().__getitem__(i)
+
+
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_ranks_are_read_only_when_keys_tie(method):
+    """On continuous data no two strengths tie, so the search reads no rank and finds the sets it
+    finds with the ranks read; under an oracle every dependent candidate ties, and the ranks read
+    are those of tied candidates."""
+    x, test = _search_data("fisherz")
+    ranks = _Recorded(tie_ranks(x).tolist())
+    search = LocalSearch(test, ranks, 0.05)
+    plain = LocalSearch(test, list(ranks), 0.05)
+    for t in range(15):
+        assert search.local(method, t) == plain.local(method, t), t
+    assert ranks.read == []
+    keys = {3: 0.5, 1: 0.25, 7: 0.25, 2: 0.25, 5: 0.75}
+    ranks = _Recorded([0, 9, 4, 8, 1, 2, 7, 3])
+    assert strongest(keys, ranks) == 7
+    assert set(ranks.read) <= {1, 7, 2}
+    with pytest.raises(ValueError, match="no candidate"):
+        strongest({}, ranks)
+    oracle = _oracle(0)
+    ranks = _Recorded(list(range(oracle.d)))
+    LocalSearch(oracle, ranks, 0.5).local(method, 0)
+    assert ranks.read
+
+
+def test_a_search_counts_queries_issued_computed_and_distinct():
+    """On the chain 0 -> 1 -> 2 under a memoizing oracle, IAMB at 0 asks (0, 1) and (0, 2) given
+    nothing, then (0, 2) given 1, which separates them, and its shrink asks (0, 1) given nothing
+    again, which the oracle answers from its memo: 4 issued, 3 distinct, 3 computed."""
+    oracle = DSepOracle(nx.DiGraph([(0, 1), (1, 2)]))
+    search = LocalSearch(oracle, [0, 1, 2], 0.5, trace=True)
+    assert search.run("iamb", 0) == ([1], {2: (1,)})
+    counts = search.counts
+    assert (counts.issued, counts.distinct, counts.computed) == (4, 3, 3)
+    assert counts.queries == {(0, 1, ()), (0, 2, ()), (0, 2, (1,))}
+    assert 0.0 <= counts.test_seconds <= counts.search_seconds
+    search.run("iamb", 0)
+    assert (counts.issued, counts.computed) == (4, 3)
+
+
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_n_tests_is_the_count_of_tests_computed(method):
+    """A target fit's ``n_tests`` is the engine's computed count; a test without kept answers
+    computes every query it is asked, and a repeated query counts once among the distinct."""
+    x, _ = _search_data("fisherz")
+    for t in (0, 6):
+        search = local_search(x, alpha=0.05, indep_test="fisherz", trace=True)
+        search.local(method, t)
+        counts = search.counts
+        fit = getattr(andrey, method)(x, target=t, indep_test="fisherz")
+        assert fit.metadata["n_tests"] == counts.computed == counts.issued, t
+        assert counts.distinct is not None and counts.distinct <= counts.issued
+    x, _ = _search_data("chisq")
+    search = local_search(x, alpha=0.05, indep_test="chisq")
+    search.local(method, 0)
+    fit = getattr(andrey, method)(x, target=0, indep_test="chisq")
+    assert fit.metadata["n_tests"] == search.counts.computed <= search.counts.issued
+    assert search.counts.distinct is None
 
 
 def test_table_size_counts_cells_and_degrees_of_freedom():

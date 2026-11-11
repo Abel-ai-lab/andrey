@@ -596,6 +596,8 @@ def _moves(base: Iterable[int], moves: Iterable[tuple[str, int]]) -> list[list[i
 #: one call makes, read from the call's result, the test, and the call's arguments.
 CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "__call__": lambda p, test, x, y, conditions=(): [(x, y, conditions, p)],
+    "statistic_pvalue": lambda rp, test, x, y, conditions=(): [(x, y, conditions, rp[1])],
+    "statistic_pvalues": lambda rp, test, xs, ys, sets: list(zip(xs, ys, sets, rp[1])),
     "_bounded_pvalue": lambda p, test, x, y, conditions, *settings, **options: [
         (x, y, conditions, p)
     ],

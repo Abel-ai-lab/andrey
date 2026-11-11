@@ -30,6 +30,16 @@ names its pull request.
   runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
   scores, and the contract that the adapter of an Andrey method fills. ([#912])
 
+### Changed
+
+- `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
+  partial-correlation test. With Fisher-z, one grow step is 12 to 47 times faster on 400 to 12,800
+  variables with blankets of 2 to 10 members. A fit at one target is 1.3 to 4.2 times faster on
+  200 to 1,600 variables, less as the learned blanket grows (12 to 72 members), and a fit of the
+  whole graph on 60 variables 3.7 to 4.6 times faster. Their graphs and `metadata["n_tests"]` do
+  not change, bit for bit. Fits with the chi-square tests, and `mmpc` fits, take the same time as
+  before. ([#927])
+
 ## [0.17.0] - 2026-11-11
 
 ### Highlights
@@ -2498,6 +2508,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#927]: https://github.com/Abel-ai-lab/andrey/pull/927
 [#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
