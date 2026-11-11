@@ -70,8 +70,9 @@ several domains; and ICP's parents of one variable from several environments.
 :img-alt: The true graph of this notebook's data
 
 XGES, hill climbing, tabu search, and exact search look for the graph with the best score, by
-default the extended BIC; MMHC and RSMAX2 restrict the search with tests first; GIES also learns
-from interventions, and GnIES from environments whose changes it is not told.
+default the extended BIC; AGES directs more edges than GES when some effects are weak; MMHC and
+RSMAX2 restrict the search with tests first; GIES also learns from interventions, and GnIES from
+environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

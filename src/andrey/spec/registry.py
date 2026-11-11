@@ -804,7 +804,7 @@ _add(
             "whether its orientations were taken",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(

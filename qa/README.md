@@ -155,7 +155,7 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
-XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI,
+XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI,
 UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM,
 CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM,
 Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported
@@ -167,6 +167,7 @@ targets UT-IGSP learns:
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
+| `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
@@ -245,6 +246,13 @@ targets UT-IGSP learns:
   at 10 variables and 40 against 40 at 20. `notears_paper_raw` keeps the columns as generated,
   where the variances grow along the causal order and the fit reads the order from them, at 10
   variables. A fit at 50 standardized variables takes about half a minute on one core.
+- **Linear Gaussian models with weak edges.** AGES's published regime, drawn by its benchmark
+  driver (`benchmarks/ages_cpu.py`) as two of its comparison's cells: the simulation of Eigenmann,
+  Nandy, and Maathuis (2017) on 10 variables with 10,000 rows, where each pair of variables holds a
+  strong edge (weight magnitude 0.8 to 1.2) or a weak one (0.1 to 0.3). One cell has 10%
+  strong and 30% weak edges, and one has 30% of each. AGES directs edges beyond the
+  CPDAG, so the gate scores its graph against the true DAG, where an edge left undirected counts
+  one.
 - **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,
   MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and the
   benchmark drivers of GIES and GnIES): `interventional_gauss_er` at `n = 50d`, with intervention
@@ -315,8 +323,9 @@ targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-NOTEARS, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its groups,
-and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed variables.
+NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its
+groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed
+variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
