@@ -102,7 +102,21 @@ def test_every_cell_pairs_andrey_with_its_reference_the_controls_and_the_floor()
     assert names("standardized", 20, robust=True) == always | robust
     assert names("standardized", 50, robust=True) == always
     assert names("raw", 10, robust=True) == always | scaled
-    assert set(notears_cpu.solution_names()) == always | scaled | robust
+    paper = {"andrey.dagma.paper", "bello.dagma.paper"}
+    assert set(notears_cpu.solution_names()) == always | scaled | robust | paper
+    with_paper = {a.name for a in notears_cpu.arms("standardized", 50, paper=True)}
+    assert with_paper == always | paper
+    assert {a.name for a in notears_cpu.arms("raw", 50, paper=True)} == always | scaled
+
+
+def test_paper_arms_set_the_paper_penalty_in_both_codes() -> None:
+    andrey_arm, reference = (
+        a for a in notears_cpu.arms("standardized", 10, paper=True) if a.name.endswith(".paper")
+    )
+    assert andrey_arm.params() == {"lambda1": 0.05}
+    assert reference.params()["lambda1"] == 0.05
+    default = next(a for a in notears_cpu.arms("standardized", 10) if a.name == "bello.dagma")
+    assert default.params()["lambda1"] == 0.03
     # The controls run where CausalDisco is installed.
     controls = [a for a in notears_cpu.arms("raw", 10) if a.name.startswith("causaldisco")]
     assert {a.python_env for a in controls} == {notears_cpu.REFERENCE_ENV}
