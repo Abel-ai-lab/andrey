@@ -51,7 +51,8 @@ A typed count goes stale without failing anything when a method is added or prom
   that lists such methods uses the substitution; a method without a prose name in `PROSE_NAMES`
   stops the build.
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
-  methods (`COUNTED_WITH` names the methods that count with the one they extend).
+  methods: the supported ones, where `COUNTED_WITH` names the methods that count with the one they
+  extend.
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
   markers; `--check-readme` and `tests/unit/test_launch_material.py` fail when a block drifts.
 
