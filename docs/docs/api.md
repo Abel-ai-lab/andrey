@@ -799,15 +799,15 @@ query.
 `score_func="normal_scores"` is experimental; {{ rank_score_names }} take it. It replaces each
 column by its normal scores, the transformation of `indep_test="normal_scores"`, and scores them
 with the linear-Gaussian BIC, `penalty_discount` and `ebic_gamma` included. Its model is the
-nonparanormal, or Gaussian copula: each column is an unknown strictly increasing function of a
-latent variable, and the latent variables follow a linear-Gaussian model of the graph. Use it for
-continuous data that are Gaussian only after such a transformation of each column. A column's
-normal scores depend on it only through its ranks, so a strictly increasing transformation of any
-column leaves the score, and so the graph, unchanged; on data that are Gaussian already, it ranks
-graphs almost as `"bic"` does. Neither option sets the other: `indep_test="normal_scores"` alone
-keeps the default score, `"bic"`. In a method that takes both, pass both, and the test and the
-score read one model; then a strictly increasing transformation of any column leaves the graph
-unchanged.
+nonparanormal, or Gaussian copula, model of Liu, Lafferty, and Wasserman: each column is an unknown
+strictly increasing function of a latent variable, and the latent variables follow a linear-Gaussian
+model of the graph. Use it for continuous data that are Gaussian only after such a transformation of
+each column. A column's normal scores depend on it only through its ranks, so a strictly increasing
+transformation of any column leaves the score, and so the graph, unchanged; on data that are
+Gaussian already, it ranks graphs almost as `"bic"` does. Neither option sets the other:
+`indep_test="normal_scores"` alone keeps the default score, `"bic"`. In a method that takes both,
+pass both, and the test and the score read one model; then a strictly increasing transformation of
+any column leaves the graph unchanged.
 
 We estimate the latent correlations by the correlations of the normal scores. Nandy, Hauser and
 Maathuis estimate them from Spearman's or Kendall's rank correlation, transformed, which estimates
