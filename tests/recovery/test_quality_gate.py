@@ -295,9 +295,10 @@ def _regime_draws(regime: str) -> list:
     return out
 
 
-@pytest.mark.parametrize("cell", [*qg.REGIMES, *qg.PAIRS, "asia"])
+@pytest.mark.parametrize("cell", [*qg.REGIMES, *qg.PAIRS, *qg.LINEAR_SEM_CELLS, "asia"])
 def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) -> None:
-    """The gate's regimes, pairs, and ASIA list their columns in an order drawn from the seed.
+    """The gate's regimes, pairs, NOTEARS cells, and ASIA list their columns in an order drawn from
+    the seed.
 
     The control: ASIA's unshuffled columns, which follow its file; for the regimes and pairs, the
     same draws sorted by causal depth, since an Erdos-Renyi draw already numbers its nodes at
@@ -316,7 +317,10 @@ def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) ->
         plain = [scm.sample(n=5, seed=s, shuffle=False, scale="raw") for s in _ORDER_SEEDS]
         control, _ = _correlations(qg.Draw(ds.data, ds.graph) for ds in plain)
     else:
-        draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)
+        if cell in qg.LINEAR_SEM_CELLS:
+            draws = qg.linear_sem_draws(*qg.LINEAR_SEM_CELLS[cell])
+        else:
+            draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)
         control, _ = _correlations(draws, by_depth=True)
     mean, bound = _correlations(draws)
     assert abs(mean) < bound

@@ -57,6 +57,7 @@ import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import igsp_cpu  # noqa: E402
 import jpcmciplus_cpu  # noqa: E402
+import notears_cpu  # noqa: E402
 import stein_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
@@ -265,6 +266,18 @@ CONTEXT_CELLS: dict[str, str] = {
     "jpcmciplus_half_m10_t100": "half-M10-T100",
 }
 
+#: NOTEARS's published regime, drawn by its benchmark driver (``benchmarks/notears_cpu.py``) as two
+#: of its comparison's cells, as ``(scale, d)``: the simulation of the NOTEARS paper, a linear model
+#: on an Erdos-Renyi graph with ``2 d`` edges, Gaussian noise of unit variance, and 1,000 rows. On
+#: standardized columns, the scale of the comparison's decision cells, the median SHD over the
+#: gate's seeds is below the empty graph's by a clear margin only at 50 variables: at 10 it is 18.5
+#: against 20, and at 20 it is 40 against 40. On raw columns the variances grow along the causal
+#: order, which the least-squares fit reads, so that cell holds the fit to a near-exact recovery.
+LINEAR_SEM_CELLS: dict[str, tuple[str, int]] = {
+    "notears_paper_standardized_d50": ("standardized", 50),
+    "notears_paper_raw_d10": ("raw", 10),
+}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -427,6 +440,17 @@ def order_draws(regime: str, d: int, density: str) -> tuple[Draw, ...]:
     draws it."""
     out = []
     for key in stein_cpu.regime_keys(regime, d, stein_cpu.DENSITIES[density], SEEDS):
+        x, marks, kind, _ = datasets.generate_one(key)
+        out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
+    return tuple(out)
+
+
+def linear_sem_draws(scale: str, d: int) -> tuple[Draw, ...]:
+    """One dataset per seed of the NOTEARS lane's Erdos-Renyi cell with Gaussian noise at ``scale``
+    and ``d`` variables, with its true DAG."""
+    out = []
+    for seed in SEEDS:
+        key = notears_cpu.cell_key("er2", d, "gaussian", scale, seed)
         x, marks, kind, _ = datasets.generate_one(key)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind)))
     return tuple(out)
@@ -668,6 +692,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
     },
     **{name: functools.partial(order_draws, *cell) for name, cell in ORDER_CELLS.items()},
     **{name: functools.partial(index_pag_draws, cell) for name, cell in INDEX_PAG_CELLS.items()},
+    **{name: functools.partial(linear_sem_draws, *cell) for name, cell in LINEAR_SEM_CELLS.items()},
     **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
@@ -751,6 +776,8 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # have: interventions, environments that change noise variances, domains, groups, or latents
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 # SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
+# NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
+# fit reads the columns' units, so one cell has standardized columns and one raw.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -898,6 +925,7 @@ SUPPORTED: dict[str, Method] = {
     "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
+    "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
@@ -1243,6 +1271,7 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 #: The cells that take over 10 seconds on a CI runner, slowest first. With several jobs they start
 #: first, so no worker is left fitting one long cell after the others have finished.
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
+    ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
@@ -1270,6 +1299,7 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("NOTEARS", "notears_paper_raw_d10"),
 )
 
 

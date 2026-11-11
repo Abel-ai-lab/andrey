@@ -172,7 +172,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
@@ -187,6 +187,12 @@ change through them and are not listed.
 
 With `env`, `ges`, `hc`, `tabu`, `boss`, and `grasp` return the same kind of graph: kind `cpdag`,
 partially directed by the index, with the same `index_edges` and `changing_variables`.
+
+`ages` returns kind `cpdag`, but its graph can direct edges that the CPDAG of its skeleton leaves
+undirected, as a CPDAG narrowed by background knowledge does: it takes the directions from the
+sparser CPDAGs that GES returns at higher penalties, so score it against the graph AGES can
+identify rather than the true DAG's CPDAG. `metadata["path_penalties"]` lists the penalties of
+those CPDAGs and `metadata["path_aggregated"]` whether each one's directions were taken.
 
 `fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
 `metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for

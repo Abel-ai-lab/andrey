@@ -18,6 +18,7 @@ to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's 
 """
 
 from .api import (
+    ages,
     anm,
     boss,
     boss_fci,
@@ -131,6 +132,7 @@ __all__ = [
     "inter_iamb",
     "mmpc",
     "ges",
+    "ages",
     "gies",
     "gnies",
     "xges",

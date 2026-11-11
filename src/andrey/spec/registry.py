@@ -787,6 +787,40 @@ _add(
 )
 _add(
     MethodSpec(
+        name="ages",
+        family="score",
+        summary="Aggregative greedy equivalence search for linear-Gaussian data with weak edges: "
+        "the CPDAGs GES returns for every penalty from penalty_discount up, overlaid on the CPDAG "
+        "of that minimum penalty, so the graph keeps the GES skeleton and can direct more of its "
+        "edges. Standard linear-Gaussian BIC only. Returns a partially directed graph, tagged "
+        "cpdag.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the aggregated partially directed graph (APDAG), a maximally oriented one, as a "
+            "CPDAG narrowed by background knowledge is; metadata['path_penalties'] lists the "
+            "penalty_discount of each CPDAG of the solution path and metadata['path_aggregated'] "
+            "whether its orientations were taken",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "penalty_discount",
+                doc="Multiplier on the BIC penalty of log(n) per parent, the minimum penalty of "
+                "the solution path: the result has the skeleton of the ges CPDAG with this "
+                "penalty_discount, ebic_gamma=0.0, and no gate on a node's parents. 1.0 is the "
+                "standard BIC, the paper's minimum.",
+            ),
+        ),
+        references=("Eigenmann, Nandy & Maathuis 2017", "Chickering 2002", "Meek 1995"),
+    )
+)
+_add(
+    MethodSpec(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
@@ -1132,7 +1166,7 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -3220,6 +3254,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     **dict.fromkeys(("gfci", "boss_fci", "grasp_fci"), ("index_edges",)),
     "gnies": ("score", "changing_variables", "environments"),
+    "ages": ("path_penalties", "path_aggregated"),
     "exact_search": ("dag",),
     "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
     "ut_igsp": ("targets", "score", "invariance_test", "alpha"),

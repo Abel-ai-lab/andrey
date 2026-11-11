@@ -10,7 +10,9 @@ what R2-sortability gives away. CausalDisco (BSD-3-Clause) is the authors' packa
 :class:`CausalDiscoR2SortnRegress` returns the graph of ``r2_sort_regress``;
 :class:`CausalDiscoR2Sort` returns the full DAG of its order
 (:mod:`~andrey_bench.adapters.order_dag`), the floor for the share of true edges an order gets
-right.
+right. :class:`CausalDiscoVarSortnRegress` returns the graph of ``var_sort_regress`` (Reisach et
+al., 2021), which orders the variables by their variance instead: the control for data at the
+generator's own scale, where the variances grow along the causal order.
 """
 
 from __future__ import annotations
@@ -53,6 +55,19 @@ class CausalDiscoR2SortnRegress:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalDiscoVarSortnRegress(CausalDiscoR2SortnRegress):
+    """CausalDisco's ``var_sort_regress`` at its defaults."""
+
+    name: str = "causaldisco.var_sort_regress"
+    algorithm: str = "var_sort_regress"
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Return the 0/1 adjacency of the regression weights. The only timed region."""
+        from CausalDisco.baselines import var_sort_regress  # ty: ignore[unresolved-import]
+
+        return (var_sort_regress(np.asarray(data, dtype=np.float64)) != 0).astype(np.int8)
 
 
 class CausalDiscoR2Sort(CausalDiscoR2SortnRegress):
