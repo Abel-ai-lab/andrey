@@ -178,6 +178,10 @@ the share of datasets where Andrey and the reference return the same DAG.
 The four DAGMA cells that were worse on the first seeds ran again on seeds 20 to 39; "rerun" is
 that run's difference from the reference.
 
+These DAGMA rows are of the first build, which held the diagonal of the weight matrix at zero;
+[DAGMA with a free diagonal](#dagma-with-a-free-diagonal) has the rows of the build that leaves it
+free, which ties the reference in all 24 cells.
+
 ### Raw, rescaled, and standardized cells beside the controls
 
 Means over the three noises of a graph and size; the counts are over those three cells.
@@ -330,6 +334,235 @@ Median seconds per fit; each entry is the median over a scale and size's six cel
 | DAGMA | standardized | 50 | 10.7 | 9.8 | 0.91 |
 | DAGMA | standardized | 100 | 46.7 | 38.2 | 0.82 |
 
+## DAGMA with a free diagonal
+
+The DAGMA rows above are of the first build, whose fit held the diagonal of the weight matrix at
+zero at every step. The paper's algorithm (Bello et al., 2022, Algorithm 1) solves each stage as an
+unconstrained problem over the whole matrix, started at zero: nothing fixes the diagonal, and the
+acyclicity function, which counts a self-weight as a cycle, brings it back toward zero as the path
+proceeds. The authors' package does the same: its Adam step updates every entry, and the result is
+thresholded and nothing else, so a diagonal entry goes only because it is small (at most 5e-5 in
+the fits traced). The diagonal changes the path the other weights take through the first stage, and
+the path ends at another solution. `andrey.dagma` now leaves the diagonal free in its
+least-squares fit; its graph and its returned weights carry no diagonal entry. The likelihood steps
+of `robust=True` hold the diagonal at zero, as before.
+
+The rows below are `andrey.dagma` of the build with that change (commit `6c70976ab`), at its
+defaults on the same datasets, against the recorded rows of the authors' package and of the empty
+graph: 1,200 fits, and 240 more with `robust=True`.
+
+| scale | cells | better / tie / worse than the reference | below / tied with / above the empty graph | reference below / tied with / above the empty graph | better / tie / worse than the first build |
+|---|---|---|---|---|---|
+| standardized (decision cells) | 24 | 0 / 24 / 0 | 0 / 8 / 16 | 0 / 8 / 16 | 4 / 20 / 0 |
+| raw | 18 | 0 / 18 / 0 | 18 / 0 / 0 | 18 / 0 / 0 | 0 / 17 / 1 |
+| rescaled | 18 | 0 / 17 / 1 | 18 / 0 / 0 | 18 / 0 / 0 | 4 / 14 / 0 |
+
+On the decision cells DAGMA now ties its authors' package in all 24, where the first build was
+worse in 4 on the first seeds and in 3 again on fresh ones. It returns the reference's recorded
+graph in every dataset at 10 variables, 96% of them at 20, 84% at 50, and 57% at 100, against 0 to
+80% of a cell's datasets in the first build. The floor does not move: it is below the empty graph
+in none of the 24 cells and above it in 16, exactly as the authors' package is. The one rescaled
+cell worse than the reference, `SF4` at 50 variables with Gaussian noise (+0.6 [+0.1, +1.2]), ran
+again on seeds 20 to 39: +0.25 [+0.0, +0.7], a tie, so no cell is worse than the reference twice.
+The one raw cell where the first build was better than the reference, `ER2` at 10 variables with
+Gumbel noise (0.5 against 1.0), is now a tie at 1.0: the build makes the errors its reference
+makes.
+
+Standardized cells, mean SHD over the 20 datasets of each cell; "before the change" is the first
+build on the same datasets:
+
+| graph | d | noise | Andrey | reference | empty graph | Andrey - reference | same graph | Andrey - empty | reference - empty | before the change | Andrey - before | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ER2 | 10 | exponential | 18.8 | 18.8 | 20.0 | +0.0 [+0.0, +0.0] | 100% | -1.2 [-2.6, +0.1] | -1.2 [-2.6, +0.1] | 19.0 | -0.2 [-1.3, +0.7] | tie |
+| ER2 | 10 | gaussian | 18.9 | 18.9 | 20.0 | +0.0 [+0.0, +0.0] | 100% | -1.1 [-2.1, +0.1] | -1.1 [-2.1, +0.1] | 19.1 | -0.1 [-0.7, +0.3] | tie |
+| ER2 | 10 | gumbel | 19.6 | 19.6 | 20.0 | +0.0 [+0.0, +0.0] | 100% | -0.5 [-1.8, +0.9] | -0.5 [-1.8, +0.9] | 19.4 | +0.1 [-0.3, +0.8] | tie |
+| ER2 | 20 | exponential | 41.8 | 41.8 | 40.0 | +0.0 [+0.0, +0.0] | 100% | +1.8 [-0.8, +4.4] | +1.8 [-0.8, +4.4] | 42.1 | -0.3 [-1.1, +0.4] | tie |
+| ER2 | 20 | gaussian | 42.7 | 42.8 | 40.0 | -0.1 [-0.1, +0.0] | 95% | +2.7 [+0.1, +5.5] | +2.8 [+0.1, +5.5] | 42.5 | +0.2 [-0.3, +0.8] | tie |
+| ER2 | 20 | gumbel | 42.5 | 42.5 | 40.0 | +0.0 [+0.0, +0.0] | 100% | +2.5 [-0.3, +5.4] | +2.5 [-0.3, +5.3] | 42.4 | +0.1 [-0.7, +0.8] | tie |
+| ER2 | 50 | exponential | 110.8 | 110.6 | 100.0 | +0.2 [-0.1, +0.7] | 80% | +10.8 [+6.7, +14.8] | +10.6 [+6.5, +14.6] | 112.5 | -1.6 [-3.2, +0.1] | tie |
+| ER2 | 50 | gaussian | 110.0 | 110.0 | 100.0 | +0.0 [-0.1, +0.1] | 90% | +10.1 [+6.0, +14.2] | +10.1 [+6.0, +14.4] | 113.5 | -3.5 [-5.5, -1.8] | tie |
+| ER2 | 50 | gumbel | 111.2 | 111.3 | 100.0 | -0.1 [-0.4, +0.0] | 90% | +11.2 [+6.4, +15.7] | +11.3 [+6.7, +15.8] | 111.5 | -0.3 [-2.8, +2.4] | tie |
+| ER2 | 100 | exponential | 206.9 | 206.8 | 200.0 | +0.1 [-0.1, +0.4] | 75% | +6.9 [+2.9, +10.9] | +6.8 [+2.8, +10.8] | 211.2 | -4.3 [-6.8, -1.8] | tie |
+| ER2 | 100 | gaussian | 208.6 | 208.9 | 200.0 | -0.3 [-0.9, +0.0] | 80% | +8.6 [+4.6, +12.5] | +8.9 [+5.0, +12.8] | 211.2 | -2.6 [-4.7, -0.3] | tie |
+| ER2 | 100 | gumbel | 207.4 | 207.5 | 200.0 | -0.1 [-0.3, +0.2] | 60% | +7.5 [+4.0, +10.8] | +7.5 [+4.0, +10.8] | 212.6 | -5.1 [-7.6, -2.6] | tie |
+| SF4 | 10 | exponential | 23.5 | 23.5 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.5 [-1.8, +0.7] | -0.5 [-1.8, +0.7] | 23.4 | +0.1 [+0.0, +0.3] | tie |
+| SF4 | 10 | gaussian | 23.2 | 23.2 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.8 [-1.9, +0.3] | -0.8 [-1.9, +0.3] | 23.5 | -0.3 [-0.9, +0.2] | tie |
+| SF4 | 10 | gumbel | 23.4 | 23.4 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.7 [-1.6, +0.2] | -0.7 [-1.6, +0.2] | 23.6 | -0.3 [-1.0, +0.2] | tie |
+| SF4 | 20 | exponential | 67.3 | 67.3 | 64.0 | +0.1 [+0.0, +0.1] | 95% | +3.4 [+1.1, +5.5] | +3.3 [+1.1, +5.6] | 68.0 | -0.7 [-1.8, +0.2] | tie |
+| SF4 | 20 | gaussian | 67.8 | 67.5 | 64.0 | +0.3 [+0.0, +0.9] | 95% | +3.8 [+1.4, +6.2] | +3.5 [+1.1, +5.8] | 67.3 | +0.5 [-0.7, +1.6] | tie |
+| SF4 | 20 | gumbel | 67.8 | 67.8 | 64.0 | +0.0 [+0.0, +0.0] | 90% | +3.8 [+1.1, +6.2] | +3.8 [+1.1, +6.3] | 68.5 | -0.8 [-1.7, +0.1] | tie |
+| SF4 | 50 | exponential | 197.8 | 198.3 | 184.0 | -0.6 [-1.7, +0.2] | 80% | +13.8 [+8.4, +19.1] | +14.3 [+9.2, +19.4] | 198.9 | -1.1 [-2.9, +0.6] | tie |
+| SF4 | 50 | gaussian | 197.5 | 197.5 | 184.0 | +0.0 [-0.3, +0.3] | 80% | +13.5 [+8.2, +18.8] | +13.5 [+8.3, +18.6] | 198.8 | -1.3 [-2.9, +0.3] | tie |
+| SF4 | 50 | gumbel | 197.8 | 197.9 | 184.0 | -0.1 [-0.5, +0.4] | 85% | +13.8 [+9.4, +18.1] | +13.9 [+9.6, +18.2] | 198.7 | -0.8 [-2.2, +0.9] | tie |
+| SF4 | 100 | exponential | 408.4 | 408.4 | 384.0 | +0.0 [-0.7, +0.7] | 35% | +24.4 [+19.1, +29.8] | +24.4 [+18.9, +29.9] | 409.4 | -0.9 [-3.4, +1.5] | tie |
+| SF4 | 100 | gaussian | 408.1 | 407.5 | 384.0 | +0.6 [-0.1, +1.4] | 55% | +24.1 [+18.9, +29.1] | +23.5 [+18.5, +28.4] | 409.6 | -1.6 [-3.7, +0.8] | tie |
+| SF4 | 100 | gumbel | 407.7 | 407.5 | 384.0 | +0.2 [-0.8, +1.4] | 35% | +23.7 [+18.8, +28.4] | +23.5 [+18.9, +28.1] | 407.7 | +0.0 [-1.6, +1.6] | tie |
+
+Raw and rescaled cells, mean SHD over the three noises (60 datasets a row):
+
+Raw:
+
+| graph | d | Andrey | reference | before the change | empty graph |
+|---|---|---|---|---|---|
+| ER2 | 10 | 0.6 | 0.6 | 0.3 | 20 |
+| ER2 | 20 | 0.8 | 0.8 | 1.0 | 40 |
+| ER2 | 50 | 2.7 | 2.7 | 2.4 | 100 |
+| SF4 | 10 | 1.4 | 1.4 | 1.1 | 24 |
+| SF4 | 20 | 6.8 | 6.8 | 6.9 | 64 |
+| SF4 | 50 | 26.1 | 26.6 | 27.2 | 184 |
+
+Rescaled:
+
+| graph | d | Andrey | reference | before the change | empty graph |
+|---|---|---|---|---|---|
+| ER2 | 10 | 14.8 | 14.8 | 14.7 | 20 |
+| ER2 | 20 | 34.0 | 34.0 | 34.0 | 40 |
+| ER2 | 50 | 83.5 | 83.5 | 85.9 | 100 |
+| SF4 | 10 | 18.6 | 18.6 | 18.8 | 24 |
+| SF4 | 20 | 53.3 | 53.3 | 53.2 | 64 |
+| SF4 | 50 | 143.3 | 143.1 | 145.4 | 184 |
+
+With `robust=True` on the standardized cells at 10 and 20 variables the mean SHD is 18.8 and 40.0
+on `ER2` and 22.9 and 65.2 on `SF4`: below the empty graph in 1 of the 12 cells, above it in none,
+and below the default fit in 5.
+
+### At the paper's penalty
+
+The package default of the `l1` penalty is 0.03, in the authors' package and in Andrey; the
+experiments of the DAGMA paper use 0.05. `--paper-penalty` runs both codes at 0.05 on the
+standardized cells, seeds 0 to 19. This measures the paper's setting beside the default's; it is
+not a default.
+
+| penalty | better / tie / worse than the reference | below / tied with / above the empty graph | reference below / tied with / above the empty graph |
+|---|---|---|---|
+| 0.03, the default | 0 / 24 / 0 | 0 / 8 / 16 | 0 / 8 / 16 |
+| 0.05, the paper's | 0 / 24 / 0 | 6 / 12 / 6 | 6 / 12 / 6 |
+
+At 0.05 DAGMA is below the empty graph on `ER2` at 100 variables (175.7 against 200) and in 3 of
+the 9 smaller `ER2` cells, tied with it on `SF4` at 10 and 20 variables, and above it on `SF4` at 50
+and 100 (189.4 against 184, 392.7 against 384). Andrey ties the authors' package in every cell.
+
+| graph | d | noise | Andrey | reference | empty graph | Andrey - reference | same graph | Andrey - empty | reference - empty | result |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ER2 | 10 | exponential | 18.9 | 18.9 | 20.0 | +0.0 [+0.0, +0.0] | 100% | -1.1 [-2.4, +0.2] | -1.1 [-2.4, +0.2] | tie |
+| ER2 | 10 | gaussian | 18.6 | 18.6 | 20.0 | +0.0 [+0.0, +0.0] | 100% | -1.4 [-2.4, -0.3] | -1.4 [-2.4, -0.3] | tie |
+| ER2 | 10 | gumbel | 18.6 | 18.6 | 20.0 | +0.0 [+0.0, +0.0] | 95% | -1.4 [-2.6, -0.1] | -1.4 [-2.6, -0.1] | tie |
+| ER2 | 20 | exponential | 39.0 | 38.8 | 40.0 | +0.2 [+0.0, +0.5] | 85% | -1.0 [-3.6, +1.6] | -1.2 [-4.0, +1.5] | tie |
+| ER2 | 20 | gaussian | 38.7 | 38.8 | 40.0 | -0.1 [-0.2, +0.0] | 90% | -1.3 [-3.6, +1.1] | -1.2 [-3.5, +1.1] | tie |
+| ER2 | 20 | gumbel | 37.6 | 37.6 | 40.0 | +0.0 [+0.0, +0.0] | 100% | -2.4 [-4.7, +0.1] | -2.4 [-4.7, +0.1] | tie |
+| ER2 | 50 | exponential | 97.6 | 97.6 | 100.0 | +0.0 [+0.0, +0.0] | 100% | -2.4 [-6.0, +1.1] | -2.4 [-6.0, +1.1] | tie |
+| ER2 | 50 | gaussian | 97.2 | 97.0 | 100.0 | +0.1 [-0.1, +0.6] | 90% | -2.9 [-6.5, +0.8] | -3.0 [-6.7, +0.6] | tie |
+| ER2 | 50 | gumbel | 95.4 | 95.3 | 100.0 | +0.1 [+0.0, +0.3] | 95% | -4.6 [-8.7, -0.7] | -4.7 [-8.8, -0.8] | tie |
+| ER2 | 100 | exponential | 176.2 | 176.2 | 200.0 | -0.1 [-0.3, +0.1] | 80% | -23.9 [-29.0, -19.1] | -23.8 [-29.0, -18.9] | tie |
+| ER2 | 100 | gaussian | 174.6 | 174.3 | 200.0 | +0.2 [-0.1, +0.7] | 70% | -25.4 [-30.2, -21.1] | -25.6 [-30.4, -21.2] | tie |
+| ER2 | 100 | gumbel | 176.4 | 176.5 | 200.0 | -0.1 [-0.5, +0.2] | 80% | -23.6 [-28.0, -18.9] | -23.5 [-28.0, -18.7] | tie |
+| SF4 | 10 | exponential | 23.1 | 23.1 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.8 [-1.9, +0.3] | -0.8 [-1.9, +0.3] | tie |
+| SF4 | 10 | gaussian | 23.1 | 23.1 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.9 [-1.9, +0.2] | -0.9 [-1.9, +0.2] | tie |
+| SF4 | 10 | gumbel | 23.4 | 23.4 | 24.0 | +0.0 [+0.0, +0.0] | 100% | -0.6 [-1.7, +0.5] | -0.6 [-1.7, +0.5] | tie |
+| SF4 | 20 | exponential | 65.0 | 65.0 | 64.0 | +0.1 [+0.0, +0.1] | 95% | +1.0 [-1.1, +3.0] | +0.9 [-1.1, +3.0] | tie |
+| SF4 | 20 | gaussian | 65.5 | 65.3 | 64.0 | +0.1 [+0.0, +0.2] | 90% | +1.4 [-0.4, +3.3] | +1.4 [-0.5, +3.2] | tie |
+| SF4 | 20 | gumbel | 65.5 | 65.5 | 64.0 | +0.0 [+0.0, +0.0] | 95% | +1.5 [-0.3, +3.5] | +1.5 [-0.3, +3.5] | tie |
+| SF4 | 50 | exponential | 188.8 | 189.3 | 184.0 | -0.5 [-1.4, +0.0] | 90% | +4.8 [+1.6, +8.3] | +5.3 [+2.1, +8.7] | tie |
+| SF4 | 50 | gaussian | 189.4 | 189.4 | 184.0 | -0.1 [-0.3, +0.1] | 90% | +5.4 [+1.3, +9.6] | +5.5 [+1.4, +9.6] | tie |
+| SF4 | 50 | gumbel | 189.9 | 189.9 | 184.0 | +0.1 [-0.1, +0.2] | 75% | +6.0 [+2.7, +9.2] | +5.9 [+2.7, +9.2] | tie |
+| SF4 | 100 | exponential | 393.5 | 393.4 | 384.0 | +0.1 [-0.5, +0.8] | 55% | +9.5 [+3.9, +15.4] | +9.3 [+3.7, +15.3] | tie |
+| SF4 | 100 | gaussian | 390.9 | 390.9 | 384.0 | -0.1 [-0.7, +0.6] | 60% | +6.9 [+1.9, +12.6] | +7.0 [+1.8, +12.8] | tie |
+| SF4 | 100 | gumbel | 393.8 | 393.4 | 384.0 | +0.5 [-0.4, +1.6] | 70% | +9.8 [+4.5, +15.3] | +9.3 [+3.8, +14.9] | tie |
+
+## Why the least-squares score fails on standardized columns
+
+NOTEARS and DAGMA minimize the same score, half the mean squared residual summed over the variables
+plus an `l1` penalty, and differ in how they enforce acyclicity and in their default penalty (0.1
+and 0.03). On the raw columns of this simulation a variable's variance grows along the causal order:
+92 to 94% of the true edges point from the lower to the higher variance, and a child's standard
+deviation is 2.3 to 4.9 times its parent's (median). The score reads that order, and so does sorting
+the columns by variance (Var-SortnRegress, above). Z-scoring removes it, and the score's lowest
+value then belongs to another graph. The tables below trace this on the standardized cells with the
+authors' code of both methods and the weights each returns before its threshold (refits of the
+recorded datasets, the build before the diagonal change; 60 datasets a row unless a table says
+otherwise).
+
+**The objective prefers the returned graph to the true one.** Each method's own penalized score
+(DAGMA at penalty 0.03, NOTEARS at 0.1), per dataset: of the empty graph, of the true weights, of
+the best weights on the true DAG, of the method's solution before the threshold, and of the best
+weights on the DAG it returns; then the share of datasets in which the solution scores below the
+true weights, and the returned DAG below the true DAG.
+
+| method | graph | d | empty | true weights | true DAG, best weights | solution | returned DAG, best weights | solution below true weights | returned DAG below true DAG | datasets |
+|---|---|---|---|---|---|---|---|---|---|---|
+| DAGMA | ER2 | 10 | 5.00 | 2.06 | 2.01 | 1.74 | 1.78 | 100% | 98% | 60 |
+| DAGMA | ER2 | 20 | 10.00 | 4.03 | 3.97 | 3.30 | 3.62 | 100% | 92% | 60 |
+| DAGMA | ER2 | 50 | 25.00 | 10.67 | 10.59 | 8.69 | 9.69 | 100% | 97% | 30 |
+| DAGMA | SF4 | 10 | 5.00 | 1.91 | 1.84 | 1.59 | 1.64 | 100% | 100% | 60 |
+| DAGMA | SF4 | 20 | 10.00 | 3.30 | 3.06 | 2.37 | 2.69 | 100% | 92% | 60 |
+| DAGMA | SF4 | 50 | 25.00 | 7.30 | 6.84 | 5.33 | 7.35 | 100% | 43% | 30 |
+| NOTEARS | ER2 | 10 | 5.00 | 2.91 | 2.60 | 2.46 | 2.53 | 100% | 82% | 60 |
+| NOTEARS | ER2 | 20 | 10.00 | 5.56 | 5.15 | 4.85 | 5.31 | 100% | 33% | 60 |
+| NOTEARS | ER2 | 50 | 25.00 | 14.18 | 13.46 | 12.79 | 14.12 | 100% | 17% | 30 |
+| NOTEARS | SF4 | 10 | 5.00 | 2.86 | 2.45 | 2.30 | 2.36 | 100% | 80% | 60 |
+| NOTEARS | SF4 | 20 | 10.00 | 5.55 | 4.37 | 3.87 | 4.50 | 100% | 40% | 60 |
+| NOTEARS | SF4 | 50 | 25.00 | 12.69 | 10.22 | 9.12 | 11.40 | 100% | 10% | 30 |
+
+Both solutions score below the true weights in every dataset. A DAGMA run started at the true
+standardized weights leaves them and ends at the error of a run started at zero (SHD 113.2 against
+116.6 on `ER2` at 50 variables, where the true weights thresholded would have 32.9; 30 datasets).
+So the optimizer is not the cause: the score is.
+
+**The threshold is not the cause.** Mean SHD of the authors' code at its default penalty as the
+threshold falls from the default 0.3:
+
+| method | graph | d | 0.05 | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | empty graph | datasets |
+|---|---|---|---|---|---|---|---|---|---|---|
+| DAGMA | ER2 | 10 | 21.9 | 20.7 | 20.1 | 19.6 | 19.3 | 19.1 | 20.0 | 60 |
+| DAGMA | ER2 | 20 | 55.8 | 51.6 | 48.6 | 46.4 | 44.5 | 42.9 | 40.0 | 60 |
+| DAGMA | ER2 | 50 | 135.2 | 127.4 | 122.5 | 118.9 | 115.2 | 111.8 | 100.0 | 60 |
+| DAGMA | ER2 | 100 | 293.9 | 253.8 | 235.1 | 221.7 | 212.2 | 205.8 | 200.0 | 40 |
+| DAGMA | SF4 | 10 | 26.0 | 25.2 | 24.5 | 24.0 | 23.6 | 23.4 | 24.0 | 60 |
+| DAGMA | SF4 | 20 | 78.3 | 74.7 | 72.5 | 70.6 | 68.8 | 68.2 | 64.0 | 60 |
+| DAGMA | SF4 | 50 | 227.7 | 220.3 | 214.9 | 209.8 | 203.3 | 198.2 | 184.0 | 60 |
+| DAGMA | SF4 | 100 | 440.9 | 440.9 | 440.8 | 432.9 | 414.4 | 401.6 | 384.0 | 30 |
+| NOTEARS | ER2 | 10 | 19.6 | 19.3 | 19.2 | 18.8 | 18.4 | 18.3 | 20.0 | 60 |
+| NOTEARS | ER2 | 20 | 39.5 | 38.6 | 38.0 | 37.5 | 37.4 | 37.2 | 40.0 | 60 |
+| NOTEARS | ER2 | 50 | 86.5 | 86.5 | 86.5 | 86.5 | 86.4 | 86.0 | 100.0 | 30 |
+| NOTEARS | SF4 | 10 | 24.2 | 23.7 | 23.4 | 23.2 | 23.3 | 23.2 | 24.0 | 60 |
+| NOTEARS | SF4 | 20 | 64.3 | 64.2 | 64.0 | 63.9 | 63.7 | 63.7 | 64.0 | 60 |
+| NOTEARS | SF4 | 50 | 180.0 | 180.0 | 180.0 | 180.0 | 179.7 | 179.4 | 184.0 | 30 |
+
+A lower threshold trades fewer missing edges for more extra and more reversed ones: DAGMA is below
+the empty graph in none of its 24 cells at any of these thresholds. Of the true edges it keeps
+adjacent, DAGMA orients 39 to 52% the right way and NOTEARS 38 to 70%.
+
+**The penalty separates the two methods.** Mean SHD of the authors' code at threshold 0.3 as the
+`l1` penalty changes, seeds 0 to 9 (30 datasets a row; NOTEARS at 50 variables was fit at 0.03 and
+0.1 only). This is a sensitivity curve on 10 seeds, not a recommended setting:
+
+| graph | d | method | 0 | 0.01 | 0.03 | 0.05 | 0.1 | empty graph |
+|---|---|---|---|---|---|---|---|---|
+| ER2 | 20 | DAGMA | 76.2 | 52.7 | 43.1 | 38.8 | 35.0 | 40.0 |
+| ER2 | 20 | NOTEARS | 72.7 | 52.8 | 42.1 | 40.7 | 36.8 | 40.0 |
+| ER2 | 50 | DAGMA | 321.7 | 152.5 | 116.7 | 98.0 | 81.8 | 100.0 |
+| ER2 | 50 | NOTEARS | | | 110.2 | | 86.0 | 100.0 |
+| SF4 | 20 | DAGMA | 113.4 | 73.4 | 67.4 | 63.5 | 63.6 | 64.0 |
+| SF4 | 20 | NOTEARS | 110.6 | 71.6 | 68.6 | 64.7 | 63.3 | 64.0 |
+| SF4 | 50 | DAGMA | 637.2 | 226.4 | 194.7 | 188.4 | 180.8 | 184.0 |
+| SF4 | 50 | NOTEARS | | | 189.7 | | 179.4 | 184.0 |
+
+At the same penalty the two methods are within a few edges of each other, so DAGMA's result above
+the empty graph and NOTEARS's below it in the decision cells separate two default penalties, not
+two methods. A larger penalty returns fewer edges: at 0.1 both are below the empty graph on `ER2`
+and at it on `SF4`.
+
+**What the literature reports.** Reisach et al. (2021) define varsortability, the share of
+directed paths that run from a lower to a higher variance, find it above 0.94 in the usual
+simulations and at one half after standardization, and report that NOTEARS is "excellent on raw
+data but far worse on standardized data". Kaiser and Sipos (2022) show NOTEARS orienting an edge
+differently after the data are normalized. Ng et al. (2024) trace it to the score: least squares is
+the Gaussian likelihood with equal noise variances, and after standardization the noise variances
+are far from equal, so least-squares methods "are not expected to perform well after standardizing
+the data". Deng et al. (2024), with two of DAGMA's authors, report for standardized data that "the
+SHD values are not any better than an empty graph" for GOLEM, NOTEARS and DAGMA. The DAGMA paper's
+own experiments use the raw simulated columns only, with a penalty of 0.05.
+
 ## Status
 
 The bar: never less accurate than the reference in a decision cell that repeats, and below the
@@ -338,15 +571,20 @@ empty graph in more than half of the decision cells.
 - `notears` meets both bars. Against the authors' code it is better in 1 decision cell, tied in
   23, and worse in none, so no cell needed a rerun, and it is below the empty graph in 15 of 24,
   with the small margins listed under Limits.
-- `dagma` meets neither. It is below the empty graph in no decision cell and above it in 15, and
-  it is worse than the authors' package on the first seeds and again on fresh ones in 3. The
-  authors' package is below the empty graph in none either, so the floor fails for the method on
-  these data and not only for Andrey's implementation. On the rescaled cells it is below the empty
-  graph in all 18. It stays experimental, with this reason in its docstring's Limitations.
+- `dagma` meets the reference bar and not the floor. With the free diagonal it ties the authors'
+  package in all 24 decision cells. It is below the empty graph in none and above it in 16, as the
+  authors' package is, so the floor fails for the method on these data and not for Andrey's
+  implementation. On the rescaled cells it is below the empty graph in all 18. It stays
+  experimental, with a stated scope: data whose units are meaningful, where the columns' variances
+  follow the causal order. On standardized columns, or data whose units are arbitrary, it does no
+  better than the empty graph at its default penalty; at the paper's 0.05 it is below the empty
+  graph in 6 of 24 cells and above it in 6; and at NOTEARS's penalty it matches NOTEARS (the
+  sensitivity curve above).
 - In the package `notears` is supported from 0.17.0: its rows are in the release's summary,
   [`published/0.17.0/summary.json`](../published/0.17.0/summary.json), and the
   [0.17.0 release card](../../docs/docs/benchmarks/0.17.0.md#notears) has its
-  section. `dagma` is experimental.
+  section. `dagma` is experimental, and the card's
+  [DAGMA part](../../docs/docs/benchmarks/0.17.0.md#dagma) states its scope.
 
 ## Limits
 
@@ -396,10 +634,14 @@ $ANDREY_BENCH_PYTHON benchmarks/notears_cpu.py --first-seed 20 --scales standard
     --solutions andrey.dagma bello.dagma baseline.empty --out outputs-rerun/part-0 --resume
 $ANDREY_BENCH_PYTHON benchmarks/notears_summary.py --runs outputs/*/ outputs-d100/*/ \
     --replications outputs-rerun/*/ --out notears-dagma.json
+$ANDREY_BENCH_PYTHON benchmarks/notears_cpu.py --paper-penalty --sizes 10 20 50 100 \
+    --scales standardized --solutions andrey.dagma.paper bello.dagma.paper \
+    --out outputs-paper/part-0 --resume
 ```
 
 `--part i --parts k` splits the grid into independent jobs, and `--first-seed` moves the seeds for
-a rerun. `start_notears.sh` prints the environment variables the reference arms read.
+a rerun. `--paper-penalty` adds both DAGMA codes at `lambda1 = 0.05` on the standardized cells.
+`start_notears.sh` prints the environment variables the reference arms read.
 
 ## Known differences
 
@@ -417,6 +659,10 @@ a rerun. `start_notears.sh` prints the environment variables the reference arms 
   35.
 - Deng, C., Bello, K., Ravikumar, P., and Aragam, B. (2024). Markov equivalence and consistency in
   differentiable structure learning. Advances in Neural Information Processing Systems 37.
+- Kaiser, M. and Sipos, M. (2022). Unsuitability of NOTEARS for causal graph discovery when
+  dealing with dimensional quantities. Neural Processing Letters 54(3), 1587-1595.
+- Ng, I., Huang, B., and Zhang, K. (2024). Structure learning with continuous optimization: A
+  sober look and beyond. CLeaR 2024, PMLR 236, 71-105.
 - Reisach, A. G., Seiler, C., and Weichwald, S. (2021). Beware of the simulated DAG! Causal
   discovery benchmarks may be easy to game. Advances in Neural Information Processing Systems 34.
 - Reisach, A. G., Tami, M., Seiler, C., Chambaz, A., and Weichwald, S. (2023). A scale-invariant

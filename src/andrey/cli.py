@@ -1392,7 +1392,8 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
     lines = [f"andrey {command} {spec.name} -- {spec.summary}", ""]
     if spec.status == "experimental":
         lines += [
-            "Experimental: not supported (see its Limitations); the API may change without deprecation.",
+            "Experimental: not supported (see its Limitations); the API may change without "
+            "deprecation.",
             "",
         ]
     lines.append("Inputs:")

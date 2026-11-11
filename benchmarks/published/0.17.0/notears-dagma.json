@@ -24851,5 +24851,4765 @@
    "result": "tie",
    "rerun": false
   }
- ]
+ ],
+ "dagma_free_diagonal": {
+  "build": "Andrey pre-release build of 10 November 2026 on the 0.17.0 release branch (version string 0.16.0), commit 6c70976ab: the least-squares fit of dagma leaves the diagonal of the weight matrix free",
+  "about": "andrey.dagma of this build at its defaults on the datasets of the rows above (seeds 0 to 19), against the bello.dagma and baseline.empty records of those rows; before_fix is andrey.dagma of the first build on the same datasets. The rows of method dagma above are of the first build.",
+  "summary": {
+   "2a standardized": {
+    "cells": 24,
+    "vs_reference": {
+     "better": 0,
+     "tie": 24,
+     "worse": 0
+    },
+    "vs_empty": {
+     "better": 0,
+     "tie": 8,
+     "worse": 16
+    },
+    "reference_vs_empty": {
+     "better": 0,
+     "tie": 8,
+     "worse": 16
+    },
+    "vs_before_fix": {
+     "better": 4,
+     "tie": 20,
+     "worse": 0
+    }
+   },
+   "2a raw": {
+    "cells": 18,
+    "vs_reference": {
+     "better": 0,
+     "tie": 18,
+     "worse": 0
+    },
+    "vs_empty": {
+     "better": 18,
+     "tie": 0,
+     "worse": 0
+    },
+    "reference_vs_empty": {
+     "better": 18,
+     "tie": 0,
+     "worse": 0
+    },
+    "vs_before_fix": {
+     "better": 0,
+     "tie": 17,
+     "worse": 1
+    }
+   },
+   "2a rescaled": {
+    "cells": 18,
+    "vs_reference": {
+     "better": 0,
+     "tie": 17,
+     "worse": 1
+    },
+    "vs_empty": {
+     "better": 18,
+     "tie": 0,
+     "worse": 0
+    },
+    "reference_vs_empty": {
+     "better": 18,
+     "tie": 0,
+     "worse": 0
+    },
+    "vs_before_fix": {
+     "better": 4,
+     "tie": 14,
+     "worse": 0
+    }
+   }
+  },
+  "rows": [
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 18.75,
+    "reference": 18.75,
+    "empty": 20.0,
+    "median_s": 12.9,
+    "median_s_reference": 1.9,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.25,
+     "bootstrap_95": [
+      -2.6,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.25,
+     "bootstrap_95": [
+      -2.6,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 19.0,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.3,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 18.95,
+    "reference": 18.95,
+    "empty": 20.0,
+    "median_s": 12.1,
+    "median_s_reference": 2.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -2.1,
+      0.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -2.1,
+      0.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 19.05,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.65,
+      0.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 19.55,
+    "reference": 19.55,
+    "empty": 20.0,
+    "median_s": 10.5,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.8,
+      0.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.8,
+      0.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 19.4,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.35,
+      0.8
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 41.75,
+    "reference": 41.75,
+    "empty": 40.0,
+    "median_s": 6.1,
+    "median_s_reference": 3.4,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.75,
+     "bootstrap_95": [
+      -0.85,
+      4.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 1.75,
+     "bootstrap_95": [
+      -0.75,
+      4.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 42.1,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -1.1,
+      0.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 42.7,
+    "reference": 42.75,
+    "empty": 40.0,
+    "median_s": 5.8,
+    "median_s_reference": 3.0,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 2.7,
+     "bootstrap_95": [
+      0.05,
+      5.5
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 2.75,
+     "bootstrap_95": [
+      0.05,
+      5.45
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 42.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.3,
+      0.75
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 42.45,
+    "reference": 42.45,
+    "empty": 40.0,
+    "median_s": 7.8,
+    "median_s_reference": 3.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 2.45,
+     "bootstrap_95": [
+      -0.35,
+      5.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 2.45,
+     "bootstrap_95": [
+      -0.35,
+      5.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 42.35,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      -0.65,
+      0.8
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 110.8,
+    "reference": 110.6,
+    "empty": 100.0,
+    "median_s": 12.5,
+    "median_s_reference": 9.5,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.15,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 10.8,
+     "bootstrap_95": [
+      6.7,
+      14.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 10.6,
+     "bootstrap_95": [
+      6.5,
+      14.6
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 112.45,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.65,
+     "bootstrap_95": [
+      -3.25,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 110.05,
+    "reference": 110.05,
+    "empty": 100.0,
+    "median_s": 13.5,
+    "median_s_reference": 10.8,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.15,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 10.05,
+     "bootstrap_95": [
+      6.0,
+      14.25
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 10.05,
+     "bootstrap_95": [
+      5.9988,
+      14.4
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 113.55,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -3.5,
+     "bootstrap_95": [
+      -5.45,
+      -1.75
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 111.15,
+    "reference": 111.3,
+    "empty": 100.0,
+    "median_s": 14.1,
+    "median_s_reference": 9.4,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.4,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 11.15,
+     "bootstrap_95": [
+      6.4,
+      15.7
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 11.3,
+     "bootstrap_95": [
+      6.65,
+      15.85
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 111.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -2.8,
+      2.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 206.9,
+    "reference": 206.8,
+    "empty": 200.0,
+    "median_s": 37.8,
+    "median_s_reference": 35.8,
+    "same_graph": 0.75,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      -0.15,
+      0.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 6.9,
+     "bootstrap_95": [
+      2.85,
+      10.8512
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 6.8,
+     "bootstrap_95": [
+      2.8,
+      10.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 211.25,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -4.35,
+     "bootstrap_95": [
+      -6.85,
+      -1.75
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 208.55,
+    "reference": 208.9,
+    "empty": 200.0,
+    "median_s": 34.0,
+    "median_s_reference": 38.1,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -0.9,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 8.55,
+     "bootstrap_95": [
+      4.6,
+      12.5
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 8.9,
+     "bootstrap_95": [
+      4.95,
+      12.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 211.15,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -2.6,
+     "bootstrap_95": [
+      -4.7,
+      -0.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 207.45,
+    "reference": 207.5,
+    "empty": 200.0,
+    "median_s": 38.6,
+    "median_s_reference": 38.3,
+    "same_graph": 0.6,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.35,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 7.45,
+     "bootstrap_95": [
+      3.95,
+      10.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 7.5,
+     "bootstrap_95": [
+      4.05,
+      10.75
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 212.55,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -5.1,
+     "bootstrap_95": [
+      -7.5512,
+      -2.6
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 23.5,
+    "reference": 23.5,
+    "empty": 24.0,
+    "median_s": 6.4,
+    "median_s_reference": 2.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.75,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.75,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 23.35,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      0.0,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 23.2,
+    "reference": 23.2,
+    "empty": 24.0,
+    "median_s": 13.7,
+    "median_s_reference": 2.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.8,
+     "bootstrap_95": [
+      -1.95,
+      0.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.8,
+     "bootstrap_95": [
+      -1.95,
+      0.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 23.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.95,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 23.35,
+    "reference": 23.35,
+    "empty": 24.0,
+    "median_s": 6.9,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.65,
+     "bootstrap_95": [
+      -1.55,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.65,
+     "bootstrap_95": [
+      -1.55,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "before_fix": 23.65,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -1.0,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 67.35,
+    "reference": 67.3,
+    "empty": 64.0,
+    "median_s": 7.7,
+    "median_s_reference": 4.2,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 3.35,
+     "bootstrap_95": [
+      1.15,
+      5.55
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 3.3,
+     "bootstrap_95": [
+      1.1,
+      5.6
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 68.0,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.65,
+     "bootstrap_95": [
+      -1.75,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 67.8,
+    "reference": 67.5,
+    "empty": 64.0,
+    "median_s": 11.8,
+    "median_s_reference": 4.3,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.3,
+     "bootstrap_95": [
+      0.0,
+      0.9
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 3.8,
+     "bootstrap_95": [
+      1.35,
+      6.25
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 3.5,
+     "bootstrap_95": [
+      1.1488,
+      5.85
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 67.3,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.5,
+     "bootstrap_95": [
+      -0.65,
+      1.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 67.75,
+    "reference": 67.75,
+    "empty": 64.0,
+    "median_s": 10.4,
+    "median_s_reference": 3.8,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 3.75,
+     "bootstrap_95": [
+      1.1,
+      6.25
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 3.75,
+     "bootstrap_95": [
+      1.15,
+      6.3
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 68.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.75,
+     "bootstrap_95": [
+      -1.7,
+      0.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 197.8,
+    "reference": 198.35,
+    "empty": 184.0,
+    "median_s": 14.6,
+    "median_s_reference": 10.6,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.55,
+     "bootstrap_95": [
+      -1.7,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 13.8,
+     "bootstrap_95": [
+      8.45,
+      19.05
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 14.35,
+     "bootstrap_95": [
+      9.2,
+      19.45
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 198.95,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.15,
+     "bootstrap_95": [
+      -2.9,
+      0.6
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 197.5,
+    "reference": 197.5,
+    "empty": 184.0,
+    "median_s": 11.7,
+    "median_s_reference": 10.1,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 13.5,
+     "bootstrap_95": [
+      8.15,
+      18.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 13.5,
+     "bootstrap_95": [
+      8.35,
+      18.6012
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 198.8,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.3,
+     "bootstrap_95": [
+      -2.85,
+      0.35
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 197.85,
+    "reference": 197.9,
+    "empty": 184.0,
+    "median_s": 12.6,
+    "median_s_reference": 9.5,
+    "same_graph": 0.85,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.45,
+      0.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 13.85,
+     "bootstrap_95": [
+      9.45,
+      18.15
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 13.9,
+     "bootstrap_95": [
+      9.5988,
+      18.2
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 198.65,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.8,
+     "bootstrap_95": [
+      -2.2,
+      0.9
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 408.45,
+    "reference": 408.45,
+    "empty": 384.0,
+    "median_s": 37.8,
+    "median_s_reference": 38.6,
+    "same_graph": 0.35,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.7,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 24.45,
+     "bootstrap_95": [
+      19.1,
+      29.8012
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 24.45,
+     "bootstrap_95": [
+      18.9,
+      29.9
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 409.35,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.9,
+     "bootstrap_95": [
+      -3.35,
+      1.4512
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 408.05,
+    "reference": 407.5,
+    "empty": 384.0,
+    "median_s": 34.2,
+    "median_s_reference": 38.4,
+    "same_graph": 0.55,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.55,
+     "bootstrap_95": [
+      -0.15,
+      1.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 24.05,
+     "bootstrap_95": [
+      18.95,
+      29.15
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 23.5,
+     "bootstrap_95": [
+      18.5,
+      28.45
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 409.6,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.55,
+     "bootstrap_95": [
+      -3.7,
+      0.8
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 407.7,
+    "reference": 407.5,
+    "empty": 384.0,
+    "median_s": 31.7,
+    "median_s_reference": 34.8,
+    "same_graph": 0.35,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.85,
+      1.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 23.7,
+     "bootstrap_95": [
+      18.7988,
+      28.45
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 23.5,
+     "bootstrap_95": [
+      18.95,
+      28.0512
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "before_fix": 407.7,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -1.65,
+      1.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 0.35,
+    "reference": 0.35,
+    "empty": 20.0,
+    "median_s": 14.2,
+    "median_s_reference": 1.9,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -19.65,
+     "bootstrap_95": [
+      -19.9,
+      -19.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -19.65,
+     "bootstrap_95": [
+      -19.9,
+      -19.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 0.2,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      0.0,
+      0.4
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 0.5,
+    "reference": 0.5,
+    "empty": 20.0,
+    "median_s": 8.7,
+    "median_s_reference": 2.3,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -19.5,
+     "bootstrap_95": [
+      -19.85,
+      -19.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -19.5,
+     "bootstrap_95": [
+      -19.85,
+      -19.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 0.2,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.3,
+     "bootstrap_95": [
+      0.0,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 1.0,
+    "reference": 1.0,
+    "empty": 20.0,
+    "median_s": 10.3,
+    "median_s_reference": 2.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -19.0,
+     "bootstrap_95": [
+      -19.65,
+      -18.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -19.0,
+     "bootstrap_95": [
+      -19.65,
+      -18.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 0.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.5,
+     "bootstrap_95": [
+      0.05,
+      1.15
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 0.95,
+    "reference": 0.95,
+    "empty": 40.0,
+    "median_s": 10.6,
+    "median_s_reference": 3.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -39.05,
+     "bootstrap_95": [
+      -39.75,
+      -38.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -39.05,
+     "bootstrap_95": [
+      -39.75,
+      -38.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 1.15,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.9,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 0.75,
+    "reference": 0.75,
+    "empty": 40.0,
+    "median_s": 3.6,
+    "median_s_reference": 2.8,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -39.25,
+     "bootstrap_95": [
+      -39.75,
+      -38.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -39.25,
+     "bootstrap_95": [
+      -39.8,
+      -38.5988
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 1.05,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.9,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 0.75,
+    "reference": 0.75,
+    "empty": 40.0,
+    "median_s": 7.8,
+    "median_s_reference": 3.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -39.25,
+     "bootstrap_95": [
+      -39.85,
+      -38.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -39.25,
+     "bootstrap_95": [
+      -39.85,
+      -38.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 0.75,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 2.7,
+    "reference": 2.7,
+    "empty": 100.0,
+    "median_s": 17.3,
+    "median_s_reference": 9.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -97.3,
+     "bootstrap_95": [
+      -99.0,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -97.3,
+     "bootstrap_95": [
+      -99.05,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 2.6,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      -0.15,
+      0.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 2.7,
+    "reference": 2.7,
+    "empty": 100.0,
+    "median_s": 9.6,
+    "median_s_reference": 8.8,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -97.3,
+     "bootstrap_95": [
+      -99.0,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -97.3,
+     "bootstrap_95": [
+      -98.95,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 2.05,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.65,
+     "bootstrap_95": [
+      -0.05,
+      1.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 2.6,
+    "reference": 2.6,
+    "empty": 100.0,
+    "median_s": 13.5,
+    "median_s_reference": 8.3,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -97.4,
+     "bootstrap_95": [
+      -99.15,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -97.4,
+     "bootstrap_95": [
+      -99.1,
+      -95.3
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 2.4,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.2,
+      0.8
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 1.4,
+    "reference": 1.4,
+    "empty": 24.0,
+    "median_s": 4.3,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -22.6,
+     "bootstrap_95": [
+      -23.4,
+      -21.7
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -22.6,
+     "bootstrap_95": [
+      -23.4,
+      -21.7
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 1.4,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 1.6,
+    "reference": 1.6,
+    "empty": 24.0,
+    "median_s": 14.8,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -22.4,
+     "bootstrap_95": [
+      -23.1512,
+      -21.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -22.4,
+     "bootstrap_95": [
+      -23.15,
+      -21.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 1.15,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.45,
+     "bootstrap_95": [
+      0.0,
+      1.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 1.1,
+    "reference": 1.1,
+    "empty": 24.0,
+    "median_s": 12.4,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -22.9,
+     "bootstrap_95": [
+      -23.55,
+      -22.15
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -22.9,
+     "bootstrap_95": [
+      -23.55,
+      -22.15
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 0.7,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.4,
+     "bootstrap_95": [
+      0.0,
+      1.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 5.85,
+    "reference": 5.85,
+    "empty": 64.0,
+    "median_s": 12.7,
+    "median_s_reference": 5.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -58.15,
+     "bootstrap_95": [
+      -60.65,
+      -55.45
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -58.15,
+     "bootstrap_95": [
+      -60.6,
+      -55.45
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 6.05,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -1.45,
+      0.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 7.35,
+    "reference": 7.35,
+    "empty": 64.0,
+    "median_s": 5.2,
+    "median_s_reference": 6.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -56.65,
+     "bootstrap_95": [
+      -59.8,
+      -53.0
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -56.65,
+     "bootstrap_95": [
+      -59.7,
+      -53.05
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 7.65,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -1.2,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 7.1,
+    "reference": 7.1,
+    "empty": 64.0,
+    "median_s": 10.7,
+    "median_s_reference": 6.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -56.9,
+     "bootstrap_95": [
+      -59.55,
+      -54.0
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -56.9,
+     "bootstrap_95": [
+      -59.6,
+      -54.0
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 6.9,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.65,
+      1.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 25.45,
+    "reference": 25.75,
+    "empty": 184.0,
+    "median_s": 23.0,
+    "median_s_reference": 20.3,
+    "same_graph": 0.75,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -2.3,
+      1.85
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -158.55,
+     "bootstrap_95": [
+      -166.45,
+      -149.95
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -158.25,
+     "bootstrap_95": [
+      -167.25,
+      -148.4488
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 26.15,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.7,
+     "bootstrap_95": [
+      -3.7,
+      2.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 28.4,
+    "reference": 27.7,
+    "empty": 184.0,
+    "median_s": 22.9,
+    "median_s_reference": 19.8,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.7,
+     "bootstrap_95": [
+      -0.65,
+      2.65
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -155.6,
+     "bootstrap_95": [
+      -163.5,
+      -147.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -156.3,
+     "bootstrap_95": [
+      -164.45,
+      -147.6
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 29.25,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.85,
+     "bootstrap_95": [
+      -3.2,
+      1.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "raw",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 24.6,
+    "reference": 26.35,
+    "empty": 184.0,
+    "median_s": 20.8,
+    "median_s_reference": 17.9,
+    "same_graph": 0.75,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -1.75,
+     "bootstrap_95": [
+      -5.7,
+      0.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -159.4,
+     "bootstrap_95": [
+      -168.0513,
+      -150.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -157.65,
+     "bootstrap_95": [
+      -166.7,
+      -147.75
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 26.1,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.5,
+     "bootstrap_95": [
+      -4.8,
+      1.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 15.1,
+    "reference": 15.1,
+    "empty": 20.0,
+    "median_s": 12.3,
+    "median_s_reference": 1.6,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -4.9,
+     "bootstrap_95": [
+      -6.35,
+      -3.4
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -4.9,
+     "bootstrap_95": [
+      -6.35,
+      -3.4
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 15.0,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      -0.35,
+      0.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 14.6,
+    "reference": 14.6,
+    "empty": 20.0,
+    "median_s": 10.5,
+    "median_s_reference": 1.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.4,
+     "bootstrap_95": [
+      -6.95,
+      -3.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.4,
+     "bootstrap_95": [
+      -6.95,
+      -3.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 14.4,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.35,
+      0.7512
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 14.75,
+    "reference": 14.75,
+    "empty": 20.0,
+    "median_s": 12.2,
+    "median_s_reference": 1.6,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.25,
+     "bootstrap_95": [
+      -6.5,
+      -4.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.25,
+     "bootstrap_95": [
+      -6.5,
+      -4.05
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 14.8,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.4,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 34.5,
+    "reference": 34.5,
+    "empty": 40.0,
+    "median_s": 4.2,
+    "median_s_reference": 2.4,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.5,
+     "bootstrap_95": [
+      -8.25,
+      -2.8
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.5,
+     "bootstrap_95": [
+      -8.2,
+      -2.75
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 33.7,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.8,
+     "bootstrap_95": [
+      -0.05,
+      1.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 33.25,
+    "reference": 33.3,
+    "empty": 40.0,
+    "median_s": 7.0,
+    "median_s_reference": 2.5,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -6.75,
+     "bootstrap_95": [
+      -9.5,
+      -3.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -6.7,
+     "bootstrap_95": [
+      -9.55,
+      -3.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 33.5,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -0.8,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 34.2,
+    "reference": 34.2,
+    "empty": 40.0,
+    "median_s": 4.5,
+    "median_s_reference": 2.6,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.8,
+     "bootstrap_95": [
+      -8.4512,
+      -3.05
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.8,
+     "bootstrap_95": [
+      -8.55,
+      -3.05
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 34.85,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.65,
+     "bootstrap_95": [
+      -1.5,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 83.35,
+    "reference": 83.35,
+    "empty": 100.0,
+    "median_s": 12.2,
+    "median_s_reference": 7.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -16.65,
+     "bootstrap_95": [
+      -20.7,
+      -12.7
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -16.65,
+     "bootstrap_95": [
+      -20.75,
+      -12.65
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 85.2,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.85,
+     "bootstrap_95": [
+      -3.6,
+      -0.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 83.9,
+    "reference": 83.95,
+    "empty": 100.0,
+    "median_s": 16.4,
+    "median_s_reference": 8.0,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -16.1,
+     "bootstrap_95": [
+      -20.65,
+      -11.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -16.05,
+     "bootstrap_95": [
+      -20.55,
+      -11.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 86.45,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -2.55,
+     "bootstrap_95": [
+      -4.45,
+      -0.95
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 83.25,
+    "reference": 83.2,
+    "empty": 100.0,
+    "median_s": 15.8,
+    "median_s_reference": 7.8,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -16.75,
+     "bootstrap_95": [
+      -21.05,
+      -12.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -16.8,
+     "bootstrap_95": [
+      -21.15,
+      -12.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 85.95,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -2.7,
+     "bootstrap_95": [
+      -4.35,
+      -0.9
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 19.0,
+    "reference": 19.0,
+    "empty": 24.0,
+    "median_s": 5.9,
+    "median_s_reference": 1.8,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.0,
+     "bootstrap_95": [
+      -6.1,
+      -3.9
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.0,
+     "bootstrap_95": [
+      -6.1,
+      -3.9
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 19.05,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.9,
+      0.75
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 18.4,
+    "reference": 18.4,
+    "empty": 24.0,
+    "median_s": 6.1,
+    "median_s_reference": 1.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.6,
+     "bootstrap_95": [
+      -6.95,
+      -4.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.6,
+     "bootstrap_95": [
+      -6.95,
+      -4.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 18.4,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.5,
+      0.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 18.3,
+    "reference": 18.3,
+    "empty": 24.0,
+    "median_s": 3.5,
+    "median_s_reference": 1.7,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -5.7,
+     "bootstrap_95": [
+      -6.95,
+      -4.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -5.7,
+     "bootstrap_95": [
+      -6.95,
+      -4.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 18.9,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.6,
+     "bootstrap_95": [
+      -1.45,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 53.0,
+    "reference": 53.0,
+    "empty": 64.0,
+    "median_s": 13.0,
+    "median_s_reference": 3.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -11.0,
+     "bootstrap_95": [
+      -13.5,
+      -8.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -11.0,
+     "bootstrap_95": [
+      -13.5,
+      -8.5
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 52.95,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -1.2,
+      1.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 53.15,
+    "reference": 53.15,
+    "empty": 64.0,
+    "median_s": 3.6,
+    "median_s_reference": 2.6,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -10.85,
+     "bootstrap_95": [
+      -13.6,
+      -8.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -10.85,
+     "bootstrap_95": [
+      -13.6,
+      -8.15
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 53.45,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -1.75,
+      1.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 53.75,
+    "reference": 53.8,
+    "empty": 64.0,
+    "median_s": 5.8,
+    "median_s_reference": 2.7,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -10.25,
+     "bootstrap_95": [
+      -12.8012,
+      -7.65
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -10.2,
+     "bootstrap_95": [
+      -12.75,
+      -7.6
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 53.35,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": 0.4,
+     "bootstrap_95": [
+      -0.75,
+      1.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 144.6,
+    "reference": 144.7,
+    "empty": 184.0,
+    "median_s": 7.9,
+    "median_s_reference": 7.6,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -39.4,
+     "bootstrap_95": [
+      -43.55,
+      -35.0
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -39.3,
+     "bootstrap_95": [
+      -43.45,
+      -34.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 146.75,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -2.15,
+     "bootstrap_95": [
+      -4.55,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 143.6,
+    "reference": 143.0,
+    "empty": 184.0,
+    "median_s": 9.7,
+    "median_s_reference": 6.4,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      0.1,
+      1.2
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -40.4,
+     "bootstrap_95": [
+      -45.4,
+      -35.45
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -41.0,
+     "bootstrap_95": [
+      -46.0,
+      -35.9488
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 144.8,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -1.2,
+     "bootstrap_95": [
+      -3.35,
+      0.9
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 141.7,
+    "reference": 141.65,
+    "empty": 184.0,
+    "median_s": 8.1,
+    "median_s_reference": 7.0,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.5,
+      0.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -42.3,
+     "bootstrap_95": [
+      -46.4,
+      -38.25
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -42.35,
+     "bootstrap_95": [
+      -46.5012,
+      -38.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "before_fix": 144.55,
+    "vs_before_fix": {
+     "paired": 20,
+     "mean_D": -2.85,
+     "bootstrap_95": [
+      -4.75,
+      -0.75
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   }
+  ],
+  "robust": [
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 18.7,
+    "empty": 20.0,
+    "median_s": 22.0,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.3,
+     "bootstrap_95": [
+      -2.9,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 18.95,
+    "empty": 20.0,
+    "median_s": 21.3,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -2.35,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 18.9,
+    "empty": 20.0,
+    "median_s": 24.3,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.1,
+     "bootstrap_95": [
+      -2.8,
+      0.5512
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 39.3,
+    "empty": 40.0,
+    "median_s": 22.5,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.7,
+     "bootstrap_95": [
+      -4.1,
+      2.9
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 39.7,
+    "empty": 40.0,
+    "median_s": 23.8,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -4.15,
+      3.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 40.85,
+    "empty": 40.0,
+    "median_s": 26.3,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 0.85,
+     "bootstrap_95": [
+      -3.0,
+      4.85
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 23.45,
+    "empty": 24.0,
+    "median_s": 17.8,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.55,
+     "bootstrap_95": [
+      -1.9,
+      0.75
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 22.7,
+    "empty": 24.0,
+    "median_s": 22.3,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.3,
+     "bootstrap_95": [
+      -2.65,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 22.6,
+    "empty": 24.0,
+    "median_s": 15.1,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.4,
+     "bootstrap_95": [
+      -2.65,
+      -0.15
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 64.45,
+    "empty": 64.0,
+    "median_s": 20.1,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 0.45,
+     "bootstrap_95": [
+      -3.25,
+      3.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 65.55,
+    "empty": 64.0,
+    "median_s": 24.5,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.55,
+     "bootstrap_95": [
+      -1.3,
+      4.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 65.55,
+    "empty": 64.0,
+    "median_s": 25.8,
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.55,
+     "bootstrap_95": [
+      -1.75,
+      4.85
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   }
+  ],
+  "rerun_seeds_20_39": [
+   {
+    "scale": "rescaled",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 144.95,
+    "reference": 144.7,
+    "empty": 184.0,
+    "median_s": 6.7,
+    "median_s_reference": 6.5,
+    "same_graph": 0.85,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.25,
+     "bootstrap_95": [
+      0.0,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -39.05,
+     "bootstrap_95": [
+      -43.9,
+      -34.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -39.3,
+     "bootstrap_95": [
+      -44.05,
+      -34.55
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   }
+  ]
+ },
+ "dagma_paper_penalty": {
+  "build": "Andrey pre-release build of 10 November 2026 on the 0.17.0 release branch (version string 0.16.0), commit 6c70976ab: the least-squares fit of dagma leaves the diagonal of the weight matrix free",
+  "about": "andrey.dagma and the authors' dagma 1.1.1, both at lambda1 = 0.05, the penalty of the experiments of Bello et al. (2022), on the 24 standardized cells, seeds 0 to 19; a measurement of the paper's setting beside the default's (0.03), not a default.",
+  "summary": {
+   "2b paper penalty standardized": {
+    "cells": 24,
+    "vs_reference": {
+     "better": 0,
+     "tie": 24,
+     "worse": 0
+    },
+    "vs_empty": {
+     "better": 6,
+     "tie": 12,
+     "worse": 6
+    },
+    "reference_vs_empty": {
+     "better": 6,
+     "tie": 12,
+     "worse": 6
+    }
+   }
+  },
+  "rows": [
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 18.9,
+    "reference": 18.9,
+    "empty": 20.0,
+    "median_s": 9.4,
+    "median_s_reference": 2.0,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.1,
+     "bootstrap_95": [
+      -2.4,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.1,
+     "bootstrap_95": [
+      -2.4,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 18.65,
+    "reference": 18.65,
+    "empty": 20.0,
+    "median_s": 12.9,
+    "median_s_reference": 2.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.35,
+      -0.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.35,
+      -0.35
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 18.65,
+    "reference": 18.65,
+    "empty": 20.0,
+    "median_s": 11.1,
+    "median_s_reference": 2.0,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.6,
+      -0.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.35,
+     "bootstrap_95": [
+      -2.6,
+      -0.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 39.0,
+    "reference": 38.8,
+    "empty": 40.0,
+    "median_s": 8.9,
+    "median_s_reference": 3.2,
+    "same_graph": 0.85,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      0.0,
+      0.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.0,
+     "bootstrap_95": [
+      -3.65,
+      1.65
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.2,
+     "bootstrap_95": [
+      -3.95,
+      1.5
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 38.7,
+    "reference": 38.8,
+    "empty": 40.0,
+    "median_s": 14.2,
+    "median_s_reference": 3.4,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -1.3,
+     "bootstrap_95": [
+      -3.6,
+      1.05
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.2,
+     "bootstrap_95": [
+      -3.5,
+      1.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 37.65,
+    "reference": 37.65,
+    "empty": 40.0,
+    "median_s": 5.3,
+    "median_s_reference": 3.4,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -2.35,
+     "bootstrap_95": [
+      -4.65,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -2.35,
+     "bootstrap_95": [
+      -4.65,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 97.6,
+    "reference": 97.6,
+    "empty": 100.0,
+    "median_s": 18.9,
+    "median_s_reference": 9.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -2.4,
+     "bootstrap_95": [
+      -6.0,
+      1.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -2.4,
+     "bootstrap_95": [
+      -6.0,
+      1.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 97.15,
+    "reference": 97.0,
+    "empty": 100.0,
+    "median_s": 9.9,
+    "median_s_reference": 9.4,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.15,
+      0.6
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -2.85,
+     "bootstrap_95": [
+      -6.5,
+      0.75
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -3.0,
+     "bootstrap_95": [
+      -6.7,
+      0.6
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 95.4,
+    "reference": 95.3,
+    "empty": 100.0,
+    "median_s": 15.4,
+    "median_s_reference": 8.1,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      0.0,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -4.6,
+     "bootstrap_95": [
+      -8.7,
+      -0.65
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -4.7,
+     "bootstrap_95": [
+      -8.75,
+      -0.8
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 176.15,
+    "reference": 176.25,
+    "empty": 200.0,
+    "median_s": 36.4,
+    "median_s_reference": 31.7,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.35,
+      0.1
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -23.85,
+     "bootstrap_95": [
+      -29.0,
+      -19.1
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -23.75,
+     "bootstrap_95": [
+      -29.0,
+      -18.9
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 174.55,
+    "reference": 174.35,
+    "empty": 200.0,
+    "median_s": 37.4,
+    "median_s_reference": 29.7,
+    "same_graph": 0.7,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.15,
+      0.7
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -25.45,
+     "bootstrap_95": [
+      -30.1512,
+      -21.05
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -25.65,
+     "bootstrap_95": [
+      -30.35,
+      -21.2
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "er2",
+    "d": 100,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 176.4,
+    "reference": 176.5,
+    "empty": 200.0,
+    "median_s": 37.1,
+    "median_s_reference": 32.5,
+    "same_graph": 0.8,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.5,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -23.6,
+     "bootstrap_95": [
+      -28.0,
+      -18.85
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -23.5,
+     "bootstrap_95": [
+      -28.0,
+      -18.7
+     ],
+     "verdict": "better",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 23.15,
+    "reference": 23.15,
+    "empty": 24.0,
+    "median_s": 14.3,
+    "median_s_reference": 2.1,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.85,
+     "bootstrap_95": [
+      -1.85,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.85,
+     "bootstrap_95": [
+      -1.85,
+      0.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 23.1,
+    "reference": 23.1,
+    "empty": 24.0,
+    "median_s": 17.8,
+    "median_s_reference": 2.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.9,
+     "bootstrap_95": [
+      -1.95,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.9,
+     "bootstrap_95": [
+      -1.95,
+      0.2
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 10,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 23.4,
+    "reference": 23.4,
+    "empty": 24.0,
+    "median_s": 4.5,
+    "median_s_reference": 2.2,
+    "same_graph": 1.0,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": -0.6,
+     "bootstrap_95": [
+      -1.7,
+      0.5
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.6,
+     "bootstrap_95": [
+      -1.7,
+      0.5
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 65.0,
+    "reference": 64.95,
+    "empty": 64.0,
+    "median_s": 5.4,
+    "median_s_reference": 3.9,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.0,
+     "bootstrap_95": [
+      -1.15,
+      3.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 0.95,
+     "bootstrap_95": [
+      -1.15,
+      2.95
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 65.45,
+    "reference": 65.35,
+    "empty": 64.0,
+    "median_s": 9.7,
+    "median_s_reference": 3.3,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      0.0,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.45,
+     "bootstrap_95": [
+      -0.4,
+      3.3
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 1.35,
+     "bootstrap_95": [
+      -0.5,
+      3.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 20,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 65.5,
+    "reference": 65.5,
+    "empty": 64.0,
+    "median_s": 6.8,
+    "median_s_reference": 4.0,
+    "same_graph": 0.95,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 1.5,
+     "bootstrap_95": [
+      -0.35,
+      3.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 1.5,
+     "bootstrap_95": [
+      -0.35,
+      3.45
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 188.8,
+    "reference": 189.3,
+    "empty": 184.0,
+    "median_s": 18.2,
+    "median_s_reference": 9.9,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.45,
+      0.0
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 4.8,
+     "bootstrap_95": [
+      1.55,
+      8.3
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 5.3,
+     "bootstrap_95": [
+      2.1,
+      8.7
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 189.4,
+    "reference": 189.45,
+    "empty": 184.0,
+    "median_s": 14.3,
+    "median_s_reference": 10.4,
+    "same_graph": 0.9,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.3,
+      0.15
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 5.4,
+     "bootstrap_95": [
+      1.3,
+      9.55
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 5.45,
+     "bootstrap_95": [
+      1.35,
+      9.6
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 50,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 189.95,
+    "reference": 189.9,
+    "empty": 184.0,
+    "median_s": 15.0,
+    "median_s_reference": 9.6,
+    "same_graph": 0.75,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.25
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 5.95,
+     "bootstrap_95": [
+      2.7,
+      9.25
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 5.9,
+     "bootstrap_95": [
+      2.7,
+      9.2
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "exponential",
+    "datasets": 20,
+    "andrey": 393.5,
+    "reference": 393.35,
+    "empty": 384.0,
+    "median_s": 36.8,
+    "median_s_reference": 39.8,
+    "same_graph": 0.55,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.45,
+      0.85
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 9.5,
+     "bootstrap_95": [
+      3.9,
+      15.4
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 9.35,
+     "bootstrap_95": [
+      3.7,
+      15.35
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "gaussian",
+    "datasets": 20,
+    "andrey": 390.9,
+    "reference": 390.95,
+    "empty": 384.0,
+    "median_s": 35.0,
+    "median_s_reference": 34.0,
+    "same_graph": 0.6,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.65,
+      0.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 6.9,
+     "bootstrap_95": [
+      1.9,
+      12.55
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 6.95,
+     "bootstrap_95": [
+      1.8,
+      12.8
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   },
+   {
+    "scale": "standardized",
+    "graph": "sf4",
+    "d": 100,
+    "noise": "gumbel",
+    "datasets": 20,
+    "andrey": 393.8,
+    "reference": 393.35,
+    "empty": 384.0,
+    "median_s": 35.2,
+    "median_s_reference": 33.3,
+    "same_graph": 0.7,
+    "vs_reference": {
+     "paired": 20,
+     "mean_D": 0.45,
+     "bootstrap_95": [
+      -0.4,
+      1.55
+     ],
+     "verdict": "tie",
+     "failures": 0
+    },
+    "vs_empty": {
+     "paired": 20,
+     "mean_D": 9.8,
+     "bootstrap_95": [
+      4.45,
+      15.35
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 9.35,
+     "bootstrap_95": [
+      3.8,
+      14.95
+     ],
+     "verdict": "worse",
+     "failures": 0
+    },
+    "build": "6c70976ab"
+   }
+  ]
+ },
+ "fit_hours_dagma_scope": 10.38
 }
