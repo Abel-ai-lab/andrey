@@ -33,6 +33,8 @@ whose Reproduce table lists the driver.
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI, each also with `edge_removal="triangles"`; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | 0.15.0 |
 | [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
+| [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | FCI as context; no Andrey solution of the lane's own yet | the authors' MMB-by-MMB code; pcalg (RFCI) | |
+| [Y-structures](comparisons/y-structures.md) | `y_structures_cpu.py` | no Andrey solution yet | the authors' Y-structure code (sbcd) | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | 0.14.0 |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
@@ -59,10 +61,10 @@ whose Reproduce table lists the driver.
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
-`start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
-`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, `start_stein.sh`,
-and `start_notears.sh` build the separate environments some comparisons need
-([setup](README.md#setup)).
+`start_mvpc_r.sh`, `start_sbcd_r.sh`, `start_missdag.sh`, `start_mmb.sh`, `start_xges.sh`,
+`start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, `start_causalnex.sh`,
+`start_utigsp.sh`, `start_loci.sh`, `start_stein.sh`, and `start_notears.sh` build the separate
+environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
