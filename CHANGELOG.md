@@ -8,6 +8,20 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- `andrey.viz.Palette` has `amber_text`, the amber of a word set on the paper: darker in the light
+  theme, so display type keeps a 3:1 contrast. ([#919])
+
+### Changed
+
+- The homepage is about half as long and names one method per family: the supported method compared
+  with the most packages, timed against every package on one axis, beside the outcome its release
+  card records. The newest four release cards, the Sachs example, a band for agents, and five next
+  steps follow; every method list moves to the documentation. ([#919])
+
 ## [0.17.0] - 2026-11-11
 
 ### Highlights
@@ -2476,6 +2490,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#919]: https://github.com/Abel-ai-lab/andrey/pull/919
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
