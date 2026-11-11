@@ -515,6 +515,8 @@ def test_ranks_are_read_only_when_keys_tie(method):
     ranks = _Recorded([0, 9, 4, 8, 1, 2, 7, 3])
     assert strongest(keys, ranks) == 7
     assert set(ranks.read) <= {1, 7, 2}
+    with pytest.raises(ValueError, match="no candidate"):
+        strongest({}, ranks)
     oracle = _oracle(0)
     ranks = _Recorded(list(range(oracle.d)))
     LocalSearch(oracle, ranks, 0.5).local(method, 0)

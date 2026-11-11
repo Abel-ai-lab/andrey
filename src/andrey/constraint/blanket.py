@@ -40,7 +40,7 @@ to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, 
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import partial
@@ -117,9 +117,11 @@ def strongest(keys: Mapping[int, Any], ranks: Sequence[int]) -> int:
     the order of ``keys``. ``ranks`` (:func:`~andrey.core.ties.tie_ranks`) is read only for two
     candidates whose keys are equal, so the choice does not depend on the column order, and a
     search whose keys never tie never reads it. The choice is the first candidate, in the order of
-    ``keys``, whose key followed by its rank is the smallest. Raises ``StopIteration`` on empty
-    ``keys``.
+    ``keys``, whose key followed by its rank is the smallest. Raises ``ValueError`` when ``keys``
+    is empty.
     """
+    if not keys:
+        raise ValueError("no candidate to choose from")
     items = iter(keys.items())
     best, best_key = next(items)
     for x, key in items:
@@ -263,8 +265,8 @@ def blanket_graph(
 def _weakest(
     test: CITest,
     target: int,
-    xs: list[int],
-    conds: list[tuple[int, ...]],
+    xs: Sequence[int],
+    conds: Sequence[tuple[int, ...]],
     pvalues: list[np.ndarray] | None = None,
 ) -> list[tuple[float, float]]:
     """Each candidate's weakest association with ``target`` over the conditioning sets ``conds``.
@@ -790,7 +792,7 @@ class LocalSearch:
         """
         start = perf_counter()
         strengths, pvalues = _scan(self.test, target, xs, cond)
-        self._asked(start, target, xs, [cond])
+        self._asked(start, target, xs, 1, lambda: [cond])
         return strengths, pvalues
 
     def weakest(
@@ -810,8 +812,8 @@ class LocalSearch:
         per set, for :meth:`largest_sets`.
         """
         start = perf_counter()
-        out = _weakest(self.test, target, list(xs), list(conds), pvalues)
-        self._asked(start, target, xs, conds)
+        out = _weakest(self.test, target, xs, conds, pvalues)
+        self._asked(start, target, xs, len(conds), lambda: conds)
         return out
 
     def largest_sets(
@@ -845,7 +847,7 @@ class LocalSearch:
         scan_conditioning_sets(
             self.test, target, x, list(among), size, self.alpha, set(), skip_within, trace
         )
-        self._asked(start, target, [x], [record["S"] for record in trace])
+        self._asked(start, target, [x], len(trace), lambda: (record["S"] for record in trace))
         return [(record["S"], record["p"]) for record in trace if record["removed"]]
 
     def strongest(self, keys: Mapping[int, Any]) -> int:
@@ -853,15 +855,21 @@ class LocalSearch:
         return strongest(keys, self.ranks)
 
     def _asked(
-        self, start: float, target: int, xs: Sequence[int], conds: Sequence[Sequence[int]]
+        self,
+        start: float,
+        target: int,
+        xs: Sequence[int],
+        n_sets: int,
+        conds: Callable[[], Iterable[Sequence[int]]],
     ) -> None:
-        """Add a query call that began at ``start`` and asked each of ``xs`` given each of
-        ``conds`` to :attr:`counts`."""
+        """Add a query call that began at ``start`` and asked each of ``xs`` given each of the
+        ``n_sets`` sets ``conds()`` gives to :attr:`counts`; ``conds`` is called only to keep the
+        distinct queries."""
         counts = self.counts
         counts.test_seconds += perf_counter() - start
-        counts.issued += len(xs) * len(conds)
+        counts.issued += len(xs) * n_sets
         if counts.queries is not None:
-            sets = [tuple(sorted(int(c) for c in cond)) for cond in conds]
+            sets = [tuple(sorted(int(c) for c in cond)) for cond in conds()]
             counts.queries.update(
                 (min(int(target), int(x)), max(int(target), int(x)), s) for x in xs for s in sets
             )
