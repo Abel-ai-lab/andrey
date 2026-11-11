@@ -80,6 +80,11 @@ directory.
 and `library()` run in the adapter's `setup()`, before warm-up fits and outside fit timing. See
 [Where the clock starts](#where-the-clock-starts).
 
+The set-learner lane ([Markov blankets](comparisons/blankets.md)) is written against bnlearn 5.2.1,
+and `blanket_cpu.py` stops when the library holds another version. `start_r.sh` installs the current
+CRAN release into a new library, so once CRAN moves past 5.2.1, install 5.2.1 from the CRAN archive
+into `$ANDREY_BENCH_R_LIBS` first.
+
 ### Separate solution environments
 
 xges pins `numpy<2` and `numba<0.60`, which bench-env cannot satisfy. Its fits use a second
@@ -611,6 +616,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   both, and the contract of a local method's adapter ([MMB-by-MMB](comparisons/mmb-by-mmb.md)).
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
+- `andrey_bench/blanket_lane.py` - the answers of the set-learner lane (a target's set or a graph,
+  with its test counts), the true sets, and the scorers of both.
 - `andrey_bench/oracle.py` - a solution returning the true graph; a correct pipeline scores SHD 0.
 - `andrey_bench/provenance.py` - reads versions, BLAS, CPU, and GPU from the benchmark environment.
 - `tests/test_validation.py`, `tests/test_memory_cap.py` - the validation suite.

@@ -9,7 +9,8 @@ Two layers:
 
 - individual metric functions -- ``shd``, ``skeleton_scores``, ``orientation_scores``,
   ``confounder_pair_scores``, ``causal_order_accuracy``, ``coefficient_mae``,
-  ``direction_accuracy``, ``temporal_scores``, ``latent_cluster_ari``, and friends;
+  ``direction_accuracy``, ``temporal_scores``, ``latent_cluster_ari``, ``target_edge_scores``,
+  ``claim_scores``, and friends;
 - :func:`score`, a capability resolver that reads which fields a result carries and returns the
   family-appropriate dict, silently skipping metrics whose inputs are absent.
 """
@@ -23,6 +24,7 @@ from .graph import (
     to_cpdag,
 )
 from .latent import adjusted_rand_index, latent_cluster_ari, number_of_latents
+from .local import claim_scores, target_edge_scores
 from .order import (
     causal_order_accuracy,
     causal_order_kendall_tau,
@@ -51,4 +53,6 @@ __all__ = [
     "latent_cluster_ari",
     "adjusted_rand_index",
     "number_of_latents",
+    "target_edge_scores",
+    "claim_scores",
 ]

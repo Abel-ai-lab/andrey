@@ -18,7 +18,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from andrey.core.ties import tie_ranks
 
 from . import stats
-from .ci import _canonical_ranked, per_query
+from .ci import _canonical_ranked, count_tests, per_query
 from .seeding import resolve_seed
 
 __all__ = ["GPDC"]
@@ -156,6 +156,7 @@ class GPDC:
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        count_tests()
         rx, ry = self._residual(x_int, cond), self._residual(y_int, cond)
         if not (np.ptp(rx) > 0.0 and np.ptp(ry) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
