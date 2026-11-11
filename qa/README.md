@@ -167,7 +167,7 @@ targets UT-IGSP learns:
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
-| `ages_paper` with strong and weak shares `(0.3, 0.7)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
+| `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
@@ -249,8 +249,8 @@ targets UT-IGSP learns:
 - **Linear Gaussian models with weak edges.** AGES's published regime, drawn by its benchmark
   driver (`benchmarks/ages_cpu.py`) as two of its comparison's cells: the simulation of Eigenmann,
   Nandy, and Maathuis (2017) on 10 variables with 10,000 rows, where each pair of variables holds a
-  strong edge (weight magnitude 0.8 to 1.2) or a weak one (0.1 to 0.3). One cell is a complete
-  graph with 30% strong and 70% weak edges, and one has 30% of each. AGES directs edges beyond the
+  strong edge (weight magnitude 0.8 to 1.2) or a weak one (0.1 to 0.3). One cell has 10%
+  strong and 30% weak edges, and one has 30% of each. AGES directs edges beyond the
   CPDAG, so the gate scores its graph against the true DAG, where an edge left undirected counts
   one.
 - **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,

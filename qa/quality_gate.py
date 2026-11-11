@@ -283,10 +283,11 @@ LINEAR_SEM_CELLS: dict[str, tuple[str, int]] = {
 #: its comparison's cells, as ``(qs, qw, n)``: the simulation of the AGES paper, a linear Gaussian
 #: model on 10 variables where each pair holds a strong edge with probability ``qs`` and a weak one
 #: with probability ``qw``. AGES directs edges beyond the CPDAG, so its graph is scored against the
-#: true DAG: a complete graph with 70% weak edges, the setting of the paper's penalty study, and a
-#: sparser one with as many weak edges as strong ones.
+#: true DAG. Both cells leave pairs without an edge: on a complete graph, the paper's ``(0.3,
+#: 0.7)``, any complete DAG is about as close to the truth as the fit, so the gate could not tell a
+#: broken result from a good one there.
 WEAK_EDGE_CELLS: dict[str, tuple[float, float, int]] = {
-    "ages_paper_qs0.3_qw0.7_n10000": (0.3, 0.7, 10000),
+    "ages_paper_qs0.1_qw0.3_n10000": (0.1, 0.3, 10000),
     "ages_paper_qs0.3_qw0.3_n10000": (0.3, 0.3, 10000),
 }
 

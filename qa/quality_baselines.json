@@ -126,7 +126,7 @@
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "AGES": {
-        "ages_paper_qs0.3_qw0.7_n10000": {"median_shd": 27.5, "empty_median_shd": 45.0, "shd": [27, 31, 34, 32, 26, 25, 31, 28, 17, 25]},
+        "ages_paper_qs0.1_qw0.3_n10000": {"median_shd": 9.0, "empty_median_shd": 16.5, "shd": [2, 6, 16, 10, 10, 11, 6, 13, 8, 5]},
         "ages_paper_qs0.3_qw0.3_n10000": {"median_shd": 20.5, "empty_median_shd": 26.5, "shd": [29, 8, 30, 9, 31, 16, 6, 23, 20, 21]}
       },
       "HC": {
