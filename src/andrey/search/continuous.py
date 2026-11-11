@@ -368,6 +368,7 @@ def central_path(
     warm_iter: int,
     max_iter: int,
     lr: float,
+    free_diagonal: bool,
 ) -> np.ndarray:
     """Minimize ``mu * (loss + penalty) + h`` along DAGMA's decreasing ``mu``; return the weights.
 
@@ -377,13 +378,21 @@ def central_path(
     last stage. Every 1000 steps the stage ends when the objective has changed by a relative amount
     of at most ``1e-6``. A step that leaves the M-matrix domain is undone and the step size halved.
     A stage that leaves the domain at its first step, or after ``s`` has fallen to 0.9, restarts
-    with half the step size and ``s`` raised by 0.1. Forbidden and diagonal entries stay at zero,
-    and the penalty leaves the required entries.
+    with half the step size and ``s`` raised by 0.1. Forbidden entries stay at zero, and the penalty
+    leaves the required entries.
+
+    With ``free_diagonal`` the diagonal of ``W`` is optimized like every other entry, as in
+    Algorithm 1 of Bello et al. (2022), whose stages are unconstrained in ``W``: ``h`` counts a
+    self-weight as a cycle and brings it toward zero as ``mu`` falls, and the path the other
+    weights take depends on it. The returned weights then carry what is left of the diagonal,
+    which :func:`threshold_dag` drops. Without it the diagonal stays at zero.
     """
     cov = canonical.cov
     d = cov.shape[0]
     identity = np.eye(d)
-    free = ~(canonical.forbidden | np.eye(d, dtype=bool))
+    free = ~canonical.forbidden
+    if not free_diagonal:
+        free &= ~np.eye(d, dtype=bool)
     penalized = ~canonical.required
     schedule = [DAGMA_S[min(t, len(DAGMA_S) - 1)] for t in range(stages)]
 
@@ -671,13 +680,15 @@ def dagma(
 
     ``standardize`` scales each column to unit variance first, and a ``cov`` replaces the data's
     covariance (:func:`canonicalize`). The first fit
-    is the least-squares loss with an ``l1`` penalty along :func:`central_path`. With ``robust``
-    its weights start :func:`likelihood_path`, whose steps run the central path again with
-    :func:`gaussian_likelihood` and the quasi-MCP.
+    is the least-squares loss with an ``l1`` penalty along :func:`central_path` with a free
+    diagonal. With ``robust`` its weights start :func:`likelihood_path`, whose steps run the central
+    path again with :func:`gaussian_likelihood` and the quasi-MCP, the diagonal at zero.
     """
     canonical = canonicalize(data, constraints, standardize=standardize, cov=cov)
 
-    def solve(initial: np.ndarray, loss: Loss, penalty: Penalty) -> np.ndarray:
+    def solve(
+        initial: np.ndarray, loss: Loss, penalty: Penalty, *, free_diagonal: bool
+    ) -> np.ndarray:
         return central_path(
             canonical,
             loss=loss,
@@ -687,15 +698,20 @@ def dagma(
             warm_iter=warm_iter,
             max_iter=max_iter,
             lr=lr,
+            free_diagonal=free_diagonal,
         )
 
-    weights = solve(np.zeros_like(canonical.cov), least_squares, l1_penalty(lambda1))
+    weights = solve(
+        np.zeros_like(canonical.cov), least_squares, l1_penalty(lambda1), free_diagonal=True
+    )
     steps = 0
     if robust:
         weights, steps = likelihood_path(
             canonical,
             weights,
-            lambda initial, penalty: solve(initial, gaussian_likelihood, penalty),
+            lambda initial, penalty: solve(
+                initial, gaussian_likelihood, penalty, free_diagonal=False
+            ),
             w_threshold=w_threshold,
             lam=mcp_lambda,
             delta=mcp_delta,

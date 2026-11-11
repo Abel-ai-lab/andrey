@@ -73,8 +73,9 @@ them with their status.
 ### What is the difference between supported and experimental?
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
-method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process. A new method starts as experimental.
+method has recovery tests but is not supported: it has no published benchmark yet, or it did not
+pass one, and its **Limitations** say which. It warns with `andrey.ExperimentalWarning` the first
+time it runs in a process. A new method starts as experimental.
 
 ### Which method should I start with?
 

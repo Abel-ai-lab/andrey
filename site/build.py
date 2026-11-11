@@ -502,6 +502,13 @@ REGIMES |= {
     f"{noise} noise, z-scored"
     for key, noise in (("", "Gaussian"), ("_exponential", "exponential"), ("_gumbel", "Gumbel"))
 }
+# AGES on the 10-variable simulation of its paper, by the share of variable pairs that hold a weak
+# edge. Its cells are at mean degrees from 0.9 to 9, so ``MEAN_DEGREE`` leaves them to the card.
+REGIMES |= {
+    f"ages_paper_weak{share}": "linear Gaussian data from the AGES paper's simulation, "
+    + (f"{share}% of the variable pairs a weak edge" if share else "no weak edges")
+    for share in (0, 10, 30, 50, 70)
+}
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other

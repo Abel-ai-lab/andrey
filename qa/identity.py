@@ -169,6 +169,7 @@ FITS: dict[str, Fit] = {
     "GES": Fit(andrey.ges),
     "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
+    "AGES": Fit(andrey.ages),
     "HC": Fit(andrey.hc),
     "Tabu": Fit(andrey.tabu),
     "IAMB": Fit(functools.partial(andrey.iamb, alpha=ALPHA), alpha=ALPHA),
@@ -248,6 +249,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.order_draws, "score_paper_laplace_standardized", 12, "er1"
     ),
     "notears_paper_standardized_d60": functools.partial(qg.linear_sem_draws, "standardized", 60),
+    "ages_paper_qs0.5_qw0.5_n10000": functools.partial(qg.weak_edge_draws, 0.5, 0.5, 10000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
     "fci_jci_x100": functools.partial(qg.index_pag_draws, "X100"),
@@ -302,6 +304,7 @@ LARGER: dict[str, str] = {
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
+    "AGES": "ages_paper_qs0.5_qw0.5_n10000",
     "CDNOD": "domain_shift_er_d70",
     "FCI-JCI": "fci_jci_x100",
     "GIES": "interventional_gauss_er_d100",
