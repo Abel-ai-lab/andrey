@@ -75,11 +75,10 @@ names its pull request.
   causal-learn, bnlearn, Tetrad, or lingam given the same knowledge, in a setting that repeated on
   fresh seeds; `xges`, `grasp`, `exact_search`, and `fci_jci` have no reference that takes the
   knowledge. `required_paths` stays experimental in `tabu`, `mmhc`, and `rsmax2`, where bnlearn
-  given the required edges those paths imply made fewer errors, and both path parts stay
-  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the claims are mostly not applied at 50
-  variables: the graph found often has no consistent extension, and the fit then drops every
-  claim. The evidence is on the [comparison page][kp-paths].
-  ([#870])
+  given the required edges those paths imply made fewer errors, and `forbidden_paths` stays
+  experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at 50 variables often has
+  no consistent extension and most claims are dropped on it. The evidence is on the
+  [comparison page][kp-paths]. ([#870], [#892])
 - `missing="em"` is supported in `ges`, `boss`, and `grasp`. The benchmark lane `m2-tetrad` runs
   them at the standard BIC (`ebic_gamma=0.0`) beside Tetrad 8.0.0's FGES, BOSS, and GRaSP under its
   EM covariance policy, which estimates one covariance by EM before the search and is not structural
@@ -111,15 +110,38 @@ names its pull request.
   to 5 times as long. The comparison page's tables of the lanes without a reference were not run
   again and say that they were measured with one refit per round. Results on complete data do not
   change. ([#887])
-- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say why `required_paths` and
-  `forbidden_paths` are experimental there: a graph with no consistent extension stands for no DAG,
-  so the fit drops every path claim, lists them in `metadata["unmet_knowledge"]`, and returns the
-  graph it finds without them. On simulated data with 50 variables, 2,000 rows, and mean degree 4
-  that happened in 38 to 40 of 40 fits; where the graph has a consistent extension, the claims were
-  applied and the CPDAG was 0.2 to 0.6 edges closer to the class they define. The Limitations of
+- The Limitations of `iamb`, `inter_iamb`, and `mmpc` say how path claims fare on a graph with no
+  consistent extension, which stands for no DAG and which they found in 105 to 125 of 240 simulated
+  datasets, and in 19 or 20 of 20 with 50 variables, 2,000 rows, and mean degree 4: how many claims
+  direct an edge, are met by an edge the data directed, and are dropped, and why `forbidden_paths`
+  is experimental there. The Limitations of
   `iamb` and `inter_iamb` also state how often the skeleton step separates a true edge as the
   blankets grow, and that required edges, which enlarge the blankets, cost about one true pair per
-  graph at 50 variables and mean degree 4. ([#882])
+  graph at 50 variables and mean degree 4. ([#882], [#892])
+- `required_paths` and `forbidden_paths` act on a graph with no consistent extension, which `pc`,
+  `cdnod`, `iamb`, `inter_iamb`, and `mmpc` can return when their tests contradict each other on
+  finite data. Such a graph stands for no DAG, and a fit dropped every path claim on it. A claim on
+  a pair joined by an undirected edge now directs that edge, `a -> b` for a required path and
+  `b -> a` for a forbidden one (Fang and He, 2020; Fang et al., 2025), and Meek's rules follow
+  (Meek, 1995). A claim on a pair that is not adjacent, a claim against an edge the data directed,
+  and claims that conflict with each other, by asking for both directions of one edge or by closing
+  a directed cycle, are dropped and listed in `metadata["unmet_knowledge"]` as before, whatever the
+  order of the claims or the columns. `metadata["edge_claims"]` is new and lists the claims applied
+  to an edge. The result is not guaranteed to stand for a DAG, as the graph found did not, and
+  applying the reading to such a graph is Andrey's own choice. A fit without path claims, and a fit
+  whose graph has a consistent extension, return what they returned. On simulated linear-Gaussian
+  data (10 to 50 variables, 240 datasets a method) the graph found had no consistent extension in
+  49 datasets of `pc`, 71 of `cdnod`, and 105 to 125 of `iamb`, `inter_iamb`, and `mmpc`. Against
+  the fits that dropped every claim there, with the same true claims, no setting of any of the five
+  methods was farther from the true DAG or from the class of graphs the claims define, and 5 to 29
+  of 36 were closer. Most claims are still dropped on such a graph, 76 to 81% of the required and
+  96 to 97% of the forbidden paths, since most name a pair that is not adjacent. `required_paths`
+  is now supported in `iamb`, `inter_iamb`, and `mmpc`: with true required paths none was farther
+  from that class or from the true DAG than without them in any setting. `forbidden_paths` stays
+  experimental in the three: with forbidden paths alone at 50 variables and mean degree 2, the
+  CPDAG was 0.65 to 1.95 edges farther from the class in 3 or 4 of 6 settings over 40 datasets,
+  though in no setting on two separate sets of 20. `pc` and `cdnod` keep their status. The
+  [comparison page][kp-paths] has the results. ([#892])
 - The Limitations and the `n_starts` entry of `grasp` say when one search is not enough: on
   simulated linear-Gaussian data with 50 variables, mean degree 4, and 500 rows at the standard BIC,
   one start's mean SHD over 40 datasets was 29.6 (median fit 1.3 s) against 18.8 with `n_starts=4`
@@ -2397,6 +2419,7 @@ First alpha release.
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#895]: https://github.com/Abel-ai-lab/andrey/pull/895

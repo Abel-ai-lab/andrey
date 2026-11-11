@@ -208,7 +208,7 @@ directly or not (`required_paths`), that it does not (`forbidden_paths`), or tha
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
 honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
 are supported in every method that honors them except six: required paths are experimental in Tabu
-search, MMHC, and RSMAX2, and both path parts in IAMB, Inter-IAMB, and MMPC, where our measurements
+search, MMHC, and RSMAX2, and forbidden paths in IAMB, Inter-IAMB, and MMPC, where our measurements
 did not pass; a method given a part it does not honor raises an error naming the methods that do. A
 path claim says less than an edge, so when you know the edge itself, state it as `required`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
