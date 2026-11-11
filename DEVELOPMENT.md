@@ -252,6 +252,8 @@ for an experimental method; a **When to use.** and a **Limitations.** paragraph 
 method; and for a supported one, a recorded output, a place in the quality gate, a section in a
 release card, rows in a published summary, an example notebook, and an entry under "Supported
 methods" in the API reference. Review checks device parity and the card's "Reproduce" table.
+[Standards](docs/docs/standards.md) lists, for readers, the requirements every method meets and
+the check behind each; a change to a requirement or its check updates that page.
 
 | Step | Where | When it runs | Required for |
 |---|---|---|---|

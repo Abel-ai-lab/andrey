@@ -539,6 +539,7 @@ PROSE_NAMES = {
 METHOD_LISTS = {
     "indep_test": lambda s: any(p.name == "indep_test" for p in s.params),
     "score_func": lambda s: any(p.name == "score_func" for p in s.params),
+    "test_and_score": lambda s: {"indep_test", "score_func"} <= {p.name for p in s.params},
     "no_knowledge": lambda s: not s.knowledge,
     "ordering": lambda s: s.output.has_ordering,
     "weighted": lambda s: s.output.weighted,

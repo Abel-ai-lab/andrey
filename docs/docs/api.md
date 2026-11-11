@@ -14,69 +14,33 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with these
-exceptions: `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`, `hc`, `tabu`,
-`boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies`, `igsp`, and
-`ut_igsp` also take `env` with `targets`, the variables intervened on in each environment, `gnies`
-takes `env` and learns the targets, `icp` also takes `env` and `target`, the variable whose parents
-it finds, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
-list of datasets and returns one result per dataset. The first argument of every method is `data`;
-`andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
-dataset. Each method is either supported or experimental; `andrey list` prints the status.
+Every method has the same shape:
+
+- **Data in.** The first argument, `data`, is a table: a pandas DataFrame, whose column names
+  become the node labels, or a NumPy array with one row per sample and one column per variable.
+  `jpcmciplus`, `longitudinal_lingam`, and `multi_group_direct_lingam` take a list of tables
+  instead.
+- **One call.** Each method is one function, such as `andrey.pc(data)`, with its settings as
+  keyword arguments. `andrey run pc --data data.csv` runs it from the shell, with `--data` once per
+  table for a method that takes a list ([Command-line interface](#command-line-interface)).
+- **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
+  `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
+  causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
+  the test, the score, and the seed in `out.metadata`.
+- **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
+  other packages and checked against known graphs before each release; an
+  [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
+- **Tests and scores.** A method that tests conditional independence takes `indep_test`, and one
+  that scores graphs takes `score_func`. Left as `None`, each is picked from the column types, as
+  described below; [Conditional-independence tests](#conditional-independence-tests) lists the
+  tests.
 
 % concept: env
 `boss`, `boss_fci`, `cdnod`, `fci_jci`, `ges`, `gfci`, `gies`, `gnies`, `grasp`, `grasp_fci`, `hc`,
-`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, with one meaning: one label
-per row, text or finite numbers, or the name of a column of a DataFrame `data`, which is then not a
-variable, or, with `env` left out, the data given as one table per environment (see below).
-`andrey run` reads it from `--env`, a column of `--data` or a file. A label that is missing or
-infinite raises a `ValueError`. The methods read `env` in one of two ways. `gies`, `gnies`, `igsp`,
-and `ut_igsp` read it as interventions: each distinct label is one environment, which changes the
-mechanisms of its targets, known or learned, and leaves the others as they are. `icp` reads it as
-interventions on any variables, as long as they leave the mechanism of its `target` alone. `cdnod`,
-`fci_jci`, `boss`, `grasp`, `ges`, `hc`, `tabu`, `boss_fci`, `grasp_fci`, and `gfci` read it as a
-context variable that no data variable causes, the environment index, which joins the search as one
-more variable; a numeric label, such as a time step, stays a number.
-
-`gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
-variables, by name or position, with `[]` for an observational environment; as the name of a column
-whose cells give each row's variables, from whose distinct values `env` follows when you leave it
-out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
-`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
-environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
-the mapping leaves out or gives `None` as one whose targets it learns, and still needs an
-observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
-environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
-names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
-it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
-its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
-unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
-`targets` in `--config`, and reads an `--env` of whole numbers as integers.
-
-```python
-out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
-out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
-out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
-out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
-out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) fits without env
-out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
-out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
-```
-
-In Python, every method that takes `env` also takes each environment's rows apart as `data`, in
-place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
-`0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
-mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
-the first one's order, and a column of the `category` type in each keeps it, with every
-DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
-of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
-label.
-
-```python
-out = andrey.gies([observed, knockout], targets={0: [], 1: ["x"]})
-out = andrey.ut_igsp({"control": control, "drug": drug}, targets={"control": [], "drug": None})
-```
+`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, and `gies`, `gnies`,
+`icp`, `igsp`, and `ut_igsp` also take `targets`, the variables intervened on in each environment.
+[Environments and interventions](guides/getting-started.md#environments-and-interventions) gives
+the forms both take, how each method reads them, and how to pass each environment as its own table.
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
 outside its range or not one of its choices raises `ValueError`, each with a message that names the

@@ -75,6 +75,8 @@ What changed in each release.
 - [Contributing](guides/contributing.md): report a problem, set up a development environment, and
   run the checks before a pull request.
 - [Release cards](benchmarks.md): each release's timings, accuracy, and known limits.
+- [Standards](standards.md): what every method must meet, how each requirement is checked, and
+  where the exceptions are recorded.
 
 ## More
 

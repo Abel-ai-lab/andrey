@@ -353,17 +353,57 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row per
 sample and one column per variable. Most methods take that one argument and return the same kind of
-result; `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`, `hc`, `tabu`,
-`boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies` and `igsp` also take
-`env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
-learns which variables each environment's interventions changed, `icp` takes `env` and `target`, the
-variable whose parents it finds, and `multi_group_direct_lingam`, `longitudinal_lingam`, and
-`jpcmciplus` take a list of datasets. `andrey list` names the methods, and {doc}`graph-types`
-explains which graph each one returns.
+result; `multi_group_direct_lingam`, `longitudinal_lingam`, and `jpcmciplus` take a list of
+datasets, and the methods under [Environments and interventions](#environments-and-interventions)
+also take each row's environment. `andrey list` names the methods, and {doc}`graph-types` explains
+which graph each one returns.
 
-`ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. It calls the rows
-of one environment of `env` a setting. Map an observational environment to `[]`, a setting to the
-targets you know, and a setting whose targets you do not know to `None`:
+### Environments and interventions
+
+% concept: env
+`boss`, `boss_fci`, `cdnod`, `fci_jci`, `ges`, `gfci`, `gies`, `gnies`, `grasp`, `grasp_fci`, `hc`,
+`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, with one meaning: one label
+per row, text or finite numbers, or the name of a column of a DataFrame `data`, which is then not a
+variable, or, with `env` left out, the data given as one table per environment (see below).
+`andrey run` reads it from `--env`, a column of `--data` or a file. A label that is missing or
+infinite raises a `ValueError`. The methods read `env` in one of two ways. `gies`, `gnies`, `igsp`,
+and `ut_igsp` read it as interventions: each distinct label is one environment, which changes the
+mechanisms of its targets, known or learned, and leaves the others as they are. `icp` reads it as
+interventions on any variables, as long as they leave the mechanism of its `target` alone. `cdnod`,
+`fci_jci`, `boss`, `grasp`, `ges`, `hc`, `tabu`, `boss_fci`, `grasp_fci`, and `gfci` read it as a
+context variable that no data variable causes, the environment index, which joins the search as one
+more variable; a numeric label, such as a time step, stays a number. `ges`, `hc`, `tabu`, `boss`,
+`grasp`, `gfci`, `boss_fci`, and `grasp_fci` also fit without `env`, and `icp` also takes `target`,
+the variable whose parents it finds.
+
+`gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
+variables, by name or position, with `[]` for an observational environment; as the name of a column
+whose cells give each row's variables, from whose distinct values `env` follows when you leave it
+out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
+`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
+environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
+the mapping leaves out or gives `None` as one whose targets it learns, and still needs an
+observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
+environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
+`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
+names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
+it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
+its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
+unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`, and reads an `--env` of whole numbers as integers.
+
+```python
+out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
+out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
+out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
+out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) fits without env
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
+out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
+```
+
+`ut_igsp` calls the rows of one environment a setting. Map an observational environment to `[]`, a
+setting to the targets you know, and a setting whose targets you do not know to `None`:
 
 ```python
 from andrey import ut_igsp
@@ -372,14 +412,18 @@ result = ut_igsp(data, "condition", targets={"control": [], "drug": ["dose"], "k
 result.metadata["targets"]  # each environment's targets, known and learned, by its label
 ```
 
-When each environment's rows come as their own table, pass them as a dict, or a list labeled by
-position, in place of `env`:
+In Python, every method that takes `env` also takes each environment's rows apart as `data`, in
+place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
+`0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
+mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
+the first one's order, and a column of the `category` type in each keeps it, with every
+DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
+of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
+label.
 
 ```python
-result = ut_igsp(
-    {"control": control, "drug": drug, "knockout": knockout},
-    targets={"control": [], "drug": ["dose"], "knockout": None},
-)
+out = andrey.gies([observed, knockout], targets={0: [], 1: ["x"]})
+out = andrey.ut_igsp({"control": control, "drug": drug}, targets={"control": [], "drug": None})
 ```
 
 ## Background knowledge

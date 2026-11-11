@@ -8,6 +8,17 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method, how each requirement is checked, and where the exceptions are recorded. The
+  examples page opens with a numbered learning path through the notebooks, and the API reference
+  opens with the shape of the API; the details of `env` and `targets` moved to the
+  [getting-started guide](https://andrey.abel.ai/docs/guides/getting-started.html#environments-and-interventions).
+  ([#904])
+
 ## [0.17.0] - 2026-11-11
 
 ### Highlights
@@ -2476,6 +2487,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma

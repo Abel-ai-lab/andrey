@@ -9,6 +9,34 @@ html_theme.sidebar_secondary.remove: true
 
 # Examples
 
+New to Andrey? Work through the notebooks in this order; each part adds one step to the last.
+
+- **Part 1.** [Getting started](../guides/getting-started.md) and the [quick start](quick_start):
+  install Andrey, learn a graph from the Sachs protein measurements, and read the result.
+- **Part 2.** [Visualize a causal graph](viz): draw a result and read the mark at each end of an
+  edge.
+- **Part 3.** [Constraint-based discovery](constraint_based): learn a graph from
+  conditional-independence tests, and allow hidden common causes with FCI.
+- **Part 4.** [Score-based search](score_search) and [permutation-based search](permutation_based):
+  search for the graph with the best score, over graphs or over orderings of the variables.
+- **Part 5.** [Background knowledge](knowledge): pass what you already know, such as tiers in time,
+  to narrow the search.
+- **Part 6.** [Linear non-Gaussian models](lingam): orient every edge when the noise is
+  non-Gaussian.
+- **Part 7.** [Pairs that share a hidden cause](rcd) and
+  [causal order with hidden causes](bottom_up_parce_lingam): find the variables a hidden cause
+  joins.
+- **Part 8.** [Nonlinear additive-noise models](functional) and [pairwise direction](pairwise):
+  orient edges when each effect is a nonlinear function of its causes.
+- **Part 9.** [Continuous optimization](calm): fit a weighted DAG by gradient descent instead of a
+  search over graphs.
+- **Part 10.** [Time series](time_series): find the causes in data measured over time.
+- **Part 11.** [Bootstrap](bootstrap): refit on resamples of the rows to see how stable each edge
+  is.
+- **Part 12.** [Markov check](markov_check): test whether the data contradict the graph you learned.
+
+[Speed on your machine](speed_on_your_machine) times PC on your own hardware at any point.
+
 Each notebook runs one method or task, on your own machine or in Colab; each has **Open in Colab**
 and **Download this notebook** links. The [interactive demos](#interactive-demos) run in your
 browser instead. From a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A
