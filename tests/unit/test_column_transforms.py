@@ -217,11 +217,13 @@ def monotone(x: np.ndarray) -> np.ndarray:
     return np.stack([f(x[:, j]) for j, f in enumerate(MONOTONE[: x.shape[1]])], axis=1)
 
 
-@pytest.mark.parametrize(
-    "spec",
-    [spec for spec in TABLE_SPECS if accepts(spec, "normal_scores") and not scores(spec)],
-    ids=lambda spec: spec.name,
-)
+#: The methods that take ``normal_scores`` and read the data only through their test; the others
+#: that take it, gfci, mmhc, rsmax2, boss_fci, and grasp_fci, also take ``score_func``, whose score
+#: reads the values, so a monotone transform can change their graph.
+RANK_TESTED = [spec for spec in TABLE_SPECS if accepts(spec, "normal_scores") and not scores(spec)]
+
+
+@pytest.mark.parametrize("spec", RANK_TESTED, ids=lambda spec: spec.name)
 def test_a_monotone_transform_of_each_column_keeps_the_normal_scores_graph(spec):
     want = fit(spec, lambda x: x, indep_test="normal_scores")
     assert found(want)
