@@ -1,7 +1,10 @@
-"""The shared Markov-blanket engine: IAMB, Inter-IAMB, and MMPC.
+"""The shared Markov-blanket engine: IAMB, Inter-IAMB, and MMPC, and the local search over them.
 
-Under a d-separation oracle each search returns the true set. With a Fisher-Z test, IAMB returns,
-bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph is built from.
+Under a d-separation oracle each search returns the true set, each recorded separating set
+separates, and the spouse step completes the parents and children into the Markov blanket. With a
+Fisher-Z test, IAMB returns, bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph
+is built from. A memoized run is the run made afresh, and the local search gives the sets the
+methods return, whatever the column order.
 """
 
 from __future__ import annotations
@@ -11,19 +14,26 @@ from itertools import combinations
 import numpy as np
 import pytest
 
+import andrey
 from andrey import GraphStructure, data
 from andrey.constraint import blanket
 from andrey.constraint._skeleton import scan_conditioning_sets
 from andrey.constraint.blanket import (
+    LEARNERS,
+    Learner,
+    LocalSearch,
     blanket_colliders,
     blanket_graph,
+    local_search,
     markov_blanket,
     mmpc_sets,
     parents_children,
     reach,
+    table_size,
 )
 from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
 from andrey.core.ci_missing import rows_tested
+from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.search.calm import moral_graph
 from tests.recovery.helpers.oracle import DSeparation
@@ -237,3 +247,194 @@ def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
         with rows_tested() as rows:
             assert parents_children(test, target, 15, 0.05, ranks) == want, target
         assert rows == want_rows, target
+
+
+def _fresh(method, test, target, d, alpha, ranks):
+    """``target``'s run by ``method`` made anew: the set and the separating sets."""
+    sepsets: dict[int, tuple[int, ...]] = {}
+    if method == "mmpc":
+        found = parents_children(test, target, d, alpha, ranks, sepsets=sepsets)
+    else:
+        interleaved = method == "inter_iamb"
+        found = markov_blanket(
+            test, target, d, alpha, ranks, interleaved=interleaved, sepsets=sepsets
+        )
+    return found, sepsets
+
+
+class _NoTests:
+    """A test that fails on any use: a memoized answer must not reach it."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"test.{name} used")
+
+    def __call__(self, *args):
+        raise AssertionError("test called")
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq", "missing"])
+def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
+    """Each run of a local search, asked for every target in a shuffled order, is the run made
+    afresh; the parents and children are the members whose own run holds the target; and asking
+    again tests nothing."""
+    x, test = _search_data(kind)
+    ranks = tie_ranks(x).tolist()
+    search = LocalSearch(test, ranks, 0.05)
+    order = np.random.default_rng(0).permutation(15).tolist()
+    want = {}
+    for method in ("iamb", "inter_iamb", "mmpc"):
+        for t in order:
+            want[method, t] = search.local(method, t)
+            assert search.run(method, t) == _fresh(method, test, t, 15, 0.05, ranks), (method, t)
+        for t in order:
+            members, _ = _fresh(method, test, t, 15, 0.05, ranks)
+            if method == "mmpc":
+                symmetric = [v for v in members if t in _fresh(method, test, v, 15, 0.05, ranks)[0]]
+                assert want[method, t][0] == symmetric, t
+            else:
+                assert want[method, t][1] == members, t
+    search.test = _NoTests()
+    for (method, t), local in want.items():
+        assert search.local(method, t) == local
+
+
+def _check_sepsets(oracle: DSeparation, t: int, learned: list[int], sepsets) -> None:
+    """Every other variable outside ``learned`` has a recorded set, and each set separates."""
+    assert set(sepsets) == set(range(oracle.d)) - set(learned) - {t}, t
+    for v, given in sepsets.items():
+        assert oracle(t, v, given) == 1.0, (t, v, given)
+
+
+@pytest.mark.parametrize("seed", range(4))
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
+    oracle = _oracle(seed)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for t in range(oracle.d):
+        pc, mb, sepsets = search.local(method, t)
+        learned = mb if pc is None else pc
+        assert learned is not None
+        _check_sepsets(oracle, t, learned, sepsets)
+        members, own = search.run(method, t)
+        assert set(own) <= set(range(oracle.d)) - set(members) - {t}
+        assert all(oracle(t, v, given) == 1.0 for v, given in own.items())
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
+    """On data, the test given a recorded set has a p-value above alpha."""
+    x, test = _search_data(kind)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    for t in range(15):
+        for v, given in search.local(method, t)[2].items():
+            assert test(t, v, given) > 0.05, (t, v, given)
+
+
+@pytest.fixture
+def mmpc_spouses(monkeypatch):
+    """A parents-and-children-then-spouses learner over MMPC, registered for the test."""
+    monkeypatch.setitem(LEARNERS, "mmpc_spouses", Learner("pc_spouses", pc="mmpc"))
+    return "mmpc_spouses"
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_the_spouse_step_completes_the_blanket_under_an_oracle(mmpc_spouses, seed):
+    dag = data.sample_scm(graph="erdos_renyi", d=12, n=2, seed=seed, density=3.0).graph
+    oracle = DSeparation(dag)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for t in range(oracle.d):
+        pc, mb, sepsets = search.local(mmpc_spouses, t)
+        assert pc is not None and mb is not None
+        assert set(pc) == oracle.parents_children(t), t
+        assert set(mb) == oracle.markov_blanket(t) and mb[: len(pc)] == pc, t
+        _check_sepsets(oracle, t, pc, sepsets)
+    np.testing.assert_array_equal(
+        search.structure(mmpc_spouses, "moral") != 0, oracle.moral_graph()
+    )
+    np.testing.assert_array_equal(
+        search.structure(mmpc_spouses, "skeleton") != 0, oracle.skeleton()
+    )
+    truth = dag2cpdag(dag.to_numpy())
+    np.testing.assert_array_equal(search.structure(mmpc_spouses, "cpdag"), truth)
+    search.test = _NoTests()
+    assert search.local(mmpc_spouses, 0)[1] is not None
+
+
+def test_the_spouse_step_pairs_a_candidate_only_with_its_neighbor(mmpc_spouses):
+    """On P -> Q -> T -> S <- R <- P, T's blanket is {Q, S, R}: P, separated from T by {Q}, is
+    dependent on T given {Q, S}, but S is not adjacent to P, so that test is never run (Pena et
+    al. 2007, DAG (b))."""
+    p, q, t, s, r = range(5)
+    marks = np.zeros((5, 5), dtype=np.int8)
+    for i, j in [(p, q), (q, t), (t, s), (r, s), (p, r)]:
+        marks[i, j], marks[j, i] = 1, 2
+    oracle = DSeparation(GraphStructure.from_numpy(marks, kind="dag"))
+    search = LocalSearch(oracle, list(range(5)), 0.5)
+    pc, mb, sepsets = search.local(mmpc_spouses, t)
+    assert pc == [q, s] or pc == [s, q]
+    assert mb is not None and set(mb) == {q, s, r}
+    assert oracle(t, p, (q, s)) == 0.0 and q in sepsets[p]
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_the_local_entry_gives_the_set_the_method_returns(method, kind):
+    x, _ = _search_data(kind)
+    indep_test = "fisherz" if kind == "fisherz" else "chisq"
+    search = local_search(x, alpha=0.05, indep_test=indep_test)
+    fit = getattr(andrey, method)
+    key = "parents_and_children" if method == "mmpc" else "markov_blanket"
+    for t in range(15):
+        pc, mb, _ = search.local(method, t)
+        assert (pc if method == "mmpc" else mb) == fit(x, target=t, indep_test=indep_test).metadata[
+            key
+        ], t
+        assert (mb if method == "mmpc" else pc) is None
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_a_column_shuffle_leaves_every_recorded_set(method, kind):
+    x, _ = _search_data(kind)
+    indep_test = "fisherz" if kind == "fisherz" else "chisq"
+    perm = np.random.default_rng(1).permutation(15)
+    search = local_search(x, alpha=0.05, indep_test=indep_test)
+    shuffled = local_search(x[:, perm], alpha=0.05, indep_test=indep_test)
+    where = np.argsort(perm)  # where[v]: the shuffled position of column v
+
+    def back(found):
+        return None if found is None else [int(perm[v]) for v in found]
+
+    for t in range(15):
+        pc, mb, sepsets = search.local(method, t)
+        spc, smb, ssepsets = shuffled.local(method, int(where[t]))
+        assert (back(spc), back(smb)) == (pc, mb), t
+        moved = {int(perm[v]): tuple(sorted(int(perm[u]) for u in g)) for v, g in ssepsets.items()}
+        assert moved == sepsets, t
+
+
+def test_table_size_counts_cells_and_degrees_of_freedom():
+    levels = [2, 3, 4, 0]
+    assert table_size(levels, 0, 1, [2]) == 24
+    assert table_size(levels, 0, 1, [2], df=True) == 8
+    assert table_size(levels, 1, 2, []) == 12
+    assert table_size(levels, 0, 1, [3]) is None
+    x = data.sample_discrete(d=4, n=500, seed=0).data
+    want = [np.unique(c).size for c in x.T]
+    assert local_search(x, alpha=0.05, indep_test="chisq").levels.tolist() == want
+    assert local_search(x, alpha=0.05, indep_test="fisherz").levels is None
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"kind": "pc_spouses"},
+        {"kind": "pc_spouses", "pc": "mmpc", "search": blanket._mmpc},
+        {"kind": "pc"},
+        {"kind": "blanket", "search": blanket._mmpc, "pc": "mmpc"},
+    ],
+)
+def test_a_learner_row_names_one_search_or_one_pc_learner(row):
+    with pytest.raises(ValueError, match="pc_spouses"):
+        Learner(**row)
