@@ -43,6 +43,11 @@ the adapter does not default them:
   a rank computed from the data, which does not depend on the columns' order. Where several
   p-values agree, for example when they underflow to zero, the two can add variables in a
   different order, and a learner can end with a different set.
+- **Fast-IAMB's batch rule.** ``fast.iamb`` adds a candidate of a batch only when the data holds at
+  least 5 observations per cell of the table of the target, the candidate, and the blanket so far
+  (``obs.per.cell``). It applies to every asymptotic test, so to ``mi``, ``mi-adf``, ``x2``, and
+  ``x2-adf`` alike, and not to continuous data, where the count is infinite. The sparse-table rule
+  of the ``-adf`` tests is a separate rule, and applies to every learner.
 - **Deprecation.** ``fast.iamb`` is deprecated in 5.2.1 and warns on every call; the adapter
   silences that one warning.
 
