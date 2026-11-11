@@ -147,12 +147,12 @@ the registry and the published summaries into `_generated/`; `docs/_static/catal
 them and `catalog.js` shows one panel at a time and adds the filters. Choosing a kind presses its
 chip, so the picker and the filters are one mechanism.
 
-`featured()` is the one rule for the method to start with, which the homepage can call too
-(`featured_by_family()`): among the supported methods whose chart (`default_charts()`) reaches a
-size every package ran with a graph better than the empty one, the one compared with the most
-packages, then the largest such size, then registry order. For a kind of data, `start_with()`
-applies it in the first family that reads the kind, among the methods that need it (`needs()`),
-else among those that read it.
+The method to start with follows the homepage's featured rule (`featured_among()` over
+`feature_ranks()`; `featured_methods()` gives each family's): among the supported methods whose
+shown setting (`default_settings()`) reaches a size every package ran with a graph that beats the
+empty one, the one compared with the most packages, then the largest such size, then registry
+order. For a kind of data, `start_with()` applies it in the first family that reads the kind, among
+the methods that need it (`needs()`), else among those that read it.
 
 ## The blog
 

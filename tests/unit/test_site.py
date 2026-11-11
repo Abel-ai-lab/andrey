@@ -2026,13 +2026,11 @@ def test_a_kinds_panel_lists_exactly_the_methods_that_read_it(catalog):
 
 
 def test_every_method_to_start_with_is_supported_and_reads_its_data(published):
-    starts = build.featured_by_family(published)
-    assert list(starts) == [
-        f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())
-    ]
-    for family, name in starts.items():
-        assert get_spec(name).family == family and get_spec(name).status == "supported"
-    ranks = build.start_ranks(published)
+    featured = build.featured_methods(published)
+    for family, entry in featured.items():
+        spec = get_spec(entry["spec"])
+        assert spec.family == family and spec.status == "supported"
+    ranks = build.feature_ranks(published)
     for kind in DATA_KINDS:
         name = build.start_with(ranks, kind)
         assert get_spec(name).status == "supported" and _read(name, kind), kind
@@ -2043,30 +2041,18 @@ def test_every_method_to_start_with_is_supported_and_reads_its_data(published):
         assert not any(s.name in ranks for s in needing) or build.needs(get_spec(name), kind)
 
 
-def test_the_method_to_start_with_has_the_most_packages_then_the_largest_reach():
-    ranks = {"ges": (2, 200), "hc": (2, 400), "boss": (3, 40), "pc": (3, 40)}
-    assert build.featured(ranks, ["ges", "hc"]) == "hc"  # more reach
-    assert build.featured(ranks, ["ges", "hc", "boss"]) == "boss"  # more packages
-    assert build.featured(ranks, ["boss", "pc"]) == "pc"  # registry order
-    assert build.featured(ranks, ["fci", "gin"]) is None  # unranked
-
-
-def test_a_methods_reach_needs_every_package_and_a_graph_better_than_empty():
-    def row(d, theirs=1.0, ours=3, empty=5, f1=None):
-        return {"d": d, "andrey_s": 1.0, "comparator_s": theirs, "andrey_errors": ours,
-                "empty_errors": empty, "andrey_f1": f1}  # fmt: skip
-
-    one = {"family": "constraint", "rows": [row(10), row(20), row(40, ours=6)]}
-    other = {"family": "constraint", "rows": [row(10), row(20, theirs=None), row(40)]}
-    assert build.reach([one]) == 20  # at 40, more errors than the empty graph
-    assert build.reach([one, other]) == 10  # the other package did not finish 20
-    assert build.reach([{"family": "constraint", "rows": [row(10, ours=5)]}]) is None
-    temporal = {"family": "temporal", "rows": [row(10, f1=0.4), row(20, f1=0.0)]}
-    assert build.reach([temporal]) == 10
+def test_a_kind_starts_with_the_featured_rule_in_the_first_family_that_reads_it():
+    ranks = {"pc": (6, 400), "fci": (1, 400), "gfci": (1, 180), "cdnod": (1, 50), "ges": (2, 200)}
+    assert build.start_with(ranks, "categorical") == "pc"
+    assert build.start_with(ranks, "hidden_causes") == "fci"  # PC returns no PAG
+    assert (
+        build.start_with(ranks, "environments") == "cdnod"
+    )  # needs env; GFCI takes it as an option
+    assert build.start_with({"ges": (2, 200)}, "environments") == "ges"  # the next family
 
 
 def test_the_catalog_calls_pass_the_kind_of_data_they_start_from(published):
-    ranks = build.start_ranks(published)
+    ranks = build.feature_ranks(published)
     for kind in DATA_KINDS:
         spec = get_spec(build.start_with(ranks, kind))
         code = build.catalog_call(spec, kind)

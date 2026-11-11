@@ -612,13 +612,10 @@ NOT_IN_ACCURACY_CLAIM = {
     "SCORE authors' code",
     "NOTEARS authors' code",
 }
-# The package each comparator names in the speed panel's legend and the methods catalog, without
-# the version or setting its release card gives; every other comparator is a package's name already.
+# The package each comparator names, without the version or setting its release card gives;
+# every other comparator is a package's name already.
 PACKAGE_NAMES = {
     "CAM 1.0": "CAM",
-    "CausalNex 0.12.2": "CausalNex",
-    "gnies 0.3.3": "gnies",
-    "graphical-model-learning 0.1a8": "graphical-model-learning",
     "InvariantCausalPrediction 0.8": "InvariantCausalPrediction",
     "causal-learn 0.1.4.8": "causal-learn",
     "lingam 1.13.0": "lingam",
@@ -627,6 +624,9 @@ PACKAGE_NAMES = {
     "tetrad-lib 7.6.10 BossFci": "Tetrad",
     "tetrad-lib 7.6.10 GraspFci": "Tetrad",
     "tigramite 5.2.10.1": "tigramite",
+    "gnies 0.3.3": "gnies",
+    "CausalNex 0.12.2": "CausalNex",
+    "graphical-model-learning 0.1a8": "graphical-model-learning",
     "LOCI authors' code, LOCI-H": "LOCI authors' code",
 }
 # The summary lanes that measure each graph size at several sample sizes.
@@ -2552,19 +2552,6 @@ FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star", "triangle_d
 FRONTIER_BAND = 0.25  # share of chart height for errors above the empty graph's
 
 
-def default_charts(charts: list[tuple[str, list[dict]]]) -> dict[str, tuple[str, list[dict]]]:
-    """Each method's chart among ``charts`` (:func:`time_groups`): the setting ``SHOWN_SETTINGS``
-    names, else its first chart with the shortest name."""
-    default: dict[str, tuple[str, list[dict]]] = {}
-    for name, methods in charts:
-        shown = default.get(methods[0]["spec"])
-        if shown is None or (
-            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
-        ):
-            default[methods[0]["spec"]] = (name, methods)
-    return default
-
-
 def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     """Lines grouped by family, with one per method and package across shared, scored sizes.
 
@@ -2574,9 +2561,15 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     record the largest size's values. Where a comparison measures a size at several sample sizes,
     the line takes the row at the largest, the last listed among equal ones.
     """
-    default = default_charts(
-        [(name, methods) for name, methods in time_groups(summaries) if all(map(faster, methods))]
-    )
+    default: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in time_groups(summaries):
+        if not all(faster(m) for m in methods):
+            continue
+        shown = default.get(methods[0]["spec"])
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
+        ):
+            default[methods[0]["spec"]] = (name, methods)
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
         name = SHOWN_SETTINGS.get(name, name)
@@ -3220,67 +3213,124 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
     }
 
 
-# ---- the method to start with ------------------------------------------------------------------
-# The kinds of data a method that reads them cannot do without: one its result implies, or a list
-# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
-NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
+# ---- one featured method per family ---------------------------------------------------------
+# Comparators that are a method's authors' research code, not a package: they stay in the charts
+# and on their release cards, and they do not count among the packages a method is compared with.
+RESEARCH_CODE = {
+    "LOCI authors' code, LOCI-H",
+    "SCORE authors' code",
+    "NOTEARS authors' code",
+    "authors' R RESIT",
+}
 
 
-def reach(methods: list[dict]) -> int | None:
-    """The largest size in a chart's comparisons (:func:`time_groups`) that every package ran,
-    both times published, and at which Andrey's graph beats the empty graph: fewer errors, or a
-    link F1 above zero for a temporal method. None when no size does."""
-    f1 = methods[0]["family"] in F1_FAMILIES
-
-    def beats(row: dict) -> bool:
-        if row["andrey_s"] is None or row["comparator_s"] is None:
-            return False
-        if f1:
-            return (row["andrey_f1"] or 0) > 0
-        ours, empty = row["andrey_errors"], row["empty_errors"]
-        return ours is not None and empty is not None and ours < empty
-
-    return max(
-        set.intersection(*({r["d"] for r in m["rows"] if beats(r)} for m in methods)), default=None
-    )
+def default_settings(summaries: list[dict]) -> dict[str, tuple[str, list[dict]]]:
+    """Per registry method, the setting it is shown under and that setting's comparisons: the
+    chart (:func:`time_groups`) whose name ``SHOWN_SETTINGS`` lists, else the shortest-named one,
+    the first among equals. The name is the one ``SHOWN_SETTINGS`` gives, or the chart's."""
+    found: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in time_groups(summaries):
+        shown = found.get(methods[0]["spec"])
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
+        ):
+            found[methods[0]["spec"]] = (name, methods)
+    return {spec: (SHOWN_SETTINGS.get(n, n), ms) for spec, (n, ms) in found.items()}
 
 
-def start_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
-    """Each supported method's standing for :func:`featured`: how many packages its published
-    comparisons cover, in every setting, and the :func:`reach` of its chart
-    (:func:`default_charts`). A method without a reach is left out."""
-    packages: dict[str, set[str]] = {}
-    for method in supported(summaries):
-        packages.setdefault(method["spec"], set()).add(package_name(method["comparator"]))
-    charts = default_charts(time_groups(summaries))
-    return {
-        name: (len(packages[name]), size)
-        for name, (_, methods) in charts.items()
-        if (size := reach(methods)) is not None
-    }
+def shared_rows(methods: list[dict]) -> dict[int, list[dict]]:
+    """Each size at which every comparison in ``methods`` has both fit times and both graphs'
+    errors, smallest first, with each comparison's row there: at the largest sample size where a
+    lane measures several, the last listed among equal ones."""
+    by_size = [{r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods]
+    keys = ("andrey_s", "comparator_s", "andrey_errors", "comparator_errors")
+    out = {}
+    for d in sorted(by_size[0]):
+        rows = [sizes.get(d) for sizes in by_size]
+        if all(row is not None and all(row[k] is not None for k in keys) for row in rows):
+            out[d] = rows
+    return out
 
 
-def featured(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
-    """The method to start with among ``names``: of those ``ranks`` holds (:func:`start_ranks`),
+def beats_empty(family: str, row: dict) -> bool:
+    """Whether Andrey's graph beats the empty graph in ``row``: fewer errors than the empty graph,
+    or in ``F1_FAMILIES`` a link F1 above 0."""
+    if family in F1_FAMILIES:
+        return (row["andrey_f1"] or 0) > 0
+    return row["empty_errors"] is not None and row["andrey_errors"] < row["empty_errors"]
+
+
+def compared_packages(summaries: list[dict]) -> dict[str, set[str]]:
+    """Per supported registry method, the packages its published comparisons name, in any
+    setting, by :func:`package_name`; ``RESEARCH_CODE`` is not a package."""
+    out: dict[str, set[str]] = {}
+    for m in supported(summaries):
+        if m["comparator"] not in RESEARCH_CODE:
+            out.setdefault(m["spec"], set()).add(package_name(m["comparator"]))
+    return out
+
+
+def feature_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
+    """Each supported method that can be featured, by registry name: the packages it is compared
+    with (:func:`compared_packages`) and its reach, the largest size at which every package in its
+    shown setting (:func:`default_settings`) ran and Andrey's graph beats the empty graph
+    (:func:`beats_empty`). A method with no such size is left out."""
+    packages = compared_packages(summaries)
+    ranks = {}
+    for spec, (_, methods) in default_settings(summaries).items():
+        family = methods[0]["family"]
+        sizes = [d for d, rows in shared_rows(methods).items() if beats_empty(family, rows[0])]
+        if sizes:
+            ranks[spec] = (len(packages.get(spec, ())), sizes[-1])
+    return ranks
+
+
+def featured_among(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
+    """The method to feature among ``names``: of those ``ranks`` holds (:func:`feature_ranks`),
     the one compared with the most packages, then the one with the largest reach, then the first
-    in the registry; None when ``ranks`` holds none.
-
-    The rule reads coverage, not speed: a method qualifies by beating the empty graph at a size
-    every package ran, and ranks by how many packages it is compared with."""
+    in registry order; None when ``ranks`` holds none. The rule reads coverage, not the result of
+    a comparison."""
     order = {s.name: i for i, s in enumerate(list_specs())}
     found = [name for name in names if name in ranks]
     return min(found, key=lambda n: (-ranks[n][0], -ranks[n][1], order[n]), default=None)
 
 
-def featured_by_family(summaries: list[dict]) -> dict[str, str]:
-    """Each family's method to start with (:func:`featured`), in ``SPEC_FAMILIES`` order; a
-    family :func:`featured` finds none in is left out."""
-    ranks = start_ranks(summaries)
-    picks = {
-        family: featured(ranks, [s.name for s in list_specs() if s.family == family])
-        for family in SPEC_FAMILIES
-    }
-    return {family: name for family, name in picks.items() if name}
+def featured_methods(summaries: list[dict]) -> dict[str, dict]:
+    """The method each registry family features (:func:`featured_among` over the family's
+    methods), in ``SPEC_FAMILIES`` order, as the homepage and the methods catalog show it; a family
+    without one is left out. Each entry gives the method's registry name (``spec``), its shown
+    ``name``, its ``packages``, and its reach as ``size`` in ``unit``, with the ``release`` and
+    the ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row."""
+    ranks = feature_ranks(summaries)
+    settings = default_settings(summaries)
+    out = {}
+    for family in SPEC_FAMILIES:
+        spec = featured_among(ranks, [s.name for s in list_specs() if s.family == family])
+        if spec is None:
+            continue
+        name, methods = settings[spec]
+        packages, d = ranks[spec]
+        out[family] = {
+            "spec": spec,
+            "name": name,
+            "packages": packages,
+            "size": d,
+            "unit": methods[0]["unit"],
+            "release": max((m["release"] for m in methods), key=version_key),
+            "cells": list(zip(methods, shared_rows(methods)[d], strict=True)),
+        }
+    return out
+
+
+def version_key(version: str) -> tuple[int, ...]:
+    """A release's version for sorting: "0.10.0" after "0.9.0"."""
+    return tuple(int(part) for part in version.split("."))
+
+
+# ---- the method to start with on each kind of data ---------------------------------------------
+# The kinds of data a method that reads them cannot do without: one its result implies, or a list
+# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
+NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
 
 
 def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
@@ -3292,13 +3342,13 @@ def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
 
 
 def start_with(ranks: dict[str, tuple[int, int]], kind: str) -> str | None:
-    """The method to start with on data of ``kind``: in the first family, in ``SPEC_FAMILIES``
-    order, where :func:`featured` finds one, its pick among the methods that need the kind
-    (:func:`needs`), or among those that read it when none needs it."""
+    """The method to start with on data of ``kind``, from :func:`feature_ranks`: in the first
+    family, in ``SPEC_FAMILIES`` order, where :func:`featured_among` finds one, its pick among the
+    methods that need the kind (:func:`needs`), or among those that read it when none needs it."""
     for family in SPEC_FAMILIES:
         readers = [s for s in list_specs() if s.family == family and kind in s.data_kinds]
         needing = [s.name for s in readers if needs(s, kind)]
-        pick = featured(ranks, needing or [s.name for s in readers])
+        pick = featured_among(ranks, needing or [s.name for s in readers])
         if pick:
             return pick
     return None
@@ -3366,14 +3416,16 @@ DATA_KIND_TEXT = {
 # How a call passes each kind of data: an argument (``{missing}`` is the method's first way to
 # read missing values) and a comment on the placeholder it names.
 KIND_CALLS = {
-    "categorical": ('categorical=["a", "b"]', "a and b: the categorical columns"),
-    "mixed": ('categorical=["a"]', "a: the categorical columns; the others are numbers"),
+    "categorical": ('categorical=["a", "b"]', "a, b: the categorical columns"),
+    "mixed": ('categorical=["a"]', "a: the categorical columns"),
     "missing": ('missing="{missing}"', "a missing value is NaN"),
-    "environments": ('"site"', "site: the column that names each row's environment"),
-    "datasets": ("", "data_a, data_b: one table per group, over the same columns"),
-    "time_series": ("", "data: one row per time step"),
-    "two_variables": ("", "x and y: the two variables"),
+    "environments": ('"site"', "site: each row's environment"),
+    "datasets": ("", "data_a, data_b: one table per group"),
+    "time_series": ("", "one row per time step"),
+    "two_variables": ("", "x, y: the two variables"),
 }
+# The longest line a panel's code shows before its call breaks into one argument per line.
+CALL_WIDTH = 48
 # What each graph a method returns (returns_text) gives the reader, and its section of the graph
 # types guide.
 GRAPH_TEXT = {
@@ -3414,16 +3466,16 @@ def kind_anchor(kind: str) -> str:
 
 
 def compared(summaries: list[dict]) -> dict[str, tuple[list[str], list[str]]]:
-    """Each supported method's published comparisons: the packages, in the summaries' order, and
-    the releases whose cards hold them, oldest first."""
+    """Each supported method's published comparisons: what it is compared with, packages and
+    authors' code by :func:`package_name` in the summaries' order, and the releases whose cards
+    hold them, oldest first."""
     packages: dict[str, dict[str, None]] = {}
     releases: dict[str, set[str]] = {}
     for method in supported(summaries):
         packages.setdefault(method["spec"], {})[package_name(method["comparator"])] = None
         releases.setdefault(method["spec"], set()).add(method["release"])
     return {
-        name: (list(packages[name]), sorted(releases[name], key=RELEASES.index))
-        for name in packages
+        name: (list(packages[name]), sorted(releases[name], key=version_key)) for name in packages
     }
 
 
@@ -3449,8 +3501,10 @@ def catalog_call(spec, kind: str) -> str:  # noqa: ANN001 -- an andrey.spec Meth
     calls = [KIND_CALLS[k] for k in (*needed, kind) if k in KIND_CALLS]
     missing = next((p.choices[0] for p in spec.params if p.name == "missing"), "")
     args += [argument.format(missing=missing) for argument, _ in calls if argument]
-    lines = ["import andrey", "", *(f"# {comment}" for _, comment in calls)]
-    lines += [f"out = andrey.{spec.name}({', '.join(args)})", "print(out)"]
+    call = f"out = andrey.{spec.name}({', '.join(args)})"
+    if len(call) > CALL_WIDTH:
+        call = f"out = andrey.{spec.name}(\n" + "".join(f"    {a},\n" for a in args) + ")"
+    lines = ["import andrey", "", *(f"# {comment}" for _, comment in calls), call, "print(out)"]
     return "\n".join(lines)
 
 
@@ -3477,7 +3531,7 @@ def catalog_picker(summaries: list[dict], names: dict[str, str]) -> str:
     returns, its comparisons, and every family's methods that read the kind, by the graph each
     returns. Without script, each option is a link to its panel, which ``:target`` shows."""
     specs = {s.name: s for s in list_specs()}
-    ranks = start_ranks(summaries)
+    ranks = feature_ranks(summaries)
     found = compared(summaries)
     kinds = [k for k in DATA_KINDS if any(k in s.data_kinds for s in specs.values())]
     options, panels = [], []
@@ -3544,11 +3598,11 @@ def display_name(name: str, names: dict[str, str]) -> str:
 
 def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
     """The catalog's table, as MyST: the filters, which script shows, then one section per family
-    (``family-<family>``), opening with its method to start with (:func:`featured_by_family`),
+    (``family-<family>``), opening with the method it features (:func:`featured_methods`),
     and one row per method (``method-<name>``): its name and status, what it is for, the kinds
     of data it reads, the graph it returns, and its comparisons with other packages."""
     specs = list_specs()
-    starts = featured_by_family(summaries)
+    starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
     found = compared(summaries)
     kinds = [k for k in DATA_KINDS if any(k in s.data_kinds for s in specs)]
     returns = list(dict.fromkeys(returns_text(s) for s in specs))
