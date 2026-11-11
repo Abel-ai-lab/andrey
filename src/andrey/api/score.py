@@ -520,9 +520,6 @@ def ages(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -586,20 +583,28 @@ def ages(
     Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet; the fit times below are the only measurements. An
-    orientation beyond the CPDAG is as reliable as the sparser CPDAG it comes from: when path strong
-    faithfulness fails, a CPDAG of the path can direct an edge against the true DAG, and the paper
-    reports a small loss of precision against GES on sparse graphs without weak edges. The skeleton
-    is that of GES at the minimum penalty, so its missing and extra edges stay, and with few rows,
-    where GES misses the weak edges, the result is the GES CPDAG: the paper finds almost no gain at
-    100 rows on 10 variables. A CPDAG of the path can hold an unshielded collider that the first
-    lacks, so the DAGs the result stands for need not be in the equivalence class of the GES CPDAG.
-    The backward phase runs once per forward result, in one process, so a fit costs several times
-    one of :func:`~andrey.ges`: on one core with 10,000 rows, the median of five fits took 0.19 s
-    against 0.03 s for ``ges`` at 10 variables, 0.31 s against 0.06 s at 20, and 1.2 s against
-    0.13 s at 50. The data were linear-Gaussian from the paper's simulation, with 30% of the
-    possible edges strong and 70% weak at 10 variables, and an average of 4 neighbors per variable,
-    half of them weak, at 20 and 50. The numbers are a reference, not a hard limit: they change with
+    **Limitations.** Measured on the paper's simulation at 10 variables only: 23 settings of strong
+    and weak edges with 100, 1,000, and 10,000 rows, 20 datasets each. The paper's 100-variable
+    setting uses a variant of the search that is not implemented here. With 10,000 rows AGES
+    directed more edges correctly than GES at the same penalty in 20 of the 23 settings and more
+    edges wrongly in the same 20: 49% of the true edges against 46%, with 49% of the directed edges
+    correct for both, so an added direction is about as reliable as one of GES and no more. The
+    three settings without a gain were the sparsest. With 1,000 rows it directed more edges
+    correctly in 13 settings, 44% of the true edges against 43%, and with 100 rows in 1: where GES
+    misses the weak edges the result is the GES CPDAG, as on 398 of the 460 datasets with 100 rows.
+    An orientation beyond the CPDAG is as reliable as the sparser CPDAG it comes from: when path
+    strong faithfulness fails, a CPDAG of the path can direct an edge against the true DAG. The
+    skeleton is that of GES at the minimum penalty, so its missing and extra edges stay: in 7 of
+    the 69 settings, dense graphs with few or no weak edges, the errors were not clearly below the
+    empty graph's. A CPDAG of the path can hold an unshielded collider that the first lacks, so the
+    DAGs the result stands for need not be in the equivalence class of the GES CPDAG: 8 of 460
+    graphs held one with 10,000 rows, 3 with 1,000, and none with 100. The backward phase runs once
+    per forward result, in one process, so a fit costs several times one of :func:`~andrey.ges`:
+    at 10 variables the median fit took 0.02 to 0.22 s on one core, 1.6 to 3.9 times that of GES,
+    with a peak of 110 MB of memory, and with 10,000 rows the median of five fits took 0.31 s
+    against 0.06 s at 20 variables and 1.2 s against 0.13 s at 50, with an average of 4 neighbors
+    per variable, half of them weak. The data were linear-Gaussian from the paper's simulation.
+    The numbers are a reference, not a hard limit: they change with
     the data generator, the density, the method's settings, and the machine.
 
     References
