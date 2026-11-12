@@ -1,10 +1,10 @@
 # Markov blankets, and parents and children
 
 `blanket_cpu.py` compares Andrey's learners of Markov blankets (`iamb`, `inter_iamb`) and of parents
-and children (`mmpc`) with bnlearn's, and HITON-PC and HITON-MB with the authors' Causal Explorer, on
-the set each learns at a target and on the graph the sets give. A learner joins the lane by being
-named in `LEARNERS` of `andrey_bench/adapters/andrey_blanket.py`, and its reference by being named in
-`COUNTERPART` of `andrey_bench/adapters/bnlearn_blanket.py` or
+and children (`mmpc`) with bnlearn's, and HITON-PC, HITON-MB, and MMMB with the authors' Causal
+Explorer, on the set each learns at a target and on the graph the sets give. A learner joins the
+lane by being named in `LEARNERS` of `andrey_bench/adapters/andrey_blanket.py`, and its reference by
+being named in `COUNTERPART` of `andrey_bench/adapters/bnlearn_blanket.py` or
 `andrey_bench/adapters/causal_explorer_blanket.py`; the driver runs every learner the installed
 Andrey has.
 
@@ -92,11 +92,14 @@ from Andrey's and how the lane lines them up. The ones that decide a comparison:
   empty cells out of the degrees of freedom and runs only with at least five rows per cell of its
   table, the rule Andrey's HITON learners follow. MMMB takes `alpha` as `options.threshold`, the
   limit as `options.maxK`, and five rows per cell as `options.epc`, a cap on the conditioning sets
-  with no off switch. Categorical columns are coded from 0 over their observed levels. There is no
-  counterpart of `chisq`, and none on continuous data: the toolbox's manual takes Fisher's z
-  (`'z'`) in HITON only with a categorical target, and MMMB reads categorical data only. On
-  linear-Gaussian data with a continuous target, its HITON-PC and HITON-MB with `'z'` returned every
-  other variable for every target, so the Gaussian cells run without the arm.
+  with no off switch. Its MMPC, inside MMMB, runs without the symmetry check that `mmmb` runs, so
+  its blankets keep members that check removes; like `mmmb`, it tests a candidate spouse only with a
+  parent or child of the target whose own set holds the candidate. Categorical columns are coded
+  from 0 over their observed levels. There is no counterpart of `chisq`, and none on continuous
+  data: the toolbox's manual takes Fisher's z (`'z'`) in HITON only with a categorical target, and
+  MMMB reads categorical data only. On linear-Gaussian data with a continuous target, its HITON-PC
+  and HITON-MB with `'z'` returned every other variable for every target, so the Gaussian cells run
+  without the arm.
 - **Ties.** bnlearn orders candidates of equal strength by column, Andrey by a rank computed from
   the data, so where several p-values agree, for example when they underflow to zero, the two can
   add variables in a different order and end with different sets. This is a known cause of
