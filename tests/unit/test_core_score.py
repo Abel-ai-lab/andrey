@@ -12,8 +12,17 @@ import re
 
 import numpy as np
 import pytest
+from scipy.special import ndtri
+from scipy.stats import rankdata
 
-from andrey.core.score import BICScore, CopiedColumnsError, Score, copy_groups, local_score_bic
+from andrey.core.score import (
+    BICScore,
+    CopiedColumnsError,
+    Score,
+    copy_groups,
+    local_score_bic,
+    make_score,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -358,3 +367,42 @@ def test_check_columns_accepts_strongly_correlated_columns():
     x = _columns(1000, 3)
     x[:, 2] = x[:, 0] + x[:, 1] + 1e-5 * x[:, 2]
     BICScore(x)
+
+
+# ---- the rank-based score ------------------------------------------------------------------------
+
+FAMILIES = [(0, ()), (0, (1,)), (2, (0, 1)), (5, (1, 2, 3, 4))]
+
+
+def test_the_rank_based_score_is_the_bic_of_each_columns_normal_scores(data):
+    x = np.exp(data)
+    x[:, 3] = np.round(x[:, 3])  # tied values share their average rank
+    scores = ndtri(rankdata(x, axis=0) / (len(x) + 1.0))
+    got = make_score("normal_scores", x, penalty_discount=1.5, ebic_gamma=0.5)
+    want = BICScore(np.ascontiguousarray(scores), penalty_discount=1.5, ebic_gamma=0.5)
+    for node, parents in FAMILIES:
+        assert got.score(node, parents) == want.score(node, parents)
+
+
+def test_the_rank_based_score_reads_each_column_only_through_its_ranks(data):
+    monotone = np.column_stack(
+        [np.exp(data[:, 0]), data[:, 1] ** 3, 5.0 * data[:, 2] - 2.0, *data[:, 3:].T]
+    )
+    before, after = make_score("normal_scores", data), make_score("normal_scores", monotone)
+    for node, parents in FAMILIES:
+        assert after.score(node, parents) == before.score(node, parents)
+
+
+def test_the_rank_based_score_refuses_a_covariance_and_nonfinite_data(data, cov):
+    with pytest.raises(ValueError, match="only the linear-Gaussian BIC reads a covariance"):
+        make_score("normal_scores", data, cov=cov)
+    data[0, 0] = np.inf
+    with pytest.raises(ValueError, match="NaN or Inf"):
+        make_score("normal_scores", data)
+
+
+def test_a_column_whose_ranks_repeat_anothers_is_a_copy_under_the_rank_based_score(data):
+    data[:, 4] = np.exp(data[:, 1])
+    with pytest.raises(CopiedColumnsError) as error:
+        make_score("normal_scores", data)
+    assert error.value.groups == ((1, 4),)

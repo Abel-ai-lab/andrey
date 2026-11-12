@@ -29,6 +29,14 @@ names its pull request.
   formally: the model, what the data identify, what each kind of graph claims, and which methods
   fit which assumptions. It opens the learning path, and the quick-start notebook states its model
   in one equation. ([#904])
+- `score_func="normal_scores"`, experimental, is the linear-Gaussian BIC on each column's normal
+  scores: the score of the nonparanormal model, for continuous data that are Gaussian only after an
+  unknown increasing transformation of each column. `ges`, `xges`, `hc`, `tabu`, `exact_search`,
+  `boss`, `grasp`, `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take it. With
+  `indep_test="normal_scores"` as well, the test and the score read one model, and a strictly
+  increasing transformation of any column leaves the graph unchanged. Defaults do not change:
+  `indep_test="normal_scores"` alone keeps the default score. The score takes no `env` and no
+  `missing="em"`. ([#928])
 - The methods catalog, Methods in the navbar: "Start from your data" gives, for each kind of data,
   the method to start with, the graph it returns, and how many methods of each family read it, and
   every method is listed by family with the data it reads, the graph it returns, its status, and the
@@ -2511,6 +2519,7 @@ First alpha release.
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#910]: https://github.com/Abel-ai-lab/andrey/pull/910
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
+[#928]: https://github.com/Abel-ai-lab/andrey/pull/928
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
