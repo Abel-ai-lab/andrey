@@ -35,7 +35,7 @@ names its pull request.
   them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
   `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners), and
-  `max_depth=5` by default, the cap of those runs. ([#956])
+  `max_depth=5` by default, the cap of those runs, on the local structures' tests. ([#956])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
