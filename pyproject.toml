@@ -61,8 +61,8 @@ Issues = "https://github.com/Abel-ai-lab/andrey/issues"
 Changelog = "https://andrey.abel.ai/docs/changelog.html"
 
 [dependency-groups]                # not published
-# accessible-pygments: site code colors.
-dev = ["ruff", "ty", "pytest", "accessible-pygments"]
+# accessible-pygments: site code colors. pytest-xdist: `pytest -n` runs the suite on several cores.
+dev = ["ruff", "ty", "pytest", "pytest-xdist", "accessible-pygments"]
 # Notebooks and the demo apps install their own packages.
 docs = [
     "sphinx>=7",

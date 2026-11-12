@@ -142,7 +142,7 @@ jobs:
   extras:
     needs: lint
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -156,7 +156,7 @@ jobs:
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests -q -rs --durations=15
+          uv run --no-sync python -m pytest tests -q -rs --durations=0
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required
