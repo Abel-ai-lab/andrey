@@ -788,6 +788,7 @@ def fci_orient(
     max_depth: int | None = None,
     in_column_order: bool = False,
     selection_bias: bool = True,
+    apart: np.ndarray | None = None,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
@@ -812,6 +813,12 @@ def fci_orient(
 
     ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
     Zhang's complete set for PAGs without selection bias.
+
+    ``apart``, a boolean matrix, holds the pairs known to be non-adjacent, for a graph in which a
+    missing edge may be one not yet learned; by default every pair without an edge is. R4 ends a
+    discriminating path, and R9 starts its path, only at a pair ``apart`` holds; the rules that read
+    an unshielded triple read the caller's ``ambiguous``, which then holds the triples whose
+    endpoints ``apart`` does not.
     """
     if not in_column_order:
         test = _memoized(test)  # R4 repeats its tests in every round
@@ -819,13 +826,15 @@ def fci_orient(
             implied = _Implied()
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
             _rule_r3(marks, sepsets, False, ambiguous, out=implied)
-            _rule_r4(marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied)
+            _rule_r4(
+                marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied, apart=apart
+            )
             if selection_bias:
                 _rule_r5(marks, False, ambiguous, out=implied)
                 _rule_r6(marks, False, out=implied)
                 _rule_r7(marks, False, ambiguous, out=implied)
             _rule_r8(marks, False, out=implied)
-            _rule_r9(marks, False, ambiguous, out=implied)
+            _rule_r9(marks, False, ambiguous, out=implied, apart=apart)
             _rule_r10(marks, False, ambiguous, out=implied)
             if not implied.apply(marks):
                 return
@@ -835,13 +844,13 @@ def fci_orient(
         change = _rule_r1r2_cycle(marks, change, ambiguous)
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
-        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth)
+        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth, apart=apart)
         if selection_bias:
             change = _rule_r5(marks, change, ambiguous)
             change = _rule_r6(marks, change)
             change = _rule_r7(marks, change, ambiguous)
         change = _rule_r8(marks, change)
-        change = _rule_r9(marks, change, ambiguous)
+        change = _rule_r9(marks, change, ambiguous, apart=apart)
         change = _rule_r10(marks, change, ambiguous)
 
 
@@ -959,6 +968,7 @@ def _rule_r4(
     *,
     max_depth: int | None = None,
     out: _Implied | None = None,
+    apart: np.ndarray | None = None,
 ) -> bool:
     """R4: orient the endpoints closing a definite discriminating path into ``b``.
 
@@ -979,10 +989,19 @@ def _rule_r4(
                     continue
                 if out is None:
                     change = _ddp_orient(
-                        marks, a, b, c, test, alpha, sepsets, change, max_depth=max_depth
+                        marks,
+                        a,
+                        b,
+                        c,
+                        test,
+                        alpha,
+                        sepsets,
+                        change,
+                        max_depth=max_depth,
+                        apart=apart,
                     )
                     continue
-                for paths in _discriminating_paths(marks, a, b, c):
+                for paths in _discriminating_paths(marks, a, b, c, apart):
                     decided = False
                     for path in paths:
                         previous = dict(zip(path, path[1:]))
@@ -1007,14 +1026,16 @@ def _rule_r4(
     return change
 
 
-def _discriminating_paths(marks: np.ndarray, a: int, b: int, c: int) -> Iterator[list[list[int]]]:
+def _discriminating_paths(
+    marks: np.ndarray, a: int, b: int, c: int, apart: np.ndarray | None = None
+) -> Iterator[list[list[int]]]:
     """The discriminating paths ``d, ..., a, b`` for ``b`` toward ``c``, shortest first.
 
     The paths grow backward from ``a`` one node at a time, every inner node a collider on the path
     and a parent of ``c``, as :func:`_ddp_orient` grows them, and end at a node ``d`` non-adjacent
-    to ``c``. Each yield lists every path of one length, from ``d`` to ``b``. The search stops at
-    ``_UNBOUNDED_PATH`` nodes, or when one length holds more than ``_R4_PARTIAL_PATHS`` partial
-    paths.
+    to ``c``, one ``apart`` holds when it is given. Each yield lists every path of one length, from
+    ``d`` to ``b``. The search stops at ``_UNBOUNDED_PATH`` nodes, or when one length holds more
+    than ``_R4_PARTIAL_PATHS`` partial paths.
     """
     c_parents = _parents(marks, c)
     layer = [[b, a]]  # each partial path read from b backward
@@ -1026,7 +1047,8 @@ def _discriminating_paths(marks: np.ndarray, a: int, b: int, c: int) -> Iterator
                 if d in path or d == c or not _is_def_collider(marks, d, t, p):
                     continue
                 if not _adjacent(marks, d, c):
-                    found.append([*path, d][::-1])
+                    if apart is None or apart[d, c]:
+                        found.append([*path, d][::-1])
                 elif d in c_parents:
                     extended.append([*path, d])
         if found:
@@ -1057,8 +1079,10 @@ def _ddp_orient(
     change: bool,
     *,
     max_depth: int | None = None,
+    apart: np.ndarray | None = None,
 ) -> bool:
-    """Search back from ``a`` for a definite discriminating path ending at ``c`` and orient it."""
+    """Search back from ``a`` for a definite discriminating path ending at ``c`` and orient it;
+    with ``apart``, only a path whose ends it holds as non-adjacent."""
     queue: deque[int] = deque([a])
     visited: set[int] = {a, b}
     previous: dict[int, int] = {a: b}
@@ -1080,7 +1104,7 @@ def _ddp_orient(
             p = previous[t]
             if not _is_def_collider(marks, d, t, p):
                 continue
-            if not _adjacent(marks, d, c) and d != c:
+            if not _adjacent(marks, d, c) and d != c and (apart is None or apart[d, c]):
                 oriented, change = _do_ddp(
                     marks, d, a, b, c, previous, test, alpha, sepsets, change, max_depth=max_depth
                 )
@@ -1420,10 +1444,12 @@ def _rule_r9(
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
     *,
     out: np.ndarray | _Implied | None = None,
+    apart: np.ndarray | None = None,
 ) -> bool:
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``.
 
-    One reverse reachability set from ``c`` avoiding ``a`` serves every ``b``.
+    One reverse reachability set from ``c`` avoiding ``a`` serves every ``b``; with ``apart``, only
+    a ``b`` it holds as non-adjacent to ``c``.
     """
     out = marks if out is None else out
     neighbors = _neighbor_lists(marks)
@@ -1434,7 +1460,7 @@ def _rule_r9(
             candidates = [v for v in neighbors[a] if v != c and _is_possible_child(marks, a, v)]
             reaching: dict[tuple[int, int], set[int]] = {}
             for b in candidates:
-                if _adjacent(marks, b, c):
+                if _adjacent(marks, b, c) or (apart is not None and not apart[b, c]):
                     continue
                 if _exists_uncovered_pd_path(
                     marks, a, b, c, neighbors, ambiguous, reaching=reaching
