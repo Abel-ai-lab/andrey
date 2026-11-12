@@ -150,6 +150,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.14"]
+        # --shard K/N runs the tests whose id falls in part K of N (tests/conftest.py): the parts
+        # are disjoint and hold every test. Every value names the same N, and K runs from 1 to N.
+        shard: ["1/2", "2/2"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -162,7 +165,7 @@ jobs:
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests -n logical --dist loadfile -q -rs --durations=15
+          uv run --no-sync python -m pytest tests --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required

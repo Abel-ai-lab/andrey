@@ -10,8 +10,9 @@ meta:
 # Testing
 
 Every pull request, from a fork too, runs the full test suite on Linux with every extra, on Python
-3.11 and 3.14, and the recovery tests without the extras, each on all of the runner's cores with
-pytest-xdist, with the same tests and results as one core. One that changes the code also builds and
+3.11 and 3.14, and the recovery tests without the extras. Each job uses all of the runner's cores
+with pytest-xdist, and the full suite is split into two jobs per Python version, which together run
+every test once with the same results as one core. One that changes the code also builds and
 installs the wheel, and one that changes the code, the documentation, or the notebooks builds this
 website and reruns every notebook, which must reproduce the outputs the website shows. NumPy in
 float64 is the reference: the PyTorch paths must match its results and repeat exactly.
