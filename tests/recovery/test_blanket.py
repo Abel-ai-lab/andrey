@@ -1,10 +1,10 @@
-"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, and MMPC.
+"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, Fast-IAMB, and MMPC.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
 each structure its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
-to the true ones, and on one recorded case each structure is the graph bnlearn returns. GS's sets
-beat the empty answer on continuous and categorical data, and a fit repeats.
+to the true ones, and on one recorded case each structure is the graph bnlearn returns. The sets of
+GS and Fast-IAMB beat the empty answer on continuous and categorical data, and a fit repeats.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from andrey.core.orient import dag2cpdag
 from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
-METHODS = ["iamb", "inter_iamb", "gs", "mmpc"]
+METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"]
 KEY = {m: "parents_and_children" if m == "mmpc" else "markov_blanket" for m in METHODS}
 #: Each method's outputs, from its spec.
 STRUCTURES = {
@@ -92,6 +92,9 @@ def _collider() -> pd.DataFrame:
         ("gs", "a", {"b", "c"}),
         ("gs", "c", {"a", "b", "d"}),
         ("gs", "d", {"c"}),
+        ("fast_iamb", "a", {"b", "c"}),
+        ("fast_iamb", "c", {"a", "b", "d"}),
+        ("fast_iamb", "d", {"c"}),
         ("mmpc", "d", {"c"}),
     ],
 )
@@ -171,7 +174,7 @@ def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure
 
 
 @pytest.mark.parametrize("seed", range(3))
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb"])
 def test_the_skeleton_is_a_subgraph_of_the_moral_graph(method, seed):
     sample = _er_sample(20, seed)
     fit = functools.partial(getattr(andrey, method), sample.data)
@@ -211,6 +214,7 @@ def test_the_moral_graph_joins_a_childs_parents_and_the_skeleton_does_not():
         andrey.iamb(frame, structure="moral"),
         andrey.inter_iamb(frame, structure="moral"),
         andrey.gs(frame, structure="moral"),
+        andrey.fast_iamb(frame, structure="moral"),
     ):
         assert frozenset("ab") in {frozenset(e[:2]) for e in out.structure.oriented_edges()}
     for method in METHODS:
@@ -251,7 +255,7 @@ def test_each_structure_matches_bnlearn_on_a_recorded_case(method, structure):
 
 #: The graph each of bnlearn 5.2.1's learners returns by default: ``undirected = FALSE`` for
 #: ``iamb`` and ``inter.iamb``, ``TRUE`` for ``mmpc``.
-BNLEARN_DEFAULT = {"iamb": "cpdag", "inter_iamb": "cpdag", "gs": "cpdag", "mmpc": "skeleton"}
+BNLEARN_DEFAULT = {m: "skeleton" if m == "mmpc" else "cpdag" for m in METHODS}
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -280,7 +284,7 @@ def test_a_target_gives_its_set_whatever_the_structure(method):
         assert out.structure.kind == "undirected"
 
 
-def _gs_sample(kind: str):
+def _sample_of(kind: str):
     """Linear-Gaussian data on 20 variables, or categorical data on 10, with their settings."""
     if kind == "gaussian":
         return _er_sample(20, 0), {}
@@ -291,7 +295,7 @@ def _gs_sample(kind: str):
 def test_gs_sets_beat_the_empty_answer(kind):
     """Summed over every target, the members GS gets wrong, missing or extra, are at most half the
     true blanket members, which is what the empty answer gets wrong."""
-    sample, settings = _gs_sample(kind)
+    sample, settings = _sample_of(kind)
     oracle = DSeparation(sample.graph)
     wrong = members = 0
     for v in range(sample.data.shape[1]):
@@ -303,10 +307,34 @@ def test_gs_sets_beat_the_empty_answer(kind):
 
 @pytest.mark.parametrize("kind", ["gaussian", "categorical"])
 def test_a_gs_fit_repeats(kind):
-    sample, settings = _gs_sample(kind)
+    sample, settings = _sample_of(kind)
     for target in (None, 3):
         first = andrey.gs(sample.data, target=target, **settings)
         again = andrey.gs(sample.data, target=target, **settings)
+        assert first.structure.oriented_edges() == again.structure.oriented_edges()
+        assert first.metadata == again.metadata
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_fast_iamb_sets_beat_the_empty_answer(kind):
+    """As for GS: summed over every target, at most half as many wrong members as the true
+    blankets hold."""
+    sample, settings = _sample_of(kind)
+    oracle = DSeparation(sample.graph)
+    wrong = members = 0
+    for v in range(sample.data.shape[1]):
+        got = set(andrey.fast_iamb(sample.data, target=v, **settings).metadata["markov_blanket"])
+        want = oracle.markov_blanket(v)
+        wrong, members = wrong + len(got ^ want), members + len(want)
+    assert members and wrong <= members / 2
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_a_fast_iamb_fit_repeats(kind):
+    sample, settings = _sample_of(kind)
+    for target in (None, 3):
+        first = andrey.fast_iamb(sample.data, target=target, **settings)
+        again = andrey.fast_iamb(sample.data, target=target, **settings)
         assert first.structure.oriented_edges() == again.structure.oriented_edges()
         assert first.metadata == again.metadata
 

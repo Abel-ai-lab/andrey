@@ -352,8 +352,8 @@ def non_value_errors(method: str) -> str:
 UNIT_CASES = {
     **dict.fromkeys(
         (
-            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "mmpc"),
-            *("mmhc", "rsmax2"),
+            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
+            *("mmpc", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
@@ -970,6 +970,7 @@ CI_CASES = {
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
     "gs": [{}, {"target": 0}],
+    "fast_iamb": [{}, {"target": 0}],
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],

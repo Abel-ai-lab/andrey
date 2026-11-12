@@ -493,6 +493,7 @@ PROSE_NAMES = {
     "iamb": "IAMB",
     "inter_iamb": "Inter-IAMB",
     "gs": "GS",
+    "fast_iamb": "Fast-IAMB",
     "mmpc": "MMPC",
     "ges": "GES",
     "gies": "GIES",

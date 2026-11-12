@@ -1,12 +1,14 @@
-"""The shared Markov-blanket engine: IAMB, Inter-IAMB, GS, and MMPC, and the local search over them.
+"""The shared Markov-blanket engine: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, and the local search.
 
 Under a d-separation oracle each search returns the true set, each recorded separating set
 separates, and the spouse step completes the parents and children into the Markov blanket. With a
 Fisher-Z test, IAMB returns, bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph
 is built from. GS admits on a later pass what an earlier pass skipped and shrinks what its order
-admitted early. A memoized run is the run made afresh, and the local search gives the sets the
-methods return, whatever the column order. A scan of many candidates gives each the bits of its own
-query, the ranks are read only when keys tie, and the counts follow their definitions.
+admitted early. Fast-IAMB adds a batch per round, stops a batch where the data hold too few rows per
+cell, and ends a cycle of additions and removals. A memoized run is the run made afresh, and the
+local search gives the sets the methods return, whatever the column order. A scan of many candidates
+gives each the bits of its own query, the ranks are read only when keys tie, and the counts follow
+their definitions.
 """
 
 from __future__ import annotations
@@ -133,6 +135,59 @@ def test_gs_shrinks_a_member_its_order_admitted_early():
     given {2}, and the shrink, in the same order, drops 2 given {1}."""
     oracle = DSepOracle(nx.DiGraph([(0, 1), (1, 2)]))
     assert LocalSearch(oracle, [0, 2, 1], 0.5).run("gs", 0) == ([1], {2: (1,)})
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_fast_iamb_finds_the_true_blanket_under_an_oracle(seed):
+    oracle = _oracle(seed)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for v in range(oracle.d):
+        assert set(search.run("fast_iamb", v)[0]) == oracle.markov_blanket(v), v
+    np.testing.assert_array_equal(search.structure("fast_iamb", "moral") != 0, oracle.moral_graph())
+
+
+def test_fast_iamb_adds_a_batch_per_round():
+    """0 -> 1, 0 -> 2, 0 -> 3 with no categories to count: one round adds all three, so the search
+    asks the three tests of the round and the three of the shrink, where IAMB asks 3 + 2 + 1 and
+    the shrink's three."""
+    oracle = DSepOracle(nx.DiGraph([(0, 1), (0, 2), (0, 3)]))
+    fast = LocalSearch(oracle, [0, 1, 2, 3], 0.5)
+    assert fast.run("fast_iamb", 0) == ([1, 2, 3], {})
+    plain = LocalSearch(oracle, [0, 1, 2, 3], 0.5)
+    assert plain.run("iamb", 0)[0] == [1, 2, 3]
+    assert (fast.counts.issued, plain.counts.issued) == (6, 9)
+
+
+@pytest.mark.parametrize(("n", "want"), [(50, [1, 2]), (81, [1, 2, 3]), (80, [1, 2])])
+def test_fast_iamb_stops_a_batch_where_a_table_has_five_rows_per_cell_or_fewer(n, want):
+    """0 -> 1, 0 -> 2, 0 -> 3, each variable with two categories: adding the k-th member needs more
+    than 5 * 2**(k + 1) rows, 20, 40, and 80. With fewer rows the batch stops, the shrink drops
+    nothing, and the search ends, the variable left out with no separating set."""
+    oracle = DSepOracle(nx.DiGraph([(0, 1), (0, 2), (0, 3)]))
+    search = LocalSearch(oracle, [0, 1, 2, 3], 0.5, levels=np.full(4, 2), n=n)
+    assert search.run("fast_iamb", 0) == (want, {})
+
+
+class _Table:
+    """A test of target 0 that finds each listed (variable, set) independent and the rest
+    dependent."""
+
+    def __init__(self, independent: set[tuple[int, tuple[int, ...]]]) -> None:
+        self.independent = independent
+
+    def __call__(self, x, y, cond=()):
+        other = y if x == 0 else x
+        return 1.0 if (other, tuple(sorted(cond))) in self.independent else 0.0
+
+
+def test_fast_iamb_ends_a_cycle_of_additions_and_removals():
+    """Round 1 adds 1 and 2 and the shrink keeps {2}; round 2 adds 3 and the shrink drops 2 and
+    then 3; round 3 is round 1 again, and the search ends at the blanket it held after the first
+    shrink."""
+    independent = {(1, (2,)), (1, (3,)), (2, (1,)), (2, (1, 3)), (2, (3,)), (3, ())}
+    independent |= {(3, (1,)), (3, (1, 2))}
+    search = LocalSearch(_Table(independent), [0, 1, 2, 3], 0.5)
+    assert search.run("fast_iamb", 0) == ([2], {1: (2,), 3: ()})
 
 
 def test_the_order_reads_ranks_only_when_keys_tie():
@@ -298,9 +353,9 @@ def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
 def _fresh(method, test, target, d, alpha, ranks):
     """``target``'s run by ``method`` made anew: the set and the separating sets."""
     sepsets: dict[int, tuple[int, ...]] = {}
-    if method == "gs":
+    if method in ("gs", "fast_iamb"):
         assert d == len(ranks)
-        return LocalSearch(test, ranks, alpha).run("gs", target)
+        return LocalSearch(test, ranks, alpha).run(method, target)
     if method == "mmpc":
         found = parents_children(test, target, d, alpha, ranks, sepsets=sepsets)
     else:
@@ -331,7 +386,7 @@ def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
     search = LocalSearch(test, ranks, 0.05)
     order = np.random.default_rng(0).permutation(15).tolist()
     want = {}
-    for method in ("iamb", "inter_iamb", "gs", "mmpc"):
+    for method in ("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"):
         for t in order:
             want[method, t] = search.local(method, t)
             assert search.run(method, t) == _fresh(method, test, t, 15, 0.05, ranks), (method, t)
@@ -355,7 +410,7 @@ def _check_sepsets(oracle: DSeparation, t: int, learned: list[int], sepsets) -> 
 
 
 @pytest.mark.parametrize("seed", range(4))
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
     oracle = _oracle(seed)
     search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
@@ -370,7 +425,7 @@ def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
     """On data, the test given a recorded set has a p-value above alpha."""
     x, test = _search_data(kind)
@@ -427,7 +482,7 @@ def test_the_spouse_step_pairs_a_candidate_only_with_its_neighbor(mmpc_spouses):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_the_local_entry_gives_the_set_the_method_returns(method, kind):
     x, _ = _search_data(kind)
     indep_test = "fisherz" if kind == "fisherz" else "chisq"
@@ -443,7 +498,7 @@ def test_the_local_entry_gives_the_set_the_method_returns(method, kind):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_a_column_shuffle_leaves_every_recorded_set(method, kind):
     x, _ = _search_data(kind)
     indep_test = "fisherz" if kind == "fisherz" else "chisq"
@@ -544,7 +599,7 @@ class _Recorded(list):
         return super().__getitem__(i)
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_ranks_are_read_only_when_keys_tie(method):
     """On continuous data no two strengths tie, so the search reads no rank and finds the sets it
     finds with the ranks read; under an oracle every dependent candidate ties, and the ranks read
@@ -583,7 +638,7 @@ def test_a_search_counts_queries_issued_computed_and_distinct():
     assert (counts.issued, counts.computed) == (4, 3)
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_n_tests_is_the_count_of_tests_computed(method):
     """A target fit's ``n_tests`` is the engine's computed count; a test without kept answers
     computes every query it is asked, and a repeated query counts once among the distinct."""

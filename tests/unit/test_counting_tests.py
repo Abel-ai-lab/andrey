@@ -164,7 +164,7 @@ def test_with_missing_values_every_query_is_one_test(name, method, structure):
     assert tests.n == sum(rows.values()) > 0
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb"])
 def test_a_blanket_graph_counts_each_variable_s_search(method):
     """The moral graph runs each variable's search once, the tests of a run with that target."""
     x, _ = data_for("fisherz")
@@ -182,7 +182,7 @@ def test_iamb_under_the_oracle_counts_each_new_query():
     assert found == [1] and tests.n == 3
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
 def test_the_count_does_not_depend_on_the_column_order(method):
     x, _ = data_for("fisherz")
     order = np.random.default_rng(1).permutation(D)

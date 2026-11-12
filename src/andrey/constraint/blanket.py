@@ -1,14 +1,15 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
-:func:`andrey.inter_iamb`, :func:`andrey.gs`, and :func:`andrey.mmpc`.
+:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, and :func:`andrey.mmpc`.
 
-:func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` learner Grow-Shrink, and
-:func:`parents_children` the forward and backward phases of MMPC. :func:`blanket_graph` and
-:func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set (the
-AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and
-:func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`, and background
-knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of
-the other's set from the start and never leaves it, and a pair the knowledge makes non-adjacent is
-never in a returned set.
+:func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
+learners Grow-Shrink and Fast-IAMB, and :func:`parents_children` the forward and backward phases of
+MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for every variable. Keeping a pair when
+each lies in the other's set (the AND rule) gives the moral graph and the skeleton that
+:func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
+:class:`~andrey.core.ci.CITest`, and background knowledge as
+:class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
+set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
+returned set.
 
 :data:`LEARNERS` names each learner and its kind: a ``"blanket"`` learner returns a Markov blanket,
 a ``"pc"`` learner the parents and children before the symmetry check, and a ``"pc_spouses"``
@@ -333,6 +334,78 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 kept[x] = removed
         if removed == before:
             break
+    for x in blanket:
+        sepsets.pop(x, None)
+    if constraints is None:
+        return blanket
+    support = constraints.support()[target]
+    return [x for x in blanket if support[x]]
+
+
+#: Fast-IAMB's least average number of rows per cell of the table of a test it adds a member by
+#: (Yaramakala and Margaritis 2005, Eq. 2, k = 5).
+CELL_ROWS = 5
+
+
+def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s Markov blanket by Fast-IAMB [1]_, in the order its members joined.
+
+    Each round tests every variable outside the blanket given the blanket in one
+    :meth:`LocalSearch.scan`, the first round given no variable, and orders those whose p-value is
+    at or below ``alpha`` from the strongest dependence to the weakest
+    (:meth:`LocalSearch.ordered`). It adds them in that order, without a test, while the data
+    suffice: on categorical data, while the rows per cell of the table of ``target``, the variable,
+    and the blanket so far exceed ``CELL_ROWS``, the cells the product of the columns' levels
+    (:func:`table_size`) and the rows every row of the data; a variable that fails the rule marks
+    the data insufficient and ends the batch. On a table with a continuous column the rule does not
+    apply and the whole batch joins. Then one shrink pass in joining order (:func:`_shrink`). The
+    search stops when no variable tests dependent; when the data were insufficient and the shrink
+    dropped nothing, the variables the rule kept out taken as independent; or when the blanket after
+    a shrink repeats one it held after an earlier shrink, which ends a cycle of additions and
+    removals the paper does not guard against.
+
+    ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: a batch stops
+    once the blanket holds more than ``max_depth`` members, and the search stops while it does, so
+    no test conditions on more than ``max_depth`` variables.
+
+    References
+    ----------
+    .. [1] Yaramakala, S., and Margaritis, D. (2005). Speculative Markov blanket discovery for
+       optimal feature selection. Fifth IEEE International Conference on Data Mining (ICDM).
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    blanket: list[int] = list(required)
+    seen: set[frozenset[int]] = set()
+    while max_depth is None or len(blanket) <= max_depth:
+        candidates = [x for x in range(search.d) if x != target and x not in blanket]
+        strengths, pvalues = search.scan(target, candidates, blanket)
+        given = tuple(sorted(blanket))
+        sepsets.update((candidates[i], given) for i in np.flatnonzero(pvalues > alpha).tolist())
+        dependent = np.flatnonzero(pvalues <= alpha).tolist()
+        if not dependent:
+            break
+        strength = strengths[dependent].tolist()
+        batch = search.ordered(
+            {candidates[i]: -round(s, KEY_DP) for i, s in zip(dependent, strength, strict=True)}
+        )
+        insufficient = False
+        for x in batch:
+            if max_depth is not None and len(blanket) > max_depth:
+                break
+            size = None if search.levels is None else table_size(search.levels, target, x, blanket)
+            if size is not None and search.n <= CELL_ROWS * size:
+                insufficient = True
+                break
+            blanket.append(x)
+        before = len(blanket)
+        _shrink(search, target, blanket, required, sepsets)
+        if insufficient and len(blanket) == before:
+            break
+        state = frozenset(blanket)
+        if state in seen:
+            break
+        seen.add(state)
     for x in blanket:
         sepsets.pop(x, None)
     if constraints is None:
@@ -801,6 +874,7 @@ LEARNERS: dict[str, Learner] = {
     "inter_iamb": Learner("blanket", partial(_iamb, interleaved=True)),
     "mmpc": Learner("pc", _mmpc),
     "gs": Learner("blanket", _gs),
+    "fast_iamb": Learner("blanket", _fast_iamb),
 }
 
 
