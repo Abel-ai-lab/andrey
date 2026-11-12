@@ -1,4 +1,4 @@
-"""The stipple ground shared by the link-preview cards, the README banner, and the homepage hero.
+"""The stipple ground shared by the link-preview cards, the README banner, and the release covers.
 
 A cobalt-to-amber gradient printed as frosted glass: random specks whose density follows the tone,
 over a darker gradient, with light grain. Darker bands (``Band``) can sit behind text so white type
@@ -7,7 +7,6 @@ stays readable. The generator is seeded, so the same call draws the same pixels 
 
 from __future__ import annotations
 
-import io
 from typing import NamedTuple
 
 import numpy as np
@@ -64,42 +63,6 @@ def stipple(width: int, height: int, bands: tuple[Band, ...] = ()) -> Image.Imag
     img = img + rng.normal(0, 6, tone.shape)[..., None]  # a finer grain over the specks
     pixels = np.clip(img, 0, 255).astype(np.uint8)
     return Image.fromarray(pixels).resize((width, height), Image.LANCZOS)
-
-
-def speck_tile(color: str, density: float, size: int = 256, seed: int = SEED) -> bytes:
-    """A repeating tile of ``color`` specks on transparency, as a two-color PNG.
-
-    The homepage lays these over CSS gradients and fades them with masks, which draws the cards'
-    stipple at any width for a few kilobytes.
-    """
-    rng = np.random.default_rng(seed)
-    specks = rng.random((size, size)) < density
-    tile = Image.fromarray(specks.astype(np.uint8), "P")
-    tile.putpalette([0, 0, 0, *_rgb(color).astype(int)])
-    buffer = io.BytesIO()
-    tile.save(buffer, "PNG", transparency=0, optimize=True)
-    return buffer.getvalue()
-
-
-def grain_tile(size: int = 256, seed: int = SEED + 1) -> bytes:
-    """A repeating tile of faint light and dark grain, as a three-color PNG."""
-    rng = np.random.default_rng(seed)
-    noise = rng.normal(0, 1, (size, size))
-    pixels = np.where(noise > 1.2, 2, np.where(noise < -1.2, 1, 0)).astype(np.uint8)
-    tile = Image.fromarray(pixels, "P")
-    tile.putpalette([0, 0, 0, 0, 0, 0, 255, 255, 255])
-    buffer = io.BytesIO()
-    tile.save(buffer, "PNG", transparency=bytes([0, 60, 60]), optimize=True)
-    return buffer.getvalue()
-
-
-def hero_tiles() -> tuple[tuple[str, bytes], ...]:
-    """The stipple's tiles for the homepage's hero and bento tiles, by file name: cobalt specks
-    and grain."""
-    return (
-        ("grain-cobalt.png", speck_tile(COBALT_LIGHT, 0.55)),
-        ("grain-noise.png", grain_tile()),
-    )
 
 
 def ground_tokens() -> dict[str, str]:

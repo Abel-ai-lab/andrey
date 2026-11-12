@@ -1477,41 +1477,42 @@ html:not(:has(.andrey-home)) .bd-header::before {
   white-space: nowrap;
 }
 
-/* On a narrow screen the API reference's summary tables stack each entry, its name over its
-   description, in the same card, since a long name would leave its description a thin column. */
+/* On a narrow screen the API reference's summary tables and the methods catalog's tables
+   (`stacked`) stack each entry, its cells one under another in the same card, since a long name
+   would leave the other cells thin columns. */
 @media (max-width: 36rem) {
-  .bd-article .pst-scrollable-table-container:has(> table.autosummary) {
+  .bd-article .pst-scrollable-table-container:has(> table:is(.autosummary, .stacked)) {
     padding-top: 0.3rem;
   }
 
-  .bd-article table.table.autosummary,
-  .bd-article table.table.autosummary tbody,
-  .bd-article table.table.autosummary tbody tr,
-  .bd-article table.table.autosummary tbody tr td:nth-child(n) {
+  .bd-article table.table:is(.autosummary, .stacked),
+  .bd-article table.table:is(.autosummary, .stacked) tbody,
+  .bd-article table.table:is(.autosummary, .stacked) tbody tr,
+  .bd-article table.table:is(.autosummary, .stacked) tbody tr td:nth-child(n) {
     display: block;
   }
 
-  .bd-article table.table.autosummary thead {
+  .bd-article table.table:is(.autosummary, .stacked) thead {
     display: none;
   }
 
-  .bd-article table.table.autosummary tbody {
+  .bd-article table.table:is(.autosummary, .stacked) tbody {
     overflow: hidden;
     border: 1px solid var(--andrey-line);
     border-radius: 8px;
     background: var(--andrey-surface);
   }
 
-  .bd-article table.table.autosummary tbody tr:nth-child(n) + tr {
+  .bd-article table.table:is(.autosummary, .stacked) tbody tr:nth-child(n) + tr {
     border-top: 1px solid var(--andrey-line);
   }
 
-  .bd-article table.table.autosummary tbody tr td:nth-child(n) {
+  .bd-article table.table:is(.autosummary, .stacked) tbody tr td:nth-child(n) {
     border: 0;
     border-radius: 0;
   }
 
-  .bd-article table.table.autosummary tbody tr td:first-child {
+  .bd-article table.table:is(.autosummary, .stacked) tbody tr td:not(:last-child) {
     padding-bottom: 0;
   }
 }
@@ -1535,6 +1536,13 @@ code.literal {
   border: 1px solid var(--andrey-line);
   border-radius: var(--andrey-radius-sm);
   padding: 0.1em 0.35em;
+}
+
+/* ---------- math ---------- */
+/* KaTeX's hidden MathML copy is absolutely positioned; anchored to its formula, it cannot sit past
+   the right edge of a phone screen and widen the page. */
+.katex {
+  position: relative;
 }
 
 /* ---------- cards (sphinx-design) ---------- */

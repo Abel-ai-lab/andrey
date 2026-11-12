@@ -13,7 +13,7 @@ kernelspec:
 
 This guide learns a causal graph from real measurements, checks it against what biologists already
 know, and then tests how far to trust it. Every output on this page is computed when the site is
-built.
+built. [Concepts](concepts.md) states the problem formally and what each kind of graph claims.
 
 ## Install
 
@@ -353,17 +353,57 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row per
 sample and one column per variable. Most methods take that one argument and return the same kind of
-result; `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`, `hc`, `tabu`,
-`boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies` and `igsp` also take
-`env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
-learns which variables each environment's interventions changed, `icp` takes `env` and `target`, the
-variable whose parents it finds, and `multi_group_direct_lingam`, `longitudinal_lingam`, and
-`jpcmciplus` take a list of datasets. `andrey list` names the methods, and {doc}`graph-types`
-explains which graph each one returns.
+result; `multi_group_direct_lingam`, `longitudinal_lingam`, and `jpcmciplus` take a list of
+datasets, and the methods under [Environments and interventions](#environments-and-interventions)
+also take each row's environment. `andrey list` names the methods, and {doc}`graph-types` explains
+which graph each one returns.
 
-`ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. It calls the rows
-of one environment of `env` a setting. Map an observational environment to `[]`, a setting to the
-targets you know, and a setting whose targets you do not know to `None`:
+### Environments and interventions
+
+% concept: env
+`boss`, `boss_fci`, `cdnod`, `fci_jci`, `ges`, `gfci`, `gies`, `gnies`, `grasp`, `grasp_fci`, `hc`,
+`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, with one meaning: one label
+per row, text or finite numbers, or the name of a column of a DataFrame `data`, which is then not a
+variable, or, with `env` left out, the data given as one table per environment (see below).
+`andrey run` reads it from `--env`, a column of `--data` or a file. A label that is missing or
+infinite raises a `ValueError`. The methods read `env` in one of two ways. `gies`, `gnies`, `igsp`,
+and `ut_igsp` read it as interventions: each distinct label is one environment, which changes the
+mechanisms of its targets, known or learned, and leaves the others as they are. `icp` reads it as
+interventions on any variables, as long as they leave the mechanism of its `target` alone. `cdnod`,
+`fci_jci`, `boss`, `grasp`, `ges`, `hc`, `tabu`, `boss_fci`, `grasp_fci`, and `gfci` read it as a
+context variable that no data variable causes, the environment index, which joins the search as one
+more variable; a numeric label, such as a time step, stays a number. `ges`, `hc`, `tabu`, `boss`,
+`grasp`, `gfci`, `boss_fci`, and `grasp_fci` also fit without `env`, and `icp` also takes `target`,
+the variable whose parents it finds.
+
+`gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
+variables, by name or position, with `[]` for an observational environment; as the name of a column
+whose cells give each row's variables, from whose distinct values `env` follows when you leave it
+out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
+`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
+environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
+the mapping leaves out or gives `None` as one whose targets it learns, and still needs an
+observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
+environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
+`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
+names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
+it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
+its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
+unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`, and reads an `--env` of whole numbers as integers.
+
+```python
+out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
+out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
+out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
+out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) fits without env
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
+out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
+```
+
+`ut_igsp` calls the rows of one environment a setting. Map an observational environment to `[]`, a
+setting to the targets you know, and a setting whose targets you do not know to `None`:
 
 ```python
 from andrey import ut_igsp
@@ -372,14 +412,18 @@ result = ut_igsp(data, "condition", targets={"control": [], "drug": ["dose"], "k
 result.metadata["targets"]  # each environment's targets, known and learned, by its label
 ```
 
-When each environment's rows come as their own table, pass them as a dict, or a list labeled by
-position, in place of `env`:
+In Python, every method that takes `env` also takes each environment's rows apart as `data`, in
+place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
+`0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
+mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
+the first one's order, and a column of the `category` type in each keeps it, with every
+DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
+of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
+label.
 
 ```python
-result = ut_igsp(
-    {"control": control, "drug": drug, "knockout": knockout},
-    targets={"control": [], "drug": ["dose"], "knockout": None},
-)
+out = andrey.gies([observed, knockout], targets={0: [], 1: ["x"]})
+out = andrey.ut_igsp({"control": control, "drug": drug}, targets={"control": [], "drug": None})
 ```
 
 ## Background knowledge
@@ -410,19 +454,19 @@ of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI
 The result honors every part: a required edge is there and directed, a forbidden one is not, and a
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
-of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
-graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
-`structure="moral"`, a choice of `iamb` and `inter_iamb`: a required edge is there without a
-direction, and tiers and edges forbidden one way, which constrain orientation, do not change them.
-With `structure="cpdag"`, the default of `iamb` and `inter_iamb`, they direct the edges the
-knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
-and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
-earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
-directions close a cycle over the edges the search kept raises one after the adjacency search.
-Labels stay attached to their columns, so the same knowledge fits the table in any column order. A
-label is the column name as text: name a column called `1` with `"1"`, as the integer `1` is the
-second column. On the command line, give a JSON object inline or as a file:
-`andrey run pc --data data.csv knowledge=knowledge.json`.
+of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, GS, Fast-IAMB, and MMPC
+return undirected graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and
+with `structure="moral"`, a choice of `iamb`, `inter_iamb`, `gs`, and `fast_iamb`: a required edge
+is there without a direction, and tiers and edges forbidden one way, which constrain orientation, do
+not change them. With `structure="cpdag"`, the default of `iamb`, `inter_iamb`, `gs`, and
+`fast_iamb`, they direct the edges the knowledge decides, as in any CPDAG. In a PAG, a forbidden `a
+-> b` puts an arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itself,
+such as a required edge into an earlier tier, raises a `ValueError` before the search runs. In PC,
+CD-NOD, and FCI, knowledge whose directions close a cycle over the edges the search kept raises one
+after the adjacency search. Labels stay attached to their columns, so the same knowledge fits the
+table in any column order. A label is the column name as text: name a column called `1` with `"1"`,
+as the integer `1` is the second column. On the command line, give a JSON object inline or as a
+file: `andrey run pc --data data.csv knowledge=knowledge.json`.
 
 Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
 in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in
@@ -478,10 +522,10 @@ method that honors them except six. Required paths are experimental in Tabu sear
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
 paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
 has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
-96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
-edges farther from the class the claims define. A path claim says less than an edge and so directs
-less: a required path cannot restore an edge the search left out. When you know the edge itself,
-state it as `required`.
+96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to
+1.95 edges farther from the class the claims define. A path claim says less than an edge and so
+directs less: a required path cannot restore an edge the search left out. When you know the edge
+itself, state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -528,14 +572,16 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-{{ indep_test_names }} take the tests; {{ score_func_names }} take every score; `gies` scores each
-variable on the rows without an intervention on it. `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and
-`rsmax2` take a score and a test that read the same kind of data, such as
-`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
+{{ indep_test_names }} take the tests; {{ score_func_names }} take every score, except
+`normal_scores` in `gies`, which scores each variable on the rows without an intervention on it.
+`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take a score and a test that read the same
+kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`; with
+`score_func="normal_scores"` and `indep_test="normal_scores"`, both read each column's normal
+scores, so a strictly increasing transformation of any column leaves the graph unchanged.
 
 ### Categorical data
 
@@ -715,11 +761,12 @@ EM does not always settle within its 10 rounds. In our benchmark the last round 
 graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with 50 variables and 100 rows.
 Such a fit logs a warning, and more rows help. EM also costs time: a fit runs the search 10 times
 and the E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+[missing-data
+comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
-reference implementation exists to compare them with, so the
-[release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
-test-wise deletion, dropping rows, and mean imputation.
+reference implementation exists to compare them with, so the [release
+card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside test-wise
+deletion, dropping rows, and mean imputation.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with

@@ -42,6 +42,7 @@ from tests.unit.methods import REQUIRED, SHORT, domains, environments
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
 UPGRADING = API_MD.parent / "guides" / "upgrading.md"
+GETTING_STARTED = API_MD.parent / "guides" / "getting-started.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -352,8 +353,8 @@ def non_value_errors(method: str) -> str:
 UNIT_CASES = {
     **dict.fromkeys(
         (
-            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc"),
-            "rsmax2",
+            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
+            *("mmpc", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
@@ -969,6 +970,8 @@ CI_CASES = {
     "fci_jci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
+    "gs": [{}, {"target": 0}],
+    "fast_iamb": [{}, {"target": 0}],
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
@@ -1301,10 +1304,11 @@ def test_every_warning_the_package_raises_is_an_andrey_warning():
     assert calls > 10
 
 
-def test_documented_method_lists_match_the_table():
-    """A paragraph of docs/docs/api.md marked ``% concept: <key>`` names exactly the methods that
-    take the concept today, under any name."""
-    lines = API_MD.read_text(encoding="utf-8").splitlines()
+@pytest.mark.parametrize("page", [API_MD, GETTING_STARTED], ids=lambda page: page.name)
+def test_documented_method_lists_match_the_table(page):
+    """A paragraph of the API reference or the getting-started guide marked ``% concept: <key>``
+    names exactly the methods that take the concept today, under any name."""
+    lines = page.read_text(encoding="utf-8").splitlines()
     marked = [
         (i, line.split(":", 1)[1].strip())
         for i, line in enumerate(lines)

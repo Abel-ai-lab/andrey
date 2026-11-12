@@ -101,7 +101,10 @@ jobs:
         # A module-level import of an optional dependency fails here, not in a contributor's checkout.
         run: uv run --no-sync python -m pytest --collect-only -qq tests/unit
       - name: Ground-truth recovery and recorded-output regression
-        run: uv run --no-sync python -m pytest tests/recovery tests/metrics -q
+        # On every core, one file per worker, as in the extras job.
+        run: >-
+          uv run --no-sync python -m pytest tests/recovery tests/metrics
+          -n logical --dist loadfile -q --durations=15
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
         run: >-
@@ -147,16 +150,22 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.14"]
+        # --shard K/N runs the tests whose id falls in part K of N (tests/conftest.py): the parts
+        # are disjoint and hold every test. Every value names the same N, and K runs from 1 to N.
+        shard: ["1/2", "2/2"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Correctness suites, all extras - recovery, determinism, torch kernels
+        # pytest-xdist runs one worker per core (4 on a hosted runner; `logical` counts the cores
+        # the same with or without psutil). `loadfile` keeps a file's tests, and the module-scoped
+        # fixtures they share, on one worker.
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests -q -rs --durations=15
+          uv run --no-sync python -m pytest tests --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required

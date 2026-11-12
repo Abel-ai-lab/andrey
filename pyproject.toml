@@ -1,6 +1,6 @@
 [project]
 name = "andrey-core"       # import root is "andrey" (taken on PyPI)
-version = "0.17.0"        # must equal andrey.__version__ (scripts/check_dist.py)
+version = "0.17.1"        # must equal andrey.__version__ (scripts/check_dist.py)
 description = "Andrey: accelerated, accurate, agentic causal discovery. Install andrey-core, import andrey."
 dynamic = ["readme"]  # README.md, its image paths pinned to the release (fancy-pypi-readme below)
 requires-python = ">=3.11"
@@ -61,8 +61,8 @@ Issues = "https://github.com/Abel-ai-lab/andrey/issues"
 Changelog = "https://andrey.abel.ai/docs/changelog.html"
 
 [dependency-groups]                # not published
-# accessible-pygments: site code colors.
-dev = ["ruff", "ty", "pytest", "accessible-pygments"]
+# accessible-pygments: site code colors. pytest-xdist: `pytest -n` runs the suite on several cores.
+dev = ["ruff", "ty", "pytest", "pytest-xdist", "accessible-pygments"]
 # Notebooks and the demo apps install their own packages.
 docs = [
     "sphinx>=7",

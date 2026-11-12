@@ -31,6 +31,7 @@ from .api import (
     direct_lingam,
     dynotears,
     exact_search,
+    fast_iamb,
     fci,
     fci_jci,
     ges,
@@ -41,6 +42,7 @@ from .api import (
     granger,
     grasp,
     grasp_fci,
+    gs,
     hc,
     iamb,
     ica_lingam,
@@ -88,7 +90,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.17.0"
+__version__ = "0.17.1"
 
 __all__ = [
     "__version__",
@@ -130,6 +132,8 @@ __all__ = [
     "icp",
     "iamb",
     "inter_iamb",
+    "gs",
+    "fast_iamb",
     "mmpc",
     "ges",
     "ages",

@@ -1704,6 +1704,7 @@ def cmd_list(
             "output": s.output.graph_kind or s.output.structure_type,
             "accel": s.accel,
             "determinism": s.determinism,
+            "data_kinds": list(s.data_kinds),
             "summary": s.summary,
         }
         for s in list_specs()

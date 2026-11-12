@@ -55,6 +55,11 @@ class Palette:
     ramp : tuple of str
         The colors of :func:`andrey.viz.mpl.cmap`, from the lowest value to the highest. The lowest
         is nearest the background, so low values fade into the page in either theme.
+    amber_text : str
+        The amber of a word set in it on ``paper``, such as the website's "fast": dark enough on
+        the light ground to read as display type (3:1 or more), the bright amber on the dark one.
+        :func:`~andrey.viz.draw` and :mod:`andrey.viz.mpl` do not use it; a palette built without
+        it takes the light theme's.
     """
 
     paper: str
@@ -70,6 +75,7 @@ class Palette:
     edge_partial: str
     categorical: tuple[str, ...]
     ramp: tuple[str, ...]  # sequential cobalt ramp (confidence / weight), low value -> high
+    amber_text: str = "#b88238"
 
 
 LIGHT = Palette(
@@ -95,6 +101,7 @@ LIGHT = Palette(
         "#c9a227",
     ),
     ramp=("#e7ebfb", "#bcc8f4", "#7c93ee", "#3b5bdb", "#1f338f"),
+    amber_text="#b88238",
 )
 
 DARK = Palette(
@@ -120,6 +127,7 @@ DARK = Palette(
         "#d9b94a",
     ),
     ramp=("#141d33", "#293a6b", "#4d63c8", "#6e86f5", "#aebdf7"),
+    amber_text="#f0b357",
 )
 
 # Edge type -> the Palette attribute that colors it. A 2-cycle is directed feedback, so graphite.

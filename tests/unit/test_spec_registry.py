@@ -21,7 +21,8 @@ import pytest
 import andrey
 from andrey import metrics
 from andrey.api import __all__ as API_ALL
-from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.spec import DATA_KINDS, ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
 # Input names are a closed set (the InputSpec names in the registry), each a `cmd_run` option.
@@ -145,6 +146,28 @@ def test_knowledge_parts_match_the_facade(name):
         doc = inspect.getdoc(getattr(andrey, name)) or ""
         entry = doc.split("knowledge : Knowledge or None", 1)[1].split("\n\n", 1)[0]
         assert "all honored" in " ".join(entry.split())
+
+
+@pytest.mark.parametrize("name", list(REGISTRY))
+def test_data_kinds_match_the_facade(name):
+    """The kinds of data a method reads agree with the arguments its facade takes: categorical
+    and mixed columns with ``categorical``, environments with ``env``, datasets with a list, and
+    missing values with ``missing``, unless its only way to read them is experimental."""
+    spec = get_spec(name)
+    kinds = set(spec.data_kinds)
+    facade = inspect.signature(getattr(andrey, name)).parameters
+    assert "continuous" in kinds
+    assert ("categorical" in kinds) is ("mixed" in kinds) is ("categorical" in facade)
+    assert ("environments" in kinds) is ("env" in facade)
+    assert ("datasets" in kinds) is str(facade["data"].annotation).startswith("Sequence[")
+    if "missing" in kinds:
+        assert "missing" in facade
+    elif "missing" in facade:
+        assert name in EM_METHODS and name not in EM_SUPPORTED
+
+
+def test_every_data_kind_is_read_by_some_method():
+    assert {kind for spec in REGISTRY.values() for kind in spec.data_kinds} == set(DATA_KINDS)
 
 
 def test_param_type_is_consistent_with_default():

@@ -1,7 +1,7 @@
 ---
 name: guides-index
-description: Practical guides - install Andrey, recover your first structure, read its graph
-  types and representations.
+description: The causal discovery problem stated formally, then practical guides - install
+  Andrey, recover your first structure, read its graph types and representations.
 meta:
   type: index
 ---
@@ -10,6 +10,8 @@ meta:
 
 Practical guides for using Andrey.
 
+- [Concepts](concepts.md): the causal discovery problem stated formally, what the data identify,
+  what each graph a method returns claims, and which methods fit which assumptions.
 - [Getting started](getting-started.md): install Andrey, learn a graph from real measurements,
   and check how far to trust it.
 - [Graph types](graph-types.md): what a DAG, a CPDAG, a PAG, and a temporal graph each claim, with
@@ -20,12 +22,13 @@ Practical guides for using Andrey.
   or change machines, and the `tie_break` setting.
 - [Upgrading](upgrading.md): what to change in your code for a new release, with the common calls
   before and after.
-- [Contributing](contributing.md): report a problem, set up a development environment, and run the
-  checks before a pull request.
+- [Contributing](contributing.md): ways to help, and the steps from a fork to a merged pull
+  request.
 
 ```{toctree}
 :hidden:
 
+concepts
 getting-started
 graph-types
 graph-representation

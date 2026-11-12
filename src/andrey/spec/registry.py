@@ -12,6 +12,7 @@ from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
+from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -72,10 +73,16 @@ _COLLIDER_ORDER = ParamSpec(
     nullable=True,
 )
 _PENALTY_DISCOUNT = concept_param("penalty_discount")
+#: The scores of categorical and mixed data, and how null picks a score.
+_OTHER_SCORES = (
+    "bdeu = BDeu and discrete_bic = multinomial BIC, for categorical data coded by whole numbers; "
+    "degen_gauss and cond_gauss = degenerate and conditional Gaussian BIC, for mixed data. "
+    + _DECLARED.format(every="bdeu", fallback="bic")
+)
 _SCORE_DOC = (
-    "Local score: bic = linear-Gaussian BIC; bdeu = BDeu and discrete_bic = multinomial BIC, "
-    "for categorical data coded by whole numbers; degen_gauss and cond_gauss = degenerate and "
-    "conditional Gaussian BIC, for mixed data. " + _DECLARED.format(every="bdeu", fallback="bic")
+    "Local score: bic = linear-Gaussian BIC; normal_scores = experimental, bic on each column's "
+    "normal scores, for continuous data whose columns are monotone transformations of Gaussian "
+    "variables, with no env and no missing values; " + _OTHER_SCORES
 )
 _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
 _EBIC_GAMMA = concept_param("ebic_gamma")
@@ -512,7 +519,7 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-for _name, _summary, _key, _structure, _kind, _refs in (
+for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
         "iamb",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
@@ -523,6 +530,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
+        "supported",
     ),
     (
         "inter_iamb",
@@ -533,6 +541,33 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
+        "supported",
+    ),
+    (
+        "gs",
+        "One variable's Markov blanket by Grow-Shrink: the other variables visited in one fixed "
+        "order, the most dependent first, each added at once when a conditional-independence test "
+        "finds it dependent given the blanket so far, in passes until none joins, then a shrink. "
+        "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
+        "structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Margaritis & Thrun 2000", "Margaritis 2003"),
+        "experimental",
+    ),
+    (
+        "fast_iamb",
+        "One variable's Markov blanket by Fast-IAMB: each round tests every variable outside the "
+        "blanket given it and adds the dependent ones, the most dependent first, while the data "
+        "hold more than five rows per cell of the next test's table (categorical data), then "
+        "shrinks. With target=null, every variable's blanket joined into a CPDAG by the "
+        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Yaramakala & Margaritis 2005", "Margaritis 2003"),
+        "experimental",
     ),
     (
         "mmpc",
@@ -552,6 +587,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         ),
         "undirected",
         ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
+        "supported",
     ),
 ):
     _add(
@@ -566,7 +602,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             accel="numpy",
-            status="supported",
+            status=_status,
             column_order="relabels",
             tie_break=True,
             params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
@@ -662,8 +698,9 @@ _add(
             ),
             concept_param(
                 "score_func",
-                doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
-                "on it.",
+                choices=tuple(s for s in SCORES if s not in RANK_SCORES),
+                doc="Local score: bic = linear-Gaussian BIC; " + _OTHER_SCORES + " Each variable "
+                "is scored on the rows without an intervention on it.",
             ),
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -977,6 +1014,7 @@ _add(
         accel="torch",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "Repeats on one machine with one torch version; on another platform the graph "
@@ -1158,6 +1196,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1217,6 +1256,7 @@ _add(
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1778,6 +1818,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels_if_converged",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "At few rows per variable, FastICA can reach another solution under a new "
@@ -2473,6 +2514,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -2964,6 +3006,8 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
+    "gs": _BLANKET_RULE,
+    "fast_iamb": _BLANKET_RULE,
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
@@ -3051,6 +3095,8 @@ _PATH_METHODS = (
     "exact_search",
     "iamb",
     "inter_iamb",
+    "gs",
+    "fast_iamb",
     "mmpc",
 )
 _PATH_RULE = (
@@ -3243,6 +3289,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
+    "gs": ("target", "markov_blanket"),
+    "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(

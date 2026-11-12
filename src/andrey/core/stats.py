@@ -405,6 +405,21 @@ def checked_matrix(
     return arr
 
 
+def normal_scores(data: npt.ArrayLike) -> np.ndarray:
+    """Each column of the finite ``(n_samples, n_features)`` ``data`` as its normal scores.
+
+    The scores are ``Phi^-1(rank / (n + 1))`` (van der Waerden), with tied values sharing their
+    average rank: a column's scores depend on it only through its ranks, so a strictly increasing
+    transformation of a column leaves its scores unchanged, bit for bit. The rank-based test
+    ``indep_test="normal_scores"`` and the score ``score_func="normal_scores"`` read these scores.
+    """
+    from scipy.special import ndtri
+    from scipy.stats import rankdata
+
+    arr = np.asarray(data, dtype=np.float64)
+    return ndtri(rankdata(arr, axis=0) / (arr.shape[0] + 1.0))
+
+
 def cov(X: np.ndarray, *, rowvar: bool = True, ddof: int = 1) -> np.ndarray:
     """Covariance matrix, matching ``np.cov(X, rowvar=rowvar, ddof=ddof)``.
 

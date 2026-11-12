@@ -12,6 +12,9 @@ once and memoizes scores behind the :class:`Score` protocol that structure-searc
 the same protocol, and :class:`CategoricalBICScore` with the multinomial BIC. :class:`DGScore` and
 :class:`CGScore` score mixed data, continuous and categorical columns marked by a mask, with the BIC
 of the degenerate Gaussian and conditional Gaussian models of :mod:`andrey.core.mixed`.
+:func:`make_score` also builds the linear-Gaussian BIC over each column's normal scores, the score
+of the nonparanormal model (Liu, Lafferty and Wasserman 2009) that Nandy, Hauser and Maathuis (2018,
+Section 7) give GES with rank correlations.
 
 References
 ----------
@@ -40,6 +43,12 @@ Journal of Data Science and Analytics 6(1):3-18. https://doi.org/10.1007/s41060-
 
 Andrews, Ramsey & Cooper (2019). Learning high-dimensional directed acyclic graphs with mixed
 data-types. Proceedings of Machine Learning Research 104:4-21.
+
+Liu, Lafferty & Wasserman (2009). The nonparanormal: semiparametric estimation of high dimensional
+undirected graphs. Journal of Machine Learning Research 10:2295-2328.
+
+Nandy, Hauser & Maathuis (2018). High-dimensional consistency in score-based and hybrid structure
+learning. Annals of Statistics 46(6A):3151-3183. https://doi.org/10.1214/17-AOS1654
 """
 
 from __future__ import annotations
@@ -59,15 +68,23 @@ from scipy.special import gammaln
 from . import categorical, stats
 from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 
-#: The linear-Gaussian BIC.
+#: The linear-Gaussian BIC on the values, the one score that also reads a given covariance.
 LINEAR_SCORES: tuple[str, ...] = ("bic",)
+#: The linear-Gaussian BIC on each column's normal scores, which reads a column only through its
+#: ranks.
+RANK_SCORES: tuple[str, ...] = ("normal_scores",)
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
 DISCRETE_SCORES: tuple[str, ...] = ("bdeu", "discrete_bic")
 MIXED_SCORES: tuple[str, ...] = ("cond_gauss", "degen_gauss")
 #: Every score name :func:`make_score` builds: what a search with all three kinds of score accepts.
-SCORES: tuple[str, ...] = (*LINEAR_SCORES, *DISCRETE_SCORES, *MIXED_SCORES)
+SCORES: tuple[str, ...] = (*LINEAR_SCORES, *RANK_SCORES, *DISCRETE_SCORES, *MIXED_SCORES)
 #: The scores whose penalty ``penalty_discount`` multiplies; BDeu has no such penalty.
-PENALIZED_SCORES: tuple[str, ...] = (*LINEAR_SCORES, "discrete_bic", *MIXED_SCORES)
+PENALIZED_SCORES: tuple[str, ...] = (
+    *LINEAR_SCORES,
+    *RANK_SCORES,
+    "discrete_bic",
+    *MIXED_SCORES,
+)
 
 # A residual variance at most this fraction of the node's variance is zero up to rounding.
 ZERO_RESIDUAL = 1e-12
@@ -977,17 +994,20 @@ def make_score(
 ) -> LocalScore:
     """Build the local score ``score_func`` names over ``data``.
 
-    ``"bic"`` names :class:`BICScore`, ``"bdeu"`` :class:`BDeuScore` with its default structure
-    prior, ``"discrete_bic"`` :class:`CategoricalBICScore`, and ``"degen_gauss"`` and
-    ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
-    ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
-    it out but still check its range, as BDeu does ``penalty_discount``'s.
+    ``"bic"`` names :class:`BICScore`, ``"normal_scores"`` :class:`BICScore` over each column's
+    normal scores (:func:`~andrey.core.stats.normal_scores`), ``"bdeu"`` :class:`BDeuScore` with
+    its default structure prior, ``"discrete_bic"`` :class:`CategoricalBICScore`, and
+    ``"degen_gauss"`` and ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the
+    ``categorical`` mask.
+    ``ebic_gamma`` weighs the extended-BIC term of the two linear-Gaussian BICs; the other scores
+    leave it out but still check its range, as BDeu does ``penalty_discount``'s.
     ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A ``cov``
     replaces the covariance of ``data`` in the linear-Gaussian BIC, over as many rows as ``data``
     holds, such as the expected covariance of data with missing values
     (:mod:`andrey.search.em`); its columns are checked as :class:`BICScore` checks the data's.
     Raises :class:`NotImplementedError` for a name outside :data:`SCORES`, and ``ValueError`` for
-    a ``cov`` with another score.
+    a ``cov`` with another score, ``"normal_scores"`` included, and for ``"normal_scores"`` on data
+    with a ``NaN`` or an infinity.
     """
     if cov is not None:
         if score_func not in LINEAR_SCORES:
@@ -1001,6 +1021,13 @@ def make_score(
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
         )
+    if score_func in RANK_SCORES:
+        # The scores come in Fortran order; in C order, as the searches pass "bic" its values, the
+        # covariance, whose sums follow the layout, is that of "bic" on the same scores.
+        scores = np.ascontiguousarray(
+            stats.normal_scores(stats.checked_matrix(data, "compute BIC scores"))
+        )
+        return BICScore(scores, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
     penalty_weight(ebic_gamma, "ebic_gamma")
     if score_func == "bdeu":
         penalty_weight(penalty_discount)

@@ -30,7 +30,7 @@ from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
-from andrey.core.score import SCORES
+from andrey.core.score import RANK_SCORES, SCORES
 from andrey.core.structure import Kind
 from andrey.search.gfci import EDGE_REMOVALS
 
@@ -114,7 +114,7 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
 # Method groups the rules below name.
 CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
-    *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+    *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -392,6 +392,16 @@ _CONCEPTS = (
             "gnies",
         ),
         others_exempt="Not a search over parent sets scored by a decomposable score.",
+        deviations=(
+            Deviation(
+                method="gies",
+                name="score_func",
+                default=None,
+                choices=tuple(s for s in SCORES if s not in RANK_SCORES),
+                reason="It scores each variable on the rows without an intervention on it, and "
+                "normal_scores ranks every row, so the ranks would mix the intervened rows in.",
+            ),
+        ),
     ),
     Concept(
         key="penalty_discount",
@@ -419,7 +429,8 @@ _CONCEPTS = (
             "Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) "
             "that the linear-Gaussian BIC adds per variable; it grows with the number of "
             "variables, from 0 to 1. Larger values give sparser graphs; 0.0 is the standard BIC. "
-            "Only bic uses it: passing it with another score raises ValueError.",
+            "Only bic and normal_scores use it: passing it with another score raises "
+            "ValueError.",
             minimum=0,
             maximum=1,
         ),
@@ -664,6 +675,8 @@ _CONCEPTS = (
                 "fci_jci",
                 "iamb",
                 "inter_iamb",
+                "gs",
+                "fast_iamb",
                 "mmpc",
             ),
             *_exempt(
@@ -1038,6 +1051,8 @@ _CONCEPTS = (
             "fci_jci",
             "iamb",
             "inter_iamb",
+            "gs",
+            "fast_iamb",
             "mmpc",
             *PCMCI_FAMILY,
             "anm",
@@ -1219,7 +1234,7 @@ _CONCEPTS = (
             *_exempt(
                 "A Markov-blanket search, with no place for a context variable; cdnod is the "
                 "test-based search that takes env.",
-                *("iamb", "inter_iamb", "mmpc"),
+                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
@@ -1279,11 +1294,11 @@ _CONCEPTS = (
     ),
     Concept(
         key="structure",
-        summary="The graph a Markov-blanket search returns without a target: iamb and inter_iamb "
-        "return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its sets of "
-        "parents and children give. cpdag is the CPDAG of the Grow-Shrink structure learner "
-        "(Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the Markov "
-        "blankets.",
+        summary="The graph a Markov-blanket search returns without a target: iamb, inter_iamb, gs, "
+        "and fast_iamb return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its "
+        "sets of parents and children give. cpdag is the CPDAG of the Grow-Shrink structure "
+        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
+        "Markov blankets.",
         param=_template(
             "structure",
             "str",
@@ -1295,7 +1310,7 @@ _CONCEPTS = (
             choices=tuple(BLANKET_STRUCTURES),
         ),
         fragment="cpdag",
-        suitable=("iamb", "inter_iamb", "mmpc"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
             Deviation(
@@ -1326,7 +1341,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("iamb", "inter_iamb", "mmpc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1405,7 +1420,7 @@ _CONCEPTS = (
         "undirected for a set, so an absent edge away from the target means nothing. "
         "metadata['target'] names the target, and each set the fit learns is a list of columns "
         "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
-        suitable=("iamb", "inter_iamb", "mmpc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1413,7 +1428,7 @@ _CONCEPTS = (
         summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
         "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
         "query whose p-value a test computed, none for a query answered from a kept answer.",
-        suitable=("iamb", "inter_iamb", "mmpc"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
         others_exempt="Does not report its test count.",
     ),
     Concept(
@@ -1464,6 +1479,8 @@ _CONCEPTS = (
                 "Markov blanket, not by a separating set.",
                 "iamb",
                 "inter_iamb",
+                "gs",
+                "fast_iamb",
                 "mmpc",
             ),
         ),

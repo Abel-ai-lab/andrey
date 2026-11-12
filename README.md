@@ -8,6 +8,8 @@ banner links the website's homepage. -->
 <p align="center">
   <a href="https://pypi.org/project/andrey-core/"><img alt="PyPI version"
     src="https://img.shields.io/pypi/v/andrey-core?label=PyPI&amp;color=3b5bdb"></a>
+  <a href="https://pepy.tech/projects/andrey-core"><img alt="PyPI downloads"
+    src="https://img.shields.io/pepy/dt/andrey-core?label=downloads&amp;color=3b5bdb"></a>
   <a href="https://github.com/Abel-ai-lab/andrey/actions/workflows/ci.yml"><img alt="CI status"
     src="https://img.shields.io/github/actions/workflow/status/Abel-ai-lab/andrey/ci.yml?branch=main&amp;label=CI"></a>
   <img alt="Python 3.11, 3.12, 3.13, 3.14"
@@ -18,18 +20,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.17.0
+## ⭐ What's new in 0.17.1
 
-0.17.0 adds SCORE and NoGAM, which read the causal order of nonlinear data with additive noise from
-the score, the gradient of its log density. Neither made more errors than its reference
-implementation, and both are supported. NOTEARS and AGES are supported too. The release also
-continues the work from 0.16.0. EM for missing data follows Friedman's alternating scheme and is
-supported in GES, BOSS, and GRaSP. Path and confounder claims are supported in more methods.
-`andrey.data` draws more noise families and mechanisms.
+0.17.1 makes Andrey easier to enter and states its standards. The homepage shows one method per
+family, and a Methods page lists every method by the kind of data it reads. A standards page says
+what we require of every method and how we check it, with new tests that rescale each column and
+require the same graph. The docs gain a concepts guide and a learning path, and
+`score_func="normal_scores"`, experimental, keeps a search's graph under increasing transforms of a
+column. 0.17.0 added SCORE, NoGAM, and AGES.
 
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)** · Posts:
-**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
-**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)**
+**[Methods](https://andrey.abel.ai/docs/methods.html)** ·
+**[Standards](https://andrey.abel.ai/docs/standards.html)** ·
+**[0.17.0 release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)**
 
 ---
 
@@ -90,7 +92,7 @@ You install andrey-core and then `import andrey`.
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`fci_jci`](https://andrey.abel.ai/docs/api/andrey.fci_jci.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, Undirected graph |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`fci_jci`](https://andrey.abel.ai/docs/api/andrey.fci_jci.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`gs`](https://andrey.abel.ai/docs/api/andrey.gs.html)\*, [`fast_iamb`](https://andrey.abel.ai/docs/api/andrey.fast_iamb.html)\*, [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, Undirected graph |
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`ages`](https://andrey.abel.ai/docs/api/andrey.ages.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html), [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html)\*, [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`boss_fci`](https://andrey.abel.ai/docs/api/andrey.boss_fci.html), [`grasp_fci`](https://andrey.abel.ai/docs/api/andrey.grasp_fci.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG, PAG |
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html), [`score_matching`](https://andrey.abel.ai/docs/api/andrey.score_matching.html), [`nogam`](https://andrey.abel.ai/docs/api/andrey.nogam.html) | DAG |
@@ -188,7 +190,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.17.0},
+  version = {0.17.1},
   url = {https://andrey.abel.ai},
 }
 ```
