@@ -101,7 +101,10 @@ jobs:
         # A module-level import of an optional dependency fails here, not in a contributor's checkout.
         run: uv run --no-sync python -m pytest --collect-only -qq tests/unit
       - name: Ground-truth recovery and recorded-output regression
-        run: uv run --no-sync python -m pytest tests/recovery tests/metrics -n logical --dist loadfile -q
+        # On every core, one file per worker, as in the extras job.
+        run: >-
+          uv run --no-sync python -m pytest tests/recovery tests/metrics
+          -n logical --dist loadfile -q --durations=15
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
         run: >-
