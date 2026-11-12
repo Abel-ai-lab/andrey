@@ -247,13 +247,12 @@ def iamb(
     of the target given the other current members. With exact tests, the result is the true Markov
     blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
-    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
-    unless two columns are identical. The strength is the absolute partial correlation for
-    ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
-    candidate with the strongest statistic joins first, as the association measure of [1]_ orders
-    them.
+    The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
+    to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
+    the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
+    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
+    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
+    depend on the column order unless two columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -522,11 +521,12 @@ def inter_iamb(
     step repeats one it held after an earlier step, which on sample data could otherwise make it
     cycle. With exact tests, the result is the true Markov blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
-    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
-    unless two columns are identical. The strength is the absolute partial correlation for
-    ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests.
+    The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
+    to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
+    the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
+    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
+    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
+    depend on the column order unless two columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each

@@ -102,6 +102,13 @@ names its pull request.
   whole graph on 60 variables 3.7 to 4.6 times faster. Their graphs and `metadata["n_tests"]` do
   not change, bit for bit. Fits with the chi-square tests, and `mmpc` fits, take the same time as
   before. ([#927])
+- `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
+  significant digits, as `gs` and `fast_iamb` do, where they compared p-values rounded to nine
+  decimals, which tied every p-value below 5e-10 and left the choice to a rank computed from the
+  data. On categorical data their blankets can change for some targets, and so can the graphs of
+  `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
+  five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
+  pooled F1 is never lower. ([#964])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2639,6 +2646,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
