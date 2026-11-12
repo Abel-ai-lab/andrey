@@ -27,9 +27,11 @@ from andrey.core.orient import dag2cpdag
 from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
-METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb"]
+METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"]
 #: The learners of parents and children; the others learn Markov blankets.
 PC_LEARNERS = ("mmpc", "hiton_pc")
+#: The learners that add spouses to a parents-and-children learner's sets, and that learner.
+SPOUSE_LEARNERS = {"hiton_mb": "hiton_pc", "mmmb": "mmpc"}
 KEY = {m: "parents_and_children" if m in PC_LEARNERS else "markov_blanket" for m in METHODS}
 #: The settings under which the oracle checks run each method: the setting of its correctness
 #: theorem, without a conditioning-set cap.
@@ -111,6 +113,9 @@ def _collider() -> pd.DataFrame:
         ("hiton_mb", "a", {"b", "c"}),
         ("hiton_mb", "c", {"a", "b", "d"}),
         ("hiton_mb", "d", {"c"}),
+        ("mmmb", "a", {"b", "c"}),
+        ("mmmb", "c", {"a", "b", "d"}),
+        ("mmmb", "d", {"c"}),
     ],
 )
 def test_a_collider_gives_each_set(method, target, want):
@@ -181,14 +186,14 @@ def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure
     """On 20 variables with 2,000 rows, an undirected structure has at most a third as many wrong
     pairs as its truth has pairs. A CPDAG pair is wrong when its edge or its marks differ, and one
     wrong collider misdirects the edges Meek's rules orient from it, so the CPDAG has at most half
-    as many. HITON-MB reaches a spouse only through a child its parents-and-children search found,
-    so an edge it misses also drops the spouses behind it from both blankets, and its moral graph
-    has at most half as many."""
+    as many. HITON-MB and MMMB reach a spouse only through a child their parents-and-children
+    search found, so an edge it misses also drops the spouses behind it from both blankets, and
+    their moral graphs have at most half as many."""
     sample = _er_sample(20, seed)
     want = _true_structure(DSeparation(sample.graph), sample, structure)
     got = _got_structure(getattr(andrey, method)(sample.data, structure=structure), structure)
     wrong = (got != want) | (got.T != want.T)
-    half = structure == "cpdag" or (method, structure) == ("hiton_mb", "moral")
+    half = structure == "cpdag" or (method in SPOUSE_LEARNERS and structure == "moral")
     share = 1 / 2 if half else 1 / 3
     assert np.triu(wrong, 1).sum() <= np.triu(want != 0, 1).sum() * share
 
@@ -422,6 +427,60 @@ def test_hiton_mb_parents_and_children_are_hiton_pcs(kind):
         assert got["parents_and_children"] == pc == got["markov_blanket"][: len(pc)], v
     skeleton = andrey.hiton_mb(sample.data, structure="skeleton", **settings)
     assert _named_edges(skeleton) == _named_edges(andrey.hiton_pc(sample.data, **settings))
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_mmmb_sets_beat_the_empty_answer(kind):
+    """At its defaults, summed over every target, at most half as many wrong members as the true
+    blankets hold, which is what the empty answer gets wrong."""
+    sample, settings = _sample_of(kind)
+    oracle = DSeparation(sample.graph)
+    wrong = members = 0
+    for v in range(sample.data.shape[1]):
+        out = andrey.mmmb(sample.data, target=v, **settings)
+        want = oracle.markov_blanket(v)
+        wrong += len(set(out.metadata["markov_blanket"]) ^ want)
+        members += len(want)
+    assert members and wrong <= members / 2
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_a_mmmb_fit_repeats(kind):
+    sample, settings = _sample_of(kind)
+    for target in (None, 3):
+        first = andrey.mmmb(sample.data, target=target, **settings)
+        again = andrey.mmmb(sample.data, target=target, **settings)
+        assert first.structure.oriented_edges() == again.structure.oriented_edges()
+        assert first.metadata == again.metadata
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_mmmb_parents_and_children_are_mmpcs(kind):
+    """MMMB's parents and children are MMPC's at the same settings and open its blanket, and its
+    skeleton is MMPC's."""
+    sample, settings = _sample_of(kind)
+    for v in range(sample.data.shape[1]):
+        got = andrey.mmmb(sample.data, target=v, **settings).metadata
+        pc = andrey.mmpc(sample.data, target=v, **settings).metadata["parents_and_children"]
+        assert got["parents_and_children"] == pc == got["markov_blanket"][: len(pc)], v
+    skeleton = andrey.mmmb(sample.data, structure="skeleton", **settings)
+    assert _named_edges(skeleton) == _named_edges(andrey.mmpc(sample.data, **settings))
+
+
+def test_mmmb_finds_the_blanket_on_the_graph_the_2003_form_gets_wrong():
+    """Pena et al. (2007), DAG (b), P -> Q -> T -> S <- R <- P, on 5,000 rows of linear-Gaussian
+    data: T's blanket is {Q, S, R}. P is dependent on T given {Q, S}, so the 2003 MMMB, which tests
+    P with every parent and child of T, admits it; MMMB tests P only with Q, its neighbor."""
+    rng = np.random.default_rng(0)
+    p = rng.standard_normal(5000)
+    q = p + rng.standard_normal(5000)
+    t = q + rng.standard_normal(5000)
+    r = p + rng.standard_normal(5000)
+    s = t + r + rng.standard_normal(5000)
+    frame = pd.DataFrame({"P": p, "Q": q, "T": t, "S": s, "R": r})
+    out = andrey.mmmb(frame, target="T")
+    assert set(out.metadata["parents_and_children"]) == {"Q", "S"}
+    assert set(out.metadata["markov_blanket"]) == {"Q", "S", "R"}
 
 
 # ---- background knowledge ------------------------------------------------------------------------

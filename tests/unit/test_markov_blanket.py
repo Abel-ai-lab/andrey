@@ -620,9 +620,10 @@ def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
                 assert want[method, t][0] == symmetric, t
             else:
                 assert want[method, t][1] == members, t
-    for t in order:
-        want["hiton_mb", t] = search.local("hiton_mb", t)
-        assert want["hiton_mb", t] == LocalSearch(test, ranks, 0.05).local("hiton_mb", t), t
+    for method in ("hiton_mb", "mmmb"):
+        for t in order:
+            want[method, t] = search.local(method, t)
+            assert want[method, t] == LocalSearch(test, ranks, 0.05).local(method, t), (method, t)
     search.test = _NoTests()
     for (method, t), local in want.items():
         assert search.local(method, t) == local
@@ -661,53 +662,69 @@ def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
             assert test(t, v, given) > 0.05, (t, v, given)
 
 
-@pytest.fixture
-def mmpc_spouses(monkeypatch):
-    """A parents-and-children-then-spouses learner over MMPC, registered for the test."""
-    monkeypatch.setitem(LEARNERS, "mmpc_spouses", Learner("pc_spouses", pc="mmpc"))
-    return "mmpc_spouses"
-
-
 @pytest.mark.parametrize("seed", range(4))
-def test_the_spouse_step_completes_the_blanket_under_an_oracle(mmpc_spouses, seed):
+def test_mmmb_finds_the_true_blanket_under_an_oracle(seed):
     dag = data.sample_scm(graph="erdos_renyi", d=12, n=2, seed=seed, density=3.0).graph
     oracle = DSeparation(dag)
     search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
     for t in range(oracle.d):
-        pc, mb, sepsets = search.local(mmpc_spouses, t)
+        pc, mb, sepsets = search.local("mmmb", t)
         assert pc is not None and mb is not None
+        assert pc == search.parents_children("mmpc", t), t
         assert set(pc) == oracle.parents_children(t), t
         assert set(mb) == oracle.markov_blanket(t) and mb[: len(pc)] == pc, t
         _check_sepsets(oracle, t, pc, sepsets)
-    np.testing.assert_array_equal(
-        search.structure(mmpc_spouses, "moral") != 0, oracle.moral_graph()
-    )
-    np.testing.assert_array_equal(
-        search.structure(mmpc_spouses, "skeleton") != 0, oracle.skeleton()
-    )
+    np.testing.assert_array_equal(search.structure("mmmb", "moral") != 0, oracle.moral_graph())
+    np.testing.assert_array_equal(search.structure("mmmb", "skeleton") != 0, oracle.skeleton())
     truth = dag2cpdag(dag.to_numpy())
-    np.testing.assert_array_equal(search.structure(mmpc_spouses, "cpdag"), truth)
+    np.testing.assert_array_equal(search.structure("mmmb", "cpdag"), truth)
     search.test = _NoTests()
-    assert search.local(mmpc_spouses, 0)[1] is not None
+    assert search.local("mmmb", 0)[1] is not None
 
 
-def test_the_spouse_step_pairs_a_candidate_only_with_its_neighbor(mmpc_spouses):
-    """On P -> Q -> T -> S <- R <- P, T's blanket is {Q, S, R}: P, separated from T by {Q}, is
-    dependent on T given {Q, S}, but S is not adjacent to P, so that test is never run (Pena et
-    al. 2007, DAG (b))."""
-    p, q, t, s, r = range(5)
-    marks = np.zeros((5, 5), dtype=np.int8)
-    for i, j in [(p, q), (q, t), (t, s), (r, s), (p, r)]:
+def _dag(edges: list[tuple[int, int]], d: int) -> DSeparation:
+    marks = np.zeros((d, d), dtype=np.int8)
+    for i, j in edges:
         marks[i, j], marks[j, i] = 1, 2
-    oracle = DSeparation(GraphStructure.from_numpy(marks, kind="dag"))
+    return DSeparation(GraphStructure.from_numpy(marks, kind="dag"))
+
+
+def test_mmmb_pairs_a_candidate_only_with_its_neighbor():
+    """Pena et al. (2007), DAG (b): on P -> Q -> T -> S <- R <- P, T's blanket is {Q, S, R}. P is
+    separated from T by {Q} and is dependent on T given {Q, S}, so the 2003 MMMB, which tests P
+    with every member of PC(T) = {Q, S}, admits it. Q is P's only neighbor in PC(T) and lies in
+    P's separating set, so P is never tested again; R, separated from T by {P}, joins through S."""
+    p, q, t, s, r = range(5)
+    oracle = _dag([(p, q), (q, t), (t, s), (r, s), (p, r)], 5)
+    logged = _Logged(oracle)
+    search = LocalSearch(logged, list(range(5)), 0.5)
+    pc = search.parents_children("mmpc", t)
+    for y in pc:
+        search.parents_children("mmpc", y)
+    before = len(logged.log)
+    got, mb, sepsets = search.local("mmmb", t)
+    assert got == pc and set(pc) == {q, s}
+    assert mb is not None and mb[:2] == pc and mb[2:] == [r]
+    assert sepsets[p] == (q,) and sepsets[r] == (p,)
+    assert oracle(t, p, (q, s)) == 0.0
+    assert logged.log[before:] == [(t, r, (p, s))]
+
+
+def test_mmmb_runs_the_symmetry_check_of_mmpc():
+    """Pena et al. (2007), DAG (a): on T -> Q <- P, P -> R, Q -> S <- R, T's blanket is {Q, P}.
+    No subset of MMPC's set {Q, S} separates the grandchild S from T (only {Q, P} and {Q, R} do),
+    so the 2003 MMMB, without the symmetry check, keeps S. S's own set does not hold T, so the
+    check drops S, and its separating set comes from S's run."""
+    t, q, p, r, s = range(5)
+    oracle = _dag([(t, q), (p, q), (p, r), (q, s), (r, s)], 5)
     search = LocalSearch(oracle, list(range(5)), 0.5)
-    pc, mb, sepsets = search.local(mmpc_spouses, t)
-    assert pc == [q, s] or pc == [s, q]
-    assert mb is not None and set(mb) == {q, s, r}
-    assert oracle(t, p, (q, s)) == 0.0 and q in sepsets[p]
+    assert set(search.run("mmpc", t)[0]) == {q, s}
+    pc, mb, sepsets = search.local("mmmb", t)
+    assert pc == [q] and mb == [q, p]
+    assert oracle(t, s, sepsets[s]) == 1.0 and sepsets[s] == search.run("mmpc", s)[1][t]
 
 
-_ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb"]
+_ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"]
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])

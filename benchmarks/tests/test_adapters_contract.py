@@ -22,6 +22,7 @@ import pytest
 
 from andrey import GraphStructure
 from andrey_bench.adapters import tetrad_pag
+from andrey_bench.adapters.andrey_adjustment import AndreyPCAdjustment
 from andrey_bench.adapters.andrey_blanket import LEARNERS as BLANKET_LEARNERS
 from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
@@ -40,6 +41,7 @@ from andrey_bench.adapters.andrey_jpcmciplus import AndreyJPCMCIPlus, AndreyPool
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.andrey_xges import AndreyXGES
+from andrey_bench.adapters.baseline_adjustment import AdjustForEverything, AdjustForNothing
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_blanket import FUNCTIONS as BNLEARN_BLANKET_FUNCTIONS
 from andrey_bench.adapters.bnlearn_blanket import BnlearnBlanket
@@ -132,6 +134,10 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     TigramiteJPCMCIPlus(),
     OracleGES(),
     BaselineEmpty(),
+    # The pair lane's arms; the Andrey methods of its table join as they ship.
+    AdjustForNothing(),
+    AdjustForEverything(),
+    AndreyPCAdjustment(),
 ]
 
 
@@ -179,6 +185,7 @@ DEFERRED_MODULES = {
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
+    "andrey.pc.adjustment": "andrey.core.adjustment",
     **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
     "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
     "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",

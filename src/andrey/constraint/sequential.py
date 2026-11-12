@@ -41,17 +41,18 @@ References
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import combinations
 from typing import Literal
 
 import numpy as np
 
 from andrey.constraint.blanket import LEARNERS, LocalSearch
-from andrey.constraint.fci import fci_orient
+from andrey.constraint.fci import fci_orient, knowledge_marks
 from andrey.constraint.pc import undirect_conflicts
 from andrey.core import ARROW, CIRCLE, NULL, TAIL
 from andrey.core.ci import counting_tests
+from andrey.core.knowledge import Constraints
 from andrey.core.orient import meek
 
 #: A pair of variables, the lower position first.
@@ -276,7 +277,9 @@ def sequential(
     that disagree, is left undirected at the end. With the CPDAG rules and ``search`` constraints
     that direct edges (tiers, edges forbidden one way), each step directs those edges after the
     merge, over any arrowhead a v-structure put on them (:func:`direct`), and Meek's rule R4 joins
-    R1-R3.
+    R1-R3. With the PAG rules and ``search`` constraints, each step sets the endpoints the
+    knowledge decides on the edges after the merge (:func:`mark_knowledge`), and the FCI rules
+    keep them.
 
     Raises
     ------
@@ -287,10 +290,12 @@ def sequential(
         raise ValueError(f"{blanket!r} learns parents and children, not a Markov blanket")
     cache = Cache() if cache is None else cache
     network = Network(CIRCLE if rules.orient == "pag" else TAIL)
-    decided = None
+    decided = known = None
     if rules.orient == "meek" and search.constraints is not None:
         decided = search.constraints.decided()
         decided = decided if decided.any() else None
+    elif search.constraints is not None:
+        known = search.constraints
     waitlist, done, learned = [target], [], []
     stopped = "empty"
     with counting_tests() as tests, search.pinned():
@@ -310,6 +315,8 @@ def sequential(
             merge(network, local, x)
             if decided is not None:
                 direct(network, decided)
+            if known is not None:
+                mark_knowledge(network, known)
             orient(network, cache.sepsets, rules.orient, search, rule4=decided is not None)
             if rules.expand == "adjacent":
                 adjacent = set(network.neighbors(x))
@@ -486,6 +493,25 @@ def direct(network: Network, decided: np.ndarray) -> None:
     rows, cols = np.nonzero(decided[np.ix_(nodes, nodes)] & (marks != NULL))
     marks[rows, cols] = TAIL
     marks[cols, rows] = ARROW
+
+
+def mark_knowledge(network: Network, constraints: Constraints) -> None:
+    """Set in place the endpoints ``constraints`` decide on the edges of a PAG ``network``, as
+    :func:`~andrey.constraint.fci.knowledge_marks` sets them on FCI's graph: an arrowhead at the
+    end of an edge forbidden out of it alone (a tier, or an edge forbidden one way), and a tail at
+    the cause of a required edge. Path knowledge is not read."""
+    nodes = network.nodes
+    inside = np.ix_(nodes, nodes)
+    local = replace(
+        constraints,
+        forbidden=constraints.forbidden[inside],
+        required=constraints.required[inside],
+        tier=constraints.tier[nodes],
+        required_paths=None,
+        forbidden_paths=None,
+        confounded=None,
+    )
+    knowledge_marks(network.marks, local)
 
 
 def _apart(network: Network, sepsets: Mapping[Pair, tuple[int, ...]]) -> np.ndarray:

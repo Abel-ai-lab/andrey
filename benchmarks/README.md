@@ -37,6 +37,8 @@ Packages:
 - the authors' R code for Y-structures under selection bias
   ([sbcd](https://github.com/philipversteeg/sbcd)), read from disk and never copied - see
   [Y-structures](comparisons/y-structures.md)
+- the authors' code for LDECC, LDP, LD3, SNAP, and LOAD, read from disk and never copied - see
+  [Treatment-outcome methods](comparisons/adjustment.md)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](comparisons/categorical.md)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md),
@@ -233,9 +235,31 @@ benchmarks/start_sbcd_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_SBCD_R=$PWD/benchmarks/.sbcd-r/sbcd-<commit>
 ```
 
+The authors' code for LDECC, LDP, LD3, SNAP, and LOAD, the references of the treatment-outcome lane
+(`adjustment_cpu.py`), is run unmodified the same way: each start script downloads the archive of a
+pinned commit, checks its SHA-256, extracts it under a git-ignored folder, and builds a pinned
+environment (see [Treatment-outcome methods](comparisons/adjustment.md)):
+
+```shell
+benchmarks/start_ldecc.sh      # prints the two exports below
+export ANDREY_BENCH_LDECC_PYTHON=$PWD/benchmarks/.venv-ldecc/bin/python
+export ANDREY_BENCH_LDECC=$PWD/benchmarks/.ldecc/local-causal-discovery-<commit>
+benchmarks/start_maasch.sh     # LDP and LD3: prints the three exports below
+export ANDREY_BENCH_MAASCH_PYTHON=$PWD/benchmarks/.venv-maasch/bin/python
+export ANDREY_BENCH_LDP=$PWD/benchmarks/.maasch/ldp-<commit>
+export ANDREY_BENCH_LD3=$PWD/benchmarks/.maasch/LD3-<commit>
+benchmarks/start_schubert.sh   # SNAP and LOAD: prints the three exports below
+export ANDREY_BENCH_SCHUBERT_PYTHON=$PWD/benchmarks/.venv-schubert/bin/python
+export ANDREY_BENCH_SNAP=$PWD/benchmarks/.schubert/snap-<commit>
+export ANDREY_BENCH_LOAD=$PWD/benchmarks/.schubert/load-<commit>
+```
+
 The networks of these lanes that `andrey.data` does not ship (`mildew`, `win95pts`, `hailfinder`,
 and `pigs`) are fetched from the bnlearn repository on first use, checked against a SHA-256, and
 kept in the git-ignored `benchmarks/.networks`, or in `$ANDREY_BENCH_NETWORKS`.
+The fitted Gaussian networks of the treatment-outcome lane (`magic-niab` and `sangiovese`) are
+bnlearn's R objects: the R lane reads each once, and the structure and parameters are kept as JSON
+beside the download, so later runs need no R.
 
 The `m2-tetrad` lane runs Tetrad's FGES, BOSS, and GRaSP under its EM covariance policy, with its
 effective sample size at the number of rows and at the mean pairwise count, which tetrad-lib has
@@ -652,6 +676,11 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/selection_models.py` - the simulation under selection bias.
 - `andrey_bench/local_lane.py` - how an adapter answers at a target or claims pairs, the scores of
   both, and the contract of a local method's adapter ([MMB-by-MMB](comparisons/mmb-by-mmb.md)).
+- `andrey_bench/adjustment_lane.py` - how an adapter answers for a treatment and an outcome (the
+  `effects` records, packed), the contract of such an adapter, and the scorer of the answers, the
+  sets, and the effect estimates ([Treatment-outcome methods](comparisons/adjustment.md)).
+- `andrey_bench/adjustment_models.py`, `network_models.py`, `gaussian_networks.py` - the planted
+  models of that lane, one generator per paper, and the fitted networks it replays.
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
 - `andrey_bench/blanket_lane.py` - the answers of the set-learner lane (a target's set or a graph,

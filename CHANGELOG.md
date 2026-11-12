@@ -36,6 +36,14 @@ names its pull request.
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
   ([#957])
+- `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
+  authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
+  parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
+  check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
+  children, then admits a variable as a spouse when a test finds it dependent on the target given
+  the set that separated the two and a parent or child of the target whose own set holds the
+  variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
+  ([#965])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
   experimental: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
@@ -44,7 +52,7 @@ names its pull request.
   `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
   runs it beside the authors' code. ([#959])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
-  its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
+  its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
   is absent. ([#957])
@@ -56,6 +64,16 @@ names its pull request.
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
   caps every test, as in the other learners, and sets no cap by default. ([#956])
+- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
+  effects of one target when unmeasured common causes may exist, the edges the target has in the
+  PAG with their marks, learned one Markov blanket at a time outward from the target until its
+  marks are decided or the paper's stop rules end the search. `metadata` lists the target's
+  `parents`, `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end),
+  its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
+  conditioning, a test of each variable given all the others, as in the paper's runs
+  (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. The benchmark lane of
+  MMB-by-MMB runs it beside the authors' code. ([#966])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -92,6 +110,15 @@ names its pull request.
   linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
   against a true graph: its validity, and its precision and recall against the optimal set.
   ([#939])
+- A benchmark lane for the methods that answer for a treatment and an outcome. `adjustment_cpu.py`
+  runs the methods of the group as they ship, PC read at the pair, and two baselines that adjust
+  for nothing and for everything, beside the authors' code for LDECC, LDP, LD3, SNAP, and LOAD, on
+  models planted as each method's paper describes them: pretreatment covariates, the partition
+  graphs of LDP, sink outcomes, LDECC's covariates and mediators, identifiable and non-identifiable
+  direct effects, random graphs with a target pair, and the MAGIC-NIAB, SANGIOVESE, and MILDEW
+  networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
+  set estimates, on a fresh sample, against the true effect; a method that gives no set is never
+  scored as the empty set. ([#964])
 
 ### Changed
 
@@ -108,7 +135,7 @@ names its pull request.
   data. On categorical data their blankets can change for some targets, and so can the graphs of
   `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
-  pooled F1 is never lower. ([#964])
+  pooled F1 is never lower. ([#968])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2646,6 +2673,9 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#968]: https://github.com/Abel-ai-lab/Andrey/pull/968
+[#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
+[#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
