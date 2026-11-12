@@ -37,7 +37,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
-from tests.unit.methods import REQUIRED, SHORT, domains, environments
+from tests.unit.methods import REQUIRED, SHORT, domains, environments, requires_target
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -363,7 +363,7 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
-            *("mmpc", "hiton_pc", "hiton_mb", "mb_by_mb", "mmhc", "rsmax2"),
+            *("mmpc", "hiton_pc", "hiton_mb", "mb_by_mb", "mmb_by_mmb", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
@@ -594,7 +594,7 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
 
 
 #: A target-centered method answers for the edges at its target, so the target is the edge's end.
-EDGE_TARGET = {"mb_by_mb": {"target": "y"}}
+EDGE_TARGET = {m: {"target": "y"} for m in REGISTRY if requires_target(m)}
 
 
 def required_edge_is_kept(method: str, kind: str) -> bool:
@@ -997,6 +997,7 @@ CI_CASES = {
     "hiton_pc": [{}, {"target": 0}],
     "hiton_mb": [{}, {"target": 0}],
     "mb_by_mb": [{"target": 0}],
+    "mmb_by_mmb": [{"target": 0}, {"target": 0, "blanket": "iamb"}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
     "pcmci": [{}],
