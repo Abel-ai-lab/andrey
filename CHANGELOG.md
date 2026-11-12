@@ -36,6 +36,13 @@ names its pull request.
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
   ([#957])
+- `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
+  experimental: claims that one variable is a causal ancestor of another from a pattern of four
+  variables, sound when the rows were selected by a mechanism the variables affect, with hidden
+  common causes allowed. Each claim is a record in `metadata["effects"]` with the paper's score and
+  its patterns, and the graph has no edges; `extended=True` tests the extended Y-structure, and
+  `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
+  runs it beside the authors' code. ([#959])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
   its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
@@ -2624,6 +2631,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
 [#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
