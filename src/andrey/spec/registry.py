@@ -519,6 +519,20 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
+#: A set learner's own max_depth, where its default is not the concept's.
+_OWN_DEPTH = {
+    "hiton_pc": (
+        concept_param(
+            "max_depth",
+            default=3,
+            doc="The maximum conditioning-set size of every conditional-independence test, at "
+            "least 0: 0 runs only unconditional tests, and null sets no limit. Aliferis et al. "
+            "2010 leave the cap open and run HITON-PC with caps 1 to 4; the default 3 is the cap "
+            "of their Markov-blanket experiments. A smaller cap runs fewer tests and can keep "
+            "variables that a larger conditioning set would remove.",
+        ),
+    ),
+}
 for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
         "iamb",
@@ -589,6 +603,27 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
         "supported",
     ),
+    (
+        "hiton_pc",
+        "One variable's parents and children, undirected, by semi-interleaved HITON-PC: the "
+        "candidates join in order of their unconditional association, each newcomer tested against "
+        "subsets of the members before it and every member again once all have joined, with a "
+        "symmetry check. With target=null, the skeleton, or, with structure=cpdag, that skeleton "
+        "oriented into a CPDAG by the Grow-Shrink structure learner.",
+        "parents_and_children",
+        concept_param(
+            "structure",
+            default="skeleton",
+            choices=("skeleton", "cpdag"),
+            doc="The graph returned without a target: skeleton = the adjacencies, each variable "
+            "joined to its parents and children; cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003), which costs more. With a "
+            "target, the target's set, whatever the value.",
+        ),
+        "undirected",
+        ("Aliferis et al. 2010", "Margaritis 2003"),
+        "experimental",
+    ),
 ):
     _add(
         MethodSpec(
@@ -605,7 +640,15 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             status=_status,
             column_order="relabels",
             tie_break=True,
-            params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
+            params=(
+                _TARGET,
+                _structure,
+                _ALPHA,
+                _INDEP_TEST,
+                _CATEGORICAL,
+                _TEST_SEED,
+                *_OWN_DEPTH.get(_name, ()),
+            ),
             references=_refs,
         )
     )
@@ -3011,6 +3054,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
+    "hiton_pc": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent is never a candidate. "
+    + _BLANKET_ORIENT_RULE,
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
@@ -3098,6 +3144,7 @@ _PATH_METHODS = (
     "gs",
     "fast_iamb",
     "mmpc",
+    "hiton_pc",
 )
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
@@ -3292,6 +3339,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gs": ("target", "markov_blanket"),
     "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
+    "hiton_pc": ("target", "parents_and_children"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

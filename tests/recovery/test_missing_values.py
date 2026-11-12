@@ -34,7 +34,10 @@ RATE = 0.2
 # A test of a series method reads many lagged columns and loses far more of its rows than the share
 # of values missing, so the series methods run at a lower rate.
 SERIES_RATE = 0.1
-IID = ["pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"]
+IID = [
+    *("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+    "hiton_pc",
+]
 SERIES = ["pcmci", "pcmciplus", "lpcmci"]
 PAIRS = ["anm", "pnl", "loci"]
 

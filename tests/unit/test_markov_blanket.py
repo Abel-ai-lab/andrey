@@ -1,18 +1,21 @@
-"""The shared Markov-blanket engine: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, and the local search.
+"""The shared Markov-blanket engine: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, and the local
+search.
 
 Under a d-separation oracle each search returns the true set, each recorded separating set
 separates, and the spouse step completes the parents and children into the Markov blanket. With a
 Fisher-Z test, IAMB returns, bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph
 is built from. GS admits on a later pass what an earlier pass skipped and shrinks what its order
 admitted early. Fast-IAMB adds a batch per round, stops a batch where the data hold too few rows per
-cell, and ends a cycle of additions and removals. A memoized run is the run made afresh, and the
-local search gives the sets the methods return, whatever the column order. A scan of many candidates
-gives each the bits of its own query, the ranks are read only when keys tie, and the counts follow
-their definitions.
+cell, and ends a cycle of additions and removals. HITON-PC follows its paper's trace, orders by
+the p-value and then the statistic, and skips a test with fewer than five rows per cell. A memoized
+run is the run made afresh, and the local search gives the sets the methods return, whatever the
+column order. A scan of many candidates gives each the bits of its own query, the ranks are read
+only when keys tie, and the counts follow their definitions.
 """
 
 from __future__ import annotations
 
+from functools import partial
 from itertools import combinations
 
 import networkx as nx
@@ -88,6 +91,10 @@ def test_iamb_with_fisherz_is_calms_moral_graph_bit_for_bit(d, n, density, seed,
     want = (reference & reference.T).astype(np.float64)
     got = moral_graph(x, alpha=alpha)
     assert got.dtype == want.dtype and got.tobytes() == want.tobytes()
+
+
+#: The settings that make a method's facade call the engine's defaults: no conditioning-set cap.
+_UNCAPPED = {"hiton_pc": {"max_depth": None}}
 
 
 def _oracle(seed: int, d: int = 12, density: float = 3.0) -> DSeparation:
@@ -251,6 +258,90 @@ def test_mmpc_symmetry_check_drops_a_descendant_the_target_cannot_separate():
     np.testing.assert_array_equal(sets & sets.T, oracle.skeleton())
 
 
+@pytest.mark.parametrize("seed", range(4))
+def test_hiton_pc_finds_the_true_parents_and_children_under_an_oracle(seed):
+    oracle = _oracle(seed)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for v in range(oracle.d):
+        # Without the symmetry check, a set may also hold descendants it cannot separate.
+        assert set(search.run("hiton_pc", v)[0]) >= oracle.parents_children(v), v
+        assert set(search.parents_children("hiton_pc", v)) == oracle.parents_children(v), v
+    np.testing.assert_array_equal(search.structure("hiton_pc", "skeleton") != 0, oracle.skeleton())
+
+
+class _Logged:
+    """A test that answers as ``test`` does and logs each query in the order asked."""
+
+    def __init__(self, test) -> None:
+        self.test = test
+        self.log: list[tuple[int, int, tuple[int, ...]]] = []
+
+    def __call__(self, x, y, cond=()):
+        self.log.append((x, y, tuple(cond)))
+        return self.test(x, y, cond)
+
+
+def test_hiton_pc_follows_the_papers_trace():
+    """The network of Aliferis et al. (2010), Figure 7, and their trace at T (Table 2): with the
+    order F, D, E, A, B, and G and C independent of T, each newcomer is tested alone, F leaves only
+    in the pass after the last candidate, B, has joined, given {D, E}, and the symmetry check drops
+    B, whose own set does not hold T (p. 197)."""
+    T, A, B, C, D, E, F, G = range(8)
+    edges = [(F, D), (F, E), (D, T), (E, T), (G, A), (T, A), (C, A), (C, B), (A, B)]
+    oracle = DSepOracle(nx.DiGraph(edges))
+    logged = _Logged(oracle)
+    ranks = [5, 3, 4, 7, 1, 2, 0, 6]
+    search = LocalSearch(logged, ranks, 0.5)
+    assert search.run("hiton_pc", T) == ([D, E, A, B], {C: (), G: (), F: (D, E)})
+    asked = [(other, cond) for t, other, cond in logged.log if t == T and cond]
+    tested = [other for other, _ in asked]
+    # Each newcomer is tested when it joins; F, which joined first against an empty set, is
+    # tested only in the final pass, which it opens.
+    assert set(tested[: tested.index(F)]) == {D, E, A, B}
+    assert (F, (D, E)) in asked
+    assert search.parents_children("hiton_pc", T) == [D, E, A]
+    assert search.local("hiton_pc", T)[2][B] == (A, C)
+
+
+class _Statistics:
+    """A test of target 0 that answers each variable with its own statistic and p-value, whatever
+    the set."""
+
+    def __init__(self, answers: dict[int, tuple[float, float]]) -> None:
+        self.answers = answers
+
+    def __call__(self, x, y, cond=()):
+        return self.answers[y if x == 0 else x][1]
+
+    def statistic_pvalues(self, x, y, conditions):
+        answers = np.array([self.answers[int(b if a == 0 else a)] for a, b in zip(x, y)])
+        return answers[:, 0], answers[:, 1]
+
+
+def test_hiton_pc_orders_by_the_p_value_then_by_the_statistic():
+    """p-values below ``10**-KEY_DP`` keep the order of their sizes, and p-values that underflow
+    to zero go by the larger statistic, so the ranks, here the reverse, are not read."""
+    answers = {1: (500.0, 0.0), 2: (300.0, 1e-70), 3: (800.0, 0.0), 4: (50.0, 1e-12)}
+    ranks = _Recorded([0, 4, 3, 2, 1])
+    assert LocalSearch(_Statistics(answers), ranks, 0.05).run("hiton_pc", 0)[0] == [3, 1, 2, 4]
+    assert ranks.read == []
+
+
+@pytest.mark.parametrize(
+    ("n", "want"),
+    [(19, ([], {1: (), 2: (), 3: ()})), (79, ([1, 2, 3], {})), (80, ([1, 2], {3: (1, 2)}))],
+)
+def test_hiton_pc_runs_a_test_only_with_five_rows_per_cell(n, want):
+    """3 -> 1 -> 0 and 3 -> 2 -> 0, every variable with two categories: a test of 0 given ``k``
+    variables has ``2**(k + 2)`` cells, so it runs with at least 20, 40, and 80 rows. Below 20 every
+    variable is taken as independent of 0 without a test; below 80, {1, 2}, the only set that
+    separates 3, is not tested and 3 stays."""
+    oracle = DSepOracle(nx.DiGraph([(3, 1), (1, 0), (3, 2), (2, 0)]))
+    search = LocalSearch(oracle, [0, 1, 2, 3], 0.5, levels=np.full(4, 2), n=n)
+    assert search.run("hiton_pc", 0) == want
+    assert (search.counts.issued == 0) == (n < 20)
+
+
 def test_independent_columns_have_empty_sets():
     x = np.random.default_rng(0).standard_normal((500, 6))
     test = FisherZ(x)
@@ -378,7 +469,7 @@ def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
 def _fresh(method, test, target, d, alpha, ranks):
     """``target``'s run by ``method`` made anew: the set and the separating sets."""
     sepsets: dict[int, tuple[int, ...]] = {}
-    if method in ("gs", "fast_iamb"):
+    if method in ("gs", "fast_iamb", "hiton_pc"):
         assert d == len(ranks)
         return LocalSearch(test, ranks, alpha).run(method, target)
     if method == "mmpc":
@@ -411,13 +502,13 @@ def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
     search = LocalSearch(test, ranks, 0.05)
     order = np.random.default_rng(0).permutation(15).tolist()
     want = {}
-    for method in ("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"):
+    for method in ("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"):
         for t in order:
             want[method, t] = search.local(method, t)
             assert search.run(method, t) == _fresh(method, test, t, 15, 0.05, ranks), (method, t)
         for t in order:
             members, _ = _fresh(method, test, t, 15, 0.05, ranks)
-            if method == "mmpc":
+            if LEARNERS[method].kind == "pc":
                 symmetric = [v for v in members if t in _fresh(method, test, v, 15, 0.05, ranks)[0]]
                 assert want[method, t][0] == symmetric, t
             else:
@@ -435,7 +526,7 @@ def _check_sepsets(oracle: DSeparation, t: int, learned: list[int], sepsets) -> 
 
 
 @pytest.mark.parametrize("seed", range(4))
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
     oracle = _oracle(seed)
     search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
@@ -450,7 +541,7 @@ def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
     """On data, the test given a recorded set has a p-value above alpha."""
     x, test = _search_data(kind)
@@ -507,23 +598,22 @@ def test_the_spouse_step_pairs_a_candidate_only_with_its_neighbor(mmpc_spouses):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_the_local_entry_gives_the_set_the_method_returns(method, kind):
     x, _ = _search_data(kind)
     indep_test = "fisherz" if kind == "fisherz" else "chisq"
     search = local_search(x, alpha=0.05, indep_test=indep_test)
-    fit = getattr(andrey, method)
-    key = "parents_and_children" if method == "mmpc" else "markov_blanket"
+    fit = partial(getattr(andrey, method), **_UNCAPPED.get(method, {}))
+    is_pc = LEARNERS[method].kind == "pc"
+    key = "parents_and_children" if is_pc else "markov_blanket"
     for t in range(15):
         pc, mb, _ = search.local(method, t)
-        assert (pc if method == "mmpc" else mb) == fit(x, target=t, indep_test=indep_test).metadata[
-            key
-        ], t
-        assert (mb if method == "mmpc" else pc) is None
+        assert (pc if is_pc else mb) == fit(x, target=t, indep_test=indep_test).metadata[key], t
+        assert (mb if is_pc else pc) is None
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_a_column_shuffle_leaves_every_recorded_set(method, kind):
     x, _ = _search_data(kind)
     indep_test = "fisherz" if kind == "fisherz" else "chisq"
@@ -624,7 +714,7 @@ class _Recorded(list):
         return super().__getitem__(i)
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_ranks_are_read_only_when_keys_tie(method):
     """On continuous data no two strengths tie, so the search reads no rank and finds the sets it
     finds with the ranks read; under an oracle every dependent candidate ties, and the ranks read
@@ -663,7 +753,7 @@ def test_a_search_counts_queries_issued_computed_and_distinct():
     assert (counts.issued, counts.computed) == (4, 3)
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_n_tests_is_the_count_of_tests_computed(method):
     """A target fit's ``n_tests`` is the engine's computed count; a test without kept answers
     computes every query it is asked, and a repeated query counts once among the distinct."""
@@ -672,13 +762,15 @@ def test_n_tests_is_the_count_of_tests_computed(method):
         search = local_search(x, alpha=0.05, indep_test="fisherz", trace=True)
         search.local(method, t)
         counts = search.counts
-        fit = getattr(andrey, method)(x, target=t, indep_test="fisherz")
+        fit = getattr(andrey, method)(
+            x, target=t, indep_test="fisherz", **_UNCAPPED.get(method, {})
+        )
         assert fit.metadata["n_tests"] == counts.computed == counts.issued, t
         assert counts.distinct is not None and counts.distinct <= counts.issued
     x, _ = _search_data("chisq")
     search = local_search(x, alpha=0.05, indep_test="chisq")
     search.local(method, 0)
-    fit = getattr(andrey, method)(x, target=0, indep_test="chisq")
+    fit = getattr(andrey, method)(x, target=0, indep_test="chisq", **_UNCAPPED.get(method, {}))
     assert fit.metadata["n_tests"] == search.counts.computed <= search.counts.issued
     assert search.counts.distinct is None
 

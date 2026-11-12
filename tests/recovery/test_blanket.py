@@ -1,10 +1,12 @@
-"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, Fast-IAMB, and MMPC.
+"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, and
+HITON-PC.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
 each structure its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
 to the true ones, and on one recorded case each structure is the graph bnlearn returns. The sets of
-GS and Fast-IAMB beat the empty answer on continuous and categorical data, and a fit repeats.
+GS and Fast-IAMB and the parents and children of HITON-PC beat the empty answer on continuous and
+categorical data, and a fit repeats.
 """
 
 from __future__ import annotations
@@ -24,8 +26,14 @@ from andrey.core.orient import dag2cpdag
 from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
-METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"]
-KEY = {m: "parents_and_children" if m == "mmpc" else "markov_blanket" for m in METHODS}
+METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"]
+#: The learners of parents and children; the others learn Markov blankets.
+PC_LEARNERS = ("mmpc", "hiton_pc")
+KEY = {m: "parents_and_children" if m in PC_LEARNERS else "markov_blanket" for m in METHODS}
+#: The settings under which the oracle checks run each method: the setting of its correctness
+#: theorem, without a conditioning-set cap.
+ORACLE = {m: {"indep_test": "dsep", "alpha": 0.5} for m in METHODS}
+ORACLE["hiton_pc"]["max_depth"] = None
 #: Each method's outputs, from its spec.
 STRUCTURES = {
     m: next(p.choices for p in REGISTRY[m].params if p.name == "structure") for m in METHODS
@@ -40,7 +48,7 @@ def _er_sample(d: int, seed: int, n: int = 2000):
 
 
 def _truth(oracle: DSeparation, method: str, v: int) -> set[int]:
-    return oracle.parents_children(v) if method == "mmpc" else oracle.markov_blanket(v)
+    return oracle.parents_children(v) if method in PC_LEARNERS else oracle.markov_blanket(v)
 
 
 def _adjacency(out: andrey.StructureOutput) -> np.ndarray:
@@ -96,6 +104,9 @@ def _collider() -> pd.DataFrame:
         ("fast_iamb", "c", {"a", "b", "d"}),
         ("fast_iamb", "d", {"c"}),
         ("mmpc", "d", {"c"}),
+        ("hiton_pc", "a", {"c"}),
+        ("hiton_pc", "c", {"a", "b", "d"}),
+        ("hiton_pc", "d", {"c"}),
     ],
 )
 def test_a_collider_gives_each_set(method, target, want):
@@ -140,7 +151,7 @@ def test_each_set_is_the_true_set_under_an_oracle(method, seed, oracle_test):
     sample = _er_sample(15, seed)
     oracle = oracle_test["oracle"] = DSeparation(sample.graph)
     for v in range(15):
-        out = getattr(andrey, method)(sample.data, target=v, indep_test="dsep", alpha=0.5)
+        out = getattr(andrey, method)(sample.data, target=v, **ORACLE[method])
         assert set(out.metadata[KEY[method]]) == _truth(oracle, method, v), v
 
 
@@ -151,7 +162,7 @@ def test_each_structure_is_its_own_truth_under_an_oracle(method, structure, seed
     graph, and the kind says which: ``cpdag``, else ``undirected``."""
     sample = _er_sample(15, seed)
     oracle = oracle_test["oracle"] = DSeparation(sample.graph)
-    out = getattr(andrey, method)(sample.data, structure=structure, indep_test="dsep", alpha=0.5)
+    out = getattr(andrey, method)(sample.data, structure=structure, **ORACLE[method])
     np.testing.assert_array_equal(
         _got_structure(out, structure), _true_structure(oracle, sample, structure)
     )
@@ -235,7 +246,8 @@ def _two_colliders() -> pd.DataFrame:
 
 #: bnlearn 5.2.1's graphs on :func:`_two_colliders` with ``test="zf"`` and ``alpha=0.05``: each
 #: variable's ``learn.mb`` joined by the AND rule, ``undirected=TRUE``, and the default; ``gs``
-#: and ``fast.iamb`` give the same graphs.
+#: and ``fast.iamb`` give the same graphs, and ``si.hiton.pc`` the skeleton (its default,
+#: ``undirected=TRUE``) and the CPDAG (``undirected=FALSE``).
 BNLEARN_RECORDED = {
     "moral": {"a - b", "a - c", "b - c", "c - d", "d - e", "d - f", "e - f"},
     "skeleton": {"a - c", "b - c", "c - d", "d - f", "e - f"},
@@ -255,7 +267,7 @@ def test_each_structure_matches_bnlearn_on_a_recorded_case(method, structure):
 
 #: The graph each of bnlearn 5.2.1's learners returns by default: ``undirected = FALSE`` for
 #: ``iamb`` and ``inter.iamb``, ``TRUE`` for ``mmpc``.
-BNLEARN_DEFAULT = {m: "skeleton" if m == "mmpc" else "cpdag" for m in METHODS}
+BNLEARN_DEFAULT = {m: "skeleton" if m in PC_LEARNERS else "cpdag" for m in METHODS}
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -269,9 +281,10 @@ def test_a_call_without_structure_returns_the_graph_bnlearn_returns_by_default(m
     assert out.structure.kind == REGISTRY[method].output.graph_kind
 
 
-def test_mmpc_has_no_moral_graph():
+@pytest.mark.parametrize("method", PC_LEARNERS)
+def test_a_parents_and_children_learner_has_no_moral_graph(method):
     with pytest.raises(ValueError, match="structure"):
-        andrey.mmpc(_collider(), structure="moral")
+        getattr(andrey, method)(_collider(), structure="moral")
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -339,6 +352,31 @@ def test_a_fast_iamb_fit_repeats(kind):
         assert first.metadata == again.metadata
 
 
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_hiton_pc_sets_beat_the_empty_answer(kind):
+    """At its defaults, summed over every target, at most half as many wrong members as the true
+    parents and children hold, which is what the empty answer gets wrong."""
+    sample, settings = _sample_of(kind)
+    oracle = DSeparation(sample.graph)
+    wrong = members = 0
+    for v in range(sample.data.shape[1]):
+        out = andrey.hiton_pc(sample.data, target=v, **settings)
+        want = oracle.parents_children(v)
+        wrong += len(set(out.metadata["parents_and_children"]) ^ want)
+        members += len(want)
+    assert members and wrong <= members / 2
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_a_hiton_pc_fit_repeats(kind):
+    sample, settings = _sample_of(kind)
+    for target in (None, 3):
+        first = andrey.hiton_pc(sample.data, target=target, **settings)
+        again = andrey.hiton_pc(sample.data, target=target, **settings)
+        assert first.structure.oriented_edges() == again.structure.oriented_edges()
+        assert first.metadata == again.metadata
+
+
 # ---- background knowledge ------------------------------------------------------------------------
 
 # On _collider: a - d is not a true edge and c - d is; the tiers constrain orientation only.
@@ -395,13 +433,11 @@ def test_true_knowledge_leaves_the_true_sets_under_an_oracle(method, seed, oracl
     )
     kept = oracle.skeleton()
     for v in range(15):
-        out = getattr(andrey, method)(
-            sample.data, target=v, indep_test="dsep", alpha=0.5, knowledge=knowledge
-        )
+        out = getattr(andrey, method)(sample.data, target=v, knowledge=knowledge, **ORACLE[method])
         want = {u for u in _truth(oracle, method, v) if kept[v, u]}
         assert set(out.metadata[KEY[method]]) == want, v
     for structure in STRUCTURES[method]:
         out = getattr(andrey, method)(
-            sample.data, indep_test="dsep", alpha=0.5, knowledge=knowledge, structure=structure
+            sample.data, knowledge=knowledge, structure=structure, **ORACLE[method]
         )
         np.testing.assert_array_equal(_adjacency(out), kept)

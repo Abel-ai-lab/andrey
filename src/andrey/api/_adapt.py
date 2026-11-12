@@ -45,6 +45,7 @@ TESTWISE_METHODS = (
     "gs",
     "fast_iamb",
     "mmpc",
+    "hiton_pc",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")
