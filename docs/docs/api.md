@@ -101,7 +101,7 @@ single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`,
-`pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty,
+`y_structures`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty,
 `NA`, or `N/A` field of a CSV file: each conditional-independence test reads only the rows where all
 of its variables are observed (test-wise deletion), and so do the pair tests `anm`, `pnl`, and
 `loci`, which read the rows where both columns are observed; `metadata["rows_tested"]` gives the
@@ -136,8 +136,8 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and
-`lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for
+`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `pcmci`,
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for
 continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for
 mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks from
@@ -321,8 +321,9 @@ tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`,
-`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole
+`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `y_structures`, `pcmci`, `pcmciplus`,
+`jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam`
+take `seed`, a whole
 number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured
 seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart
 from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
@@ -668,6 +669,7 @@ in a process.
    gs
    fast_iamb
    hiton_pc
+   y_structures
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -700,6 +702,14 @@ newcomer against the subsets of the members before it; once all have joined, it 
 again, and a symmetry check keeps a member only when the target is in that member's own set. Without
 a `target` it joins the sets into the same skeleton or CPDAG. It is experimental until its
 comparison with bnlearn's `si.hiton.pc` is published.
+
+Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
+ancestor of another from a pattern of four variables, and the claims hold when the rows were
+selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
+2022). `y_structures` returns a graph with no edges: each claim is a record in
+`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
+to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
+patterns. It is experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

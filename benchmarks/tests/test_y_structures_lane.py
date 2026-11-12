@@ -1,4 +1,4 @@
-"""The Y-structure lane: the driver's records and scores, and the authors' R code.
+"""The Y-structure lane: the driver's records and scores, Andrey's adapter, and the authors' R code.
 
 The driver tests replace ``run_task`` with an in-process fit, so they need no harness environment;
 the tests of the authors' code skip unless the R lane and ``start_sbcd_r.sh`` have run, as the other
@@ -23,6 +23,7 @@ import y_structures_cpu  # noqa: E402
 
 from andrey_bench import local_lane as L  # noqa: E402
 from andrey_bench import runner, selection_models  # noqa: E402
+from andrey_bench.adapters import andrey_y_structures as andrey_yst  # noqa: E402
 from andrey_bench.adapters import versteeg_ystructures as sbcd  # noqa: E402
 
 
@@ -64,6 +65,7 @@ def lane(tmp_path, monkeypatch):
     monkeypatch.setattr(y_structures_cpu, "run_task", fit_here)
     monkeypatch.setattr(y_structures_cpu, "check_interpreters", lambda field: {})
     monkeypatch.setattr(y_structures_cpu, "REFERENCES", [StandInClaims()])
+    monkeypatch.setattr(y_structures_cpu, "ANDREY_ARMS", [])
     flags = ["--out", str(tmp_path / "run"), "--settings", "fixed", "--rows", "300", "--seeds", "2"]
     return tmp_path / "run", flags, calls
 
@@ -124,7 +126,33 @@ def test_a_run_is_rescored_from_its_stored_claims(lane):
 def test_the_papers_settings_and_sample_size():
     assert set(selection_models.SETTINGS) == {"fixed", "small", "large"}
     assert y_structures_cpu.ROWS == (10000,) and y_structures_cpu.ALPHA == 0.01
-    assert [a.name for a in y_structures_cpu.solutions()] == ["sbcd.yst", "sbcd.yst_ext"]
+    assert [a.name for a in y_structures_cpu.solutions()] == [
+        "andrey.yst",
+        "andrey.yst_ext",
+        "sbcd.yst",
+        "sbcd.yst_ext",
+    ]
+
+
+def test_andreys_adapter_claims_only_true_ancestry_on_the_fixed_graph():
+    """On the paper's fixed graph, with and without selection, Andrey's Y-structure claims only
+    true ancestral pairs and reports its tests; the extended form claims at least as much."""
+    yst, ext = andrey_yst.AndreyYStructures(False), andrey_yst.AndreyYStructures(True)
+    assert (yst.name, ext.name) == ("andrey.yst", "andrey.yst_ext")
+    assert isinstance(yst, L.ClaimAdapter) and yst.params() == {
+        "alpha": 0.01,
+        "indep_test": "fisherz",
+    }
+    yst.setup()
+    draw = selection_models.sample("fixed", n=10000, seed=0)
+    for data in (draw.biased, draw.unbiased):
+        scores, tests = L.unpack_answer(yst.fit(data, yst.params()))
+        assert tests is not None and tests > 0 and scores.shape == (7, 7)
+        s = L.claim_scores(scores, draw.ancestral, draw.system)
+        assert s["tp"] >= 1 and s["fp"] == 0, s
+        wider, _ = L.unpack_answer(ext.fit(data, ext.params()))
+        assert ((scores > 0) <= (wider > 0)).all()
+    assert yst.to_structure(L.pack_answer(scores)).n_nodes == 7
 
 
 def test_the_adapters_name_the_forms_and_the_script_that_builds_their_environment(monkeypatch):
