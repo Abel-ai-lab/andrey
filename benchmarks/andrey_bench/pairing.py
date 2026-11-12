@@ -1,11 +1,20 @@
-"""Whether two measurements may be compared at all.
+"""Whether two measurements may be compared at all, and how a paired difference is judged.
 
-Tables belong to a batch and live with its output; only the rules are here.
+Tables belong to a batch and live with its output; only the rules are here. :func:`compare` is
+the paired rule of the release cards: the mean of the per-dataset difference, its percentile
+bootstrap 95% interval, and the side of 0 the interval lies on.
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+
+#: Bootstrap resamples of the paired datasets.
+BOOTSTRAP = 10_000
+
+#: The fewest paired datasets a verdict needs; with fewer a row is reported, not judged.
+MIN_PAIRS = 10
 
 #: Two arms whose fits differ by more than this are filtered by node contention unevenly.
 SKEW_LIMIT = 5.0
@@ -87,3 +96,37 @@ def duration_skew(a: pd.DataFrame, b: pd.DataFrame) -> float:
         return 1.0
     am, bm = a.wall_s.median(), b.wall_s.median()
     return max(am, bm) / max(min(am, bm), 1e-12)
+
+
+def bootstrap_95(values: object) -> list[float]:
+    """The percentile bootstrap 95% interval of the mean of ``values``.
+
+    :data:`BOOTSTRAP` resamples drawn with ``numpy.random.default_rng(0)``; ``[0.0, 0.0]`` when
+    every value is 0.
+    """
+    values = np.asarray(values, dtype=float)
+    if not values.any():
+        return [0.0, 0.0]
+    picks = np.random.default_rng(0).integers(0, values.size, (BOOTSTRAP, values.size))
+    low, high = np.percentile(values[picks].mean(axis=1), [2.5, 97.5])
+    return [float(low), float(high)]
+
+
+def compare(a: object, b: object, *, higher_is_better: bool = False) -> dict:
+    """Mean of ``a - b`` over paired datasets, its bootstrap 95% interval, and ``a``'s verdict.
+
+    ``"better"`` or ``"worse"`` when the interval lies wholly on that side of 0, ``"tie"`` else;
+    whether ``paired`` reaches :data:`MIN_PAIRS` is the caller's to judge.
+    """
+    diff = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
+    low, high = bootstrap_95(diff)
+    above, below = low > 0, high < 0
+    verdict = "tie"
+    if above or below:
+        verdict = "better" if above == higher_is_better else "worse"
+    return {
+        "paired": int(diff.size),
+        "mean_D": round(float(diff.mean()), 4),
+        "bootstrap_95": [round(low, 4), round(high, 4)],
+        "verdict": verdict,
+    }

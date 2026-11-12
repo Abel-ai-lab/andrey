@@ -7,8 +7,8 @@ directed as the true DAG directs them, higher is better), and ``wrong`` (directe
 DAG does not direct that way, lower is better). Precision and recall, the paper's measures, are
 ``correct`` over the directed edges and over the true edges, pooled over a setting's datasets.
 
-:func:`compare` gives the mean of the per-dataset difference with its percentile-bootstrap 95%
-interval over :data:`DRAWS` resamples of the datasets. :func:`cell` reports, per setting:
+:func:`~andrey_bench.pairing.compare` gives the mean of the per-dataset difference with its
+percentile-bootstrap 95% interval over resamples of the datasets. :func:`cell` reports, per setting:
 
 - Andrey's AGES against pcalg's: ``identical`` when every paired dataset has the same graph;
   otherwise ``worse`` when a measure's interval lies wholly on the worse side of 0, ``better`` when
@@ -29,10 +29,9 @@ from pathlib import Path
 
 import numpy as np
 
-ANDREY, REFERENCE, GES = "andrey.ages.numpy", "pcalg.ages", "andrey.ges.numpy.bic"
+from andrey_bench.pairing import compare
 
-#: Bootstrap resamples of a setting's datasets.
-DRAWS = 10_000
+ANDREY, REFERENCE, GES = "andrey.ages.numpy", "pcalg.ages", "andrey.ges.numpy.bic"
 
 #: The compared measures and whether a higher value is better.
 MEASURES: dict[str, bool] = {"shd": False, "correct": True, "wrong": False}
@@ -50,26 +49,6 @@ def load(folders: list[str]) -> list[dict]:
                 record["wrong"] = record["directed"] - record["correct"]
                 records.append(record)
     return records
-
-
-def compare(a: list[float], b: list[float], *, higher_is_better: bool = False) -> dict:
-    """Mean of ``a - b`` over paired datasets, its bootstrap 95% interval, and ``a``'s verdict."""
-    diff = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
-    if not diff.any():
-        low = high = 0.0
-    else:
-        picks = np.random.default_rng(0).integers(0, diff.size, (DRAWS, diff.size))
-        low, high = np.percentile(diff[picks].mean(axis=1), [2.5, 97.5])
-    above, below = low > 0, high < 0
-    verdict = "tie"
-    if above or below:
-        verdict = "better" if above == higher_is_better else "worse"
-    return {
-        "paired": int(diff.size),
-        "mean_D": round(float(diff.mean()), 4),
-        "bootstrap_95": [round(float(low), 4), round(float(high), 4)],
-        "verdict": verdict,
-    }
 
 
 def colliders(marks: list[list[int]]) -> set[tuple[int, int, int]]:
