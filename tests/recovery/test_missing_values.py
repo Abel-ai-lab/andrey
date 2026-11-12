@@ -36,7 +36,7 @@ RATE = 0.2
 SERIES_RATE = 0.1
 IID = [
     *("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
-    *("hiton_pc", "hiton_mb"),
+    *("hiton_pc", "hiton_mb", "mmmb"),
 ]
 SERIES = ["pcmci", "pcmciplus", "lpcmci"]
 PAIRS = ["anm", "pnl", "loci"]

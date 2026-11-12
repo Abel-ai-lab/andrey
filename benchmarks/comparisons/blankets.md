@@ -33,9 +33,11 @@ The default cells are three networks and two Gaussian sizes, each at two sample 
 | `fast_iamb` | `learn.mb(method = "fast.iamb")` | `fast.iamb` |
 | `hiton_pc` | `learn.nbr(method = "si.hiton.pc")`, kept as for `mmpc` | `si.hiton.pc` |
 | `hiton_mb` | none | none |
+| `mmmb` | none | none |
 
 A learner runs beside the function in its row once it is named in `LEARNERS` and the installed
-Andrey has it. `hiton_mb`, `mmmb`, and `pcmb` have no bnlearn function.
+Andrey has it. `hiton_mb`, `mmmb`, and `pcmb` have no bnlearn function; the lane's `mmpc` row
+compares MMMB's first step, the parents and children, with bnlearn's.
 
 The authors of HITON-PC, HITON-MB, and MMMB distribute their code as Causal Explorer 1.5, a MATLAB
 toolbox under a non-commercial license. The lane runs it as a reference only:
@@ -50,8 +52,6 @@ arm out, so nothing about it runs in CI.
 | `hiton_pc` | `Causal_Explorer('HITON_PC', ...)`, kept as for `mmpc` |
 | `hiton_mb` | `Causal_Explorer('HITON_MB', ...)` |
 | `mmmb` | `Causal_Explorer('MMMB', ..., 'MMPC', options)` |
-
-The last row is ready for `mmmb`: it runs once the installed Andrey has it.
 
 bnlearn's `pc.stable` is read at a target as well, once per fit: `mb()` of its CPDAG for a
 blanket, `nbr()` for parents and children, the answer a graph learner gives to the same question.
