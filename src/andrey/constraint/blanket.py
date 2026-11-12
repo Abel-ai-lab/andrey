@@ -1,14 +1,14 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
-:func:`andrey.inter_iamb`, and :func:`andrey.mmpc`.
+:func:`andrey.inter_iamb`, :func:`andrey.gs`, and :func:`andrey.mmpc`.
 
-:func:`markov_blanket` runs IAMB or Inter-IAMB for one target and :func:`parents_children` the
-forward and backward phases of MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for
-every variable. Keeping a pair when each lies in the other's set (the AND rule) gives the moral
-graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2`
-search within. Each takes any :class:`~andrey.core.ci.CITest`, and background knowledge as
-:class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
-set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
-returned set.
+:func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` learner Grow-Shrink, and
+:func:`parents_children` the forward and backward phases of MMPC. :func:`blanket_graph` and
+:func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set (the
+AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and
+:func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`, and background
+knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of
+the other's set from the start and never leaves it, and a pair the knowledge makes non-adjacent is
+never in a returned set.
 
 :data:`LEARNERS` names each learner and its kind: a ``"blanket"`` learner returns a Markov blanket,
 a ``"pc"`` learner the parents and children before the symmetry check, and a ``"pc_spouses"``
@@ -133,6 +133,25 @@ def strongest(keys: Mapping[int, Any], ranks: Sequence[int]) -> int:
     return best
 
 
+def ordered(keys: Mapping[int, Any], ranks: Sequence[int]) -> list[int]:
+    """The candidates from the smallest key to the largest, those whose keys are equal by rank.
+
+    The order :func:`strongest` gives when asked again for what is left: ``keys`` and ``ranks`` are
+    as there, and ``ranks`` is read only for candidates whose keys are equal.
+    """
+    items = sorted(keys.items(), key=lambda item: item[1])
+    order: list[int] = []
+    start = 0
+    while start < len(items):
+        stop = start + 1
+        while stop < len(items) and items[stop][1] == items[start][1]:
+            stop += 1
+        tied = [x for x, _ in items[start:stop]]
+        order.extend(tied if len(tied) == 1 else sorted(tied, key=lambda x: ranks[x]))
+        start = stop
+    return order
+
+
 def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
     """The variables a required edge joins to ``target``, in rank order; none without
     ``constraints``."""
@@ -237,6 +256,89 @@ def _shrink(
             blanket.remove(x)
             if sepsets is not None:
                 sepsets[x] = tuple(sorted(rest))
+
+
+def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s Markov blanket by Grow-Shrink (GS) [1]_ [2]_, in the order its members joined.
+
+    The candidates are visited in one fixed order, the most dependent on ``target`` first: by their
+    unconditional strength (:meth:`LocalSearch.scan`), rounded to ``KEY_DP`` decimals, ties by rank.
+    Grow: each pass visits every candidate outside the blanket in that order, tests it given the
+    current blanket, and adds it at once when the p-value is at or below ``alpha``, so the next
+    candidate of the pass is tested given the larger blanket; passes repeat until one adds nothing.
+    Shrink: each pass visits the members in the same order and drops each one the test finds
+    independent of ``target`` given the other current members; passes repeat until one drops
+    nothing. A test whose conditioning set has not changed since the candidate's last test is not
+    asked again, and while the blanket is still empty the grow test is the ordering test itself.
+
+    ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
+    stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
+    ``target`` is in the blanket from the start and never tested, a pair the knowledge makes
+    non-adjacent is left out of the returned set, and a variable outside it that a test found
+    independent keeps the conditioning set of the last such test.
+
+    References
+    ----------
+    .. [1] Margaritis, D., and Thrun, S. (2000). Bayesian network induction via local
+       neighborhoods. Advances in Neural Information Processing Systems 12, 505-511.
+    .. [2] Margaritis, D. (2003). Learning Bayesian network model structure from data. PhD thesis,
+       Carnegie Mellon University, CMU-CS-03-153.
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    blanket = list(required)
+    candidates = [x for x in range(search.d) if x != target and x not in required]
+    strengths, pvalues = search.scan(target, candidates, ())
+    order = search.ordered(
+        {x: -round(s, KEY_DP) for x, s in zip(candidates, strengths.tolist(), strict=True)}
+    )
+    unconditional = dict(zip(candidates, pvalues.tolist(), strict=True))
+    # The blanket size at each candidate's last independent verdict: the blanket only grows here,
+    # so an equal size is the same conditioning set.
+    last: dict[int, int] = {}
+    growing = True
+    while growing:
+        added = False
+        for y in order:
+            if y in blanket or last.get(y) == len(blanket):
+                continue
+            if max_depth is not None and len(blanket) > max_depth:
+                growing = False
+                break
+            if blanket:
+                p = search.scan(target, [y], blanket)[1][0]
+            else:
+                p = unconditional[y]
+            if p <= alpha:
+                blanket.append(y)
+                added = True
+            else:
+                last[y] = len(blanket)
+                sepsets[y] = tuple(sorted(blanket))
+        growing = growing and added
+    # The removals made when each member was last found dependent: the blanket only shrinks here.
+    kept: dict[int, int] = {}
+    removed = 0
+    while True:
+        before = removed
+        for x in [y for y in order if y in blanket]:
+            if kept.get(x) == removed:
+                continue
+            rest = [z for z in blanket if z != x]
+            if search.scan(target, [x], rest)[1][0] > alpha:
+                blanket.remove(x)
+                removed += 1
+                sepsets[x] = tuple(sorted(rest))
+            else:
+                kept[x] = removed
+        if removed == before:
+            break
+    for x in blanket:
+        sepsets.pop(x, None)
+    if constraints is None:
+        return blanket
+    support = constraints.support()[target]
+    return [x for x in blanket if support[x]]
 
 
 def blanket_graph(
@@ -698,6 +800,7 @@ LEARNERS: dict[str, Learner] = {
     "iamb": Learner("blanket", partial(_iamb, interleaved=False)),
     "inter_iamb": Learner("blanket", partial(_iamb, interleaved=True)),
     "mmpc": Learner("pc", _mmpc),
+    "gs": Learner("blanket", _gs),
 }
 
 
@@ -853,6 +956,11 @@ class LocalSearch:
     def strongest(self, keys: Mapping[int, Any]) -> int:
         """The candidate with the smallest key, ties broken by ``ranks`` (:func:`strongest`)."""
         return strongest(keys, self.ranks)
+
+    def ordered(self, keys: Mapping[int, Any]) -> list[int]:
+        """The candidates from the smallest key to the largest, ties by ``ranks``
+        (:func:`ordered`)."""
+        return ordered(keys, self.ranks)
 
     def _asked(
         self,
