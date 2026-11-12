@@ -139,9 +139,9 @@ possible-d-separation search with the serial search, and the PyTorch paths must 
 output, floats as bytes, on the base commit and on the change; `--compare` fails on any changed
 output or any rise in the number of queries a search makes.
 
-**Exceptions.** `qa/identity.py` runs by hand; the last release card that reports a run is
-[0.9.0](benchmarks/0.9.0.md)'s, with 1,216 of 1,216 outputs identical. The [GPU](ci.md#gpus) parity
-suite runs on our own machines, not in CI, and agrees with NumPy within a tolerance.
+**Exceptions.** For one speed change, `qa/identity.py` runs by hand. Each release runs it against
+the release before, and [Release checks](#release-checks) gives the results. The [GPU](ci.md#gpus)
+parity suite runs on our own machines, not in CI, and agrees with NumPy within a tolerance.
 
 ## Workers and machines
 
@@ -156,3 +156,14 @@ host's thread count cannot change their result.
 **Exceptions.** [Across machines](guides/column-order.md#across-machines) names the methods whose
 result can change on another machine, and why. No check compares outputs across machines; the one
 published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
+
+## Release checks
+
+Before a release merges, `qa/identity.py` fits every supported method on the release and on the
+release before it, on complete data with default arguments, and compares the outputs bit for bit.
+The quality gate and the reference comparisons run on the same code.
+
+| Release | Outputs against the release before | Quality gate | Reference comparisons |
+|---|---|---|---|
+| 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed |
+| 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed |
