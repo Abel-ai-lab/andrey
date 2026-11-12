@@ -29,6 +29,18 @@ names its pull request.
   of the members before it, tests every member again once all have joined, and keeps a member only
   when the target is in that member's own set. On categorical data a test runs only with at least
   five rows per cell of its table. ([#950])
+- `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
+  experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
+  target and for each of its parents and children, then admits each child's other parent when a
+  test finds it dependent on the target given the set that separated the two and the common child.
+  On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
+  ([#957])
+- The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
+  its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
+  the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
+  fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
+  is absent. ([#957])
 - `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014), experimental: the direct causes and direct
   effects of one target, the edges the target has in the CPDAG with their directions, learned one
   Markov blanket at a time outward from the target until no further blanket can direct one of
@@ -2621,6 +2633,7 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
+[#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
 [#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
 [#931]: https://github.com/Abel-ai-lab/Andrey/pull/931

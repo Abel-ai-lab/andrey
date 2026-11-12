@@ -78,11 +78,12 @@ def mb_by_mb(
     target : str, int, or None, default=None
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). ``None`` raises ``ValueError``.
-    blanket : {"iamb_forward", "iamb", "inter_iamb", "gs", "fast_iamb"}, default="iamb_forward"
-        The Markov blanket learner run for each variable the search visits. ``"iamb_forward"`` is
+    blanket : str, default="iamb_forward"
+        The Markov blanket learner run for each variable the search visits: ``"iamb_forward"``,
         IAMB's grow phase without its shrink, the learner of the paper's runs [1]_, which keeps a
-        variable added in error rather than lose a member; the others are :func:`~andrey.iamb`,
-        :func:`~andrey.inter_iamb`, :func:`~andrey.gs`, and :func:`~andrey.fast_iamb`.
+        variable added in error rather than lose a member, or :func:`~andrey.iamb`,
+        :func:`~andrey.inter_iamb`, :func:`~andrey.gs`, :func:`~andrey.fast_iamb`, or
+        :func:`~andrey.hiton_mb` by name.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. The paper runs
         0.01 and 0.05 [1]_.

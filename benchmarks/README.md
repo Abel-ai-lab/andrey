@@ -32,6 +32,8 @@ Packages:
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' code for MMB-by-MMB, read from disk and never copied - see
   [MMB-by-MMB](comparisons/mmb-by-mmb.md)
+- the authors' Causal Explorer (MATLAB) for HITON-PC, HITON-MB, and MMMB, run from disk and never
+  copied - see [Markov blankets](comparisons/blankets.md)
 - the authors' R code for Y-structures under selection bias
   ([sbcd](https://github.com/philipversteeg/sbcd)), read from disk and never copied - see
   [Y-structures](comparisons/y-structures.md)
@@ -208,6 +210,17 @@ has no license, so the harness runs it unmodified and keeps it out of the reposi
 benchmarks/start_mmb.sh
 export ANDREY_BENCH_MMB_PYTHON=$PWD/benchmarks/.venv-mmb/bin/python
 export ANDREY_BENCH_MMB=$PWD/benchmarks/.mmb
+```
+
+The authors' Causal Explorer, the reference of the HITON-PC, HITON-MB, and MMMB rows of
+`blanket_cpu.py`, is MATLAB code under a non-commercial license, run the same way:
+`start_causal_explorer.sh` clones the public repository at a pinned commit into
+`benchmarks/.causal-explorer`, and the lane calls it through `matlab` when that is on the `PATH`
+(see [Markov blankets](comparisons/blankets.md)):
+
+```shell
+benchmarks/start_causal_explorer.sh
+export ANDREY_BENCH_CAUSAL_EXPLORER=$PWD/benchmarks/.causal-explorer
 ```
 
 The authors' R code for Y-structures, the reference of `y_structures_cpu.py`, is read from disk the

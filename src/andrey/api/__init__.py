@@ -12,7 +12,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 ``StructureOutput`` construction.
 """
 
-from .blanket import fast_iamb, gs, hiton_pc, iamb, inter_iamb, mmpc
+from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc
 from .continuous import dagma, notears
 from .fcm import cam, camuv, nogam, resit, score_matching
@@ -48,6 +48,7 @@ __all__ = [
     "gs",
     "fast_iamb",
     "mmpc",
+    "hiton_mb",
     "hiton_pc",
     "mb_by_mb",
     # score-based
