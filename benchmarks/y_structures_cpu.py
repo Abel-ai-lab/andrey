@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark ancestral claims under selection bias: the authors' Y-structure code.
+"""Benchmark ancestral claims under selection bias: Andrey's and the authors' Y-structure code.
 
 Runs the simulation of Versteeg, Zhang, and Mooij (2022, Sect. 4.2) (:mod:`andrey_bench.selection_models`):
 a linear-Gaussian model on the fixed 7-node graph of its Figure 5(a), or on a random graph of
@@ -11,10 +11,10 @@ claims, true and false positives, precision, recall, the area under the precisio
 and the base rate, the precision of claiming every pair, which a method that claims anything has
 to beat.
 
-The solutions are the authors' Y-structure and extended Y-structure code, each on the same data at
-the same ``alpha``. :data:`ANDREY_ARMS` is where the adapters of Andrey's own method go; each needs
-the contract of :class:`~andrey_bench.local_lane.ClaimAdapter` and nothing else in the driver. The
-empty answer claims nothing, so its row is the base rate.
+The solutions are Andrey's ``y_structures`` and the authors' code, each as the Y-structure and the
+extended Y-structure, on the same data at the same ``alpha``. :data:`ANDREY_ARMS` holds the adapters
+of Andrey's method; each needs the contract of :class:`~andrey_bench.local_lane.ClaimAdapter` and
+nothing else in the driver. The empty answer claims nothing, so its row is the base rate.
 
 :data:`ROWS` is the paper's ``n = 10000``. One JSON line per fit goes to ``<out>/records.jsonl``
 with the claims and their scores, so ``--rescore`` recomputes the scores without fitting;
@@ -38,14 +38,15 @@ from pathlib import Path
 import numpy as np
 
 from andrey_bench import rsession, rundir, selection_models
+from andrey_bench.adapters.andrey_y_structures import AndreyYStructures
 from andrey_bench.adapters.versteeg_ystructures import VersteegYStructures
 from andrey_bench.local_lane import claim_scores, unpack_answer
 from andrey_bench.runner import available_cores, check_interpreters, run_task, split_cores
 
-#: Adapters of Andrey's own ``y_structures``. Each follows
+#: Adapters of Andrey's ``y_structures``, the Y-structure and the extended one. Each follows
 #: :class:`~andrey_bench.local_lane.ClaimAdapter`: ``fit`` reads the context in the last column and
 #: packs the claims' scores.
-ANDREY_ARMS: list = []
+ANDREY_ARMS: list = [AndreyYStructures(extended=False), AndreyYStructures(extended=True)]
 
 #: The references: the Y-structure and the extended Y-structure.
 REFERENCES = [VersteegYStructures(extended=False), VersteegYStructures(extended=True)]

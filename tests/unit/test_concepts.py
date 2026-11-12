@@ -251,14 +251,23 @@ def test_returns_names_the_categorical_columns_a_fit_records(method):
 N = 200
 
 
-def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
+#: The methods whose answer needs a pattern of four variables: their data add a second cause w of
+#: y, so that x -> y <- w, y -> z is a Y-structure.
+FOUR_VARIABLES = ("y_structures",)
+
+
+def frame(seed: int, *, codes: bool, gaps: bool = False, w: bool = False) -> pd.DataFrame:
     """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories,
-    and with ``gaps``, a few values of x and y are missing."""
+    with ``gaps``, a few values of x and y are missing, and with ``w``, a fourth column w is a
+    second cause of y."""
     rng = np.random.default_rng(seed)
     u = rng.uniform(-1, 1, size=(N, 3)) ** 3
     x = rng.integers(0, 4, N).astype(float) if codes else u[:, 0]
-    y = 0.8 * x + u[:, 1]
+    cause = rng.uniform(-1, 1, size=N) ** 3 if w else np.zeros(N)
+    y = 0.8 * x + u[:, 1] + cause
     data = pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    if w:
+        data["w"] = cause
     if gaps:
         data.iloc[::13, 0] = np.nan
         data.iloc[5::11, 1] = np.nan
@@ -289,7 +298,7 @@ def needed(method: str, inp) -> bool:
 
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
-    frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
+    frames = [frame(seed, codes=codes, gaps=gaps, w=method in FOUR_VARIABLES) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
         if not needed(method, inp):
@@ -382,6 +391,7 @@ UNIT_CASES = {
     "nogam": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
+    "y_structures": "gauss_7v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -411,7 +421,8 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
 
 
 def graphs_and_orders(out) -> list:
-    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    """The endpoint marks of every graph (each lag, occasion, and group), every causal order, and
+    the claims about pairs."""
     if isinstance(out, list):
         return [graphs_and_orders(o) for o in out]
     s = out.structure
@@ -419,7 +430,7 @@ def graphs_and_orders(out) -> list:
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
     else:
         graphs = [s]
-    keys = ("partial_order", "cluster_order", "causal_orders", "unordered")
+    keys = ("partial_order", "cluster_order", "causal_orders", "unordered", "effects")
     orders = {k: out.metadata.get(k) for k in keys}
     return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
 
@@ -754,7 +765,10 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
 #: that changes the best DAG at random.
 RANDOMIZED = {
-    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus")},
+    **{
+        m: {"indep_test": "rcot"}
+        for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "y_structures")
+    },
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }
 

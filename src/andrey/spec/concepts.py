@@ -146,9 +146,9 @@ RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -194,6 +194,7 @@ _CONCEPTS = (
             "icp",
             "igsp",
             "ut_igsp",
+            "y_structures",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -223,6 +224,13 @@ _CONCEPTS = (
                 default=0.01,
                 reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
                 "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
+            ),
+            Deviation(
+                method="y_structures",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published simulations (Versteeg, Zhang "
+                "and Mooij 2022, Appendix C.2).",
             ),
             Deviation(
                 method="rcd",
@@ -599,6 +607,10 @@ _CONCEPTS = (
                 "igsp",
                 "ut_igsp",
             ),
+            *_exempt(
+                "Every test is marginal or conditions on one variable, the pattern's middle one.",
+                "y_structures",
+            ),
         ),
         deviations=(
             Deviation(
@@ -709,6 +721,7 @@ _CONCEPTS = (
                 "ages",
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
+            *_exempt("Claims ancestors from fixed test patterns; no parent sets.", "y_structures"),
             *_exempt(
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
@@ -785,7 +798,15 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
+        suitable=(
+            *CI_SEARCHES,
+            *PCMCI_FAMILY,
+            "jpcmciplus",
+            *STARTS,
+            "calm",
+            "ica_lingam",
+            "y_structures",
+        ),
         exempt=(
             *_exempt(
                 "Deterministic.",
@@ -989,6 +1010,11 @@ _CONCEPTS = (
                 "knowledge; ges takes knowledge.",
                 "ages",
             ),
+            *_exempt(
+                "Fixed test patterns and no graph: a claim reads only its four variables' tests, "
+                "which no knowledge of edges enters.",
+                "y_structures",
+            ),
         ),
     ),
     Concept(
@@ -1000,9 +1026,9 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages")),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "y_structures")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages"),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "y_structures"),
         ),
     ),
     Concept(
@@ -1035,6 +1061,7 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
             "igsp",
             "ut_igsp",
+            "y_structures",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1074,6 +1101,7 @@ _CONCEPTS = (
             "mmpc",
             "hiton_pc",
             "hiton_mb",
+            "y_structures",
             "mb_by_mb",
             *PCMCI_FAMILY,
             "anm",
@@ -1264,6 +1292,11 @@ _CONCEPTS = (
                 "ages",
             ),
             *_exempt(
+                "Its patterns are among the columns of data, and a context variable is one more "
+                "column.",
+                "y_structures",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1429,7 +1462,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="in any order",
-        suitable=(),
+        suitable=("y_structures",),
         others_exempt="Answers for no set of variables given together.",
     ),
     Concept(
@@ -1483,6 +1516,7 @@ _CONCEPTS = (
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb"),
             "mb_by_mb",
+            "y_structures",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1499,7 +1533,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=(),
+        suitable=("y_structures",),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

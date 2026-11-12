@@ -737,6 +737,64 @@ _add(
     )
 )
 
+# --- claims about pairs ---------------------------------------------------------------------------
+
+_add(
+    MethodSpec(
+        name="y_structures",
+        family="constraint",
+        summary="Y-structures: claims that one variable is a causal ancestor of another, each from "
+        "a pattern of four variables in which the first makes a third independent of the second "
+        "and dependent on a fourth. The claims hold when the rows were selected by a mechanism "
+        "the variables affect, with hidden common causes allowed. Returns no edges; the claims "
+        "and their scores are in metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            hidden_causes=True,
+            doc="no edges; metadata['effects'] lists one record per claimed pair, the ancestor as "
+            "treatment, by descending score, each with its score and patterns",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The listing order of claims with equal scores and of a claim's patterns "
+        "follows the column order.",
+        params=(
+            concept_param(
+                "variables",
+                doc="The variables to answer for, in any order: a list of column names from the "
+                "data file's header or 0-based positions, at least two. Claims are made only about "
+                "ordered pairs of them; the other variables of a pattern may be any column. null "
+                "answers for every ordered pair of columns.",
+            ),
+            ParamSpec(
+                name="extended",
+                type="bool",
+                default=False,
+                doc="false = the Y-structure, in which x makes both other variables independent of "
+                "y; true = the extended Y-structure, which needs this of one of them, so it finds "
+                "more patterns and, in its paper's simulations, less precise claims.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every test: a p-value below alpha is a dependence, any "
+                "other an independence. The default is the level of Versteeg, Zhang & Mooij 2022.",
+            ),
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=(
+            "Versteeg, Zhang & Mooij 2022",
+            "Mani, Spirtes & Cooper 2006",
+            "Mooij & Cremers 2015",
+        ),
+    )
+)
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(

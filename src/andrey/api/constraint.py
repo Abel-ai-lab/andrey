@@ -2435,3 +2435,233 @@ def _check_rows(
                 f"columns {', '.join(flat)} are constant on the rows outside {label!r}; use "
                 "invariance_test='approximate'"
             )
+
+
+@method_spec("y_structures")
+def y_structures(
+    data: npt.ArrayLike,
+    *,
+    variables: Sequence[str | int] | None = None,
+    extended: bool = False,
+    alpha: float = 0.01,
+    indep_test: str | None = None,
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Claim causal ancestors from Y-structures, sound under selection bias.
+
+    A Y-structure is a pattern of conditional independences among four variables ``v``, ``w``,
+    ``x``, ``y``: ``x`` makes ``v`` and ``y`` independent, and makes ``v`` and ``w`` dependent
+    [1]_ [2]_. Only one causal situation explains the pattern: ``x`` is an ancestor of ``y``,
+    ``y`` is not an ancestor of ``x``, and no hidden common cause joins them. This holds even when
+    the rows were selected by a mechanism the variables affect, with hidden common causes and
+    feedback loops allowed [3]_. The method tests every four variables for the pattern and claims
+    each ancestor pair it finds, with a score; it returns no graph.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    variables : sequence of str or int, or None, default=None
+        The variables to answer for, in any order: a list of column labels (strings) or 0-based
+        positions (integers), at least two. Claims are made only about ordered pairs of them; the
+        other two variables of a pattern may be any column. ``None`` answers for every ordered
+        pair of columns. A pair gets the same claim either way.
+    extended : bool, default=False
+        Which pattern to test. ``False``: the Y-structure [2]_, in which ``x`` makes both ``v``
+        and ``w`` independent of ``y``. ``True``: the extended Y-structure [1]_, which needs this
+        of ``v`` alone, so it finds more patterns; in the simulations of [3]_ its claims were less
+        precise.
+    alpha : float, default=0.01
+        Significance level of every test, in ``(0, 1)``: a p-value below ``alpha`` is a
+        dependence, any other an independence. The default is the level of [3]_.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every column with no edges: a
+        claim is about ancestry, not about an edge. ``metadata["effects"]`` lists one record per
+        claimed pair (:mod:`andrey.core.effects`), by descending score: ``treatment`` is the
+        ancestor ``x`` and ``outcome`` is ``y``, by column label or 0-based position;
+        ``estimand`` is ``"total"``; ``nonzero`` and ``identifiable`` are ``True``;
+        ``adjustment_sets`` is ``[[]]`` with ``set_kind`` ``"valid"``, since within the selected
+        rows nothing confounds the pair, so the regression of ``y`` on ``x`` gives the effect
+        ([3]_, Corollary 5); ``score`` is the claim's score (see Notes); and ``patterns`` lists
+        the pairs ``[v, w]`` of the patterns found. A pair without a record is not claimed either
+        way. ``metadata["algorithm"]`` is ``"y_structures"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
+        number of conditional-independence tests the fit evaluated.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``variables`` is a string,
+        or a member is neither a column label nor a position, or ``categorical`` is not a list of
+        column names and positions.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``variables`` names a column
+        ``data`` lacks, names one twice, or names fewer than two; or if ``data`` or
+        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** Y-structures suit observational data whose rows may have been selected by
+    something the variables affect, such as the patients a hospital admits or the cells a screen
+    keeps, and that may also have hidden common causes and feedback loops, when you want a few
+    causal claims that hold in that setting rather than a whole graph. Its claim [3]_: when every
+    independence in the selected rows follows from the causal graph (faithfulness) and the tests
+    are exact, each claimed ``x`` is an ancestor of ``y``, ``y`` is not an ancestor of ``x``, no
+    hidden common cause joins them, and ``x`` does not cause the selection, for both patterns;
+    without selection the same holds [1]_ [2]_. The default Fisher-Z test assumes continuous data
+    with linear effects and Gaussian noise; the other tests read categorical or mixed data or
+    detect nonlinear effects, as :func:`~andrey.pc` describes. For a whole graph that allows hidden
+    common causes, use :func:`~andrey.fci`.
+
+    **How it works.** ``x`` makes a minimal independence of ``v`` and ``y`` when they test
+    dependent (a p-value below ``alpha``) and independent given ``x``, and a minimal dependence of
+    ``v`` and ``w`` when they test independent and dependent given ``x`` [3]_. The extended
+    Y-structure ``(v, w, x, y)`` is both, with ``x`` the same; the Y-structure also needs a minimal
+    independence of ``w`` and ``y``, so ``v`` and ``w`` play the same role and each of its patterns
+    is listed once. A claim's score is the largest, over its patterns, of the smaller of ``-log
+    p`` for ``v`` and ``y`` and for ``w`` and ``y``, the p-values of their marginal tests ([3]_,
+    eq. 9): the more clearly ``y`` depends on both, the higher. A p-value of ``0`` gives an infinite
+    score; ``"fisherz"`` returns ``0`` below about ``2e-16``, so the strongest claims share an
+    infinite score. Every test is marginal or conditions on ``x`` alone: each pair is
+    tested marginally once, and given ``x`` only when a pattern at ``x`` could use it, so the
+    claims do not depend on the column order.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [4]_ [5]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [5]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample of their own. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the examples of [3]_
+    and on random graphs with a selection node, and on simulated linear-Gaussian data with
+    selection drawn as in [3]_. A claim says that ``x`` is an ancestor of ``y``, not that it is a
+    direct cause. A pair without a claim may still be causal: the method claims only what a
+    pattern shows, and a pair no pattern surrounds gets no claim. On finite data a pair can be
+    claimed both ways, which no graph explains; both claims are then kept. On the random graphs of
+    the simulations of [3]_ drawn under selection, most claims at 10,000 rows were wrong, and exact
+    tests made none on the models checked: the tests' errors made those claims. The fit runs one
+    marginal test per pair and, for each ``x``, up to one test per pair of the other variables, so
+    its cost grows with the cube of the number of variables. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Mooij, J. M., and Cremers, J. (2015). An empirical study of one of the simplest causal
+       prediction algorithms. Proceedings of the UAI 2015 Workshop on Advances in Causal
+       Inference, CEUR Workshop Proceedings 1504, 30-39.
+    .. [2] Mani, S., Spirtes, P., and Cooper, G. F. (2006). A theoretical study of Y structures
+       for causal discovery. Proceedings of the Twenty-Second Conference on Uncertainty in
+       Artificial Intelligence, 314-323.
+    .. [3] Versteeg, P., Zhang, C., and Mooij, J. M. (2022). Local constraint-based causal
+       discovery under selection bias. Proceedings of the First Conference on Causal Learning and
+       Reasoning, Proceedings of Machine Learning Research 177, 840-860.
+    .. [4] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [5] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import y_structures
+    >>> rng = np.random.default_rng(0)
+    >>> v, w = rng.standard_normal((2, 5000))
+    >>> x = v + w + rng.standard_normal(5000)
+    >>> y = x + rng.standard_normal(5000)
+    >>> out = y_structures(pd.DataFrame({"v": v, "w": w, "x": x, "y": y}))
+    >>> [(e["treatment"], e["outcome"], e["patterns"]) for e in out.metadata["effects"]]
+    [('x', 'y', [['v', 'w']])]
+    """
+    from andrey.api._adapt import dag_from_adjacency
+    from andrey.api._local import variable_columns
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.ystructures import y_structures as _y_structures
+    from andrey.core.ci import counting_tests
+    from andrey.core.effects import effect_record
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, _ = fit_inputs(
+        data, "indep_test", indep_test, categorical, None, method="y_structures", missing=True
+    )
+    d = X.shape[1]
+    columns = (
+        list(range(d))
+        if variables is None
+        else variable_columns(variables, labels, d, "y_structures")
+    )
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+        search = local_search(
+            X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed, ranked=False
+        )
+        with search.pinned():
+            claims = _y_structures(search, columns, extended=extended)
+    name = label_of(labels)
+    effects = [
+        effect_record(
+            c.cause,
+            c.effect,
+            estimand="total",
+            nonzero=True,
+            identifiable=True,
+            adjustment_sets=[[]],
+            set_kind="valid",
+            name=name,
+            score=c.score,
+            patterns=[[name(v), name(w)] for v, w in c.patterns],
+        )
+        for c in claims
+    ]
+    metadata = {
+        "effects": effects,
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        "n_tests": tests.n,
+    }
+    adjacency = np.zeros((d, d), dtype=np.int8)
+    return structure_output(dag_from_adjacency(adjacency), labels=labels, metadata=metadata)

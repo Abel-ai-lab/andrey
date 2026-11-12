@@ -48,6 +48,7 @@ TESTWISE_METHODS = (
     "hiton_pc",
     "hiton_mb",
     "mb_by_mb",
+    "y_structures",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")

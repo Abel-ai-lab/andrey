@@ -243,6 +243,8 @@ class OutputSpec(Spec):
     weighted: bool = False  # carries a weighted_adjacency
     has_ordering: bool = False  # carries a discovered causal order
     has_latents: bool = False  # flags latent nodes via node_types (GIN)
+    # Its claims hold with hidden common causes, which a graph of its kind does not show.
+    hidden_causes: bool = False
     multi: bool = False  # returns list[StructureOutput], one per group
     # Every key a fit's metadata can hold; a fit holds a subset (some keys depend on the settings).
     metadata: tuple[str, ...] = ()
@@ -300,8 +302,9 @@ class MethodSpec(Spec):
           (``data.missing``) or by structural EM where EM is supported for it.
         - ``environments``: it takes ``env``, the environment of each row; ``datasets``: it takes
           a list of datasets over the same variables (a panel input).
-        - ``hidden_causes``: its graph allows hidden common causes: a PAG or a MAG, latent nodes,
-          or the ``confounded`` part of background knowledge.
+        - ``hidden_causes``: its answer allows hidden common causes: a PAG or a MAG, latent nodes,
+          the ``confounded`` part of background knowledge, or claims that hold with them
+          (``output.hidden_causes``).
         - ``time_series``: it returns a graph over time; ``two_variables``: it decides the
           direction between two variables (the pairwise family).
         """
@@ -318,6 +321,7 @@ class MethodSpec(Spec):
             "datasets": any(i.kind == "panel" for i in self.data.inputs),
             "hidden_causes": self.output.graph_kind in ("pag", "mag")
             or self.output.has_latents
+            or self.output.hidden_causes
             or "confounded" in self.knowledge,
             "time_series": self.output.structure_type == "temporal",
             "two_variables": self.family == "pairwise",

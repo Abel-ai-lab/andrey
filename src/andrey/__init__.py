@@ -73,6 +73,7 @@ from .api import (
     ut_igsp,
     varma_lingam,
     xges,
+    y_structures,
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
 from .core.backend import config, describe
@@ -133,6 +134,7 @@ __all__ = [
     "cdnod",
     "fci_jci",
     "icp",
+    "y_structures",
     "iamb",
     "inter_iamb",
     "gs",

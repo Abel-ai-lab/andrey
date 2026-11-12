@@ -1,7 +1,7 @@
 # Y-structures
 
 `y_structures_cpu.py` measures the ancestral claims of a method that works under selection bias. It
-runs the authors' Y-structure code on the simulation of the method's paper (Versteeg, Zhang, and
+runs Andrey's `y_structures` and the authors' Y-structure code on the simulation of the method's paper (Versteeg, Zhang, and
 Mooij, 2022, Section 4.2 and Appendix D) and scores each claim that `i` is an ancestor of `j`
 against the model's ancestral pairs. A claim is ancestry, not an edge, so the lane scores pairs and
 no graph.
@@ -36,6 +36,11 @@ variable, the last column (`andrey_bench/selection_models.py`):
 
 Every solution runs at `alpha = 0.01`, the value of the authors' `simulate.R`.
 
+- `andrey.yst` and `andrey.yst_ext` run `andrey.y_structures` with `extended=False` and `True`,
+  Fisher's z test (`indep_test="fisherz"`), on every column, the context included, as the authors'
+  code reads them. The answer holds each claim's score and the fit's `metadata["n_tests"]`. An
+  extended Y-structure whose second variable tests independent of the effect has score 0; the
+  adapter writes it as the smallest positive number, so the lane counts the claim.
 - `sbcd.yst` is the Y-structure and `sbcd.yst_ext` the extended Y-structure of the authors' code,
   `philipversteeg/sbcd` at a pinned commit (BSD 3-clause), read from disk and run unmodified.
   `benchmarks/start_sbcd_r.sh` downloads the repository, checks the archive's SHA-256, and installs
