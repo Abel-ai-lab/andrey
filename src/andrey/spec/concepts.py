@@ -1305,9 +1305,9 @@ _CONCEPTS = (
         key="structure",
         summary="The graph a Markov-blanket search returns without a target: iamb, inter_iamb, gs, "
         "and fast_iamb return the CPDAG (cpdag) by default, and mmpc and hiton_pc the skeleton, "
-        "the graph their sets of parents and children give. cpdag is the CPDAG of the Grow-Shrink structure "
-        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
-        "Markov blankets.",
+        "the graph their sets of parents and children give. cpdag is the CPDAG of the "
+        "Grow-Shrink structure learner (Margaritis 2003); skeleton, its adjacencies; moral, the "
+        "moral graph of the Markov blankets.",
         param=_template(
             "structure",
             "str",

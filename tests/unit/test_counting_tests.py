@@ -182,7 +182,7 @@ def test_iamb_under_the_oracle_counts_each_new_query():
     assert found == [1] and tests.n == 3
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
 def test_the_count_does_not_depend_on_the_column_order(method):
     x, _ = data_for("fisherz")
     order = np.random.default_rng(1).permutation(D)

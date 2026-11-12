@@ -246,7 +246,8 @@ def _two_colliders() -> pd.DataFrame:
 
 #: bnlearn 5.2.1's graphs on :func:`_two_colliders` with ``test="zf"`` and ``alpha=0.05``: each
 #: variable's ``learn.mb`` joined by the AND rule, ``undirected=TRUE``, and the default; ``gs``
-#: and ``fast.iamb`` give the same graphs.
+#: and ``fast.iamb`` give the same graphs, and ``si.hiton.pc`` the skeleton (its default,
+#: ``undirected=TRUE``) and the CPDAG (``undirected=FALSE``).
 BNLEARN_RECORDED = {
     "moral": {"a - b", "a - c", "b - c", "c - d", "d - e", "d - f", "e - f"},
     "skeleton": {"a - c", "b - c", "c - d", "d - f", "e - f"},

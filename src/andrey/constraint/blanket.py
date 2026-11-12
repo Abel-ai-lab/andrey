@@ -661,17 +661,17 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     zero, by the larger statistic (:meth:`LocalSearch.weakest`), then by rank. The candidates join
     the set one at a time in that order, and each newcomer is tested against the subsets of the
     other members, by increasing size, and leaves for good at the first size at which a subset
-    separates it; the members before it are not tested then. The last candidate is not tested when
-    it joins: once every candidate has joined, each member, in joining order, is tested against the
-    subsets of the other current members, and leaves when one separates it, so a later member's
-    tests read the set without the members dropped before it. A member skips the subsets of the
-    members it was tested against when it joined. With ``max_depth``, a test conditions on at most
+    separates it; the members before it are not tested then. Once every candidate has joined, each
+    member, in joining order, is tested against the subsets of the other current members, and
+    leaves when one separates it, so a later member's tests read the set without the members
+    dropped before it. A member skips the subsets of the members it was tested against when it
+    joined, so the last one is not tested again. With ``max_depth``, a test conditions on at most
     ``max_depth`` variables; the set itself may grow larger.
 
     On categorical data a test runs only when the data hold at least ``HITON_CELL_ROWS`` rows per
-    cell of its table (:func:`table_size`) [1]_: a candidate whose unconditional test fails the rule
-    is taken as independent of ``target`` without a test, and a conditioning set that fails it is not
-    tested, so it removes nothing.
+    cell of its table (:func:`table_size`) [1]_: a candidate whose unconditional test fails the
+    rule is taken as independent of ``target`` without a test, and a conditioning set that fails it
+    is not tested, so it removes nothing.
 
     ``constraints`` act as in :func:`parents_children`: each variable a required edge joins to
     ``target`` is a member from the start, in rank order, and never tested, and a pair the knowledge
@@ -734,16 +734,14 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     members = list(required)
     # The members each candidate was tested against when it joined.
     seen: dict[int, set[int]] = {}
-    for new in order[:-1]:
+    for new in order:
         rest = list(members)
-        members.append(new)
         found = separating(new, rest, set())
         if found is None:
+            members.append(new)
             seen[new] = set(rest)
         else:
-            members.remove(new)
             sepsets[new] = found
-    members.extend(order[-1:])
     for x in list(members):
         if x in required:
             continue

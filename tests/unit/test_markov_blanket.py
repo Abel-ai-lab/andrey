@@ -284,8 +284,8 @@ class _Logged:
 def test_hiton_pc_follows_the_papers_trace():
     """The network of Aliferis et al. (2010), Figure 7, and their trace at T (Table 2): with the
     order F, D, E, A, B, and G and C independent of T, each newcomer is tested alone, F leaves only
-    in the pass after the last candidate, B, joined, given {D, E}, and the symmetry check drops B,
-    whose own set does not hold T (p. 197)."""
+    in the pass after the last candidate, B, has joined, given {D, E}, and the symmetry check drops
+    B, whose own set does not hold T (p. 197)."""
     T, A, B, C, D, E, F, G = range(8)
     edges = [(F, D), (F, E), (D, T), (E, T), (G, A), (T, A), (C, A), (C, B), (A, B)]
     oracle = DSepOracle(nx.DiGraph(edges))
@@ -295,9 +295,9 @@ def test_hiton_pc_follows_the_papers_trace():
     assert search.run("hiton_pc", T) == ([D, E, A, B], {C: (), G: (), F: (D, E)})
     asked = [(other, cond) for t, other, cond in logged.log if t == T and cond]
     tested = [other for other, _ in asked]
-    # D, E, and A are tested when they join; F, which joined first, and B, which joined last, only
-    # in the final pass, which F opens.
-    assert set(tested[: tested.index(F)]) == {D, E, A}
+    # Each newcomer is tested when it joins; F, which joined first against an empty set, is
+    # tested only in the final pass, which it opens.
+    assert set(tested[: tested.index(F)]) == {D, E, A, B}
     assert (F, (D, E)) in asked
     assert search.parents_children("hiton_pc", T) == [D, E, A]
     assert search.local("hiton_pc", T)[2][B] == (A, C)
