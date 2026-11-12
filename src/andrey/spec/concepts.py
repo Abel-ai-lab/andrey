@@ -114,7 +114,7 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
 # Method groups the rules below name.
 CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
-    *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "mmhc", "rsmax2"),
+    *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -601,6 +601,13 @@ _CONCEPTS = (
         ),
         deviations=(
             Deviation(
+                method="hiton_pc",
+                name="max_depth",
+                default=3,
+                reason="Aliferis et al. 2010 leave the cap open and run HITON-PC with caps 1 to 4; "
+                "3 is the cap of their Markov-blanket experiments. null runs it uncapped.",
+            ),
+            Deviation(
                 method="rcd",
                 name="max_depth",
                 default=2,
@@ -678,6 +685,7 @@ _CONCEPTS = (
                 "gs",
                 "fast_iamb",
                 "mmpc",
+                "hiton_pc",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -1054,6 +1062,7 @@ _CONCEPTS = (
             "gs",
             "fast_iamb",
             "mmpc",
+            "hiton_pc",
             *PCMCI_FAMILY,
             "anm",
             "pnl",
@@ -1234,7 +1243,7 @@ _CONCEPTS = (
             *_exempt(
                 "A Markov-blanket search, with no place for a context variable; cdnod is the "
                 "test-based search that takes env.",
-                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
@@ -1295,8 +1304,8 @@ _CONCEPTS = (
     Concept(
         key="structure",
         summary="The graph a Markov-blanket search returns without a target: iamb, inter_iamb, gs, "
-        "and fast_iamb return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its "
-        "sets of parents and children give. cpdag is the CPDAG of the Grow-Shrink structure "
+        "and fast_iamb return the CPDAG (cpdag) by default, and mmpc and hiton_pc the skeleton, "
+        "the graph their sets of parents and children give. cpdag is the CPDAG of the Grow-Shrink structure "
         "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
         "Markov blankets.",
         param=_template(
@@ -1310,7 +1319,7 @@ _CONCEPTS = (
             choices=tuple(BLANKET_STRUCTURES),
         ),
         fragment="cpdag",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
             Deviation(
@@ -1321,6 +1330,15 @@ _CONCEPTS = (
                 reason="The skeleton is the graph MMPC's sets give (Tsamardinos, Brown and "
                 "Aliferis 2006); cpdag stays available. MMPC learns parents and children, which "
                 "hold no child's other parents, so it has no moral graph to return.",
+            ),
+            Deviation(
+                method="hiton_pc",
+                name="structure",
+                default="skeleton",
+                choices=("skeleton", "cpdag"),
+                reason="As for mmpc: the skeleton is the graph HITON-PC's sets of parents and "
+                "children give (Aliferis et al. 2010), which hold no child's other parents, so it "
+                "has no moral graph to return; cpdag stays available.",
             ),
         ),
     ),
@@ -1341,7 +1359,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1420,7 +1438,7 @@ _CONCEPTS = (
         "undirected for a set, so an absent edge away from the target means nothing. "
         "metadata['target'] names the target, and each set the fit learns is a list of columns "
         "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1428,7 +1446,7 @@ _CONCEPTS = (
         summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
         "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
         "query whose p-value a test computed, none for a query answered from a kept answer.",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
         others_exempt="Does not report its test count.",
     ),
     Concept(
@@ -1482,6 +1500,7 @@ _CONCEPTS = (
                 "gs",
                 "fast_iamb",
                 "mmpc",
+                "hiton_pc",
             ),
         ),
         others_exempt="No separating-set orientation.",

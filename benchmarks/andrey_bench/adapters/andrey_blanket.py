@@ -59,6 +59,7 @@ LEARNERS: dict[str, Learner] = {
     "mmpc": Learner("pc", ("skeleton", "cpdag")),
     "gs": Learner("mb", ("moral", "skeleton", "cpdag")),
     "fast_iamb": Learner("mb", ("moral", "skeleton", "cpdag")),
+    "hiton_pc": Learner("pc", ("skeleton", "cpdag")),
 }
 
 

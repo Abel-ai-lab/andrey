@@ -1,11 +1,13 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
-:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, and :func:`andrey.mmpc`.
+:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, :func:`andrey.mmpc`, and
+:func:`andrey.hiton_pc`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
-learners Grow-Shrink and Fast-IAMB, and :func:`parents_children` the forward and backward phases of
-MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for every variable. Keeping a pair when
-each lies in the other's set (the AND rule) gives the moral graph and the skeleton that
-:func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
+learners Grow-Shrink and Fast-IAMB, :func:`parents_children` the forward and backward phases of
+MMPC, and the ``"hiton_pc"`` learner semi-interleaved HITON-PC. :func:`blanket_graph` and
+:func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set
+(the AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`,
+:func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
 :class:`~andrey.core.ci.CITest`, and background knowledge as
 :class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
 set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
@@ -643,6 +645,115 @@ def mmpc_sets(
     return raw
 
 
+#: HITON-PC's least number of rows per cell of a categorical test's table for the test to run
+#: (Aliferis et al. 2010, p. 201, the parameter h-ps, whose value the paper leaves open; 5 is the
+#: authors' value).
+HITON_CELL_ROWS = 5
+
+
+def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s parents and children by semi-interleaved HITON-PC without its symmetry check
+    [1]_, in the order the members joined.
+
+    The candidates are the variables whose unconditional test with ``target`` finds them dependent
+    (a p-value at or below ``alpha``), ordered once by that test, the most dependent first: by the
+    p-value to ``KEY_DP`` significant digits, then, where p-values agree, as when they underflow to
+    zero, by the larger statistic (:meth:`LocalSearch.weakest`), then by rank. The candidates join
+    the set one at a time in that order, and each newcomer is tested against the subsets of the
+    other members, by increasing size, and leaves for good at the first size at which a subset
+    separates it; the members before it are not tested then. The last candidate is not tested when
+    it joins: once every candidate has joined, each member, in joining order, is tested against the
+    subsets of the other current members, and leaves when one separates it, so a later member's
+    tests read the set without the members dropped before it. A member skips the subsets of the
+    members it was tested against when it joined. With ``max_depth``, a test conditions on at most
+    ``max_depth`` variables; the set itself may grow larger.
+
+    On categorical data a test runs only when the data hold at least ``HITON_CELL_ROWS`` rows per
+    cell of its table (:func:`table_size`) [1]_: a candidate whose unconditional test fails the rule
+    is taken as independent of ``target`` without a test, and a conditioning set that fails it is not
+    tested, so it removes nothing.
+
+    ``constraints`` act as in :func:`parents_children`: each variable a required edge joins to
+    ``target`` is a member from the start, in rank order, and never tested, and a pair the knowledge
+    makes non-adjacent is never a candidate. Each candidate dropped keeps in ``sepsets`` the set
+    that separated it, the one with the largest p-value at the first size that separates
+    (:meth:`LocalSearch.largest_sets`), and ``()`` for one dropped by its unconditional test or the
+    rule.
+
+    References
+    ----------
+    .. [1] Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D.
+       (2010). Local causal and Markov blanket induction for causal discovery and feature
+       selection for classification part I: Algorithms and empirical evaluation. Journal of
+       Machine Learning Research 11, 171-234.
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    allowed = None if constraints is None else constraints.support()[target]
+
+    def reliable(x: int, cond: tuple[int, ...]) -> bool:
+        size = None if search.levels is None else table_size(search.levels, target, x, cond)
+        return size is None or search.n >= HITON_CELL_ROWS * size
+
+    def separating(x: int, among: list[int], tested: set[int]) -> tuple[int, ...] | None:
+        """The set that separates ``x`` from ``target`` at the first size at which one does,
+        among the subsets of ``among`` not inside ``tested`` that pass the rule; ``None`` when
+        none does."""
+        among = sorted(among)
+        top = len(among) if max_depth is None else min(len(among), max_depth)
+        for size in range(1, top + 1):
+            conds = [
+                c for c in combinations(among, size) if not tested.issuperset(c) and reliable(x, c)
+            ]
+            if not conds:
+                continue
+            found: list[np.ndarray] = []
+            search.weakest(target, [x], conds, found)
+            row = found[0][0]
+            at = np.flatnonzero(row > alpha)
+            if at.size:
+                [z] = search.largest_sets(row[at].reshape(1, -1), [conds[j] for j in at])
+                return z
+        return None
+
+    others = []
+    for x in range(search.d):
+        if x == target or x in required or (allowed is not None and not allowed[x]):
+            continue
+        if reliable(x, ()):
+            others.append(x)
+        else:
+            sepsets[x] = ()
+    keys: dict[int, tuple[float, float]] = {}
+    for x, (p, strength) in zip(others, search.weakest(target, others, [()]), strict=True):
+        if p <= alpha:
+            keys[x] = (float(f"{p:.{KEY_DP}g}"), -round(strength, KEY_DP))
+        elif p > alpha:
+            sepsets[x] = ()
+    order = search.ordered(keys)
+    members = list(required)
+    # The members each candidate was tested against when it joined.
+    seen: dict[int, set[int]] = {}
+    for new in order[:-1]:
+        rest = list(members)
+        members.append(new)
+        found = separating(new, rest, set())
+        if found is None:
+            seen[new] = set(rest)
+        else:
+            members.remove(new)
+            sepsets[new] = found
+    members.extend(order[-1:])
+    for x in list(members):
+        if x in required:
+            continue
+        found = separating(x, [z for z in members if z != x], seen.get(x, set()))
+        if found is not None:
+            members.remove(x)
+            sepsets[x] = found
+    return members
+
+
 def reach(sets: np.ndarray) -> np.ndarray:
     """Each variable's set together with the sets of its members, less the variable itself: the
     blanket MMPC's sets stand in for, which holds each child's other parents."""
@@ -871,6 +982,7 @@ LEARNERS: dict[str, Learner] = {
     "mmpc": Learner("pc", _mmpc),
     "gs": Learner("blanket", _gs),
     "fast_iamb": Learner("blanket", _fast_iamb),
+    "hiton_pc": Learner("pc", _hiton_pc),
 }
 
 
