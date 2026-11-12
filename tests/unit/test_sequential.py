@@ -47,6 +47,7 @@ from andrey.data.latent import (
     observed_ancestors,
     pag_projection,
 )
+from andrey.metrics import target_oracle
 
 #: MMB-by-MMB with the stop rules R1 and R2, which stop only once the target's marks are decided.
 MMB_R1_R2 = Rules(local="pc", expand="adjacent", orient="pag", stop="r1_r2")
@@ -113,10 +114,12 @@ def _ranks(seed: int, d: int) -> list[int]:
 @pytest.mark.parametrize(("seed", "d"), [(s, 8 + s % 7) for s in range(12)] + [(40, 30), (41, 40)])
 def test_the_cpdag_rules_give_the_true_cpdag_at_every_target(rules, seed, d):
     dag = _random_dag(seed, d)
-    truth = _cpdag(dag)
+    truth, adjacency = _cpdag(dag), nx.to_numpy_array(dag, nodelist=range(d))
     for target in range(d):
         result = sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules)
-        assert np.array_equal(result.network.star(target, d), _star(truth, target)), target
+        answer = result.network.star(target, d)
+        assert np.array_equal(answer, _star(truth, target)), target
+        assert np.array_equal(answer, target_oracle(adjacency, target, "cpdag").to_numpy())
 
 
 @pytest.mark.parametrize(
@@ -126,10 +129,14 @@ def test_the_cpdag_rules_give_the_true_cpdag_at_every_target(rules, seed, d):
 )
 def test_the_pag_rules_give_the_true_pag_at_every_target(seed, d, hidden, mediated):
     dag = _random_dag(seed, d, hidden, mediated)
-    truth = _pag(dag, d)
+    truth, adjacency = _pag(dag, d), nx.to_numpy_array(dag, nodelist=range(d + hidden))
+    hidden_nodes = range(d, d + hidden)
     for target in range(d):
         result = sequential(_search(dag, _ranks(seed, d)), target, "iamb", MMB_R1_R2)
-        assert np.array_equal(result.network.star(target, d), _star(truth, target)), target
+        answer = result.network.star(target, d)
+        assert np.array_equal(answer, _star(truth, target)), target
+        oracle = target_oracle(adjacency, target, "pag", latent=hidden_nodes).to_numpy()
+        assert np.array_equal(answer, oracle), target
 
 
 def test_r3_stops_at_an_arrowhead_before_the_pag_decides_the_circle():
