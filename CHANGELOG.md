@@ -51,6 +51,14 @@ names its pull request.
   `pooled_answer_scores` apply it to targets, pairs, and claims. The benchmark harness adds the gate
   on the net score, paired risk on the queries two methods both answered, and risk-coverage
   tables. ([#932])
+- `GraphStructure.is_adjustment_set` says whether a set of covariates is an adjustment set for the
+  total effect of a treatment on an outcome, in a DAG, a CPDAG, or a MAG or PAG without selection
+  bias, by the generalized adjustment criterion of Perković et al. (2018).
+  `GraphStructure.optimal_adjustment_set` returns the adjustment set of Henckel, Perković and
+  Maathuis (2022) that gives the least-squares estimate its smallest asymptotic variance in a
+  linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
+  against a true graph: its validity, and its precision and recall against the optimal set.
+  ([#939])
 
 ### Changed
 
@@ -2609,6 +2617,7 @@ First alpha release.
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [#928]: https://github.com/Abel-ai-lab/andrey/pull/928
 [#919]: https://github.com/Abel-ai-lab/andrey/pull/919
+[#939]: https://github.com/Abel-ai-lab/Andrey/pull/939
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma

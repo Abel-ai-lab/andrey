@@ -13,13 +13,13 @@ Two layers:
   ``claim_scores``, and friends;
 - the oracle answers of local methods and the scores of answers that may abstain --
   ``target_oracle``, ``effect_oracle``, ``answer_scores``, ``target_answer_scores``,
-  ``effect_scores``;
+  ``effect_scores``, and ``adjustment_scores`` for one adjustment set;
 - :func:`score`, a capability resolver that reads which fields a result carries and returns the
   family-appropriate dict, silently skipping metrics whose inputs are absent.
 """
 
 from .answers import answer_scores, pooled_answer_scores
-from .effects import effect_oracle, effect_scores
+from .effects import adjustment_scores, effect_oracle, effect_scores
 from .graph import (
     confounder_pair_scores,
     markov_equivalent,
@@ -64,6 +64,7 @@ __all__ = [
     "target_answer_scores",
     "effect_oracle",
     "effect_scores",
+    "adjustment_scores",
     "answer_scores",
     "pooled_answer_scores",
 ]

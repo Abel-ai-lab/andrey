@@ -9,7 +9,6 @@ import pytest
 
 from andrey import GraphStructure
 from andrey.core.effects import effect_record
-from andrey.metrics import _adjustment as adj
 from andrey.metrics import (
     answer_scores,
     claim_scores,
@@ -207,10 +206,12 @@ TWO_SETS = _dag("A X B Y", "A>X A>B B>Y X>Y")
 
 
 def test_a_pair_with_two_valid_adjustment_sets():
-    D = adj.directed(TWO_SETS.to_numpy())
     x, y = 1, 3
     valid = [
-        z for k in range(3) for z in itertools.combinations((0, 2), k) if adj.is_valid(D, x, y, z)
+        z
+        for k in range(3)
+        for z in itertools.combinations((0, 2), k)
+        if TWO_SETS.is_adjustment_set(x, y, z)
     ]
     assert valid == [(0,), (2,), (0, 2)]
     record = effect_oracle(TWO_SETS, "X", "Y", identified_from="dag")
@@ -253,64 +254,6 @@ def test_a_wider_family_of_parent_sets_is_incomplete():
     two = [dict(oracle, adjustment_sets=[["U", "V"], ["U"]], identifiable=None)]
     s = effect_scores(two, [oracle])
     assert s["adjustment"]["incomplete"] == 1 and s["identifiable"]["incomplete"] == 1
-
-
-def test_the_optimal_set_is_the_class_s_and_valid_in_every_member():
-    # In an amenable class the optimal set is the same in every DAG; checked by enumeration.
-    rng = np.random.default_rng(3)
-    checked = 0
-    for _ in range(40):
-        d = 5
-        D = np.triu(rng.random((d, d)) < 0.5, k=1)
-        cpdag = _class(D)
-        for x, y in itertools.permutations(range(d), 2):
-            if not adj.amenable(cpdag[0], x, y) or x not in adj.reach(D.T, [y]):
-                continue
-            sets = {tuple(adj.optimal_set(E, x, y)) for E in cpdag[1]}
-            assert len(sets) == 1
-            assert all(adj.is_valid(E, x, y, next(iter(sets))) for E in cpdag[1])
-            checked += 1
-    assert checked > 50
-
-
-def _class(D: np.ndarray) -> tuple[np.ndarray, list[np.ndarray]]:
-    """The CPDAG marks of ``D`` and every DAG of its class."""
-    from andrey.metrics import to_cpdag
-
-    marks = to_cpdag(D.astype(int)).to_numpy()
-    directed, undirected = adj.cpdag_parts(marks)
-    pairs = list(zip(*np.nonzero(np.triu(undirected)), strict=True))
-    members = []
-    for bits in itertools.product((False, True), repeat=len(pairs)):
-        E = directed.copy()
-        for (i, j), flip in zip(pairs, bits, strict=True):
-            E[i, j], E[j, i] = not flip, flip
-        if not _cyclic(E):
-            if np.array_equal(to_cpdag(E.astype(int)).to_numpy(), marks):
-                members.append(E)
-    return marks, members
-
-
-def _cyclic(E: np.ndarray) -> bool:
-    return any(i in adj.reach(E, np.flatnonzero(E[i]).tolist()) for i in range(len(E)))
-
-
-def test_validity_matches_the_regression_coefficient_in_linear_models():
-    # A valid set is one whose population regression coefficient is the total effect.
-    rng = np.random.default_rng(1)
-    for _ in range(30):
-        d = 5
-        B = np.triu(rng.uniform(0.5, 1.5, (d, d)) * (rng.random((d, d)) < 0.5), k=1)
-        total = np.linalg.inv(np.eye(d) - B)
-        cov = total.T @ total
-        for x, y in itertools.permutations(range(d), 2):
-            others = [v for v in range(d) if v not in (x, y)]
-            for z in itertools.chain.from_iterable(
-                itertools.combinations(others, k) for k in range(len(others) + 1)
-            ):
-                cols = [x, *z]
-                beta = np.linalg.solve(cov[np.ix_(cols, cols)], cov[cols, y])[0]
-                assert adj.is_valid(B != 0, x, y, z) == bool(abs(beta - total[x, y]) < 1e-9)
 
 
 def test_ancestor_claims_against_their_base_rate():

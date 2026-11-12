@@ -1326,6 +1326,146 @@ class GraphStructure(Structure):
 
         return _queries.separation(self, "m_separated", x, y, given)
 
+    def is_adjustment_set(
+        self, treatment: str | int, outcome: str | int, covariates: Collection[str | int]
+    ) -> bool:
+        """Return whether ``covariates`` is an adjustment set for the total effect of ``treatment``
+        on ``outcome``.
+
+        A set ``Z`` is an adjustment set when ``f(y | do(x)) = ∫ f(y | x, z) f(z) dz`` for every
+        distribution the graph allows: in a ``dag``, every distribution that factorizes along
+        it; in a ``cpdag``, along every DAG of its class; in a ``mag`` or ``pag``, along every DAG
+        with hidden variables that it stands for. The generalized adjustment criterion of
+        Perković et al. (2018) says when. First, the graph is amenable for the pair: every
+        possibly directed path from the treatment to the outcome, one with no arrowhead pointing
+        back toward the treatment, starts with a visible edge out of the treatment. Every
+        directed edge of a ``dag`` or ``cpdag`` is visible; an edge ``a -> b`` of a ``mag`` or
+        ``pag`` is visible when some node not adjacent to ``b`` has an edge into ``a``, or a
+        path into ``a`` whose inner nodes are all colliders and parents of ``b`` (Zhang 2008),
+        so that no hidden variable confounds ``a`` and ``b``. Second, ``Z`` holds no forbidden
+        node, a possible descendant of a node other than the treatment on such a path. Third,
+        ``Z`` blocks every other path from the treatment to the outcome on which each inner node
+        is a collider or a definite non-collider. In a ``dag`` this is the adjustment criterion
+        of Shpitser et al. (2010). A graph that is not amenable has no adjustment set: in a
+        ``cpdag`` the effect runs, in some DAG of the class, through an edge the class leaves
+        undirected. Selection bias, an undirected edge in a ``mag`` or ``pag``, is not covered.
+
+        Parameters
+        ----------
+        treatment : str or int
+            The treatment, by label or by 0-based position.
+        outcome : str or int
+            The outcome, by label or by 0-based position.
+        covariates : collection of str or int
+            The candidate adjustment set; empty for no adjustment.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``covariates`` meets the criterion.
+
+        Raises
+        ------
+        ValueError
+            For a kind other than ``dag``, ``cpdag``, ``mag``, and ``pag``; for a ``dag`` with a
+            directed cycle; for a ``cpdag`` that is not the CPDAG of its class, such as an MPDAG
+            that knowledge oriented further; for a ``mag`` or ``pag`` that is not ancestral or
+            has an undirected edge; if a node is not in the graph or is named twice; or if
+            ``covariates`` holds the treatment or the outcome.
+        TypeError
+            If a node is neither a label nor an integer position.
+
+        References
+        ----------
+        Perković, E., Textor, J., Kalisch, M., and Maathuis, M. H. (2018). Complete graphical
+        characterization and construction of adjustment sets in Markov equivalence classes of
+        ancestral graphs. Journal of Machine Learning Research 18(220), 1-62.
+
+        Shpitser, I., VanderWeele, T., and Robins, J. M. (2010). On the validity of covariate
+        adjustment for estimating causal effects. Proceedings of the 26th Conference on
+        Uncertainty in Artificial Intelligence, AUAI Press, 527-536.
+
+        Zhang, J. (2008). Causal reasoning with ancestral graphs. Journal of Machine Learning
+        Research 9(47), 1437-1474.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 1, 0], [2, 0, 0, 1], [2, 0, 0, 1], [0, 2, 2, 0]])
+        >>> g = GraphStructure.from_numpy(M, labels=("a", "x", "b", "y"))  # x <- a -> b, x, b -> y
+        >>> g.is_adjustment_set("x", "y", []), g.is_adjustment_set("x", "y", ["b"])
+        (False, True)
+        """
+        from . import _queries, adjustment
+
+        k, j = _queries.node(self, treatment, "treatment"), _queries.node(self, outcome, "outcome")
+        z = _queries.nodes(self, covariates, "covariates")
+        return adjustment.is_adjustment_set(self, k, j, z)
+
+    def optimal_adjustment_set(
+        self, treatment: str | int, outcome: str | int, *, index: bool = False
+    ) -> list[str | int] | None:
+        """Return the optimal adjustment set for the total effect of ``treatment`` on ``outcome``.
+
+        Of the adjustment sets (``is_adjustment_set``), the optimal set of Henckel, Perković and
+        Maathuis (2022) gives the least-squares estimate of the effect, the treatment's
+        coefficient in the regression of the outcome on the treatment and the set, the smallest
+        asymptotic variance in every linear model with independent errors the graph allows. In a
+        ``dag`` it is the parents of the causal nodes, the nodes other than the treatment on a
+        directed path from the treatment to the outcome, less the treatment and the causal
+        nodes' descendants. In a ``cpdag`` with an adjustment set, every DAG of the class has the
+        same optimal set. It is an adjustment set whenever one exists, and it is defined when the
+        treatment is an ancestor of the outcome, a nonzero effect. A ``mag`` or ``pag`` has none
+        here: with hidden variables, the valid set with the smallest variance can depend on the
+        model's coefficients, so a set best in every model the graph allows need not exist.
+
+        Parameters
+        ----------
+        treatment : str or int
+            The treatment, by label or by 0-based position.
+        outcome : str or int
+            The outcome, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int] or None
+            The set in node order, named by label when the graph has labels; ``None`` when the
+            graph has no adjustment set for the pair or the treatment is not an ancestor of the
+            outcome, a zero effect.
+
+        Raises
+        ------
+        ValueError
+            For a kind other than ``dag`` and ``cpdag``, naming why for ``mag`` and ``pag``; for
+            a ``dag`` with a directed cycle; for a ``cpdag`` that is not the CPDAG of its class;
+            or if a node is not in the graph or the treatment is the outcome.
+        TypeError
+            If a node is neither a label nor an integer position.
+
+        References
+        ----------
+        Henckel, L., Perković, E., and Maathuis, M. H. (2022). Graphical criteria for efficient
+        total effect estimation via adjustment in causal linear models. Journal of the Royal
+        Statistical Society Series B 84(2), 579-599.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 1, 0], [2, 0, 0, 1], [2, 0, 0, 1], [0, 2, 2, 0]])
+        >>> g = GraphStructure.from_numpy(M, labels=("a", "x", "b", "y"))  # x <- a -> b, x, b -> y
+        >>> g.optimal_adjustment_set("x", "y")
+        ['b']
+        """
+        from . import _queries, adjustment
+
+        k, j = _queries.node(self, treatment, "treatment"), _queries.node(self, outcome, "outcome")
+        found = adjustment.optimal_set(self, k, j)
+        return None if found is None else _queries.named(self, found, index)
+
     # ---- validation -----------------------------------------------------------------------
 
     def validate(self) -> None:

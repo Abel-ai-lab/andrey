@@ -834,6 +834,10 @@ its graph, as in `out.structure.to_dag(tie_break="label")`. It also answers grap
 `parents`, `children`, `ancestors`, `descendants`, `markov_blanket`, `d_separated` (a DAG or a
 CPDAG), and `m_separated` (a MAG or a PAG, and a DAG, where the two agree); a CPDAG or PAG answers
 as every member of its class does ([Query a graph](guides/graph-representation.md#query-a-graph)).
+For the total effect of a treatment on an outcome, `is_adjustment_set` says whether adjusting for a
+set of variables identifies it, in a DAG, a CPDAG, or a MAG or PAG without selection bias, and
+`optimal_adjustment_set` returns the adjustment set that gives the least-squares estimate its
+smallest asymptotic variance in a linear model, in a DAG or a CPDAG.
 [Graph representation](guides/graph-representation.md) gives the conventions, and
 [Hand a graph to DoWhy](guides/graph-representation.md#hand-a-graph-to-dowhy) passes a result to
 DoWhy for effect estimation.
@@ -1343,7 +1347,9 @@ score, correct minus wrong. It compares the net score with its floor, the better
 abstaining and always giving the most common oracle answer. `target_answer_scores` and
 `effect_scores` apply it to a target's adjacencies and marks and to a pair's fields;
 `claim_scores(output, truth, pairs=...)` applies it to claims, and `pooled_answer_scores` adds up
-the scores of several targets or datasets.
+the scores of several targets or datasets. `adjustment_scores(adjustment_set, truth, treatment,
+outcome)` scores one adjustment set: whether it is valid in the true graph, and its precision and
+recall against the true graph's optimal adjustment set.
 
 | `family` | When | `score` returns |
 |---|---|---|
@@ -1387,6 +1393,7 @@ the scores of several targets or datasets.
    target_answer_scores
    effect_scores
    pooled_answer_scores
+   adjustment_scores
 ```
 
 ## Visualization

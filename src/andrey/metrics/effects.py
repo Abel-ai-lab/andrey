@@ -13,10 +13,12 @@ from typing import Any, Literal
 import numpy as np
 
 from andrey.core import _queries
+from andrey.core import adjustment as adj
 from andrey.core.effects import check_effects, effect_record
 from andrey.core.output import StructureOutput
+from andrey.core.structure import GraphStructure
 
-from . import _adjustment as adj
+from ._common import prf, unwrap
 from .answers import answer_scores, tally
 from .graph import to_cpdag
 from .local import _position, hidden_nodes, true_dag
@@ -146,30 +148,30 @@ def effect_oracle(
         raise ValueError(f"a {estimand} effect takes set_kind in {allowed}, got {kind!r}")
     if (kind == "local_parents" and identified_from != "cpdag") or (kind == "optimal" and hidden):
         raise ValueError(f"set_kind={kind!r} does not fit identified_from={identified_from!r}")
-    marks = dag.to_numpy()
-    D = adj.directed(marks)
-    cpdag = to_cpdag(dag).to_numpy()
-    directed_c, undirected_c = adj.cpdag_parts(cpdag)
+    D = adj.directed(dag.to_numpy())
+    cpdag = to_cpdag(dag)
     observed = [i for i in range(dag.n_nodes) if i not in hidden]
     if estimand == "total":
         nonzero = x in adj.reach(D.T, [y])
         if identified_from == "cpdag":
-            identifiable = adj.amenable(cpdag, x, y) and not directed_c[y, x]
+            identifiable = adj.adjustment_set(cpdag, x, y) is not None
         else:
-            identifiable = adj.is_valid(D, x, y, adj.canonical_set(D, x, y, observed))
+            identifiable = adj.adjustment_set(dag, x, y, among=observed) is not None
         if kind == "local_parents":
             sets = [[v for v in s if v != y] for s in adj.local_parent_sets(cpdag, x)]
         elif not (identifiable and nonzero):
             sets = []
-        elif kind == "optimal" or identified_from == "cpdag":
-            sets = [adj.optimal_set(D, x, y)]
         else:
-            sets = [adj.canonical_set(D, x, y, observed)]
+            if kind == "optimal" or identified_from == "cpdag":
+                found = adj.optimal_set(dag, x, y)
+            else:
+                found = adj.adjustment_set(dag, x, y, among=observed)
+            sets = [] if found is None else [found]
     else:
         nonzero = bool(D[x, y])
         parents = set(np.flatnonzero(D[:, y]).tolist()) - {x}
         if identified_from == "cpdag":
-            identifiable = not undirected_c[y].any()
+            identifiable = not adj.undirected(cpdag.to_numpy())[y].any()
         else:
             identifiable = not parents & hidden
         sets = [sorted(parents)] if identifiable else []
@@ -315,4 +317,76 @@ def _valid(dag: Any, query: Any, members: frozenset[Any]) -> bool:
     n, labels = dag.n_nodes, dag.labels
     x, y = _position(treatment, labels, n, "treatment"), _position(outcome, labels, n, "outcome")
     z = [_position(v, labels, n, "an adjustment set") for v in members]
-    return adj.is_valid(adj.directed(dag.to_numpy()), x, y, z)
+    return adj.is_adjustment_set(dag, x, y, z)
+
+
+def adjustment_scores(
+    estimated: Collection[str | int], true: object, treatment: str | int, outcome: str | int
+) -> dict[str, Any]:
+    """Score one adjustment set for the total effect of ``treatment`` on ``outcome``.
+
+    ``"valid"`` says whether the set is an adjustment set in the true graph
+    (:meth:`~andrey.GraphStructure.is_adjustment_set`). ``"precision"``, ``"recall"``, and
+    ``"f1"`` compare it with the optimal adjustment set ``O`` of the true graph
+    (:meth:`~andrey.GraphStructure.optimal_adjustment_set`), as sets of variables: with ``Z`` the
+    set scored, precision is ``|Z ∩ O| / |Z|``, recall is ``|Z ∩ O| / |O|``, and f1 their
+    harmonic mean, ``2 |Z ∩ O| / (|Z| + |O|)``. A ratio whose denominator is zero is 1, as
+    elsewhere in :mod:`andrey.metrics`, so the empty set scores 1 against an empty optimal set,
+    and f1 is 0 when no variable is shared. When the true graph has no optimal set, because no
+    adjustment set is valid in it or the treatment is not an ancestor of the outcome, ``"optimal"``
+    is ``None`` and the three ratios are ``nan``.
+
+    Parameters
+    ----------
+    estimated : collection of str or int
+        The adjustment set scored, by label or by 0-based position in ``true``; it holds neither
+        the treatment nor the outcome.
+    true : StructureOutput, GraphStructure, or array-like of shape (n, n)
+        The true graph: a ``dag`` or a ``cpdag``, or a ``mag`` or ``pag`` for ``"valid"`` alone.
+        A raw array is a directed adjacency.
+    treatment : str or int
+        The treatment, by label or by 0-based position in ``true``.
+    outcome : str or int
+        The outcome, by label or by 0-based position in ``true``.
+
+    Returns
+    -------
+    dict
+        ``"valid"`` (bool), ``"optimal"`` (the optimal set, named as ``true`` names its nodes, or
+        ``None``), ``"precision"``, ``"recall"``, and ``"f1"`` (float).
+
+    Raises
+    ------
+    ValueError
+        As :meth:`~andrey.GraphStructure.is_adjustment_set` does: for a graph kind it does not
+        take, a node that is not in the graph, or a set that holds the treatment or the outcome.
+
+    References
+    ----------
+    Henckel, L., Perković, E., and Maathuis, M. H. (2022). Graphical criteria for efficient total
+    effect estimation via adjustment in causal linear models. Journal of the Royal Statistical
+    Society Series B 84(2), 579-599.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> dag = np.zeros((4, 4), dtype=int)
+    >>> dag[0, 1] = dag[0, 2] = dag[2, 3] = dag[1, 3] = 1  # 0 -> 1 -> 3, 0 -> 2 -> 3
+    >>> s = adjustment_scores([0], dag, 1, 3)  # the optimal set is {2}
+    >>> s["valid"], s["optimal"], s["precision"], s["recall"]
+    (True, [2], 0.0, 0.0)
+    """
+    graph = unwrap(true)
+    if not isinstance(graph, GraphStructure):
+        graph = true_dag(graph)
+    x = _queries.node(graph, treatment, "treatment")
+    y = _queries.node(graph, outcome, "outcome")
+    z = _queries.nodes(graph, estimated, "estimated")
+    valid = adj.is_adjustment_set(graph, x, y, z)
+    optimal = adj.optimal_set(graph, x, y) if graph.kind in ("dag", "cpdag") else None
+    if optimal is None:
+        nan = float("nan")
+        return {"valid": valid, "optimal": None, "precision": nan, "recall": nan, "f1": nan}
+    shared = len(set(z) & set(optimal))
+    scores = prf(shared, len(set(z)) - shared, len(optimal) - shared)
+    return {"valid": valid, "optimal": _queries.named(graph, optimal, False), **scores}
