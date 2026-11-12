@@ -1,12 +1,13 @@
-"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, and
-HITON-PC.
+"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
+and HITON-MB.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
 each structure its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
 to the true ones, and on one recorded case each structure is the graph bnlearn returns. The sets of
-GS and Fast-IAMB and the parents and children of HITON-PC beat the empty answer on continuous and
-categorical data, and a fit repeats.
+GS and Fast-IAMB, the parents and children of HITON-PC, and the blankets of HITON-MB beat the empty
+answer on continuous and categorical data, and a fit repeats. HITON-MB's parents and children are
+HITON-PC's.
 """
 
 from __future__ import annotations
@@ -26,14 +27,14 @@ from andrey.core.orient import dag2cpdag
 from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
-METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"]
+METHODS = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb"]
 #: The learners of parents and children; the others learn Markov blankets.
 PC_LEARNERS = ("mmpc", "hiton_pc")
 KEY = {m: "parents_and_children" if m in PC_LEARNERS else "markov_blanket" for m in METHODS}
 #: The settings under which the oracle checks run each method: the setting of its correctness
 #: theorem, without a conditioning-set cap.
 ORACLE = {m: {"indep_test": "dsep", "alpha": 0.5} for m in METHODS}
-ORACLE["hiton_pc"]["max_depth"] = None
+ORACLE["hiton_pc"]["max_depth"] = ORACLE["hiton_mb"]["max_depth"] = None
 #: Each method's outputs, from its spec.
 STRUCTURES = {
     m: next(p.choices for p in REGISTRY[m].params if p.name == "structure") for m in METHODS
@@ -107,6 +108,9 @@ def _collider() -> pd.DataFrame:
         ("hiton_pc", "a", {"c"}),
         ("hiton_pc", "c", {"a", "b", "d"}),
         ("hiton_pc", "d", {"c"}),
+        ("hiton_mb", "a", {"b", "c"}),
+        ("hiton_mb", "c", {"a", "b", "d"}),
+        ("hiton_mb", "d", {"c"}),
     ],
 )
 def test_a_collider_gives_each_set(method, target, want):
@@ -153,6 +157,8 @@ def test_each_set_is_the_true_set_under_an_oracle(method, seed, oracle_test):
     for v in range(15):
         out = getattr(andrey, method)(sample.data, target=v, **ORACLE[method])
         assert set(out.metadata[KEY[method]]) == _truth(oracle, method, v), v
+        pc = out.metadata.get("parents_and_children", oracle.parents_children(v))
+        assert set(pc) == oracle.parents_children(v), v
 
 
 @pytest.mark.parametrize("seed", range(3))
@@ -175,12 +181,15 @@ def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure
     """On 20 variables with 2,000 rows, an undirected structure has at most a third as many wrong
     pairs as its truth has pairs. A CPDAG pair is wrong when its edge or its marks differ, and one
     wrong collider misdirects the edges Meek's rules orient from it, so the CPDAG has at most half
-    as many."""
+    as many. HITON-MB reaches a spouse only through a child its parents-and-children search found,
+    so an edge it misses also drops the spouses behind it from both blankets, and its moral graph
+    has at most half as many."""
     sample = _er_sample(20, seed)
     want = _true_structure(DSeparation(sample.graph), sample, structure)
     got = _got_structure(getattr(andrey, method)(sample.data, structure=structure), structure)
     wrong = (got != want) | (got.T != want.T)
-    share = 1 / 2 if structure == "cpdag" else 1 / 3
+    half = structure == "cpdag" or (method, structure) == ("hiton_mb", "moral")
+    share = 1 / 2 if half else 1 / 3
     assert np.triu(wrong, 1).sum() <= np.triu(want != 0, 1).sum() * share
 
 
@@ -375,6 +384,44 @@ def test_a_hiton_pc_fit_repeats(kind):
         again = andrey.hiton_pc(sample.data, target=target, **settings)
         assert first.structure.oriented_edges() == again.structure.oriented_edges()
         assert first.metadata == again.metadata
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_hiton_mb_sets_beat_the_empty_answer(kind):
+    """At its defaults, summed over every target, at most half as many wrong members as the true
+    blankets hold, which is what the empty answer gets wrong."""
+    sample, settings = _sample_of(kind)
+    oracle = DSeparation(sample.graph)
+    wrong = members = 0
+    for v in range(sample.data.shape[1]):
+        out = andrey.hiton_mb(sample.data, target=v, **settings)
+        want = oracle.markov_blanket(v)
+        wrong += len(set(out.metadata["markov_blanket"]) ^ want)
+        members += len(want)
+    assert members and wrong <= members / 2
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_a_hiton_mb_fit_repeats(kind):
+    sample, settings = _sample_of(kind)
+    for target in (None, 3):
+        first = andrey.hiton_mb(sample.data, target=target, **settings)
+        again = andrey.hiton_mb(sample.data, target=target, **settings)
+        assert first.structure.oriented_edges() == again.structure.oriented_edges()
+        assert first.metadata == again.metadata
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_hiton_mb_parents_and_children_are_hiton_pcs(kind):
+    """HITON-MB's parents and children are HITON-PC's at the same settings and open its blanket,
+    and its skeleton is HITON-PC's."""
+    sample, settings = _sample_of(kind)
+    for v in range(sample.data.shape[1]):
+        got = andrey.hiton_mb(sample.data, target=v, **settings).metadata
+        pc = andrey.hiton_pc(sample.data, target=v, **settings).metadata["parents_and_children"]
+        assert got["parents_and_children"] == pc == got["markov_blanket"][: len(pc)], v
+    skeleton = andrey.hiton_mb(sample.data, structure="skeleton", **settings)
+    assert _named_edges(skeleton) == _named_edges(andrey.hiton_pc(sample.data, **settings))
 
 
 # ---- background knowledge ------------------------------------------------------------------------

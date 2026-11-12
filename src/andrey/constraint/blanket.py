@@ -1,10 +1,11 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
-:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, :func:`andrey.mmpc`, and
-:func:`andrey.hiton_pc`.
+:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, :func:`andrey.mmpc`,
+:func:`andrey.hiton_pc`, and :func:`andrey.hiton_mb`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
 learners Grow-Shrink and Fast-IAMB, :func:`parents_children` the forward and backward phases of
-MMPC, and the ``"hiton_pc"`` learner semi-interleaved HITON-PC. :func:`blanket_graph` and
+MMPC, the ``"hiton_pc"`` learner semi-interleaved HITON-PC, and the ``"hiton_mb"`` learner
+semi-interleaved HITON-MB, HITON-PC followed by the spouse step. :func:`blanket_graph` and
 :func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set
 (the AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`,
 :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
@@ -952,17 +953,22 @@ class Learner:
     one whose ``search`` returns the parents and children before the symmetry check, and
     ``"pc_spouses"`` for one that runs the ``"pc"`` learner named ``pc`` and adds the spouses
     (:meth:`LocalSearch.spouses`). A ``search`` records a separating set for every candidate it
-    drops after a test, so that :meth:`LocalSearch.local` has one for each.
+    drops after a test, so that :meth:`LocalSearch.local` has one for each. ``cell_rows``, for a
+    ``"pc_spouses"`` learner, is the least number of rows per cell of a categorical spouse test's
+    table for the test to run (:meth:`LocalSearch.spouses`); ``None`` runs every spouse test.
     """
 
     kind: Literal["blanket", "pc", "pc_spouses"]
     search: Search | None = None
     pc: str | None = None
+    cell_rows: int | None = None
 
     def __post_init__(self) -> None:
         spouses = self.kind == "pc_spouses"
         if spouses == (self.search is not None) or spouses != (self.pc is not None):
             raise ValueError("a 'pc_spouses' learner names its 'pc' learner; another has a search")
+        if self.cell_rows is not None and not spouses:
+            raise ValueError("only a 'pc_spouses' learner takes cell_rows")
 
 
 def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bool) -> list[int]:
@@ -981,6 +987,7 @@ LEARNERS: dict[str, Learner] = {
     "gs": Learner("blanket", _gs),
     "fast_iamb": Learner("blanket", _fast_iamb),
     "hiton_pc": Learner("pc", _hiton_pc),
+    "hiton_mb": Learner("pc_spouses", pc="hiton_pc", cell_rows=HITON_CELL_ROWS),
 }
 
 
@@ -1253,10 +1260,20 @@ class LocalSearch:
         if learner.kind == "pc":
             return pc, None, sepsets
         if (method, target) not in self._spouses:
-            self._spouses[method, target] = self.spouses(name, target, pc, sepsets)
+            self._spouses[method, target] = self.spouses(
+                name, target, pc, sepsets, cell_rows=learner.cell_rows
+            )
         return pc, pc + self._spouses[method, target], sepsets
 
-    def spouses(self, method: str, target: int, pc: list[int], sepsets: Sepsets) -> list[int]:
+    def spouses(
+        self,
+        method: str,
+        target: int,
+        pc: list[int],
+        sepsets: Sepsets,
+        *,
+        cell_rows: int | None = None,
+    ) -> list[int]:
         """The spouses of ``target``, in the order they join, given its parents and children
         ``pc`` and the separating sets ``sepsets`` of :meth:`local`.
 
@@ -1272,8 +1289,11 @@ class LocalSearch:
 
         A ``y`` already in the candidate's separating set leaves that set unchanged, so it admits
         nothing and is not tested. With ``max_depth``, a test that would condition on more
-        variables is not run. A candidate without a separating set, one the knowledge makes
-        non-adjacent to ``target``, never joins: such a pair is left out of every returned set.
+        variables is not run, and with ``cell_rows``, a test of categorical columns whose table
+        (:func:`table_size`) has more cells than ``n / cell_rows``; a test not run admits nothing,
+        so the candidate joins only through another ``y``. A candidate without a separating set,
+        one the knowledge makes non-adjacent to ``target``, never joins: such a pair is left out
+        of every returned set.
 
         References
         ----------
@@ -1294,6 +1314,10 @@ class LocalSearch:
                     cond = tuple(sorted((*sepsets[x], y)))
                     if self.max_depth is not None and len(cond) > self.max_depth:
                         continue
+                    if cell_rows is not None and self.levels is not None:
+                        size = table_size(self.levels, target, x, cond)
+                        if size is not None and self.n < cell_rows * size:
+                            continue
                     if self.scan(target, [x], cond)[1][0] <= self.alpha:
                         found.append(x)
         return found

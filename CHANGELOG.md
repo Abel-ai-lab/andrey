@@ -29,6 +29,13 @@ names its pull request.
   of the members before it, tests every member again once all have joined, and keeps a member only
   when the target is in that member's own set. On categorical data a test runs only with at least
   five rows per cell of its table. ([#950])
+- `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
+  experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
+  target and for each of its parents and children, then admits each child's other parent when a
+  test finds it dependent on the target given the set that separated the two and the common child.
+  On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
+  ([#955])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2612,6 +2619,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#955]: https://github.com/Abel-ai-lab/Andrey/pull/955
 [#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
 [#931]: https://github.com/Abel-ai-lab/Andrey/pull/931
