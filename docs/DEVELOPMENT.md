@@ -45,13 +45,13 @@ earlier build. Download links keep their plain addresses.
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
 only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the hero's art, the sections' claims and tiles, the charts, and the comparison table with its
-sources. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the
+the hero's art, the sections' claims and tiles, the figures, and the tables. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the
 page's never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
 speed charts, which the posts and the release cards share.
 
 The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", the
-install line, and a card per section. A pill above the headline copies the prompt that installs the
+install lines, each with a copy button that `prompt.js` shows (without script the command is
+plain text), Get started, and a card per section. A pill above the headline copies the prompt that installs the
 agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside
 the marks of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT). The
 sections follow the headline's words, then All-in-one (`ACTS` in `site/build.py`). Each opens on its
@@ -60,22 +60,43 @@ each with a figure of its own, and a note in plain type where the evidence is a 
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
 screen as Accelerated's title appears, until the speed panel rises over the art.
 
-- Accelerated: the speed panel with a tab per method family, followed by a link to the post "Why
-  Andrey is fast".
-- Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
-  tested against true graphs, and its release card gives every method's errors.
+- Accelerated: one method per registry family, each package's fit time on its own bar
+  (`speed_tiles()`), and beside it a note that links the post "Why Andrey is fast". Its claim is
+  `CLAIM`, with no number.
+- Accurate: the same methods' errors against the true graph, one bar per package
+  (`accuracy_tiles()`), and beside it a note that links the release cards. Its claim says Andrey
+  is as accurate as the other packages; the build stops when a method the figure shows has more
+  errors than a package it is compared with (`act_claims()`, `WORSE`).
 - Agentic: an agent's run of the command line, and the contract it reads first.
-- All-in-one: the methods by family, the comparison table's features per package, and every kind
-  of causal graph drawn; then "From data to graph" on its own art (`example_cover()`,
-  `EXAMPLE_ART`): the Sachs example's code, output, and graph.
+- All-in-one: Andrey beside causal-learn, Tetrad, pcalg, and bnlearn (`comparison_table()`), then
+  the families by the kinds of data their methods read (`families_table()`), then every kind of
+  causal graph drawn, and one link to the comparison page; then "From data to graph" on its own art
+  (`example_cover()`, `EXAMPLE_ART`): the Sachs example's code, output, and graph.
+
+Both figures show the method `featured_methods()` picks in each family: the supported method
+compared with the most packages (`compared_packages()`, any setting, research code in
+`RESEARCH_CODE` not counted); among equals, the largest size at which every package in its shown
+setting (`default_settings()`) ran and Andrey's graph beats the empty graph (`beats_empty()`; link
+F1 in `F1_FAMILIES`); then registry order. A row is that method at that size, each value on the
+row's own scale from zero (`featured_bars()`). The ranking is `feature_ranks()` and
+`featured_among()`, which pick among any list of methods, so the methods catalog shares it.
+
+The homepage's comparison table shows the distinct methods and the features only Andrey has in
+full (`alone()`); each partial mark keeps its note as a tooltip. The comparison page,
+[`docs/comparison.md`](docs/comparison.md), has every feature in the documentation's table style:
+`comparison_page()` writes its table and notes into `_generated/`, a mark per package for each
+feature in `COMPARISON` (read from the released versions in `PEER_VERSIONS`), the distinct methods
+per package (`METHOD_COUNTS`; Andrey's are its supported methods less `COUNTED_WITH`), and a
+numbered note for each partial mark, without which the build stops. The families table has a row
+per family, linked to its table on the methods page (`CATALOG`), with its line from
+`FAMILY_LINES`; a column per kind in `DATA_KINDS`, linked to its row there; and in each cell a dot
+sized by the number of the family's supported methods whose `data_kinds` hold the kind. Below 56rem
+the column labels stand upright and the lines drop.
 
 Each tile that leads on opens its details as a dialog (`tiles.js`) and never leaves the page;
 without script the details follow the grid and the tile jumps to them. No two tiles open the same
 dialog (Agentic's one tile shows the whole session, `agent_tile()`), and a tile whose dialog would
-only repeat it has none and carries no plus. A tile per registry family that has a supported method
-with a published comparison (`family_tiles()`) shows the family's largest ratio rounded down to one
-digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
-its tile with no change to the page.
+only repeat it has none and carries no plus.
 
 The post `docs/blog/20261008-why-andrey-is-fast.md` explains the speed through four animated scenes
 from [`site/why_fast.py`](../site/why_fast.py). Each compares Andrey with a lane labeled Others and
@@ -97,7 +118,7 @@ on its art (`docs_cover()`, `DOCS_ART`) and leads with the newest post (`_newest
 `conf.py`).
 
 The art follows [`DESIGN.md`](../DESIGN.md): the files are in `site/brand/` (`HERO_ART`, `ACTS`,
-`EXAMPLE_ART`, `FAMILY_ART`, and `tile_art()` in `site/build.py`), stored after `brand_tones` as
+`EXAMPLE_ART`, `DOCS_ART`, and `tile_art()` in `site/build.py`), stored after `brand_tones` as
 sRGB with no embedded profile, and site tests check their tones, their sizes, and that their median
 color is `--andrey-ground-art` (`cards.ground_tokens()`), the ground the CSS lays around them.
 
@@ -140,10 +161,11 @@ build time: the page shows what they print and draws the graphs they return.
 [`docs/methods.md`](docs/methods.md), Methods in the navbar, is a plain documentation page: a
 title, the count of supported and experimental methods (from `_methods_text()` in
 `docs/conf.py`), and two tables. "Start from your data" (`your-data`) has a row per kind of data a
-method reads (`MethodSpec.data_kinds`, row `data-<kind>`): what the kind means, the method to
-start with, the graph it returns, and how many methods of each family read it, each family linked
-to its section. Below, a section per family (`family-<family>`) holds a row per method
-(`method-<name>`). `catalog_start()` and `catalog_families()` in `site/build.py` write both from
+method reads (`MethodSpec.data_kinds`, row `data-<kind>`), in columns Data (what the kind
+means), Method (the one to start with), Graph (what it returns), and Families (how many methods of
+each family read it, each family linked to its section). Below, a section per family
+(`family-<family>`) holds a row per method (`method-<name>`), in columns Method, Data, Graph, and
+Compared with. `catalog_start()` and `catalog_families()` in `site/build.py` write both from
 the registry and the published summaries into `_generated/`. The tables take the documentation's
 table style, and their `stacked` class stacks each row on a phone, as the API reference's summary
 tables do (`andrey.css`). The page loads no script and no style of its own.

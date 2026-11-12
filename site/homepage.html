@@ -2,6 +2,13 @@
     (docs/_templates/docs-footer.html), as on every page. docs/conf.py fills `home` from
     site/build.py (homepage_context); site/assets/site.css styles everything under .andrey-home. -#}
 {%- extends "layout.html" %}
+{#- The copy button beside each command, shown and wired by prompt.js; without script the
+    command is selectable text. #}
+{%- macro copy_button() %}<button class="install-copy" type="button" aria-label="Copy the command"
+  title="Copy" hidden><svg class="install-copy__idle" viewBox="0 0 24 24" aria-hidden="true"><rect
+  x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><svg
+  class="install-copy__done" viewBox="0 0 24 24" aria-hidden="true"><path
+  d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>{% endmacro %}
 {%- block htmltitle %}<title>{{ home.title }}</title>{%- endblock htmltitle %}
 {%- block extrahead %}
 {{ super() }}
@@ -35,10 +42,10 @@
           <h1 id="headline"><span class="word">Accelerated, accurate, agentic</span> causal discovery.</h1>
           <div class="hero-actions">
             <div class="install-line">
-              <code>uv add andrey-core</code>
+              <code>uv add andrey-core</code>{{ copy_button() }}
             </div>
             <div class="install-line">
-              <code>pip install andrey-core</code>
+              <code>pip install andrey-core</code>{{ copy_button() }}
             </div>
             {{ home.hero_chips }}
           </div>
@@ -50,9 +57,7 @@
     {#- Each section opens on its art with its claim, then shows the evidence. #}
     <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
       {{ home.act_covers["accelerated"] }}
-      <div class="run-sheet">{{ home.speed_panel }}
-        <p class="run-more"><a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is
-          so fast</a></p></div>
+      <div class="run-sheet"><ul class="bento-grid">{{ home.speed_tiles }}</ul></div>
     </section>
   </div>
 
@@ -95,24 +100,15 @@
 
   <div class="tile-details">
     {{ home.dialog_head("graphs", home.graph_title) }}
-    <p>A causal graph says which variables drive which, and how much the data can tell decides its
-      kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of
-      measurements, and VARMA-LiNGAM on the same lawn day by day.</p>
+    <p>How much the data can tell decides a graph's kind. Here, four methods learn from data about a
+      lawn, its sprinkler, and the rain.</p>
     <div class="interface-figures">{{ home.interface_figures }}</div>
-    <p class="tile-more"><a href="docs/guides/graph-types.html">What each kind of graph means</a></p>
+    <p class="tile-more"><a href="docs/guides/graph-types.html">Graph types</a></p>
     {{ home.dialog_tail }}
     {{ home.dialog_head("agents", "Agent support") }}
-    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
-      method's parameters, so an agent can use it with no person watching.
-      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
+    <p><code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
     {{ home.agent_demo }}
     <p><a href="docs/api.html#command-line-interface">Command-line reference</a></p>
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("methods", "Methods for every kind of data") }}
-    <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
-      experimental method is not supported yet (see its Limitations), and its API may change
-      without deprecation.</p>
-    {{ home.methods }}
     {{ home.dialog_tail }}
   </div>
 

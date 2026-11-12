@@ -259,6 +259,31 @@ def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(htm
             assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
 
 
+def test_every_homepage_link_and_picture_is_built(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    main = home[home.index('<main id="main-content">') : home.index("</main>")]
+    targets = re.findall(r'(?:href|src|srcset)="([^"]+)"', main)
+    problems = []
+    for href in targets:
+        if href.startswith(("http", "mailto:", "data:")):
+            continue
+        if href.startswith("#"):
+            target, fragment = html / "index.html", href[1:]
+        else:
+            target, _, fragment = (
+                _resolve(html, html / "index.html", href),
+                *href.partition("#")[1:],
+            )
+        if not target.is_file():
+            problems.append(f"{href}: not built")
+        elif fragment and f'id="{fragment}"' not in target.read_text(encoding="utf-8"):
+            problems.append(f"{href}: no element has that id")
+    for script in ("tiles.js", "prompt.js"):
+        if script not in home or not (html / "_static" / script).is_file():
+            problems.append(f"{script}: not loaded or not built")
+    assert targets and not problems, "\n".join(problems)
+
+
 def test_every_homepage_tile_leads_to_details_that_are_built(html):
     home = (html / "index.html").read_text(encoding="utf-8")
     tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
@@ -270,9 +295,6 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
                 problems.append(f"{href}: no dialog holds its details")
         elif not _resolve(html, html / "index.html", href).is_file():
             problems.append(f"{href}: not built")
-    for script in ("tiles.js", "prompt.js"):
-        if f"{script}" not in home or not (html / "_static" / script).is_file():
-            problems.append(f"{script}: not loaded or not built")
     assert not problems, "\n".join(problems)
 
 
@@ -392,6 +414,29 @@ def test_every_link_in_the_methods_catalog_arrives(html):
     supported, experimental = statuses.count("supported"), statuses.count("experimental")
     words = " ".join(re.sub(r"<[^>]+>", " ", text).split())
     assert f"{supported} supported methods and {experimental} experimental" in words
+
+
+def test_the_comparison_page_counts_from_the_registry_and_its_links_arrive(html):
+    page = html / "docs" / "comparison.html"
+    text = page.read_text(encoding="utf-8")
+    article = text[text.index("<article") : text.index("</article>")]
+    links = _Links()
+    links.feed(article)
+    missing = []
+    for href in sorted({href for _, href in links.found if not href.startswith("http")}):
+        target = _resolve(html, page, href)
+        anchor = href.partition("#")[2]
+        if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
+            missing.append(href)
+    assert not missing, missing
+    # The registry's supported methods are the ones the page counts, less those that count with
+    # the method they extend; the table's Andrey cell is that count.
+    supported = sum(s.status == "supported" for s in andrey.spec.list_specs())
+    words = " ".join(re.sub(r"<[^>]+>", " ", article).split())
+    counted = re.search(rf"Andrey[’']s {supported} supported methods count as (\d+)", words)
+    assert counted, "the page does not count the homepage's supported methods"
+    cell = re.search(r'Distinct methods</td><td class="ct-ours">(\d+)</td>', article)
+    assert cell and cell[1] == counted[1]
 
 
 def test_every_page_has_a_built_favicon_and_link_preview_card(html):

@@ -229,41 +229,6 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     assert "ICA-LiNGAM" in build.speed_table(SUMMARY)
 
 
-def test_the_speed_panel_has_a_tab_and_a_figure_per_family():
-    summaries = build.release_summaries(SUMMARY)
-    panel = build.speed_panel(summaries)
-    families = [info["family"] for info in build.family_tiles(summaries)]
-    # Each family has a tab controlling its panel; the first tab is selected.
-    tabs = re.findall(r'role="tab" id="speed-tab-([\w-]+)" aria-controls="speed-([\w-]+)"', panel)
-    assert [t for t, _ in tabs] == families and all(t == c for t, c in tabs)
-    assert panel.count('aria-selected="true"') == 1
-    # Each panel shows the family's speedup and figure, followed by a brief description and
-    # a link to the release cards.
-    intro = build.family_intro()
-    assert len(intro) < 100 and "errors" not in intro
-    for key in families:
-        body = panel[panel.index(f'id="speed-{key}"') :]
-        body = body[: body.index('class="seg-panel"') if 'class="seg-panel"' in body else None]
-        assert 'class="tchart pf-chart"' in body or "No chart" in body
-        assert body.index(build.escape(intro)) < body.index(">Details in the release cards</a>")
-    assert "Every measurement" not in panel
-
-
-def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
-    summaries = build.release_summaries(SUMMARY)
-    points = build.frontier_points(summaries)
-    for family, shown in points.items():
-        ours = [p for p in shown if p["ours"]]
-        # Each method has one Andrey series; all packages share its largest measured size.
-        assert len({p["method"] for p in ours}) == len(ours), family
-        for p in shown:
-            mine = next(o for o in ours if o["method"] == p["method"])
-            assert p["size"] == mine["size"] and p["seconds"] > 0 and p["share"] >= 0
-    # Method names omit setting descriptions such as "XGES without extended search".
-    names = {p["method"] for shown in points.values() for p in shown}
-    assert not any(" on " in n or " without " in n or ", " in n for n in names)
-
-
 def test_a_chart_joins_only_comparisons_from_the_same_runs():
     # PC against gCastle on the causal-learn runs with one more size, against causal-learn at a
     # size no other comparison measures, and against pcalg on runs of its own.
@@ -289,9 +254,10 @@ def test_a_chart_joins_only_comparisons_from_the_same_runs():
         chart = build.time_chart(name, methods, (0.01, 100))
         sizes = {r["d"] for m in methods for r in m["rows"]}
         assert chart.count('class="tc-point tc-andrey') == len(sizes)
-    # The panel draws PC over the sizes its first chart's packages share.
-    ours = [p for p in build.frontier_points([summary])["constraint"] if p["ours"]]
-    assert [(p["method"], [d for d, _, _ in p["sizes"]]) for p in ours] == [("PC", [20, 50])]
+    # PC is shown in its first chart, over the sizes that chart's packages share.
+    _, methods = build.default_settings([summary])["pc"]
+    assert [m["comparator"] for m in methods] == ["causal-learn", "gCastle"]
+    assert list(build.shared_rows(methods)) == [20, 50]
 
 
 def test_a_setting_shown_under_its_method_name_comes_from_its_first_chart():
@@ -308,12 +274,14 @@ def test_a_setting_shown_under_its_method_name_comes_from_its_first_chart():
         ],
     }  # fmt: skip
     assert len(build.time_groups([summary])) == 2
-    (andrey,) = [p for p in build.frontier_points([summary])["constraint"] if p["ours"]]
-    assert andrey["method"] == "ICP"
-    assert [(d, t) for d, t, _ in andrey["sizes"]] == [(r["d"], r["andrey_s"]) for r in claimed]
+    name, (method,) = build.default_settings([summary])["icp"]
+    assert name == "ICP"
+    assert [(r["d"], r["andrey_s"]) for r in method["rows"]] == [
+        (r["d"], r["andrey_s"]) for r in claimed
+    ]
 
 
-def test_a_panel_line_takes_the_largest_sample_size_at_each_size():
+def test_a_featured_row_takes_the_largest_sample_size_at_each_size():
     # PC at two sample sizes per graph size, the larger listed first.
     rows = [
         dict(_row(20, 0.3, 3.0, 10.0, 5, 6, 20), n=5000),
@@ -322,18 +290,20 @@ def test_a_panel_line_takes_the_largest_sample_size_at_each_size():
         dict(_row(50, 0.4, 2.0, 5.0, 15, 15, 50), n=1000),
     ]
     summary = {**SUMMARY, "methods": [_method("PC", "constraint-based", "causal-learn", rows)]}
-    lines = build.frontier_points([summary])["constraint"]
+    _, methods = build.default_settings([summary])["pc"]
     larger = [r for r in rows if r["n"] == 5000]
-    for p in lines:
-        who = "andrey" if p["ours"] else "comparator"
-        assert [(d, t) for d, t, _ in p["sizes"]] == [(r["d"], r[f"{who}_s"]) for r in larger]
+    shown = build.shared_rows(methods)
+    for who in ("andrey", "comparator"):
+        assert [(d, rs[0][f"{who}_s"]) for d, rs in shown.items()] == [
+            (r["d"], r[f"{who}_s"]) for r in larger
+        ]
     # Every published comparison that repeats a size records each row's sample size.
     for m in build.claimed_comparisons(placeholder_summaries()):
         repeated = {d for d, k in Counter(r["d"] for r in m["rows"]).items() if k > 1}
         assert all(r["n"] is not None for r in m["rows"] if r["d"] in repeated), m["method"]
 
 
-def test_every_chart_draws_its_comparisons_and_every_scored_method_reaches_the_panel():
+def test_every_chart_draws_its_comparisons():
     summaries = placeholder_summaries()
     groups = build.time_groups(summaries)
     assert sum(len(methods) for _, methods in groups) == len(build.claimed_comparisons(summaries))
@@ -358,104 +328,6 @@ def test_every_chart_draws_its_comparisons_and_every_scored_method_reaches_the_p
             r["andrey_s"] is not None for r in drawn
         )
 
-    # A method reaches the speed panel when one of its charts has a size where every package
-    # has a time and a score.
-    def scored(method: dict, row: dict) -> bool:
-        timed = row["andrey_s"] is not None and row["comparator_s"] is not None
-        if method["family"] in build.F1_FAMILIES:
-            return timed and None not in (row["andrey_f1"], row["comparator_f1"])
-        return timed and bool(row["empty_errors"])
-
-    charts = build.speed_groups(summaries)
-    names = {p["method"] for shown in build.frontier_points(summaries).values() for p in shown}
-    shown = {ms[0]["spec"] for n, ms in charts if build.SHOWN_SETTINGS.get(n, n) in names}
-    for _, methods in charts:
-        sizes = [{r["d"] for r in m["rows"] if scored(m, r)} for m in methods]
-        if set.intersection(*sizes):
-            assert methods[0]["spec"] in shown, methods[0]["method"]
-
-
-def test_the_temporal_figure_scores_links_by_f1():
-    summaries = build.release_summaries(SUMMARY)
-    points = build.frontier_points(summaries)
-    # Temporal methods: 1 minus the link F1, bounded by 0 and 1, whatever the window of lags.
-    assert points["temporal"] and all(p["f1"] for p in points["temporal"])
-    assert all(0 <= e <= 1 for p in points["temporal"] for _, _, e in p["sizes"])
-    assert not any(p["f1"] for family, shown in points.items() if family != "temporal"
-                   for p in shown)  # fmt: skip
-    frame = build.frontier_frame([p for shown in points.values() for p in shown])
-    figure = build.frontier_chart("Temporal causal discovery", points["temporal"], frame)
-    assert "1 − link F1" in figure and "empty graph</text>" not in figure
-
-
-def test_the_panel_number_follows_the_chosen_method():
-    summaries = build.release_summaries(SUMMARY)
-    points = build.frontier_points(summaries)["constraint"]
-    info = next(i for i in build.family_tiles(summaries) if i["family"] == "constraint")
-    bar = build.method_bar(points, build.family_number(info))
-    numbers = dict(re.findall(r'data-method="([\w-]*)" data-number="([^"]*)"', bar))
-    # "All" shows the family's best speedup; each method shows its own best published speedup.
-    assert html.unescape(numbers[""]) == build.family_number(info)
-    pc = build.method_ratio(points, "PC")
-    assert pc == max(r["ratio"] or 0 for m in build.supported(summaries)
-                     if m["method"] == "PC" for r in m["rows"])  # fmt: skip
-    assert html.unescape(numbers["pc"]) == build.speed_number(pc)
-    # Distinct method keys keep the PCMCI selection from highlighting PCMCI+.
-    for shown in build.frontier_points(summaries).values():
-        names = {p["method"] for p in shown}
-        assert len({build.method_key(n) for n in names}) == len(names)
-
-
-def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
-    every = build.frontier_points(placeholder_summaries())
-    frame = build.frontier_frame([p for family in every.values() for p in family])
-    for family, points in every.items():
-        figure = build.frontier_chart(family, points, frame)
-        ours = [p for p in points if p["ours"]]
-        sizes = sum(len(p["sizes"]) for p in ours)
-        assert figure.count('class="pf-andrey"') == sizes + 1  # plus the legend marker
-        packages = {build.package_name(p["package"]) for p in points if not p["ours"]}
-        shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
-        assert len(shapes) == len(packages), family
-        assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
-        assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
-        # Each method's name appears once.
-        for p in ours:
-            assert figure.count(f">{build.escape(p['method'])}</text>") == 1
-    # A figure with more packages than shapes is refused rather than drawn with a shape twice.
-    points = every["constraint"]
-    extra = [dict(p, package=f"package {'x' * k}") for k, p in enumerate(points) if not p["ours"]]
-    with pytest.raises(ValueError, match="marker shapes"):
-        build.frontier_chart("constraint", points + extra, frame)
-
-
-def test_every_family_legend_names_each_package_once():
-    summaries = placeholder_summaries()
-    panel = build.speed_panel(summaries)
-    points = build.frontier_points(summaries)
-    for info in build.family_tiles(summaries):
-        family = info["family"]
-        body = panel[panel.index(f'id="speed-{family}"') :]
-        body = body[: body.index('class="seg-panel"') if 'class="seg-panel"' in body else None]
-        if 'class="tc-legend"' not in body:
-            continue
-        legend = body[body.index('class="tc-legend"') :]
-        legend = legend[: legend.index("</p>")]
-        keys = re.findall(r'class="pf-other pf-(\w+)" d="[^"]*"/></svg>([^<]*)</span>', legend)
-        names = [html.unescape(name) for _, name in keys]
-        # Each package has one entry and one shape, named without a version or setting.
-        assert len(names) == len(set(names)) == len({k for k, _ in keys}), (family, names)
-        assert not any(re.search(r"\d", name) for name in names), (family, names)
-        shown = [p for p in points[family] if not p["ours"]]
-        assert set(names) == {build.package_name(p["package"]) for p in shown}, family
-        # A method's lines name different packages, so no two of its lines share a shape.
-        for method in {p["method"] for p in shown}:
-            named = [build.package_name(p["package"]) for p in shown if p["method"] == method]
-            assert len(named) == len(set(named)), (family, method, named)
-    # A comparator with a version and no PACKAGE_NAMES entry is refused, not shown with it.
-    with pytest.raises(ValueError, match="PACKAGE_NAMES"):
-        build.package_name("somepackage 1.0")
-
 
 def test_errors_compare_as_a_share_rounded_against_andrey():
     exact = {"d": 50, "andrey_s": 1.0, "comparator_s": 2.0, "ratio": 2.0, "at_least": False}
@@ -476,30 +348,6 @@ def test_errors_compare_as_a_share_rounded_against_andrey():
         (400, "fewer", "<1% fewer"),
         (800, "more", "7% more"),
     ]
-
-
-def test_methods_list_every_registered_method(monkeypatch):
-    # GFCI is experimental here, so it carries the status label and no seal.
-    specs = [
-        s.model_copy(update={"status": "experimental"}) if s.name == "gfci" else s
-        for s in list_specs()
-    ]
-    monkeypatch.setattr(build, "list_specs", lambda: specs)
-    summaries = placeholder_summaries()
-    title, html = build.methods(summaries)
-    assert title.startswith(f"{len(specs)} methods in ")
-    assert html.count('class="method"') == len(specs)
-    for spec in specs:
-        assert f"docs/api/andrey.{spec.name}.html" in html
-    # Each supported method a release's summary compares with another package has the seal, and a
-    # tooltip that describes it.
-    status = {s.name: s.status for s in specs}
-    measured = {build.registry_name(m) for s in summaries for m in s["methods"]}
-    sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
-    assert sealed == sorted(n for n in measured if status[n] == "supported")
-    assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
-    assert html.count('class="method-status"') == sum(s.status == "experimental" for s in specs)
-    assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
 
 
 def test_method_descriptions_stop_at_the_first_clause():
@@ -530,17 +378,9 @@ def test_unpublished_summary_needs_the_placeholder_flag():
     assert unmarked["robots"] == unmarked["banner"] == ""
 
 
-def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
+def test_page_shows_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each family's panel holds its figure; the release cards list every measured size.
-    points = build.frontier_points(summaries)
-    for info in build.family_tiles(summaries):
-        dialog = page[page.index(f'id="speed-{info["family"]}"') :]
-        dialog = dialog[: dialog.index("</dialog>")]
-        for p in points.get(info["family"], []):
-            if p["ours"]:
-                assert f">{build.escape(p['method'])}</text>" in dialog
     assert not re.search(r"/scratch/|/home/", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
     for summary in summaries:
@@ -644,7 +484,7 @@ def test_the_headline_is_one_sentence_with_no_number(placeholder_page):
 def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder_page):
     hero = placeholder_page[placeholder_page.index('<section class="hero"') :]
     hero = hero[: hero.index("</section>")]
-    claims = build.act_claims(placeholder_summaries())
+    claims = build.act_claims(build.featured_methods(placeholder_summaries()))
     cards = re.findall(r'<a href="#([\w-]+)">.*?<b>([^<]+)</b><span>([^<]+)</span></a>', hero)
     assert [key for key, _, _ in cards] == [key for key, *_ in build.ACTS] == list(claims)
     for key, title, short in cards:
@@ -654,15 +494,6 @@ def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder
         assert short == claims[key][0]
         cover = re.sub(r"<[^>]+>", "", claims[key][1])
         assert set(re.findall(r"\d[\d,]*", short)) <= set(re.findall(r"\d[\d,]*", cover))
-
-
-def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
-    lede = build.lede()
-    families = dict.fromkeys(spec.family for spec in list_specs())
-    for family in families:
-        assert build.FAMILY_TERMS[family] in lede
-    assert lede.count(". ") == 0 and lede.endswith(" methods.")
-    assert lede in " ".join(placeholder_page.split())
 
 
 def test_the_page_title_names_what_people_search_for(placeholder_page):
@@ -942,11 +773,14 @@ def test_homepage_styles_are_scoped_to_the_homepage():
 def test_every_partial_mark_says_what_it_covers():
     notes = build.comparison_notes()
     assert all(mark == "part" or package != "Andrey" for _, package, mark, _ in notes)
-    table = build.comparison_table([SUMMARY])
-    assert table.count('class="mark mark--') == len(build.COMPARISON) * len(build.PEERS)
-    # Each partial mark carries its note as a tooltip and in its screen-reader text.
-    assert table.count(" title=") == len(notes) and "compare-note-" not in table
-    for _, _, _, note in notes:
+    table = build.comparison_table()
+    shown = {feature for _, feature, marks, _ in build.COMPARISON if build.alone(marks)}
+    assert table.count('class="mark mark--') == len(shown) * len(build.PEERS)
+    # Each partial mark the homepage shows carries its note as a tooltip and in its screen-reader
+    # text.
+    kept = [note for feature, _, _, note in notes if feature in shown]
+    assert table.count(" title=") == len(kept) and "compare-note-" not in table
+    for note in kept:
         assert f"Partly: {build.escape(note)}</span>" in table
     bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
     original, build.COMPARISON = build.COMPARISON, tuple(bad)
@@ -957,22 +791,25 @@ def test_every_partial_mark_says_what_it_covers():
         build.COMPARISON = original
 
 
-def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
-    table = build.comparison_table([SUMMARY])
-    # One table has three sections, each heading appears once, and brief attribute labels have
-    # details in the notes.
-    assert re.findall(r'<tr class="compare-group"><th[^>]*>([^<]+)</th>', table) == list(
-        build.SECTIONS
-    )
+def test_the_homepage_comparison_shows_the_features_only_andrey_has_in_full():
+    table = build.comparison_table()
+    # The measured rows, then by section the features no other package has in full; the
+    # comparison page has the rest.
+    alone = [(s, f) for s, f, marks, _ in build.COMPARISON if build.alone(marks)]
+    measured = [(s, label) for s, label, _ in build.measured_rows()]
+    expected = [
+        label for section in build.SECTIONS for s, label in [*measured, *alone] if s == section
+    ]
+    assert re.findall(r'<th scope="row">(?:<a [^>]*>)?([^<]+)<', table) == expected
+    sections = re.findall(r'<tr class="compare-group"><th[^>]*>([^<]+)</th>', table)
+    assert sections == [s for s in build.SECTIONS if any(r[0] == s for r in measured + alone)]
+    assert "<tfoot" not in table
     for section, feature, marks, _ in build.COMPARISON:
         assert section in build.SECTIONS
-        assert len(feature.split()) <= 6, feature
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
     assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
-    tiles = build.coverage_tiles([SUMMARY], "")
     # Only coverage is counted; speed has no pooled number, which would mix different methods.
-    rows = build.measured_rows(build.release_summaries(SUMMARY))
-    assert [(section, label) for section, label, _ in rows] == [("Coverage", "Distinct methods")]
+    assert measured == [("Coverage", "Distinct methods")]
     # Andrey's count is the supported methods of the registry; each method counted with another
     # names two supported ones.
     names = {spec.name for spec in build.list_specs() if spec.status != "experimental"}
@@ -980,7 +817,8 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     assert build.METHOD_COUNTS["Andrey"] == len(names) - len(build.COUNTED_WITH)
     # A partial mark has its own symbol, a half-filled circle.
     assert build.MARKS["part"][0] == "half" and "half" in build.ICON
-    assert "Compared with other packages" in tiles and "bento-note" not in tiles
+    tiles = build.coverage_tiles("")
+    assert '<table class="compare">' in tiles and '<table class="matrix">' in tiles
 
 
 def test_interface_example_returns_every_kind_of_graph():
@@ -1111,8 +949,8 @@ def test_code_and_its_output_sit_in_windows_named_for_the_file(placeholder_page)
 
 
 def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
-    # Every kind a supported method returns has the homepage's name for it, and the tile lists them
-    # all, with graphs over time, and draws each one; its dialog draws them with captions, and
+    # Every kind a supported method returns has the homepage's name for it, and the tile draws each
+    # one, with graphs over time; its dialog draws them with captions, and
     # leads to the guide that explains them. The homepage shows supported methods only, so a kind
     # that only experimental methods return is not on the tile, and neither is a conversion's kind
     # (a MAG). A skeleton is not a causal graph: a supported method may return one by default, as
@@ -1131,7 +969,7 @@ def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
     assert not (experimental - supported) & build.GRAPH_KINDS.keys()
     tile = placeholder_page[placeholder_page.index('data-tile="graphs"') :]
     tile = tile[: tile.index("</li>")]
-    assert f">{build.graph_title()}<" in tile and f"{build.listed(kinds)}." in tile
+    assert f">{build.graph_title()}<" in tile
     drawn = ["DAG", "CPDAG", "PAG", "Graph over time", "Cyclic graph"]
     assert re.findall(r"<figcaption>([^<]+)</figcaption>", tile) == drawn
     assert len(drawn) == len(kinds) and tile.count('role="img"') == len(kinds)
@@ -1175,66 +1013,11 @@ def test_every_tile_leads_to_its_details_without_script(placeholder_page):
     assert ".tile-dialog { display: block; position: static;" in page
 
 
-def test_the_page_has_a_tile_per_family_with_a_comparison(placeholder_page):
-    summaries = placeholder_summaries()
-    tiles = build.family_tiles(summaries)
-    families = {m["family"] for m in build.claimed_comparisons(summaries)}
-    assert [t["family"] for t in tiles] == [f for f in build.SPEC_FAMILIES if f in families]
-    for info in tiles:
-        assert placeholder_page.count(f'id="speed-tab-{info["family"]}"') == 1
-        panel = placeholder_page[placeholder_page.index(f'id="speed-{info["family"]}"') :]
-        assert 'href="docs/benchmarks.html"' in panel[: panel.index("</div></div>")] or (
-            'href="docs/benchmarks.html"' in panel[: panel.index('class="seg-panel"', 1)]
-            if 'class="seg-panel"' in panel[1:]
-            else 'href="docs/benchmarks.html"' in panel
-        )
-        best = max(r["ratio"] for m in info["comparisons"] for r in m["rows"] if r["ratio"])
-        if info["number"] is None:
-            assert best < 2
-        else:
-            # Rounded down to one digit: never above the family's ratio, always more than half.
-            assert best / 2 < info["number"] <= best
-            assert len(str(info["number"]).rstrip("0")) == 1
-            assert f"<b>{info['number']:,}x</b>" in placeholder_page
-
-
 @pytest.mark.parametrize(
     ("ratio", "shown"), [(941, 900), (1470, 1000), (16, 10), (6.9, 6), (2.0, 2), (99.9, 90)]
 )
 def test_a_family_number_rounds_down_to_one_digit(ratio, shown):
     assert build.round_down(ratio) == shown
-
-
-def test_a_family_where_andrey_is_not_faster_shows_no_number():
-    summaries = placeholder_summaries()
-    families = {spec.name: spec.family for spec in list_specs()}
-    for summary in summaries:
-        for method in summary["methods"]:
-            if families.get(build.registry_name(method)) == "constraint":
-                for row in method["rows"]:
-                    row.update(ratio=0.8, ratio_is_lower_bound=False)
-    tiles = {t["family"]: t for t in build.family_tiles(summaries)}
-    assert tiles["constraint"]["number"] is None
-    assert build.family_number(tiles["constraint"]) == ""
-    assert tiles["functional"]["number"] is not None
-
-
-def test_a_new_family_gets_a_tile_with_no_code_change(monkeypatch):
-    summaries = placeholder_summaries()
-    monkeypatch.setattr(build, "SPEC_FAMILIES", {**build.SPEC_FAMILIES, "spectral": "Spectral"})
-    assert "spectral" not in [t["family"] for t in build.family_tiles(summaries)]
-    original = build.comparisons
-
-    def moved(summary):
-        out = original(summary)
-        for m in out:
-            if m["method"] == "PNL":
-                m["family"] = "spectral"
-        return out
-
-    monkeypatch.setattr(build, "comparisons", moved)
-    titles = [t["title"] for t in build.family_tiles(summaries)]
-    assert "Spectral" in titles
 
 
 def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_page):
@@ -1245,14 +1028,12 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
     start = {k: placeholder_page.index(f'id="{k}"') for k in sections}
     ends = [*list(start.values())[1:], placeholder_page.index('<div class="tile-details">')]
     held = {
-        "accelerated": (
-            'id="speed-tab-constraint"',
-            'href="blog/20261008-why-andrey-is-fast.html"',
-        ),
+        "accelerated": ('class="err-pairs"', 'href="blog/20261008-why-andrey-is-fast.html"'),
         "accurate": ('class="err-pairs"', 'href="docs/benchmarks.html"'),
         "agentic": ('data-tile="agents"', "andrey run pc --help --json"),
         "all-in-one": (
-            'data-tile="methods"',
+            '<table class="matrix">',
+            'href="docs/comparison.html"',
             'data-tile="graphs"',
             '<table class="compare">',
             'id="example"',
@@ -1263,9 +1044,9 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
         # Every section shows its evidence after its cover: tiles, and notes in plain type where
         # a figure would add nothing.
         cover = re.search(r'<div class="[\w -]*\bact-cover\b', body)
-        evidence = re.search(r'<ul class="bento-grid">|<div class="seg"', body)
+        evidence = re.search(r'<ul class="bento-grid">', body)
         assert cover and evidence and cover.start() < evidence.start(), key
-        shown = ('<li class="tile', '<li class="bento-note">', 'class="seg-panel"')
+        shown = ('<li class="tile', '<li class="bento-note">')
         assert sum(body.count(mark) for mark in shown) >= 1, key
         for mark in held[key]:
             assert mark in body, (key, mark)
@@ -1292,9 +1073,9 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     assert f'src="_static/art-{build.HERO_ART}.jpg"' in art and 'fetchpriority="high"' in art
     assert 'class="cover-sweep"' in art
     first = run[run.index('id="accelerated"') : run.index('id="accurate"')]
-    assert "<img" not in first[: first.index('class="seg"')]
-    assert "<picture" not in first[: first.index('class="seg"')]
-    assert first.index('<div class="run-sheet">') < first.index('class="seg"')
+    assert "<img" not in first[: first.index('class="bento-grid"')]
+    assert "<picture" not in first[: first.index('class="bento-grid"')]
+    assert first.index('<div class="run-sheet">') < first.index('class="bento-grid"')
     css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
     rule = css[css.index(".andrey-home .run-art {") :]
     assert "position: sticky;" in rule[: rule.index("}")]
@@ -1314,52 +1095,14 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     assert preload in placeholder_page
 
 
-def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
-    rows = build.accuracy_rows([SUMMARY])
-    figure = build.accuracy_wins([SUMMARY])
-    # Each family's largest error reduction has paired bars and a percentage, with no comparison
-    # count. The other tile states the limits for other methods.
-    wins = build.family_wins([SUMMARY])
-    assert 0 < len(wins) < len(rows)
-    assert len({r["family"] for r in wins}) == len(wins)
-    for r in wins:
-        same = [o for o in rows if o["family"] == r["family"]]
-        assert build.accuracy_change(r) == min(build.accuracy_change(o) for o in same) <= -0.5
-    # Each win is a pair of bars, Andrey's then the other package's, on the row's own scale.
-    assert figure.count('<div class="err-bar err-bar--andrey">') == len(wins)
-    assert figure.count('<div class="err-bar">') == len(wins)
-    assert re.findall(r"--f: ([\d.]+)", figure)[1::2] == ["1.000"] * len(wins)
-    assert len(re.findall(r">\d+% fewer errors<", figure)) == len(wins)
-    tiles = build.accuracy_tiles([SUMMARY])
-    # The homepage shows the wins only; every other method's errors are on the release cards.
-    assert not any(hedge in tiles.lower() for hedge in ("as accurate", "on par", "within"))
-    assert '<a href="docs/benchmarks.html">Release cards</a>' in tiles
-
-
-def test_a_row_its_release_card_does_not_count_better_is_never_a_win():
-    best = build.family_wins([SUMMARY])[0]
-
-    def judged(verdict):
-        methods = [
-            {
-                **m,
-                "rows": [
-                    {**r, "card_verdict": verdict(i) if callable(verdict) else verdict}
-                    for i, r in enumerate(m["rows"])
-                ],
-            }
-            if m["method"] == best["name"]
-            else m
-            for m in SUMMARY["methods"]
-        ]
-        return [r["name"] for r in build.family_wins([{**SUMMARY, "methods": methods}])]
-
-    # A comparison with a row the card counts better and none worse stays a win; one of ties,
-    # of rows the card did not judge, or with a worse row, drops out.
-    assert best["name"] in judged("better")
-    assert best["name"] not in judged("tie")
-    assert best["name"] not in judged(None)
-    assert best["name"] not in judged(lambda i: "worse" if i == 0 else "better")
+def test_an_outcome_is_the_cards_verdict_or_else_the_error_counts():
+    row = {"andrey_errors": 5, "comparator_errors": 7}
+    for verdict in ("tie", "better", "worse"):
+        assert build.outcome({**row, "card_verdict": verdict}) == verdict
+    for verdict in (None, "unrecorded"):
+        assert build.outcome({**row, "card_verdict": verdict}) == "fewer"
+        assert build.outcome({**row, "andrey_errors": 7, "card_verdict": verdict}) == "same"
+        assert build.outcome({**row, "andrey_errors": 9, "card_verdict": verdict}) == "more"
 
 
 def test_the_quality_intro_states_each_recorded_outcome_and_names_every_setting_with_more():
@@ -1407,33 +1150,16 @@ def test_the_quality_intro_states_each_recorded_outcome_and_names_every_setting_
     assert "DirectLiNGAM" not in intro
 
 
-def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
-    # The claim is the largest cut in errors, the chart's first row, not a count of methods.
-    fewer = build.fewest_errors(placeholder_summaries())
-    lead, shown = build.more_than(fewer)
-    section = placeholder_page[placeholder_page.index('id="accurate"') :]
-    section = section[: section.index("</section>")]
-    assert f"{lead} <b>{shown}%</b> fewer errors than other popular packages." in section
-    fewer = f"{fewer:.0f}%"
-    assert re.findall(r">(\d+%) fewer errors<", section)[0] == fewer
-    # The tile under it names what its chart shows rather than repeating the number.
-    assert '<h3 class="tile-title">Fewer errors than the other package</h3>' in section
-    assert "More accurate in" not in placeholder_page
-    assert not any(hedge in section.lower() for hedge in ("as accurate", "on par", "within"))
-    # The win rows name the package each is against; PC is more accurate only against gCastle.
-    assert re.findall(r'<div class="err-bar"><span>([^<]+)</span>', section)
-
-
-def test_the_first_section_links_why_it_is_fast_under_its_speed_panel(placeholder_page):
-    # The section has a title, a speed panel, and a link to the speed explanation, with no
-    # separate animation, tile, or dialog.
+def test_the_first_section_links_why_it_is_fast_beside_its_figure(placeholder_page):
+    # The section has a title, its figure, and a link to the speed explanation, with no
+    # separate animation or dialog.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
     section = section[: section.index("</section>")]
-    assert section.index('id="accelerated-title"') < section.index('class="seg"')
-    link = '<a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is'
-    assert section.index('class="seg"') < section.index(link)
+    assert section.index('id="accelerated-title"') < section.index('class="err-pairs"')
+    link = '<a href="blog/20261008-why-andrey-is-fast.html">'
+    assert section.index('class="err-pairs"') < section.index(link)
     assert "wf-scene" not in placeholder_page and "why-fast.js" not in placeholder_page
-    assert '<li class="tile' not in section and "wf-plus" not in section
+    assert "wf-plus" not in section
 
 
 def _timed_row(d: int, n: int, ratio: float, hardware: str | None = None) -> dict:
@@ -1468,13 +1194,15 @@ def test_a_second_machines_timings_and_an_unshown_regime_are_not_counted(tmp_pat
     assert len(loaded["methods"]) == len(summary["methods"])
 
 
-def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
-    # The release promise appears as an unframed note beside a tile. The comparison table holds
-    # the method count.
-    notes = re.findall(r'<li class="bento-note">(.*?)</li>', placeholder_page, re.S)
-    assert [re.search(r"<h3>([^<]+)</h3>", note)[1] for note in notes] == [
-        "Tested against the true graphs",
-    ]
+def test_a_note_is_plain_type_beside_a_figure_not_a_card(placeholder_page):
+    # Each note sits in plain type beside the figure it completes, one in each of the first two
+    # sections, and holds one link.
+    for key in ("accelerated", "accurate"):
+        section = placeholder_page[placeholder_page.index(f'id="{key}"') :]
+        section = section[: section.index("</section>")]
+        notes = re.findall(r'<li class="bento-note">(.*?)</li>', section, re.S)
+        assert len(notes) == 1 and notes[0].count("<a ") == 1, key
+        assert "tile" not in notes[0]
 
 
 def test_the_covers_move_only_without_reduced_motion_and_only_by_transform_and_opacity():
@@ -1554,9 +1282,9 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
         assert np.abs(np.asarray(art, float) - np.asarray(toned, float)).mean() < 8, path
 
 
-def test_the_homepage_names_its_sources_where_they_are_used(placeholder_page):
-    # The comparison table names its sources, and each partial mark has a tooltip. No separate
-    # notes appear at the page's foot.
+def test_the_comparison_notes_live_on_the_comparison_page(placeholder_page):
+    # The homepage's table keeps each partial mark's note as a tooltip; the notes and sources are
+    # on the comparison page, which the page links once.
     page = placeholder_page
     for note in (
         'class="footnotes"',
@@ -1565,10 +1293,9 @@ def test_the_homepage_names_its_sources_where_they_are_used(placeholder_page):
         'class="compare-notes"',
     ):
         assert note not in page
-    tile = page[page.index('<table class="compare">') :]
-    assert html.escape(build.comparison_source()) in tile[: tile.index("</li>")]
-    for feature, package, _, note in build.comparison_notes():
-        assert f'title="{html.escape(note)}"' in tile, (feature, package)
+    assert html.escape(build.comparison_source()) not in page
+    assert page.count('href="docs/comparison.html"') == 1
+    assert build.comparison_source() in build.comparison_page()
     assert 'href="docs/benchmarks.html"' in page
 
 
@@ -1971,11 +1698,217 @@ def test_the_citation_title_is_the_tagline(cards):
     assert f"title = {{{title}}}," in (ROOT / "README.md").read_text()
 
 
+def test_a_method_whose_graph_never_beats_the_empty_graph_is_not_featured():
+    worse = [_row(20, 0.1, 1.0, 10.0, 25, 26, 20)]
+    better = [_row(20, 0.1, 1.0, 10.0, 5, 6, 20)]
+    summary = {
+        **SUMMARY,
+        "methods": [
+            _method("PC", "constraint-based", "causal-learn", worse),
+            _method("PC", "constraint-based", "gCastle", worse),
+            _method("FCI", "constraint-based", "causal-learn", better, regime="latent_gauss_er"),
+        ],
+    }
+    assert build.featured_methods([summary])["constraint"]["spec"] == "fci"
+
+
+def test_every_family_features_one_supported_method_by_the_rule(published):
+    featured = build.featured_methods(published)
+    assert list(featured) == list(build.SPEC_FAMILIES)
+    specs = {s.name: s for s in list_specs()}
+    order = list(specs)
+    packages = build.compared_packages(published)
+
+    def reach(spec):
+        """The largest size at which every package in the shown setting ran and Andrey's graph
+        beats the empty graph, or None."""
+        _, methods = build.default_settings(published)[spec]
+        family = methods[0]["family"]
+        sizes = [
+            d
+            for d, rows in build.shared_rows(methods).items()
+            if build.beats_empty(family, rows[0])
+        ]
+        return max(sizes, default=None)
+
+    for family, entry in featured.items():
+        spec = entry["spec"]
+        assert specs[spec].status == "supported" and specs[spec].family == family
+        assert entry["packages"] == len(packages[spec]) and entry["size"] == reach(spec)
+        # No other candidate in the family has more packages, or as many and a larger reach, or
+        # both equal and comes first in the registry.
+        for other in build.default_settings(published):
+            if other == spec or specs[other].family != family or reach(other) is None:
+                continue
+            mine = (len(packages.get(spec, ())), reach(spec), -order.index(spec))
+            theirs = (len(packages.get(other, ())), reach(other), -order.index(other))
+            assert mine > theirs, (family, spec, other)
+        # Every package in the row ran at its size, and Andrey's graph beats the empty graph.
+        for _, row in entry["cells"]:
+            assert row["andrey_s"] is not None and row["comparator_s"] is not None
+            assert build.beats_empty(family, row)
+
+
+def test_research_code_is_not_a_package():
+    summary = {
+        **SUMMARY,
+        "methods": [
+            _method("PC", "constraint-based", "causal-learn", [_row(20, 0.1, 1.0, 10, 5, 6, 20)]),
+            _method(
+                "PC", "constraint-based", "SCORE authors' code", [_row(20, 0.1, 2, 20, 5, 6, 20)]
+            ),
+        ],
+    }
+    assert build.compared_packages([summary]) == {"pc": {"causal-learn"}}
+
+
+def test_every_homepage_link_leads_to_a_page_the_site_builds(published_page):
+    # Each relative link names a page built from a source in docs/; the built-site test checks
+    # them again in the built site, anchors included.
+    links = set(re.findall(r'<a [^>]*href="([^"#]+)(?:#[^"]*)?"', published_page))
+    local = sorted(link for link in links if not link.startswith(("http", "mailto:")))
+    assert local
+    for link in local:
+        stem = str(ROOT / "docs" / link.removesuffix(".html"))
+        sources = [Path(stem + suffix) for suffix in (".md", ".ipynb", ".rst")]
+        assert link.endswith(".html") and any(p.exists() for p in sources), link
+
+
+def test_every_partial_mark_on_the_comparison_page_says_what_it_covers():
+    page = build.comparison_page()
+    notes = build.comparison_notes()
+    # Each note once, numbered in the order the table reads.
+    refs = [int(k) for k in re.findall(r'<sup><a href="#comparison-note-(\d+)">', page)]
+    assert refs == list(range(1, len(notes) + 1))
+    for k in refs:
+        assert f'<li id="comparison-note-{k}">' in page
+    bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
+    original, build.COMPARISON = build.COMPARISON, tuple(bad)
+    try:
+        with pytest.raises(ValueError, match="covers in part"):
+            build.comparison_notes()
+    finally:
+        build.COMPARISON = original
+
+
+def test_the_comparison_page_has_a_mark_for_every_package_and_counts_andrey_from_the_registry():
+    page = build.comparison_page()
+    table = re.search(r"<table.*?</table>", page, re.S)[0]
+    head = re.findall(r'<th scope="col"( class="ct-ours")?>([^<]+)</th>', table)
+    assert [name for _, name in head] == list(build.PEERS) and head[0][1] == "Andrey"
+    assert [bool(ours) for ours, _ in head] == [True] + [False] * (len(build.PEERS) - 1)
+    rows = re.findall(r"<tr><td>([^<]+)</td>(.*?)</tr>", table, re.S)
+    assert len(rows) == len(build.COMPARISON) + len(build.measured_rows())
+    for label, cells in rows:
+        assert len(re.findall(r"<td", cells)) == len(build.PEERS), label
+    # Andrey's distinct methods are the supported ones, less those that count with another.
+    names = {s.name for s in list_specs() if s.status == "supported"}
+    assert set(build.COUNTED_WITH) | set(build.COUNTED_WITH.values()) <= names
+    distinct = dict(rows)["Distinct methods"]
+    ours = re.search(r'<td class="ct-ours">(\d+)</td>', distinct)[1]
+    assert int(ours) == len(names) - len(build.COUNTED_WITH)
+    assert f"Andrey's {len(names)} supported methods count as {ours}" in page
+
+
+def test_the_families_table_counts_each_familys_supported_methods_by_the_data_they_read(
+    published_page,
+):
+    table = re.search(r'<table class="matrix">(.*?)</table>', published_page, re.S)[1]
+    head, body = table.split("</thead>")
+    # A column per kind of data the registry knows, each linked to its row on the methods page.
+    kinds = re.findall(r'href="docs/methods\.html#data-([\w-]+)"', head)
+    assert kinds == [k.replace("_", "-") for k in DATA_KINDS]
+    # A row per family, linked to its table there, with a count per kind equal to the registry's.
+    supported = [s for s in list_specs() if s.status == "supported"]
+    rows = re.findall(r"<tr>(.*?)</tr>", body, re.S)
+    families = [re.search(r'href="docs/methods\.html#family-(\w+)"', r)[1] for r in rows]
+    assert families == list(build.SPEC_FAMILIES)
+    for family, row in zip(families, rows, strict=True):
+        members = [s for s in supported if s.family == family]
+        assert re.search(r'<span class="ct">(\d+)<', row)[1] == str(len(members))
+        cells = [int(n) for n in re.findall(r"<td[^>]*>.*?(\d+)</span></td>", row)]
+        assert cells == [sum(k in s.data_kinds for s in members) for k in DATA_KINDS], family
+        assert all(n <= len(members) for n in cells)
+
+
+def test_amber_text_reads_on_the_paper_in_both_themes():
+    def luminance(color):
+        rgb = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+    for palette in (andrey.viz.LIGHT, andrey.viz.DARK):
+        a, b = luminance(palette.amber_text), luminance(palette.paper)
+        assert (max(a, b) + 0.05) / (min(a, b) + 0.05) >= 3, palette.amber_text
+    # Andrey's mark on the comparison's paper takes it; the art's amber stays on the art.
+    css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
+    rule = css[css.index(".andrey-home .compare-alone td:nth-child(2) {") :]
+    assert "color: var(--andrey-amber-text);" in rule[: rule.index("}")]
+
+
+def test_each_figure_draws_every_featured_method_beside_every_package_it_is_compared_with(
+    published,
+):
+    featured = build.featured_methods(published)
+    for measure in ("s", "errors"):
+        figure = build.featured_bars(featured, measure, str)
+        rows = re.findall(r"<li>(.*?)</li>", figure, re.S)
+        assert len(rows) == len(featured) <= len(build.SPEC_FAMILIES)
+        for entry, row in zip(featured.values(), rows, strict=True):
+            names = re.findall(r"<span>([^<]+)</span><i", row)
+            assert names == [
+                "Andrey",
+                *(build.package_name(m["comparator"]) for m, _ in entry["cells"]),
+            ]
+            assert len(set(names)) == len(names)
+            # Each bar on the row's own scale from zero: the largest value fills it.
+            shares = [float(f) for f in re.findall(r"--f: ([\d.]+)", row)]
+            values = [entry["cells"][0][1][f"andrey_{measure}"]]
+            values += [r[f"comparator_{measure}"] for _, r in entry["cells"]]
+            if max(values):
+                assert shares == pytest.approx([v / max(values) for v in values], abs=1e-4)
+        # A figure holds no link: the evidence is linked beside it.
+        assert "href" not in figure
+
+
+def test_the_section_claims_carry_no_ratio_and_the_accuracy_claim_holds_for_the_figure(published):
+    featured = build.featured_methods(published)
+    claims = build.act_claims(featured)
+    assert not re.search(r"\d", "".join(claims["accelerated"]))
+    assert re.sub(r"<[^>]+>", "", claims["accelerated"][1]) == build.CLAIM
+    # A featured method with more errors than a package it is compared with stops the build.
+    entry = next(iter(featured.values()))
+    method, row = entry["cells"][0]
+    worse = {**row, "card_verdict": None, "andrey_errors": row["comparator_errors"] + 1}
+    broken = {**featured, "x": {**entry, "cells": [(method, worse)]}}
+    with pytest.raises(ValueError, match="does not hold"):
+        build.act_claims(broken)
+
+
+def test_each_install_line_reads_without_script_and_its_button_copies_it(published_page):
+    lines = re.findall(r'<div class="install-line">(.*?)</div>', published_page, re.S)
+    assert len(lines) == 2
+    for line in lines:
+        # Without script the button stays hidden and the command is plain text on the page.
+        assert re.search(r"<code>[^<]+</code>", line)
+        button = re.search(r"<button[^>]*>", line)[0]
+        assert 'class="install-copy"' in button and re.search(r"\shidden\b", button)
+    script = (ROOT / "site" / "assets" / "prompt.js").read_text()
+    assert ".install-copy" in script and ".install-line" in script
+
+
 # ---- the methods catalog ---------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def published():
     """Every release's published summary, as the site build loads them."""
+    if not build.SUMMARY.exists():
+        pytest.skip("the published summary is absent")
     return build.release_summaries(build.load_summary(build.SUMMARY))
+
+
+@pytest.fixture(scope="module")
+def published_page(published):
+    return render_homepage(build.load_summary(build.SUMMARY))
 
 
 @pytest.fixture(scope="module")
