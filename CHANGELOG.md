@@ -92,6 +92,15 @@ names its pull request.
   linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
   against a true graph: its validity, and its precision and recall against the optimal set.
   ([#939])
+- A benchmark lane for the methods that answer for a treatment and an outcome. `adjustment_cpu.py`
+  runs the methods of the group as they ship, PC read at the pair, and two baselines that adjust
+  for nothing and for everything, beside the authors' code for LDECC, LDP, LD3, SNAP, and LOAD, on
+  models planted as each method's paper describes them: pretreatment covariates, the partition
+  graphs of LDP, sink outcomes, LDECC's covariates and mediators, identifiable and non-identifiable
+  direct effects, random graphs with a target pair, and the MAGIC-NIAB, SANGIOVESE, and MILDEW
+  networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
+  set estimates, on a fresh sample, against the true effect; a method that gives no set is never
+  scored as the empty set. ([#964])
 
 ### Changed
 
@@ -2639,6 +2648,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957

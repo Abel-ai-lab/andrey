@@ -99,6 +99,43 @@ The answers are scored by `andrey.metrics`, and the lane adds nothing to their d
 A fit that passes `--cap-wall-s` is a `timeout` with no answer and fails its cell, never an empty
 answer.
 
+## References
+
+The authors' code runs unmodified at a pinned commit, each in an environment of its own that a start
+script builds: the script downloads the archive of the commit, checks its SHA-256, extracts it under
+a git-ignored folder, installs pinned requirements, and runs one fit that asserts a planted answer.
+The benchmark imports the code from that folder and copies none of it. Export what the script
+prints before running the lane.
+
+| Solution | Code | License | Environment |
+|---|---|---|---|
+| `ldecc.authors` | `acmi-lab/local-causal-discovery`, `605d8d1` | none | `start_ldecc.sh`: Python 3.10 |
+| `ldp.authors`, `ld3.authors` | `jmaasch/ldp`, `838f6e2`; `jmaasch/LD3`, `74b91cb` | none | `start_maasch.sh`: Python 3.10 |
+| `snap.authors`, `load.authors` | `Matyasch/snap`, `432ab5c`; `Matyasch/load`, `7febfc6` (main) | BSD-2-Clause | `start_schubert.sh`: Python 3.12 |
+
+Repositories without a license are measurement references only: the harness redistributes none of
+their files. Each solution is called as its repository's own README or notebooks call it:
+
+- **LDECC.** The variant with checks (`ldecc_do_checks=True`) at `alpha = 0.05` with Fisher's z test.
+  The set of effects is one set per locally valid parent set, read off the returned parents,
+  unoriented neighbors, and non-colliders as the authors' notebooks do, with the outcome left out.
+  The code never reads the outcome, so its answer is the treatment's local structure.
+- **LDP.** `partition_z` at `alpha = 0.005`, Fisher's z test, or the chi-square test for categorical
+  data. The answer is the valid set `Z1` when the code's criterion on an instrument holds and "not
+  identifiable" otherwise; the code reports "not identifiable" where the empty set is valid and no
+  instrument is found.
+- **LD3.** `get_sdc_cde_adjustment` at `alpha = 0.005`: the structural direct criterion as the
+  answer on the effect and the found parents of the outcome as the set.
+- **SNAP and LOAD.** The CI test of both is a callable; the lane gives them Fisher's z test on the
+  correlation matrix, counting the distinct queries. SNAP runs with no order limit at `alpha = 0.05`
+  and returns a graph, whose sets the lane reads in the parent as it reads PC's. LOAD runs at
+  `alpha = 0.01` and returns the sets itself. The SNAP main branch orients the last v-structures by
+  PC's rule where the paper's Algorithm 2 uses the rule of RFCI.
+
+The number of tests the references report is what each code counts, a call of its test wrapper for
+LDECC, LDP, and LD3, and the distinct queries for SNAP and LOAD; it is not the number the Andrey
+methods report, which leaves cached repeats out.
+
 ## Run
 
 ```shell

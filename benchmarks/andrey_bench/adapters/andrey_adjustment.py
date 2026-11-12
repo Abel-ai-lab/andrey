@@ -80,6 +80,8 @@ class AndreyAdjustment:
     backend = "numpy"
     mode = "serial"
     output_type = "effects"
+    indep_tests = ("fisherz", "chisq", "gsq")
+    takes_max_depth = True
 
     def __init__(self, method: str, *, indep_test: str = DEFAULT_INDEP_TEST) -> None:
         if method not in METHODS:
@@ -142,9 +144,11 @@ class AndreyPCAdjustment:
     none; where it does not, the answer is the local parent sets of the treatment with the outcome
     left out. For a direct effect, the effect is identifiable when no undirected edge meets the
     outcome (Flanagan et al., 2020, Thm. 5.4), and the set is the outcome's parents but the
-    treatment; the effect is zero when the two are not adjacent. A CPDAG the adjustment core
-    refuses (PC can return a graph that is no CPDAG of any class) is an answer that decides
-    nothing.
+    treatment; the effect is zero when the two are not adjacent. PC's graph can be no CPDAG of any
+    class at a finite sample, so it is read after
+    :func:`andrey.core.orient.cpdag_of_pdag` completes it, the same skeleton and v-structures with
+    every edge oriented as the class requires; a graph with no consistent DAG extension is an
+    answer that decides nothing.
     """
 
     name = "andrey.pc.adjustment"
@@ -177,7 +181,9 @@ class AndreyPCAdjustment:
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run PC and read the pair off its CPDAG; the timed region."""
         import andrey
+        from andrey import GraphStructure
         from andrey.core import adjustment as adj
+        from andrey.core.orient import cpdag_of_pdag
 
         data = np.asarray(data, dtype=np.float64)
         d = data.shape[1]
@@ -197,13 +203,17 @@ class AndreyPCAdjustment:
             "set_kind": None,
         }
         try:
-            marks = adj.checked(out.structure, "the PC arm", ("cpdag",))
+            # PC's finite-sample graph can be no CPDAG (conflicting orientations): read the class
+            # its skeleton and v-structures define, as the SNAP reference's graph is read.
+            completed = cpdag_of_pdag(out.structure.to_numpy().astype(np.int8))
+            graph = GraphStructure.from_numpy(completed, kind="cpdag")
+            marks = adj.checked(graph, "the PC arm", ("cpdag",))
         except ValueError:
-            marks = None  # not the CPDAG of a class: the answer decides nothing
+            graph = marks = None  # no consistent DAG extension: the answer decides nothing
         if marks is not None and estimand == "direct":
             self._direct(record, adj, marks, x, y)
         elif marks is not None:
-            self._total(record, adj, out.structure, x, y)
+            self._total(record, adj, graph, x, y)
         return pack_effects([record], d, out.metadata.get("n_tests"))
 
     @staticmethod

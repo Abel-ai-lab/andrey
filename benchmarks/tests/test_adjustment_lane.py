@@ -742,6 +742,19 @@ def test_a_solution_runs_only_on_the_cells_that_ask_for_its_estimand_and_have_it
     assert adjustment_cpu.runs_on(StandIn(), hidden) and adjustment_cpu.runs_on(StandIn(), plain)
     assert not adjustment_cpu.runs_on(Classy(), hidden) and adjustment_cpu.runs_on(Classy(), plain)
     assert not adjustment_cpu.runs_on(Direct(), plain) and adjustment_cpu.runs_on(Direct(), locpc)
+
+    class GaussianOnly(StandIn):
+        name = "stand-in.gaussian"
+        indep_tests = ("fisherz",)
+        takes_max_depth = True
+
+    binary = M.parse_cell("locpc-identifiable@100,v=10,family=binary").model(0)
+    assert adjustment_cpu.runs_on(GaussianOnly(), plain) and not adjustment_cpu.runs_on(
+        GaussianOnly(), binary
+    )
+    assert adjustment_cpu.runs_on(Direct(), binary)  # no declaration: every test
+    assert adjustment_cpu._fit_params(GaussianOnly(), None, 3)["max_depth"] == 3
+    assert "max_depth" not in adjustment_cpu._fit_params(StandIn(), None, 3)
     assert adjustment_cpu.runs_on(baseline_adjustment.AdjustForNothing(), locpc)  # "any"
     kind = adjustment_cpu.kind_of(baseline_adjustment.AdjustForNothing(), "direct")
     assert kind["set_kind"] == "parents_of_outcome"

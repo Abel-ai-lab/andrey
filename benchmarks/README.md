@@ -235,6 +235,25 @@ benchmarks/start_sbcd_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_SBCD_R=$PWD/benchmarks/.sbcd-r/sbcd-<commit>
 ```
 
+The authors' code for LDECC, LDP, LD3, SNAP, and LOAD, the references of the treatment-outcome lane
+(`adjustment_cpu.py`), is run unmodified the same way: each start script downloads the archive of a
+pinned commit, checks its SHA-256, extracts it under a git-ignored folder, and builds a pinned
+environment (see [Treatment-outcome methods](comparisons/adjustment.md)):
+
+```shell
+benchmarks/start_ldecc.sh      # prints the two exports below
+export ANDREY_BENCH_LDECC_PYTHON=$PWD/benchmarks/.venv-ldecc/bin/python
+export ANDREY_BENCH_LDECC=$PWD/benchmarks/.ldecc/local-causal-discovery-<commit>
+benchmarks/start_maasch.sh     # LDP and LD3: prints the three exports below
+export ANDREY_BENCH_MAASCH_PYTHON=$PWD/benchmarks/.venv-maasch/bin/python
+export ANDREY_BENCH_LDP=$PWD/benchmarks/.maasch/ldp-<commit>
+export ANDREY_BENCH_LD3=$PWD/benchmarks/.maasch/LD3-<commit>
+benchmarks/start_schubert.sh   # SNAP and LOAD: prints the three exports below
+export ANDREY_BENCH_SCHUBERT_PYTHON=$PWD/benchmarks/.venv-schubert/bin/python
+export ANDREY_BENCH_SNAP=$PWD/benchmarks/.schubert/snap-<commit>
+export ANDREY_BENCH_LOAD=$PWD/benchmarks/.schubert/load-<commit>
+```
+
 The networks of these lanes that `andrey.data` does not ship (`mildew`, `win95pts`, `hailfinder`,
 and `pigs`) are fetched from the bnlearn repository on first use, checked against a SHA-256, and
 kept in the git-ignored `benchmarks/.networks`, or in `$ANDREY_BENCH_NETWORKS`.

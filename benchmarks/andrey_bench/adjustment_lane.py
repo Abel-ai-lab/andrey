@@ -87,6 +87,11 @@ class PairAdapter(Protocol):
     - ``unordered``: ``True`` for a method that is not told which variable is the treatment.
     - ``output_type``: ``"effects"``.
 
+    Two attributes are optional. ``indep_tests``, the tests the solution can run
+    (``"fisherz"``, ``"chisq"``, ``"gsq"``), keeps it off the cells whose test it lacks; it
+    defaults to every test. ``takes_max_depth``, ``True`` for a solution that accepts the largest
+    conditioning set as ``params["max_depth"]``, defaults to ``False``.
+
     A solution that runs in an environment of its own (``python_env``) cannot import Andrey, so a
     reference whose output is a graph rather than sets returns the packed graph from ``fit`` and
     reads the sets in the parent: its optional ``records(native, params)`` returns ``(records,

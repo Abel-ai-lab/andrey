@@ -46,6 +46,10 @@ from andrey_bench import rundir
 from andrey_bench.adapters import andrey_adjustment
 from andrey_bench.adapters.andrey_adjustment import AndreyAdjustment, AndreyPCAdjustment
 from andrey_bench.adapters.baseline_adjustment import AdjustForEverything, AdjustForNothing
+from andrey_bench.adapters.gupta_ldecc import GuptaLDECC
+from andrey_bench.adapters.maasch_ldp import MaaschLD3, MaaschLDP
+from andrey_bench.adapters.schubert_load import SchubertLOAD
+from andrey_bench.adapters.schubert_snap import SchubertSNAP
 from andrey_bench.adjustment_lane import (
     ESTIMAND_PARAM,
     OUTCOME_PARAM,
@@ -60,9 +64,8 @@ from andrey_bench.runner import available_cores, check_interpreters, run_task, s
 #: The baselines and the PC arm: no method of Andrey needs to exist for them to run.
 FIXED_ARMS: list = [AdjustForNothing(), AdjustForEverything(), AndreyPCAdjustment()]
 
-#: The references, the authors' code each in its own environment. Appended by the modules that
-#: define them; see ``solutions``.
-REFERENCES: list = []
+#: The references, the authors' code each in its own environment (the ``start_*.sh`` scripts).
+REFERENCES: list = [GuptaLDECC(), MaaschLDP(), MaaschLD3(), SchubertSNAP(), SchubertLOAD()]
 
 #: The claimed settings of the papers at the sizes they report; the campaigns choose their own.
 DEFAULT_CELLS: tuple[str, ...] = (
@@ -126,10 +129,13 @@ def kind_of(adapter: Any, estimand: str) -> dict[str, Any]:
 
 
 def runs_on(adapter: Any, model: M.LinearModel) -> bool:
-    """Whether ``adapter`` answers the question ``model`` asks: its estimand, and no hidden
-    variable for a method that identifies the effect from the Markov equivalence class."""
+    """Whether ``adapter`` answers the question ``model`` asks: its estimand, the test the cell
+    gives (``adapter.indep_tests``, every test when absent), and no hidden variable for a method
+    that identifies the effect from the Markov equivalence class."""
     estimands = {pair.estimand for pair in model.pairs}
     if adapter.estimand != "any" and adapter.estimand not in estimands:
+        return False
+    if model.indep_test not in getattr(adapter, "indep_tests", (model.indep_test,)):
         return False
     return not (adapter.identified_from == "cpdag" and model.hidden)
 
@@ -199,7 +205,7 @@ def _fit_params(adapter: Any, alpha: float | None, max_depth: int | None) -> dic
     params = dict(adapter.params())
     if alpha is not None and "alpha" in params:
         params["alpha"] = alpha
-    if max_depth is not None and "indep_test" in params:  # the methods that test
+    if max_depth is not None and getattr(adapter, "takes_max_depth", False):
         params["max_depth"] = max_depth
     return params
 
