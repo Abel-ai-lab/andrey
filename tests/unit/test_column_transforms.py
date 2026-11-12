@@ -60,8 +60,15 @@ ENV_SETTINGS = {
 }
 #: CALM's schedule here: the package-wide one finds no edge on these data.
 CALM = {"max_iter": 3, "subproblem_iter": 300}
+#: A method whose answer is claims about pairs, ``metadata["effects"]``, returns a graph with no
+#: edge: no comparison of graphs can fail for it, and the data here hold no pattern of four
+#: variables for it to claim from. ``test_y_structures.py`` checks its claims under the same
+#: changes.
 TABLE_SPECS = [
-    spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
+    spec
+    for spec in list_specs()
+    if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
+    and "effects" not in spec.output.metadata
 ]
 
 

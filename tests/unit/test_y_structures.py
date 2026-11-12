@@ -102,6 +102,44 @@ def test_the_claims_do_not_depend_on_the_columns_units():
         assert score == pytest.approx(want[key][0], rel=1e-9)
 
 
+def same_claims(got: dict, want: dict) -> None:
+    assert want
+    assert got.keys() == want.keys()
+    for key, (score, patterns) in got.items():
+        assert patterns == want[key][1]
+        assert score == pytest.approx(want[key][0], rel=1e-9)
+
+
+@pytest.mark.parametrize("extended", [False, True])
+def test_a_monotone_transform_of_each_column_keeps_the_claims_under_normal_scores(extended):
+    """The rank-based test reads each column only through its ranks, so a strictly increasing
+    transform of each column, each its own, changes no claim."""
+    data = selected()
+    transforms = [np.exp, lambda x: x**3, np.sinh, lambda x: x + x**3, np.arctan, np.cbrt, np.tanh]
+    changed = pd.DataFrame({c: f(data[c]) for c, f in zip(data.columns, transforms, strict=True)})
+    same_claims(
+        claims(y_structures(changed, indep_test="normal_scores", extended=extended)),
+        claims(y_structures(data, indep_test="normal_scores", extended=extended)),
+    )
+
+
+@pytest.mark.parametrize("indep_test", ["chisq", "gsq"])
+def test_recoding_each_columns_categories_in_order_keeps_the_claims(indep_test):
+    """A categorical test reads a column only through which rows share a category, so other whole
+    numbers in the same order for each column's categories change no claim."""
+    data = selected()
+    edges = data.quantile([1 / 3, 2 / 3])
+    levels = pd.DataFrame({c: np.digitize(data[c], edges[c]) for c in data.columns})
+    codes = [[-4, 1, 7], [10, 20, 30], [0, 5, 6], [-9, -8, 40], [2, 3, 100], [-1, 0, 1], [5, 6, 7]]
+    recoded = pd.DataFrame(
+        {c: np.array(k)[levels[c]] for c, k in zip(levels.columns, codes, strict=True)}
+    )
+    same_claims(
+        claims(y_structures(recoded, indep_test=indep_test, extended=True)),
+        claims(y_structures(levels, indep_test=indep_test, extended=True)),
+    )
+
+
 def test_a_rerun_gives_the_same_result():
     data = selected()
     assert y_structures(data).metadata == y_structures(data).metadata

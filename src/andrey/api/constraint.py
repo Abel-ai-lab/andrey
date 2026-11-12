@@ -2583,7 +2583,9 @@ def y_structures(
     the simulations of [3]_ drawn under selection, most claims at 10,000 rows were wrong, and exact
     tests made none on the models checked: the tests' errors made those claims. The fit runs one
     marginal test per pair and, for each ``x``, up to one test per pair of the other variables, so
-    its cost grows with the cube of the number of variables.
+    its cost grows with the cube of the number of variables. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -2634,7 +2636,9 @@ def y_structures(
         else variable_columns(variables, labels, d, "y_structures")
     )
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
-        search = local_search(X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed)
+        search = local_search(
+            X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed, ranked=False
+        )
         with search.pinned():
             claims = _y_structures(search, columns, extended=extended)
     name = label_of(labels)

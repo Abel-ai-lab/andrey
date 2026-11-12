@@ -1367,6 +1367,7 @@ def local_search(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     trace: bool = False,
+    ranked: bool = True,
 ) -> LocalSearch:
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
@@ -1374,9 +1375,15 @@ def local_search(
     of a stochastic test (``None`` uses ``ANDREY_SEED``); ``alpha``, ``max_depth``, and
     ``constraints`` are as :class:`LocalSearch` takes them, and ``trace`` keeps the distinct queries
     in its ``counts``. A column the test reads as categories (:func:`~andrey.core.ties.tie_mask`)
-    has as many levels as distinct observed values.
+    has as many levels as distinct observed values. With ``ranked=False``, the ranks are the column
+    positions and ``andrey.config.tie_break`` is not read: for a caller that asks the tests only
+    through :meth:`~LocalSearch.scan` and never picks between tied candidates.
     """
-    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    if ranked:
+        test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    else:
+        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+        ranks = list(range(X.shape[1]))
     mask = tie_mask(indep_test, categorical, X.shape[1])
     levels = None
     if mask.any():
