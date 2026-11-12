@@ -1328,6 +1328,21 @@ wrongly marked edges there, against the truth in the kind the answer identifies.
 scores the claims in `metadata["effects"]`, each that a treatment's effect on an outcome is or is
 not zero, against the true DAG's ancestry.
 
+A local method may also leave a question open, so its answers are scored query by query against
+the oracle answer, the method's own definition applied to the true graph. `target_oracle(truth,
+target, answer)` gives that answer at a target: its Markov blanket, its parents and children, or
+its edges in the true DAG, CPDAG, or PAG, with hidden and selection variables when you name them.
+`effect_oracle(truth, treatment, outcome)` gives the `effects` record for a pair: whether the effect
+is nonzero and identifiable, and the optimal or a valid adjustment set, or the possible parent sets
+of the treatment. `answer_scores(answers, oracle)` sorts each query into correct, wrong, incomplete
+(a "cannot tell" where the oracle decides, such as an undirected edge where the truth is
+directed, never counted as wrong), or abstained, and returns the coverage, the risk, and the net
+score, correct minus wrong. It compares the net score with its floor, the better of always
+abstaining and always giving the most common oracle answer. `target_answer_scores` and
+`effect_scores` apply it to a target's adjacencies and marks and to a pair's fields;
+`claim_scores(output, truth, pairs=...)` applies it to claims, and `pooled_answer_scores` adds up
+the scores of several targets or datasets.
+
 | `family` | When | `score` returns |
 |---|---|---|
 | `undirected` | either graph is `undirected` | the skeleton scores and `shd`, the skeleton SHD: the pairs adjacent in one graph and not in the other |
@@ -1364,6 +1379,12 @@ not zero, against the true DAG's ancestry.
    number_of_latents
    target_edge_scores
    claim_scores
+   target_oracle
+   effect_oracle
+   answer_scores
+   target_answer_scores
+   effect_scores
+   pooled_answer_scores
 ```
 
 ## Visualization

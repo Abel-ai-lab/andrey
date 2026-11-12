@@ -12,7 +12,8 @@ and ``j``, and ``0`` no edge, ``1`` tail, ``2`` arrowhead, ``3`` circle. Only th
 column are read, so a global method's whole graph is an answer at every target. A pair claim is a
 ``(d, d)`` array of scores, ``scores[i, j] > 0`` for the claim that ``i`` is an ancestor of ``j``.
 
-The module imports NumPy only, so an adapter in a reference's own environment can use it.
+The module imports NumPy only, so an adapter in a reference's own environment can use it; the
+two scorers import :mod:`andrey.metrics` when called, which counts the edges and the claims.
 """
 
 from __future__ import annotations
@@ -155,32 +156,35 @@ def target_edge_scores(marks: np.ndarray, truth: np.ndarray, target: int) -> dic
     Euclidean distance of ``(recall, precision)`` to ``(1, 1)``, and ``adj_precision`` and
     ``adj_recall`` over adjacencies.
     """
-    est, true = target_edges(marks, target), target_edges(truth, target)
-    correct = sum(1 for j, m in est.items() if true.get(j) == m)
-    both = est.keys() & true.keys()
-    extra, missing = len(est.keys() - true.keys()), len(true.keys() - est.keys())
-    mismarked = len(both) - correct
-    precision, recall = _ratio(correct, len(est)), _ratio(correct, len(true))
-    f1 = _ratio(2 * correct, len(est) + len(true))
-    distance = (
-        float(np.hypot(1 - recall, 1 - precision)) if len(est) and len(true) else float("nan")
-    )
+    from andrey import GraphStructure
+    from andrey.metrics import target_edge_scores as counts_at
+
+    # Both as PAGs, whose marks take every code, so the marks compare as they are.
+    pair = [GraphStructure.from_numpy(np.asarray(m), kind="pag") for m in (marks, truth)]
+    counted = counts_at(*pair, target)
+    est, true = len(target_edges(marks, target)), len(target_edges(truth, target))
+    extra, missing, mismarked = counted["extra"], counted["missing"], counted["wrong_marks"]
+    both = true - missing
+    correct = both - mismarked
+    precision, recall = _ratio(correct, est), _ratio(correct, true)
+    f1 = _ratio(2 * correct, est + true)
+    distance = float(np.hypot(1 - recall, 1 - precision)) if est and true else float("nan")
     return {
-        "est_edges": len(est),
-        "true_edges": len(true),
+        "est_edges": est,
+        "true_edges": true,
         "correct_edges": correct,
-        "adj_correct": len(both),
+        "adj_correct": both,
         "extra": extra,
         "missing": missing,
         "mismarked": mismarked,
-        "shd": extra + missing + mismarked,
-        "empty_shd": len(true),
+        "shd": counted["shd"],
+        "empty_shd": true,
         "precision": precision,
         "recall": recall,
         "f1": f1,
         "distance": distance,
-        "adj_precision": _ratio(len(both), len(est)),
-        "adj_recall": _ratio(len(both), len(true)),
+        "adj_precision": _ratio(both, est),
+        "adj_recall": _ratio(both, true),
     }
 
 
@@ -193,33 +197,38 @@ def claim_scores(
     confidence; ``ancestral[i, j]`` says it is true. Pairs with a column outside ``system``, such
     as a context node, and the diagonal are left out.
 
-    ``claims``, ``tp``, and ``fp`` count the claims and how they fare; ``positives`` counts the
-    true ancestral pairs, ``pairs`` all ordered pairs, and ``base_rate`` is their ratio: the
-    precision of claiming every pair, the floor a claim-only method has to beat. ``precision`` and
-    ``recall`` are ``nan`` where undefined. ``average_precision`` is the area under the
-    precision-recall curve of the ranking by score, ties as one threshold, the pairs that are not
-    claimed last, as the standard average-precision estimate takes it.
+    Each ordered pair is a query of :func:`andrey.metrics.answer_scores`, a claim its answer and
+    an unclaimed pair abstained. ``claims``, ``tp``, and ``fp`` count the claims and how they fare;
+    ``positives`` counts the true ancestral pairs, ``pairs`` all ordered pairs, and ``base_rate``
+    is their ratio: the precision of claiming every pair. ``net`` is ``tp - fp`` and
+    ``floor_rate`` the better net rate of abstaining and of claiming every pair, the floor a
+    claim-only method has to beat. ``precision`` and ``recall`` are ``nan`` where undefined.
+    ``average_precision`` is the area under the precision-recall curve of the ranking by score,
+    ties as one threshold, the pairs that are not claimed last, as the standard average-precision
+    estimate takes it.
     """
+    from andrey.metrics import answer_scores
+
     scores = np.asarray(scores, dtype=np.float64)
     truth = np.asarray(ancestral, dtype=bool)
     system = np.asarray(system, dtype=int)
-    block = np.ix_(system, system)
-    s, t = scores[block], truth[block]
-    off = ~np.eye(len(system), dtype=bool)
-    s, t = s[off], t[off]
-    claimed = s > 0
-    tp, fp = int((claimed & t).sum()), int((claimed & ~t).sum())
-    positives = int(t.sum())
+    pairs = [(int(i), int(j)) for i in system for j in system if i != j]
+    oracle = {pair: bool(truth[pair]) for pair in pairs}
+    s = answer_scores({p: True for p in pairs if scores[p] > 0}, oracle, choices=(True,))
+    tp, fp, positives = s["correct"], s["wrong"], s["policy_correct"]["True"]
+    flat = np.array([scores[p] for p in pairs]), np.array([oracle[p] for p in pairs], dtype=bool)
     return {
         "claims": tp + fp,
         "tp": tp,
         "fp": fp,
         "positives": positives,
-        "pairs": int(t.size),
-        "base_rate": _ratio(positives, t.size),
+        "pairs": len(pairs),
+        "base_rate": s["base_rate"],
+        "net": s["net"],
+        "floor_rate": s["floor_rate"],
         "precision": _ratio(tp, tp + fp),
         "recall": _ratio(tp, positives),
-        "average_precision": _average_precision(s, t),
+        "average_precision": _average_precision(*flat),
     }
 
 

@@ -40,6 +40,17 @@ names its pull request.
   FCI on published networks as linear-Gaussian models with hidden nodes, and `y_structures_cpu.py`
   runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
   scores, and the contract that the adapter of an Andrey method fills. ([#912])
+- Scores for the answers of local methods, which may leave a question open.
+  `andrey.metrics.target_oracle` and `effect_oracle` give the answer a method's definition gives on
+  the true graph: a target's Markov blanket, its parents and children, or its edges in the true
+  DAG, CPDAG, or PAG, with hidden and selection variables; and for a pair, whether the effect is
+  nonzero and identifiable, with the optimal or a valid adjustment set or the possible parent sets.
+  `answer_scores` sorts each query into correct, wrong, incomplete, or abstained and returns the
+  coverage, the risk, and the net score against its floor, the better of abstaining and the
+  base-rate answer; `target_answer_scores`, `effect_scores`, `claim_scores(pairs=)`, and
+  `pooled_answer_scores` apply it to targets, pairs, and claims. The benchmark harness adds the gate
+  on the net score, paired risk on the queries two methods both answered, and risk-coverage
+  tables. ([#932])
 
 ### Changed
 
@@ -2525,6 +2536,7 @@ First alpha release.
 [#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
+[#932]: https://github.com/Abel-ai-lab/Andrey/pull/932
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
