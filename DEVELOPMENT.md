@@ -295,6 +295,9 @@ reaching a code path no other test reaches, on the smallest input that reaches i
 - A fixed input with one certain answer is an integrity check; a threshold on a median over random
   draws is a quality measurement.
 - A fit made once per module is shared by the tests that inspect it.
+- The suite runs on every core, a file at a time (`pytest -n auto --dist loadfile`), so a test
+  leaves no process-wide setting, environment variable, or file outside `tmp_path` for the tests
+  of another file.
 - Nothing runs on a schedule: with dependencies locked, an unchanged commit gives the same result.
 
 ### 1. Recovery tests
