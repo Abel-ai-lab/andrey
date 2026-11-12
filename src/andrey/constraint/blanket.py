@@ -263,7 +263,8 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     """``target``'s Markov blanket by Grow-Shrink (GS) [1]_ [2]_, in the order its members joined.
 
     The candidates are visited in one fixed order, the most dependent on ``target`` first: by their
-    unconditional strength (:meth:`LocalSearch.scan`), rounded to ``KEY_DP`` decimals, ties by rank.
+    unconditional strength (:meth:`LocalSearch.scan`, :meth:`LocalSearch.by_strength`), ties by
+    rank.
     Grow: each pass visits every candidate outside the blanket in that order, tests it given the
     current blanket, and adds it at once when the p-value is at or below ``alpha``, so the next
     candidate of the pass is tested given the larger blanket; passes repeat until one adds nothing.
@@ -290,9 +291,7 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     blanket = list(required)
     candidates = [x for x in range(search.d) if x != target and x not in required]
     strengths, pvalues = search.scan(target, candidates, ())
-    order = search.ordered(
-        {x: -round(s, KEY_DP) for x, s in zip(candidates, strengths.tolist(), strict=True)}
-    )
+    order = search.by_strength(candidates, strengths)
     unconditional = dict(zip(candidates, pvalues.tolist(), strict=True))
     # The blanket size at each candidate's last independent verdict: the blanket only grows here,
     # so an equal size is the same conditioning set.
@@ -353,7 +352,7 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     Each round tests every variable outside the blanket given the blanket in one
     :meth:`LocalSearch.scan`, the first round given no variable, and orders those whose p-value is
     at or below ``alpha`` from the strongest dependence to the weakest
-    (:meth:`LocalSearch.ordered`). It adds them in that order, without a test, while the data
+    (:meth:`LocalSearch.by_strength`). It adds them in that order, without a test, while the data
     suffice: on categorical data, while the rows per cell of the table of ``target``, the variable,
     and the blanket so far exceed ``CELL_ROWS``, the cells the product of the columns' levels
     (:func:`table_size`) and the rows every row of the data; a variable that fails the rule marks
@@ -385,10 +384,7 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         dependent = np.flatnonzero(pvalues <= alpha).tolist()
         if not dependent:
             break
-        strength = strengths[dependent].tolist()
-        batch = search.ordered(
-            {candidates[i]: -round(s, KEY_DP) for i, s in zip(dependent, strength, strict=True)}
-        )
+        batch = search.by_strength([candidates[i] for i in dependent], strengths[dependent])
         insufficient = False
         for x in batch:
             if max_depth is not None and len(blanket) > max_depth:
@@ -950,6 +946,8 @@ class LocalSearch:
         self.levels = levels
         self.n = n
         self.counts = SearchCounts(queries=set() if trace else None)
+        # Whether a scan's strengths are negated p-values, as for a test without statistic_pvalue.
+        self._pvalue_strengths = getattr(test, "statistic_pvalue", None) is None
         self._measuring = False
         self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
@@ -1035,6 +1033,22 @@ class LocalSearch:
         """The candidates from the smallest key to the largest, ties by ``ranks``
         (:func:`ordered`)."""
         return ordered(keys, self.ranks)
+
+    def by_strength(self, xs: Sequence[int], strengths: np.ndarray) -> list[int]:
+        """``xs`` from the strongest dependence to the weakest, by the strengths :meth:`scan` gave
+        them, ties by ``ranks`` (:meth:`ordered`).
+
+        A partial correlation is compared to ``KEY_DP`` decimals, as :meth:`strongest` keys it. A
+        p-value, the strength of a test without one, is compared to ``KEY_DP`` significant digits,
+        so p-values far below ``10**-KEY_DP``, common for strong dependence on many rows, keep the
+        order of their sizes rather than tying.
+        """
+        values = np.asarray(strengths, dtype=np.float64).tolist()
+        if self._pvalue_strengths:
+            keys = {x: float(f"{-s:.{KEY_DP}g}") for x, s in zip(xs, values, strict=True)}
+        else:
+            keys = {x: -round(s, KEY_DP) for x, s in zip(xs, values, strict=True)}
+        return self.ordered(keys)
 
     def _asked(
         self,

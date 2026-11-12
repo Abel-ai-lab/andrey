@@ -190,6 +190,31 @@ def test_fast_iamb_ends_a_cycle_of_additions_and_removals():
     assert search.run("fast_iamb", 0) == ([2], {1: (2,), 3: ()})
 
 
+class _PValues:
+    """A test of target 0 that answers each variable with its own p-value, whatever the set."""
+
+    def __init__(self, pvalues: dict[int, float]) -> None:
+        self.pvalues = pvalues
+
+    def __call__(self, x, y, cond=()):
+        return self.pvalues[y if x == 0 else x]
+
+
+def test_the_strength_order_keeps_tiny_p_values_apart():
+    """p-values below ``10**-KEY_DP`` keep the order of their sizes, the lowest rank first only
+    among equal ones; partial correlations compare to ``KEY_DP`` decimals."""
+    pvalues = {1: 1e-12, 2: 1e-70, 3: 1e-41, 4: 1e-70, 5: 0.5}
+    search = LocalSearch(_PValues(pvalues), [0, 5, 4, 3, 2, 1], 0.05)
+    strengths, _ = search.scan(0, [1, 2, 3, 4, 5])
+    assert search.by_strength([1, 2, 3, 4, 5], strengths) == [4, 2, 3, 1, 5]
+    x, test = _search_data("fisherz")
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    xs = list(range(1, 15))
+    strengths, _ = search.scan(0, xs)
+    keys = {v: -round(s, KEY_DP) for v, s in zip(xs, strengths.tolist(), strict=True)}
+    assert search.by_strength(xs, strengths) == ordered(keys, search.ranks)
+
+
 def test_the_order_reads_ranks_only_when_keys_tie():
     keys = {3: 0.5, 1: 0.25, 7: 0.25, 2: 0.25, 5: 0.75}
     ranks = _Recorded([0, 9, 4, 8, 1, 2, 7, 3])
