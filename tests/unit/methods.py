@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from andrey.spec import REGISTRY
+
 #: Settings that shorten a slow fit; the facade path stays the same, and the properties the
 #: package-wide tests check do not depend on the fit converging.
 SHORT = {
@@ -15,8 +17,19 @@ SHORT = {
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
 }
-#: The arguments a method needs beyond its inputs: the target of ICP and MB-by-MB, by position.
-REQUIRED = {"icp": {"target": 2}, "mb_by_mb": {"target": 2}}
+
+
+def requires_target(method: str) -> bool:
+    """Whether ``method`` answers for one variable only: its ``target`` entry opens "Required:",
+    as ``REQUIRED_TARGET`` and ICP's own entry do."""
+    return any(
+        p.concept == "target" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
+#: The arguments a method needs beyond its inputs: a target, by position, for each method that
+#: requires one.
+REQUIRED = {method: {"target": 2} for method in REGISTRY if requires_target(method)}
 
 
 def fit_settings(method: str) -> dict:

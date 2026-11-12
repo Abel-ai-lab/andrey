@@ -259,13 +259,13 @@ in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite
 `fast_iamb`, `mmpc`, `hiton_pc`, `mb_by_mb`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`,
 `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
 conditional-independence tests; `None`, the default, sets no cap, except in `hiton_pc`, whose
-default 3 is the cap of its paper's Markov-blanket experiments, and in `mb_by_mb`, whose default 5
-is the cap of its paper's runs on its local structures' tests; its blanket learner conditions on its
-whole current set, uncapped. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`,
-and `jpcmciplus` their PC1 step; the blankets of `iamb`, `inter_iamb`, `gs`, and `fast_iamb` stop
-growing at the cap. `rcd`'s cap is the most variables it regresses out together, and `camuv`'s the
-most variables a sink test adds together as a variable's candidate parents, each with a default of
-2, its paper's setting.
+default 3 is the cap of its paper's Markov-blanket experiments. `mb_by_mb` also takes
+`local_max_depth`, a cap on its local structures' tests alone, 5 by default, the cap of its paper's
+runs. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`, and `jpcmciplus` their
+PC1 step; the blankets of `iamb`, `inter_iamb`, `gs`, `fast_iamb`, and `mb_by_mb` stop growing at
+the cap. `rcd`'s cap is the most variables it regresses out together, and `camuv`'s the most
+variables a sink test adds together as a variable's candidate parents, each with a default of 2, its
+paper's setting.
 
 % concept: max_p_global
 `lpcmci`, `pcmciplus`, and `jpcmciplus` take `max_p_global`, tigramite's name for the most

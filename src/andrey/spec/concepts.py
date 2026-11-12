@@ -602,16 +602,6 @@ _CONCEPTS = (
         ),
         deviations=(
             Deviation(
-                method="mb_by_mb",
-                name="max_depth",
-                default=5,
-                reason="Wang et al. 2014 leave the cap open and run MB-by-MB with 5 in every "
-                "experiment, a cap on the local structures' tests: the complexity they state "
-                "bounds those tests by it and the blanket learner's grow phase by the blanket "
-                "alone. null runs it uncapped.",
-                fragment="local structures' tests",
-            ),
-            Deviation(
                 method="hiton_pc",
                 name="max_depth",
                 default=3,

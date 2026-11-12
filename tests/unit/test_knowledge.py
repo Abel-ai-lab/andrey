@@ -31,6 +31,7 @@ from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import BLANKET_STRUCTURES
+from tests.unit.methods import requires_target
 
 # The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
@@ -91,6 +92,10 @@ KNOWLEDGE = Knowledge(
     forbidden=[("c", "d"), ("e", "d")],  # c -> d is a true edge
     tiers=[EARLY, LATE],
 )
+# The target of a method that answers for one variable, by label so it follows its column: the
+# effect of the knowledge's first required edge, so the answer holds the edge a test checks (here
+# b -> f, and a -> f across the tiers), else f.
+TARGET = "f"
 
 
 def _sample(seed: int = 0, n: int = 1500) -> pd.DataFrame:
@@ -120,6 +125,9 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
     if name == "calm":
         pytest.importorskip("torch")
         kwargs = {**SHORT_CALM, **kwargs}
+    if requires_target(name):
+        required = getattr(kwargs.get("knowledge"), "required", ())
+        kwargs = {"target": required[0][1] if required else TARGET, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if name in ("cdnod", "fci_jci", "gnies"):

@@ -19,6 +19,7 @@ import pytest
 
 import andrey
 from andrey import data
+from andrey.constraint import sequential as sequential_engine
 from andrey.constraint.blanket import LEARNERS, LocalSearch
 from andrey.core import ci
 from andrey.core.ci import register_indep_test
@@ -54,7 +55,7 @@ def _oracle_fit(box: dict, dag: nx.DiGraph, target: int, seed: int = 0, **settin
     box["dag"] = dag
     d = dag.number_of_nodes()
     x = np.random.default_rng(seed).standard_normal((40, d))
-    return andrey.mb_by_mb(x, target=target, indep_test="dsep", max_depth=None, **settings)
+    return andrey.mb_by_mb(x, target=target, indep_test="dsep", local_max_depth=None, **settings)
 
 
 def _truth(dag: nx.DiGraph, target: int) -> np.ndarray:
@@ -159,6 +160,36 @@ def test_the_grow_phase_stops_once_the_blanket_holds_more_than_the_cap():
     dag = _dag([(p, 6) for p in range(6)], 7)
     search = LocalSearch(DSepOracle(dag), list(range(7)), 0.05, max_depth=2)
     assert LEARNERS["iamb_forward"].search(search, 6, {}) == [0, 1, 2]
+
+
+def test_local_max_depth_caps_the_local_structures_alone(monkeypatch):
+    # Six parents of t: the blanket learner conditions on up to five of them, while the local
+    # structures test their pairs given at most local_max_depth members.
+    dag = _dag([(p, 6) for p in range(6)], 7)
+    sizes: dict[str, list[int]] = {"blanket": [], "local": []}
+    step = ["blanket"]
+
+    class Recorded:
+        def __init__(self, data, **_):
+            self._test = DSepOracle(dag)
+
+        def __call__(self, x, y, condition_set=()):
+            sizes[step[0]].append(len(condition_set))
+            return self._test(x, y, condition_set)
+
+    def learn_local(*args, **kwargs):
+        step[0] = "local"
+        try:
+            return learn(*args, **kwargs)
+        finally:
+            step[0] = "blanket"
+
+    learn = sequential_engine.learn_local
+    monkeypatch.setattr(sequential_engine, "learn_local", learn_local)
+    monkeypatch.setitem(ci._CI_REGISTRY, "recorded", Recorded)
+    x = np.random.default_rng(0).standard_normal((40, 7))
+    andrey.mb_by_mb(x, target=6, indep_test="recorded", local_max_depth=1)
+    assert max(sizes["local"]) == 1 < max(sizes["blanket"])
 
 
 # ---- the result on data --------------------------------------------------------------------------

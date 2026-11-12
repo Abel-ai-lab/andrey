@@ -58,7 +58,8 @@ def mb_by_mb(
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
-    max_depth: int | None = 5,
+    max_depth: int | None = None,
+    local_max_depth: int | None = 5,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the edges at one variable and their directions, its CPDAG's, with MB-by-MB.
@@ -106,13 +107,16 @@ def mb_by_mb(
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
         only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
         tests, ``metadata["seed"]`` records the seed used.
-    max_depth : int or None, default=5
-        The maximum conditioning-set size of the local structures' tests, at least ``0``: ``0``
-        runs only unconditional tests there, and ``None`` sets no limit. The paper leaves the cap
-        open and its runs use 5 [1]_, the default, a cap on the subsets the local structures test;
-        the blanket learner conditions on its whole current set, uncapped, as its grow phase does
-        in the paper [1]_. A smaller cap runs fewer tests and can keep edges that a larger
-        conditioning set would remove.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, the blanket
+        learner's and the local structures', at least ``0``; ``None``, the default, sets no limit.
+        Under a cap, the blanket learner stops growing at ``max_depth + 1`` members.
+    local_max_depth : int or None, default=5
+        The maximum size of the subsets the local structures test, at least ``0`` and never above
+        ``max_depth``; ``None`` sets no limit. The paper leaves the cap open and its runs use 5
+        [1]_, the default, on the local structures alone, as its complexity bounds only them by the
+        cap: the same cap on the blanket learner stops its grow phase before the blanket is whole,
+        so the errors rise with the sample.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
@@ -219,12 +223,13 @@ def mb_by_mb(
     Tested with exact d-separation on every target of 11 random graphs of up to 30 variables and of
     a 5 x 5 chessboard, and on simulated linear-Gaussian data with 20 variables and categorical data
     with 10. Each local structure tests every pair of a blanket against every subset of the rest, up
-    to ``max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
-    tests without the cap. Under the default ``max_depth=5``, a pair that only a larger set
-    separates keeps its edge. The default blanket learner never drops a variable it added, so a
-    large sample, in which more variables test dependent, gives larger blankets, and each test of
-    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    to ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about
+    ``m**2 * 2**m`` tests without the cap. Under the default ``local_max_depth=5``, a pair that
+    only a larger set separates keeps its edge. The default blanket learner never drops a variable
+    it added, so a large sample, in which more variables test dependent, gives larger blankets, and
+    each test of the blanket learner conditions on the whole set so far. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -268,9 +273,10 @@ def mb_by_mb(
             indep_test=indep_test,
             categorical=mask,
             seed=seed,
+            max_depth=max_depth,
             constraints=constraints,
         )
-        result = sequential(search, t, blanket, MB_BY_MB, local_depth=max_depth)
+        result = sequential(search, t, blanket, MB_BY_MB, local_depth=local_max_depth)
     star = result.network.star(t, d)
     metadata = target_metadata(t, _edge_sets(star, t), name)
     metadata["blankets_learned"] = [name(x) for x in result.learned]

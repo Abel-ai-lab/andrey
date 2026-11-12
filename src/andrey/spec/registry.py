@@ -690,13 +690,18 @@ _add(
             _INDEP_TEST,
             _CATEGORICAL,
             _TEST_SEED,
-            concept_param(
-                "max_depth",
+            concept_param("max_depth"),
+            ParamSpec(
+                name="local_max_depth",
+                type="int",
                 default=5,
-                doc="The maximum conditioning-set size of the local structures' tests, at least 0: "
-                "0 runs only unconditional tests there, and null sets no limit. Wang et al. 2014 "
-                "leave the cap open and run MB-by-MB with 5, the default; the blanket learner "
-                "conditions on its whole current set, uncapped.",
+                doc="The maximum size of the subsets the local structures test, at least 0 and "
+                "never above max_depth; null sets no limit. Wang et al. 2014 leave the cap open "
+                "and run MB-by-MB with 5, the default, on the local structures alone, as their "
+                "complexity bounds only them by it: the same cap on the blanket learner stops its "
+                "grow phase before the blanket is whole, so the errors rise with the sample.",
+                nullable=True,
+                minimum=0,
             ),
         ),
         references=("Wang, Zhou, Zhao & Geng 2014", "Meek 1995"),
