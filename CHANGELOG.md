@@ -40,6 +40,14 @@ names its pull request.
   `pooled_answer_scores` apply it to targets, pairs, and claims. The benchmark harness adds the gate
   on the net score, paired risk on the queries two methods both answered, and risk-coverage
   tables. ([#932])
+- `GraphStructure.is_adjustment_set` says whether a set of covariates is an adjustment set for the
+  total effect of a treatment on an outcome, in a DAG, a CPDAG, or a MAG or PAG without selection
+  bias, by the generalized adjustment criterion of Perković et al. (2018).
+  `GraphStructure.optimal_adjustment_set` returns the adjustment set of Henckel, Perković and
+  Maathuis (2022) that gives the least-squares estimate its smallest asymptotic variance in a
+  linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
+  against a true graph: its validity, and its precision and recall against the optimal set.
+  ([#PRNUM])
 
 ### Changed
 
