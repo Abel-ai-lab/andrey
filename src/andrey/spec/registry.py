@@ -15,7 +15,7 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, REQUIRED_TARGET, concept_param
+from .concepts import CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -712,8 +712,10 @@ _add(
                 default="iamb_forward",
                 doc="The Markov blanket learner run for each variable the search visits: "
                 "iamb_forward = IAMB's grow phase without its shrink, the learner of Wang et al. "
-                "2014's runs, which keeps a variable added in error rather than lose a member; the "
-                "others are the functions of those names.",
+                "2014's runs, which keeps a variable added in error rather than lose a member; "
+                "total_conditioning = each variable the test finds dependent on it given all the "
+                "other variables (Pellet & Elisseeff 2008); the others are the functions of those "
+                "names.",
             ),
             _ALPHA,
             _INDEP_TEST,
@@ -734,6 +736,70 @@ _add(
             ),
         ),
         references=("Wang, Zhou, Zhao & Geng 2014", "Meek 1995"),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="mmb_by_mmb",
+        family="constraint",
+        summary="The direct causes and direct effects of one variable when unmeasured common "
+        "causes may exist, the edges at it in the PAG, by sequential local learning: its Markov "
+        "blanket and the local structure over it, then a neighbor's, one blanket at a time, until "
+        "the marks at the target are decided or no further blanket can decide them. For one "
+        "variable of a large graph with small blankets.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="the edges at target alone, with the marks the PAG gives them; "
+            "metadata['parents'], metadata['children'], metadata['bidirected'], and "
+            "metadata['undetermined'] (a circle at either end) list the columns joined to it, "
+            "metadata['markov_blanket'] its Markov blanket, and metadata['blankets_learned'] the "
+            "variables whose blanket the search learned, in order",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            REQUIRED_TARGET,
+            concept_param(
+                "blanket",
+                default="total_conditioning",
+                choices=MMB_BLANKETS,
+                doc="The Markov blanket learner run for each variable the search visits: "
+                "total_conditioning = each variable the test finds dependent on it given all the "
+                "other variables (Pellet & Elisseeff 2008), the learner of Xie et al. 2024; the "
+                "others are the functions of those names, which find the same blanket with "
+                "hidden variables.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of the conditional-independence test, in (0, 1). Xie et "
+                "al. 2024 state none; 0.01 is the level of their code.",
+            ),
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+            ParamSpec(
+                name="local_max_depth",
+                type="int",
+                default=10,
+                doc="The maximum size of the subsets the local structures test, at least 0 and "
+                "never above max_depth; null sets no limit. Xie et al. 2024 leave the cap open; "
+                "10 is the cap of their code, which bounds only the local structures by it.",
+                nullable=True,
+                minimum=0,
+            ),
+        ),
+        references=(
+            "Xie, Li, Wu, Zeng, Liu & Geng 2024",
+            "Pellet & Elisseeff 2008",
+            "Zhang 2008",
+        ),
     )
 )
 
@@ -3207,6 +3273,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
     "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
     "forbidden_paths raise NotImplementedError.",
+    "mmb_by_mmb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent never shares an edge. As each local structure joins "
+    "the growing graph, a tier or an edge forbidden one way puts an arrowhead at the variable it "
+    "keeps from being a cause, and a required edge a tail at its cause, over any v-structure's "
+    "arrowhead; the FCI rules keep those marks. required_paths and forbidden_paths raise "
+    "NotImplementedError.",
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
@@ -3493,6 +3565,9 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "hiton_pc": ("target", "parents_and_children"),
     "hiton_mb": ("target", "markov_blanket", "parents_and_children"),
     "mb_by_mb": ("target", "parents", "children", "undirected"),
+    "mmb_by_mmb": (
+        *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
+    ),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

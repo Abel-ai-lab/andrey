@@ -85,13 +85,13 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI return `kind="pag"`. RCD, BottomUpParceLiNGAM, and
-CAM-UV use the same marks without the equivalence-class reading: `X -> Y` is an edge they found, `X
-<-> Y` a pair that RCD links through a hidden variable, and `X o-o Y` a pair in the block
-BottomUpParceLiNGAM leaves unordered, which holds the variables a hidden common cause confounds and
-their observed ancestors, or a pair that CAM-UV finds joined through a hidden variable, a common
-cause or a causal path, whose relation it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has
-marks `(3, 2)`:
+FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI return `kind="pag"`, and MMB-by-MMB returns the edges at
+its target as the PAG holds them. RCD, BottomUpParceLiNGAM, and CAM-UV use the same marks without
+the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links
+through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves unordered,
+which holds the variables a hidden common cause confounds and their observed ancestors, or a pair
+that CAM-UV finds joined through a hidden variable, a common cause or a causal path, whose relation
+it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
 
 ```python
 pag = GraphStructure.from_numpy(
@@ -174,7 +174,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mb_by_mb` |
 | `undirected` | `mmpc`, `hiton_pc` |
-| `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
+| `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients

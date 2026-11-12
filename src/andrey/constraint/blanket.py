@@ -3,7 +3,8 @@
 :func:`andrey.hiton_pc`, and :func:`andrey.hiton_mb`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
-learners Grow-Shrink and Fast-IAMB, the ``"iamb_forward"`` learner IAMB's grow phase alone,
+learners Grow-Shrink and Fast-IAMB, the ``"iamb_forward"`` learner IAMB's grow phase alone, the
+``"total_conditioning"`` learner a test of each variable given all the others,
 :func:`parents_children` the forward and backward phases of MMPC, the ``"hiton_pc"`` learner
 semi-interleaved HITON-PC, and the ``"hiton_mb"`` learner semi-interleaved HITON-MB, HITON-PC
 followed by the spouse step. :func:`blanket_graph` and
@@ -990,6 +991,51 @@ def _iamb_forward(search: LocalSearch, target: int, sepsets: Sepsets) -> list[in
     return _grow_shrink(search, target, sepsets, interleaved=False, shrink=False)
 
 
+def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s Markov blanket by total conditioning (TC) [1]_: every other variable that the
+    test finds dependent on ``target`` given all the rest, from the strongest dependence to the
+    weakest (:meth:`LocalSearch.by_strength`), ties by rank.
+
+    Under faithfulness these are exactly the blanket's members: the variables outside the blanket
+    are independent of ``target`` given the blanket, and each member is dependent given the rest
+    [1]_. The same holds with hidden variables, for the blanket in the maximal ancestral graph over
+    the observed variables, whose separation keeps those properties [2]_. Each variable left out
+    keeps all the rest as its separating set. A member a required edge joins to ``target`` is in
+    the blanket from the start and never tested, and a pair the knowledge makes non-adjacent is
+    tested, since it may be a child's other parent, and left out of the returned set, as in
+    :func:`markov_blanket`. Every test conditions on ``d - 2`` variables, so with ``max_depth``
+    below that no test runs and every variable stays in the set, as a skeleton search keeps an
+    edge that only a larger set would remove.
+
+    References
+    ----------
+    .. [1] Pellet, J.-P., and Elisseeff, A. (2008). Using Markov blankets for causal structure
+       learning. Journal of Machine Learning Research 9, 1295-1342.
+    .. [2] Pellet, J.-P., and Elisseeff, A. (2008). Finding latent causes in causal networks: an
+       efficient approach based on Markov blankets. Advances in Neural Information Processing
+       Systems 21, 1249-1256.
+    """
+    required = _required(search.constraints, target, search.ranks)
+    others = [x for x in range(search.d) if x != target and x not in required]
+    if search.max_depth is not None and search.d - 2 > search.max_depth:
+        blanket = required + sorted(others, key=lambda x: search.ranks[x])
+    else:
+        dependent, strengths = [], []
+        for x in others:
+            rest = [z for z in range(search.d) if z not in (target, x)]
+            strength, pvalue = search.scan(target, [x], rest)
+            if pvalue[0] <= search.alpha:
+                dependent.append(x)
+                strengths.append(strength[0])
+            else:
+                sepsets[x] = tuple(rest)
+        blanket = required + search.by_strength(dependent, np.asarray(strengths))
+    if search.constraints is None:
+        return blanket
+    support = search.constraints.support()[target]
+    return [x for x in blanket if support[x]]
+
+
 def _mmpc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     return _max_min(search, target, sepsets)
 
@@ -1004,6 +1050,7 @@ LEARNERS: dict[str, Learner] = {
     "fast_iamb": Learner("blanket", _fast_iamb),
     "hiton_pc": Learner("pc", _hiton_pc),
     "hiton_mb": Learner("pc_spouses", pc="hiton_pc", cell_rows=HITON_CELL_ROWS),
+    "total_conditioning": Learner("blanket", _total_conditioning),
 }
 
 
