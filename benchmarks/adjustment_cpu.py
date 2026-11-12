@@ -67,7 +67,8 @@ FIXED_ARMS: list = [AdjustForNothing(), AdjustForEverything(), AndreyPCAdjustmen
 #: The references, the authors' code each in its own environment (the ``start_*.sh`` scripts).
 REFERENCES: list = [GuptaLDECC(), MaaschLDP(), MaaschLD3(), SchubertSNAP(), SchubertLOAD()]
 
-#: The claimed settings of the papers at the sizes they report; the campaigns choose their own.
+#: The claimed settings of the papers at sizes they report, one row of cells per paper; a campaign
+#: chooses its own grid.
 DEFAULT_CELLS: tuple[str, ...] = (
     *(
         f"entner-{task}@{n}"
@@ -75,14 +76,27 @@ DEFAULT_CELLS: tuple[str, ...] = (
         for n in (100, 1000, 10000)
     ),
     *(f"locpc-{kind}@5000,v={v}" for kind in ("identifiable", "nonidentifiable") for v in (10, 50)),
+    "ldp@1000",
+    "ldp@5000",
+    "ld3-dag@1000",
+    "ld3-dag@10000",
+    "ldecc@8000",
+    "ldecc@32000",
+    "random-graph@1000,degree=3,nodes=100",
+    "random-graph@10000,degree=2,nodes=100",
+    "magic-niab@8000",
+    *(f"sangiovese@{n}" for n in (250, 500, 1000)),
+    "mildew@25000",
 )
 
-#: Smallest run that touches every kind of cell: two models of each.
+#: Smallest run that touches every kind of cell and every reference: two models of each.
 SMOKE = {
     "cells": [
         "entner-effect-admissible@1000",
+        "ldecc@2000",
+        "ldp@1000",
+        "ld3-dag@1000",
         "locpc-identifiable@2000,v=10",
-        "locpc-nonidentifiable@2000,v=10",
     ],
     "seeds": 2,
     "cap_wall_s": 300.0,

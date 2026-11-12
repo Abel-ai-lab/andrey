@@ -237,7 +237,10 @@ class AndreyPCAdjustment:
         directed = adj.directed(marks)
         record["identifiable"] = not bool(adj.undirected(marks)[y].any())
         adjacent = bool(marks[x, y] or marks[y, x])
-        record["nonzero"] = False if not adjacent else (True if directed[x, y] else None)
+        if not adjacent or directed[y, x]:
+            record["nonzero"] = False  # no arc, or the outcome causes the treatment
+        elif directed[x, y]:
+            record["nonzero"] = True
         if record["identifiable"] and record["nonzero"] is not False:
             parents = [int(v) for v in np.flatnonzero(directed[:, y]) if v != x]
             record.update(adjustment_sets=[parents], set_kind="parents_of_outcome")

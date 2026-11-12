@@ -579,6 +579,9 @@ def test_the_pc_arm_reads_a_direct_effect_off_the_edges_at_the_outcome():
     assert record["set_kind"] == "parents_of_outcome"
     (apart,), _ = L.unpack_effects(arm.fit(data, {**params, "treatment": 3}))
     assert apart["nonzero"] is False and apart["adjustment_sets"] == []  # not adjacent
+    # the outcome causes the treatment: the effect is zero, and the answer says so
+    (reverse,), _ = L.unpack_effects(arm.fit(data, {**params, "treatment": 1, "outcome": 0}))
+    assert reverse["nonzero"] is False and reverse["adjustment_sets"] == []
 
 
 # --- the driver ------------------------------------------------------------------------------

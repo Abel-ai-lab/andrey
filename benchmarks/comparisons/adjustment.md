@@ -142,8 +142,9 @@ methods report, which leaves cached repeats out.
 $ANDREY_BENCH_PYTHON benchmarks/adjustment_cpu.py --out outputs/adj --smoke
 ```
 
-The defaults are the claimed settings of the papers at their sizes: 20 seeds of each cell, every
-solution that is installed. `--cells` takes cells, `--solutions` names, `--alpha` and `--max-depth`
+The default cells are the claimed settings of the papers at sizes they report (`DEFAULT_CELLS`), 20
+seeds of each, with every solution that is installed. `--smoke` runs one cell of each kind and of
+each reference, two seeds. `--cells` takes cells, `--solutions` names, `--alpha` and `--max-depth`
 set the same value for every solution that takes it, and `--part` and `--parts` split a campaign
 over jobs. `--resume` continues a run and `--rescore` recomputes every score from the stored
 answers. `records.jsonl` holds one line per fit with the answer, the scores, and the settings.
