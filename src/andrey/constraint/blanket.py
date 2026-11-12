@@ -1,11 +1,12 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
-:func:`andrey.inter_iamb`, and :func:`andrey.mmpc`.
+:func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, and :func:`andrey.mmpc`.
 
-:func:`markov_blanket` runs IAMB or Inter-IAMB for one target and :func:`parents_children` the
-forward and backward phases of MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for
-every variable. Keeping a pair when each lies in the other's set (the AND rule) gives the moral
-graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2`
-search within. Each takes any :class:`~andrey.core.ci.CITest`, and background knowledge as
+:func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
+learners Grow-Shrink and Fast-IAMB, and :func:`parents_children` the forward and backward phases of
+MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for every variable. Keeping a pair when
+each lies in the other's set (the AND rule) gives the moral graph and the skeleton that
+:func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
+:class:`~andrey.core.ci.CITest`, and background knowledge as
 :class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
 set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
 returned set.
@@ -133,6 +134,25 @@ def strongest(keys: Mapping[int, Any], ranks: Sequence[int]) -> int:
     return best
 
 
+def ordered(keys: Mapping[int, Any], ranks: Sequence[int]) -> list[int]:
+    """The candidates from the smallest key to the largest, those whose keys are equal by rank.
+
+    The order :func:`strongest` gives when asked again for what is left: ``keys`` and ``ranks`` are
+    as there, and ``ranks`` is read only for candidates whose keys are equal.
+    """
+    items = sorted(keys.items(), key=lambda item: item[1])
+    order: list[int] = []
+    start = 0
+    while start < len(items):
+        stop = start + 1
+        while stop < len(items) and items[stop][1] == items[start][1]:
+            stop += 1
+        tied = [x for x, _ in items[start:stop]]
+        order.extend(tied if len(tied) == 1 else sorted(tied, key=lambda x: ranks[x]))
+        start = stop
+    return order
+
+
 def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
     """The variables a required edge joins to ``target``, in rank order; none without
     ``constraints``."""
@@ -237,6 +257,157 @@ def _shrink(
             blanket.remove(x)
             if sepsets is not None:
                 sepsets[x] = tuple(sorted(rest))
+
+
+def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s Markov blanket by Grow-Shrink (GS) [1]_ [2]_, in the order its members joined.
+
+    The candidates are visited in one fixed order, the most dependent on ``target`` first: by their
+    unconditional strength (:meth:`LocalSearch.scan`, :meth:`LocalSearch.by_strength`), ties by
+    rank.
+    Grow: each pass visits every candidate outside the blanket in that order, tests it given the
+    current blanket, and adds it at once when the p-value is at or below ``alpha``, so the next
+    candidate of the pass is tested given the larger blanket; passes repeat until one adds nothing.
+    Shrink: each pass visits the members in the same order and drops each one the test finds
+    independent of ``target`` given the other current members; passes repeat until one drops
+    nothing. A test whose conditioning set has not changed since the candidate's last test is not
+    asked again, and while the blanket is still empty the grow test is the ordering test itself.
+
+    ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
+    stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
+    ``target`` is in the blanket from the start and never tested, a pair the knowledge makes
+    non-adjacent is left out of the returned set, and a variable outside it that a test found
+    independent keeps the conditioning set of the last such test.
+
+    References
+    ----------
+    .. [1] Margaritis, D., and Thrun, S. (2000). Bayesian network induction via local
+       neighborhoods. Advances in Neural Information Processing Systems 12, 505-511.
+    .. [2] Margaritis, D. (2003). Learning Bayesian network model structure from data. PhD thesis,
+       Carnegie Mellon University, CMU-CS-03-153.
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    blanket = list(required)
+    candidates = [x for x in range(search.d) if x != target and x not in required]
+    strengths, pvalues = search.scan(target, candidates, ())
+    order = search.by_strength(candidates, strengths)
+    unconditional = dict(zip(candidates, pvalues.tolist(), strict=True))
+    # The blanket size at each candidate's last independent verdict: the blanket only grows here,
+    # so an equal size is the same conditioning set.
+    last: dict[int, int] = {}
+    growing = True
+    while growing:
+        added = False
+        for y in order:
+            if y in blanket or last.get(y) == len(blanket):
+                continue
+            if max_depth is not None and len(blanket) > max_depth:
+                growing = False
+                break
+            if blanket:
+                p = search.scan(target, [y], blanket)[1][0]
+            else:
+                p = unconditional[y]
+            if p <= alpha:
+                blanket.append(y)
+                added = True
+            else:
+                last[y] = len(blanket)
+                sepsets[y] = tuple(sorted(blanket))
+        growing = growing and added
+    # The removals made when each member was last found dependent: the blanket only shrinks here.
+    kept: dict[int, int] = {}
+    removed = 0
+    while True:
+        before = removed
+        for x in [y for y in order if y in blanket]:
+            if kept.get(x) == removed:
+                continue
+            rest = [z for z in blanket if z != x]
+            if search.scan(target, [x], rest)[1][0] > alpha:
+                blanket.remove(x)
+                removed += 1
+                sepsets[x] = tuple(sorted(rest))
+            else:
+                kept[x] = removed
+        if removed == before:
+            break
+    for x in blanket:
+        sepsets.pop(x, None)
+    if constraints is None:
+        return blanket
+    support = constraints.support()[target]
+    return [x for x in blanket if support[x]]
+
+
+#: Fast-IAMB's least average number of rows per cell of the table of a test it adds a member by
+#: (Yaramakala and Margaritis 2005, Eq. 2, k = 5).
+CELL_ROWS = 5
+
+
+def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s Markov blanket by Fast-IAMB [1]_, in the order its members joined.
+
+    Each round tests every variable outside the blanket given the blanket in one
+    :meth:`LocalSearch.scan`, the first round given no variable, and orders those whose p-value is
+    at or below ``alpha`` from the strongest dependence to the weakest
+    (:meth:`LocalSearch.by_strength`). It adds them in that order, without a test, while the data
+    suffice: on categorical data, while the rows per cell of the table of ``target``, the variable,
+    and the blanket so far exceed ``CELL_ROWS``, the cells the product of the columns' levels
+    (:func:`table_size`) and the rows every row of the data; a variable that fails the rule marks
+    the data insufficient and ends the batch. On a table with a continuous column the rule does not
+    apply and the whole batch joins. Then one shrink pass in joining order (:func:`_shrink`). The
+    search stops when no variable tests dependent; when the data were insufficient and the shrink
+    dropped nothing, the variables the rule kept out taken as independent; or when the blanket after
+    a shrink repeats one it held after an earlier shrink, which ends a cycle of additions and
+    removals the paper does not guard against.
+
+    ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: a batch stops
+    once the blanket holds more than ``max_depth`` members, and the search stops while it does, so
+    no test conditions on more than ``max_depth`` variables.
+
+    References
+    ----------
+    .. [1] Yaramakala, S., and Margaritis, D. (2005). Speculative Markov blanket discovery for
+       optimal feature selection. Fifth IEEE International Conference on Data Mining (ICDM).
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    blanket: list[int] = list(required)
+    seen: set[frozenset[int]] = set()
+    while max_depth is None or len(blanket) <= max_depth:
+        candidates = [x for x in range(search.d) if x != target and x not in blanket]
+        strengths, pvalues = search.scan(target, candidates, blanket)
+        given = tuple(sorted(blanket))
+        sepsets.update((candidates[i], given) for i in np.flatnonzero(pvalues > alpha).tolist())
+        dependent = np.flatnonzero(pvalues <= alpha).tolist()
+        if not dependent:
+            break
+        batch = search.by_strength([candidates[i] for i in dependent], strengths[dependent])
+        insufficient = False
+        for x in batch:
+            if max_depth is not None and len(blanket) > max_depth:
+                break
+            size = None if search.levels is None else table_size(search.levels, target, x, blanket)
+            if size is not None and search.n <= CELL_ROWS * size:
+                insufficient = True
+                break
+            blanket.append(x)
+        before = len(blanket)
+        _shrink(search, target, blanket, required, sepsets)
+        if insufficient and len(blanket) == before:
+            break
+        state = frozenset(blanket)
+        if state in seen:
+            break
+        seen.add(state)
+    for x in blanket:
+        sepsets.pop(x, None)
+    if constraints is None:
+        return blanket
+    support = constraints.support()[target]
+    return [x for x in blanket if support[x]]
 
 
 def blanket_graph(
@@ -698,6 +869,8 @@ LEARNERS: dict[str, Learner] = {
     "iamb": Learner("blanket", partial(_iamb, interleaved=False)),
     "inter_iamb": Learner("blanket", partial(_iamb, interleaved=True)),
     "mmpc": Learner("pc", _mmpc),
+    "gs": Learner("blanket", _gs),
+    "fast_iamb": Learner("blanket", _fast_iamb),
 }
 
 
@@ -773,6 +946,8 @@ class LocalSearch:
         self.levels = levels
         self.n = n
         self.counts = SearchCounts(queries=set() if trace else None)
+        # Whether a scan's strengths are negated p-values, as for a test without statistic_pvalue.
+        self._pvalue_strengths = getattr(test, "statistic_pvalue", None) is None
         self._measuring = False
         self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
@@ -853,6 +1028,27 @@ class LocalSearch:
     def strongest(self, keys: Mapping[int, Any]) -> int:
         """The candidate with the smallest key, ties broken by ``ranks`` (:func:`strongest`)."""
         return strongest(keys, self.ranks)
+
+    def ordered(self, keys: Mapping[int, Any]) -> list[int]:
+        """The candidates from the smallest key to the largest, ties by ``ranks``
+        (:func:`ordered`)."""
+        return ordered(keys, self.ranks)
+
+    def by_strength(self, xs: Sequence[int], strengths: np.ndarray) -> list[int]:
+        """``xs`` from the strongest dependence to the weakest, by the strengths :meth:`scan` gave
+        them, ties by ``ranks`` (:meth:`ordered`).
+
+        A partial correlation is compared to ``KEY_DP`` decimals, as :meth:`strongest` keys it. A
+        p-value, the strength of a test without one, is compared to ``KEY_DP`` significant digits,
+        so p-values far below ``10**-KEY_DP``, common for strong dependence on many rows, keep the
+        order of their sizes rather than tying.
+        """
+        values = np.asarray(strengths, dtype=np.float64).tolist()
+        if self._pvalue_strengths:
+            keys = {x: float(f"{-s:.{KEY_DP}g}") for x, s in zip(xs, values, strict=True)}
+        else:
+            keys = {x: -round(s, KEY_DP) for x, s in zip(xs, values, strict=True)}
+        return self.ordered(keys)
 
     def _asked(
         self,

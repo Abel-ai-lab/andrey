@@ -12,6 +12,17 @@ names its pull request.
 
 ### Added
 
+- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000), experimental:
+  the blanket of one target, or every variable's blanket joined into the CPDAG, skeleton, or moral
+  graph, with the arguments and metadata of `iamb`. It visits the other variables in one order,
+  the most dependent first, and adds each at once when a test finds it dependent given the blanket
+  so far, in passes until none joins, then shrinks the blanket in passes until none leaves.
+  ([#931])
+- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005),
+  experimental, with the arguments and metadata of `iamb`. Each round tests every variable outside
+  the blanket and adds those that test dependent together, the most dependent first, while a
+  categorical test's table holds more than five rows per cell, then shrinks the blanket once.
+  ([#935])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2527,6 +2538,8 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
+[#931]: https://github.com/Abel-ai-lab/Andrey/pull/931
 [#927]: https://github.com/Abel-ai-lab/andrey/pull/927
 [#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
