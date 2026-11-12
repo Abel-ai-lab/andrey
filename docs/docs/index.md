@@ -79,6 +79,8 @@ What changed in each release.
 - [Contributing](guides/contributing.md): report a problem, set up a development environment, and
   run the checks before a pull request.
 - [Release cards](benchmarks.md): each release's timings, accuracy, and known limits.
+- [Package comparison](comparison.md): Andrey beside causal-learn, Tetrad, pcalg, and
+  bnlearn, from the data their methods read to what an agent can drive.
 - [Standards](standards.md): what every method must meet, how each requirement is checked, and
   where the exceptions are recorded.
 
@@ -98,6 +100,7 @@ methods
 api
 configuration
 benchmarks
+comparison
 faq
 changelog
 roadmap

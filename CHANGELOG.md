@@ -12,6 +12,8 @@ names its pull request.
 
 ### Added
 
+- `andrey.viz.Palette` has `amber_text`, the amber of a word set on the paper: darker in the light
+  theme, so display type keeps a 3:1 contrast. ([#919])
 - `MethodSpec.reads_units` marks the methods whose default fit reads the columns' units: `calm`,
   `dagma`, `dynotears`, `ica_lingam`, and `notears`. The tests now fit every method on data with
   each column rescaled by its own factor, with environments, interventions, mixed data, time series,
@@ -43,6 +45,15 @@ names its pull request.
   release cards that compare it. Each method's `--help --json` contract and its `andrey list` row
   give `data_kinds`, the kinds of data it reads, which the registry derives from its tests and
   scores, its `missing` argument, its inputs, and its result. ([#920])
+
+### Changed
+
+- The homepage is about half as long and names one method per family: the supported method compared
+  with the most packages, timed against every package on one axis, beside the outcome its release
+  card records. The newest four release cards, a table of the families by the kinds of data their
+  methods read, the Sachs example, a band for agents, and five next steps follow, and the install
+  line has a copy button. The comparison with causal-learn, Tetrad, pcalg, and bnlearn moved from
+  the homepage to its own [page](https://andrey.abel.ai/docs/comparison.html). ([#919])
 
 ### Fixed
 
@@ -2520,6 +2531,7 @@ First alpha release.
 [#910]: https://github.com/Abel-ai-lab/andrey/pull/910
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [#928]: https://github.com/Abel-ai-lab/andrey/pull/928
+[#919]: https://github.com/Abel-ai-lab/andrey/pull/919
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
