@@ -72,15 +72,19 @@ def _star(marks: np.ndarray, t: int) -> np.ndarray:
     return out
 
 
-def _random_dag(seed: int, d: int, hidden: int = 0) -> nx.DiGraph:
+def _random_dag(seed: int, d: int, hidden: int = 0, mediated: bool = False) -> nx.DiGraph:
     """An Erdos-Renyi DAG over ``d + hidden`` nodes, the last ``hidden`` of them hidden: each a
-    common parent of two observed nodes, so that it confounds them."""
+    common parent of two observed nodes, so that it confounds them, and with ``mediated`` also a
+    child of a third, earlier in a causal order, so that it carries that node's effect."""
     rng = np.random.default_rng(seed)
     truth = data.sample_scm(graph="erdos_renyi", d=d, n=2, seed=seed, density=2.5).graph
     dag = causal_digraph(truth)
+    order = {v: k for k, v in enumerate(nx.topological_sort(dag))}
     for h in range(d, d + hidden):
-        a, b = rng.choice(d, size=2, replace=False).tolist()
-        dag.add_edges_from([(h, a), (h, b)])
+        a, b, c = sorted(rng.choice(d, size=3, replace=False).tolist(), key=order.__getitem__)
+        dag.add_edges_from([(h, b), (h, c)])
+        if mediated:
+            dag.add_edge(a, h)
     return dag
 
 
@@ -116,10 +120,12 @@ def test_the_cpdag_rules_give_the_true_cpdag_at_every_target(rules, seed, d):
 
 
 @pytest.mark.parametrize(
-    ("seed", "d", "hidden"), [(s, 7 + s % 6, s % 4) for s in range(14)] + [(50, 25, 4)]
+    ("seed", "d", "hidden", "mediated"),
+    [(s, 7 + s % 6, s % 4, s % 2 == 1) for s in range(14)]
+    + [(50, 25, 4, False), (51, 20, 3, True)],
 )
-def test_the_pag_rules_give_the_true_pag_at_every_target(seed, d, hidden):
-    dag = _random_dag(seed, d, hidden)
+def test_the_pag_rules_give_the_true_pag_at_every_target(seed, d, hidden, mediated):
+    dag = _random_dag(seed, d, hidden, mediated)
     truth = _pag(dag, d)
     for target in range(d):
         result = sequential(_search(dag, _ranks(seed, d)), target, "iamb", MMB_R1_R2)
