@@ -743,11 +743,10 @@ _add(
     MethodSpec(
         name="mmb_by_mmb",
         family="constraint",
-        summary="The direct causes and direct effects of one variable when unmeasured common "
-        "causes may exist, the edges at it in the PAG, by sequential local learning: its Markov "
-        "blanket and the local structure over it, then a neighbor's, one blanket at a time, until "
-        "the marks at the target are decided or no further blanket can decide them. For one "
-        "variable of a large graph with small blankets.",
+        summary="The edges at one variable in the PAG when unmeasured common causes may exist, by "
+        "sequential local learning: its Markov blanket and the local structure over it, then a "
+        "neighbor's, one blanket at a time, until the marks at the target are decided or no "
+        "further blanket can decide them. For one variable of a large graph with small blankets.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",
