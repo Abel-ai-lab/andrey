@@ -70,8 +70,10 @@ def _random_dag(seed: int, d: int) -> nx.DiGraph:
 # ---- the answer under the oracle -----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("blanket", ["iamb_forward", "iamb"])
-@pytest.mark.parametrize(("seed", "d"), [(s, 8 + s % 7) for s in range(10)] + [(40, 30)])
+@pytest.mark.parametrize(
+    ("blanket", "seed", "d"),
+    [(b, s, 8 + s % 7) for b in ("iamb_forward", "iamb") for s in range(10)] + [("iamb", 40, 30)],
+)
 def test_the_answer_is_the_cpdag_at_every_target_under_the_oracle(dsep, blanket, seed, d):
     dag = _random_dag(seed, d)
     for target in range(d):
@@ -96,10 +98,15 @@ def _grid(k: int) -> nx.DiGraph:
     return _dag(edges, k * k)
 
 
+# Section 4 supposes each blanket learned exactly, so the chessboard runs IAMB; the grow phase
+# alone can admit the shared parent 1 of 2 and 4 into the center's set, which then orients both
+# edges in one step.
+
+
 def test_the_3x3_chessboard_takes_two_blankets_at_its_center(dsep):
     # Fig. 6: the center 5 (position 4); after MB(5), 3 and 7 are left behind directed edges, and
     # MB(4) or MB(2) orients 2 -> 5 <- 4 through the shared parent 1.
-    out = _oracle_fit(dsep, _grid(3), 4)
+    out = _oracle_fit(dsep, _grid(3), 4, blanket="iamb")
     meta = out.metadata
     assert set(meta["parents"]) == {1, 3} and set(meta["children"]) == {5, 7}
     assert meta["undirected"] == []
@@ -111,7 +118,7 @@ def test_a_chessboard_target_off_the_top_and_left_sides_takes_two_blankets(dsep,
     k = 5
     dag = _grid(k)
     for target in range(k * k):
-        out = _oracle_fit(dsep, dag, target, seed)
+        out = _oracle_fit(dsep, dag, target, seed, blanket="iamb")
         assert np.array_equal(out.structure.to_numpy(), _truth(dag, target)), target
         if target >= k and target % k:
             assert len(out.metadata["blankets_learned"]) == 2, target

@@ -1452,6 +1452,7 @@ _CONCEPTS = (
                 method="mb_by_mb",
                 name="blanket",
                 default="iamb_forward",
+                choices=BLANKET_LEARNERS,
                 reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
                 "to keep a variable added in error rather than lose a member; any blanket "
                 "learner, or a superset of the blanket, satisfies its proof.",

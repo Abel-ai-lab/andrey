@@ -215,15 +215,16 @@ def mb_by_mb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare
-    with. Tested with exact d-separation on every target of 20 random graphs of up to 40
-    variables, and on simulated linear-Gaussian and categorical data. Each local structure tests
-    every pair of a blanket against every subset of the rest, up to ``max_depth`` members, so a
-    blanket of ``m`` variables takes up to about ``m**2 * 2**m`` tests without the cap. Under the
-    default ``max_depth=5``, a pair that only a larger set separates keeps its edge. The default
-    blanket learner never drops a variable it added, so a large sample, in which more variables
-    test dependent, gives larger blankets, and each test of the blanket learner conditions on the
-    whole set so far.
+    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
+    Tested with exact d-separation on every target of 11 random graphs of up to 30 variables and of
+    a 5 x 5 chessboard, and on simulated linear-Gaussian data with 20 variables and categorical data
+    with 10. Each local structure tests every pair of a blanket against every subset of the rest, up
+    to ``max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
+    tests without the cap. Under the default ``max_depth=5``, a pair that only a larger set
+    separates keeps its edge. The default blanket learner never drops a variable it added, so a
+    large sample, in which more variables test dependent, gives larger blankets, and each test of
+    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
