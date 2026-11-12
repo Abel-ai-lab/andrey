@@ -68,7 +68,7 @@ never meet. It reads top to bottom, each value computed when the site is built:
 - The families, by the kinds of data their methods read (`families_table()`): a row per family,
   linked to its table on the methods page (`CATALOG`), with its line from `FAMILY_LINES`; a column
   per kind in `DATA_KINDS`, linked to its row there; and in each cell a dot sized by the number of
-  the family's supported methods whose `data_kinds` hold the kind. On a phone the column labels
+  the family's supported methods whose `data_kinds` hold the kind. Below 56rem the column labels
   stand upright and the lines drop. The section ends in a band on the methods art (`METHODS_ART`)
   that leads to the methods page's "Start from your data".
 - From data to graph: the Sachs example's code, output, and graph.
