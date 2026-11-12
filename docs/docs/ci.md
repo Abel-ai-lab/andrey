@@ -9,11 +9,11 @@ meta:
 
 # Testing
 
-Every pull request runs the full test suite on Linux with every extra, on Python 3.11 and 3.14,
-and the recovery tests without the extras. One that changes the code also builds and installs the
-wheel, and one that changes the code, the documentation, or the notebooks builds this website and
-reruns every notebook, which must reproduce the outputs the website shows. NumPy in float64 is the
-reference: the PyTorch paths must match its results and repeat exactly.
+Every pull request, from a fork too, runs the full test suite on Linux with every extra, on Python
+3.11 and 3.14, and the recovery tests without the extras. One that changes the code also builds and
+installs the wheel, and one that changes the code, the documentation, or the notebooks builds this
+website and reruns every notebook, which must reproduce the outputs the website shows. NumPy in
+float64 is the reference: the PyTorch paths must match its results and repeat exactly.
 
 Each release's pull request into `main` runs a quality gate that fits every supported method
 ({{ n_supported }}) and the supported nonlinear tests to data with known graphs, and many of them

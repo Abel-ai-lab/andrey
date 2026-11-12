@@ -30,11 +30,14 @@ permissions:
 
 jobs:
   lint:
+    # A pull request from a fork runs only on GitHub-hosted runners, where it gets no secrets and a
+    # read-only token: when CI_RUNNER names another runner, only branches of this repository run.
     if: >-
       github.repository_owner == 'Abel-ai-lab'
       && (github.event_name != 'pull_request'
-      || (github.event.pull_request.head.repo.full_name == github.repository
-      && !github.event.pull_request.draft))
+      || (!github.event.pull_request.draft
+      && (github.event.pull_request.head.repo.full_name == github.repository
+      || !vars.CI_RUNNER)))
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
     timeout-minutes: 10
     permissions:

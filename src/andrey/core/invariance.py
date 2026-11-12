@@ -61,7 +61,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy import stats
 
-from .ci import MIXED_INDEP_TESTS, make_indep_test, normal_scores
+from .ci import MIXED_INDEP_TESTS, make_indep_test
+from .stats import normal_scores
 
 __all__ = [
     "GAUSSIAN_INVARIANCE",

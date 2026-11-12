@@ -6,7 +6,8 @@
 {%- set sections = [
   ("docs/index", "Docs", "book", pagename.startswith("docs/")
     and not pagename.startswith(("docs/examples/", "docs/benchmarks/"))
-    and pagename not in ("docs/faq", "docs/benchmarks")),
+    and pagename not in ("docs/faq", "docs/benchmarks", "docs/methods")),
+  ("docs/methods", "Methods", "grid", pagename == "docs/methods"),
   ("docs/examples/index", "Examples", "notebook", pagename.startswith("docs/examples/")),
   ("blog/index", "Blog", "post", pagename == "blog" or pagename.startswith("blog/")),
   ("docs/benchmarks", "Release cards", "chart", pagename == "docs/benchmarks"

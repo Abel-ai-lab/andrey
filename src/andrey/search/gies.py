@@ -44,6 +44,7 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta,
 from andrey.core.knowledge import Constraints, mpdag, orient, violates
 from andrey.core.orient import pdag2dag, to_structure
 from andrey.core.score import (
+    RANK_SCORES,
     BDeuScore,
     BICScore,
     CategoricalBICScore,
@@ -154,7 +155,7 @@ class InterventionalScore:
     mask : ndarray of bool, shape (n, d), or None
         True where the row's value of the variable was set by an intervention; None for none.
     score_func : str, default="bic"
-        The local score, one of :data:`~andrey.core.score.SCORES`.
+        The local score, one of :data:`~andrey.core.score.SCORES` but ``"normal_scores"``.
     penalty_discount : float, default=1.0
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float, default=0.0
@@ -172,7 +173,9 @@ class InterventionalScore:
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`.
+        If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`, or is
+        ``"normal_scores"``: ranks over rows with and without an intervention on a variable mix
+        their distributions, and each variable's score reads only the rows without one.
     """
 
     def __init__(
@@ -187,6 +190,11 @@ class InterventionalScore:
         categorical: np.ndarray | None = None,
         cache_size: int | None = 1_000_000,
     ) -> None:
+        if score_func in RANK_SCORES:
+            raise NotImplementedError(
+                "GIES scores each variable on the rows without an intervention on it, so it takes "
+                'no score_func="normal_scores", whose ranks would mix the intervened rows in'
+            )
         X = np.asarray(data, dtype=np.float64)
         n, d = X.shape
         # Checks the settings and, for the BIC, the columns (check_columns).

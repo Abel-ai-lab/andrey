@@ -77,6 +77,7 @@ def test_list_is_json_when_piped(capsys, monkeypatch):
     rows = json.loads(out)
     assert code == 0
     assert {r["name"]: r["status"] for r in rows} == {n: s.status for n, s in REGISTRY.items()}
+    assert all(r["data_kinds"] == list(REGISTRY[r["name"]].data_kinds) for r in rows)
 
 
 def test_list_on_a_terminal_names_its_columns(capsys, monkeypatch):

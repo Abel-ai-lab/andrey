@@ -1,6 +1,6 @@
 ---
 name: contributing
-description: Report a problem, set up a development environment, and run the checks before a pull request.
+description: Ways to help, how to report a problem or propose a method, and the steps from a fork to a merged pull request.
 meta:
   type: guide
 ---

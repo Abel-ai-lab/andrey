@@ -10,10 +10,10 @@ meta:
 `andrey.abel.ai` is one Sphinx project, this folder: the homepage at `/`, the blog at `/blog/`, and
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
 configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
-pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
-Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
-the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
-the brand are in [`DESIGN.md`](../DESIGN.md).
+pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Methods,
+Examples, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API
+and the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art,
+and the brand are in [`DESIGN.md`](../DESIGN.md).
 
 ## Build
 
@@ -30,7 +30,7 @@ Every build, a rebuild into the same folder included, reads each intersphinx inv
 (`intersphinx_mapping` in `conf.py`) from its project's site, or from its stored copy in
 `_intersphinx/` when the site does not answer within `intersphinx_timeout` seconds, so an
 unreachable site costs the build a few seconds and no references. Each release refreshes the
-copies (`CONTRIBUTING.md`):
+copies (`DEVELOPMENT.md`):
 
 ```shell
 uv run --group docs python scripts/refresh_intersphinx.py
@@ -44,38 +44,53 @@ earlier build. Download links keep their plain addresses.
 ## The homepage
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
-only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the hero's art, the sections' claims and tiles, the charts, and the comparison table with its
-sources. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the
-page's never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
-speed charts, which the posts and the release cards share.
+only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py),
+and `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the page's
+never meet. It reads top to bottom, each value computed when the site is built:
 
-The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", the
-install line, and a card per section. A pill above the headline copies the prompt that installs the
-agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside
-the marks of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT). The
-sections follow the headline's words, then All-in-one (`ACTS` in `site/build.py`). Each opens on its
-art at full bleed with its title and its claim (`act_covers()`), then shows its evidence: tiles,
-each with a figure of its own, and a note in plain type where the evidence is a list (`bento-note`).
-The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
-screen as Accelerated's title appears, until the speed panel rises over the art.
+- The hero, on the lanes art (`HERO_ART`): "Fast causal discovery in Python, built for agents.",
+  the claim (`CLAIM`) with the supported methods and families counted from the registry, the
+  install line (pip or uv, a pair of radio buttons, and a copy button that `prompt.js` shows; without
+  script the command is plain text), Get started, and the methods page.
+- One method per registry family, a row each on one log axis of seconds (`ledger()`). The method is
+  the one `featured_methods()` picks: the supported method compared with the most packages
+  (`compared_packages()`, any setting, research code in `RESEARCH_CODE` not counted); among equals,
+  the largest size at which every package in its shown setting (`default_settings()`) ran and
+  Andrey's graph beats the empty graph (`beats_empty()`; link F1 in `F1_FAMILIES`); then registry
+  order. The row draws each package's fit time at that size and links the release card; its notes
+  give the card's verdict (`card_verdict`), or where the card records none, the two error counts
+  compared (`outcome()`, `OUTCOME_WORDS`). The ranking is `feature_ranks()` and
+  `featured_among()`, which pick among any list of methods, so the methods catalog shares it.
+  Under the rows: the speed post and the comparison page.
+- The newest four release cards (`latest_cards()`): each card's cover from
+  `docs/_static/release-cards/`, or the default tile for a release without art, then its theme and
+  description from the card's own page.
+- The families, by the kinds of data their methods read (`families_table()`): a row per family,
+  linked to its table on the methods page (`CATALOG`), with its line from `FAMILY_LINES`; a column
+  per kind in `DATA_KINDS`, linked to its row there; and in each cell a dot sized by the number of
+  the family's supported methods whose `data_kinds` hold the kind. Below 56rem the column labels
+  stand upright and the lines drop. The section ends in a band on the methods art (`METHODS_ART`)
+  that leads to the methods page's "Start from your data".
+- From data to graph: the Sachs example's code, output, and graph.
+- Built for agents, on the agentic art (`AGENTS_ART`): the command line's own JSON from an agent's
+  session (`agent_frames()`), and a pill that copies the prompt that installs the agent skill
+  (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside the marks
+  of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT).
+- Where to next: getting started, the concepts guide and the learning path (the examples index),
+  the methods page, the release cards, and the contributing guide's "Ways to help".
 
-- Accelerated: the speed panel with a tab per method family, followed by a link to the post "Why
-  Andrey is fast".
-- Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
-  tested against true graphs, and its release card gives every method's errors.
-- Agentic: an agent's run of the command line, and the contract it reads first.
-- All-in-one: the methods by family, the comparison table's features per package, and every kind
-  of causal graph drawn; then "From data to graph" on its own art (`example_cover()`,
-  `EXAMPLE_ART`): the Sachs example's code, output, and graph.
+The comparison page, [`docs/comparison.md`](docs/comparison.md), sets Andrey beside causal-learn,
+Tetrad, pcalg, and bnlearn in the documentation's table style. `comparison_page()` in
+`site/build.py` writes its table and notes into `_generated/`: a mark per package for each feature
+in `COMPARISON` (read from the released versions in `PEER_VERSIONS`), the distinct methods per
+package (`METHOD_COUNTS`; Andrey's are its supported methods less `COUNTED_WITH`), and a numbered
+note for each partial mark, without which the build stops.
 
-Each tile that leads on opens its details as a dialog (`tiles.js`) and never leaves the page;
-without script the details follow the grid and the tile jumps to them. No two tiles open the same
-dialog (Agentic's one tile shows the whole session, `agent_tile()`), and a tile whose dialog would
-only repeat it has none and carries no plus. A tile per registry family that has a supported method
-with a published comparison (`family_tiles()`) shows the family's largest ratio rounded down to one
-digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
-its tile with no change to the page.
+On a phone each art is a strip above its type, which sits on the paper; from 48rem the type sits on
+the art's left side over a navy scrim, the same in both themes. The word "fast" is amber, slanted,
+with a trace of its letters on its right: the ground's amber over the art, and `amber_text` from
+the palette on the paper. It arrives from the right, and nothing else on the page moves; under
+reduced motion it rests in place.
 
 The post `docs/blog/20261008-why-andrey-is-fast.md` explains the speed through four animated scenes
 from [`site/why_fast.py`](../site/why_fast.py). Each compares Andrey with a lane labeled Others and
@@ -84,22 +99,9 @@ replay. Without JavaScript or under reduced motion, each scene shows its final c
 plays the scenes; it is vendored unmodified as `site/assets/motion.js` under its MIT license and
 pinned in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on that post.
 
-The page moves with the scroll, never under reduced motion: the stylesheet drives it from scroll and
-view timelines where the browser has them, and only opacity and transforms move; elsewhere the page
-is still but for the tiles, which `tiles.js` brings in. Every cover's art has one amber line
-(`SWEPT`), and a short trace of light runs along it while the art is on the screen (`tiles.js`):
-`streak()` in `site/build.py` traces the line from the art's warm pixels, and the trace is drawn in
-the art's own frame (`.cover-frame`), so it stays on the line at every width. The hero's art keeps
-nearly its own size (86% of the screen's width or 60% of its height, whichever is more); a section's
-cover band grows with the screen's width, to 90% of its height, so a wide screen shows its art's
-full height, and there its tiles rise into the band's fading foot. The documentation section opens
-on its art (`docs_cover()`, `DOCS_ART`) and leads with the newest post (`_newest_post_card` in
-`conf.py`).
-
-The art follows [`DESIGN.md`](../DESIGN.md): the files are in `site/brand/` (`HERO_ART`, `ACTS`,
-`EXAMPLE_ART`, `FAMILY_ART`, and `tile_art()` in `site/build.py`), stored after `brand_tones` as
-sRGB with no embedded profile, and site tests check their tones, their sizes, and that their median
-color is `--andrey-ground-art` (`cards.ground_tokens()`), the ground the CSS lays around them.
+The art follows [`DESIGN.md`](../DESIGN.md): the files are in `site/brand/` (`HERO_ART`,
+`METHODS_ART`, and `AGENTS_ART` in `site/build.py`), stored after `brand_tones` as sRGB with no
+embedded profile, and site tests check their tones and their sizes.
 
 The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`), as is the search
 dialog. In Chromium the pill is Liquid Glass: `glass.js` draws a lens map for the pill's size into
@@ -131,9 +133,29 @@ uv run --group docs sphinx-build -b html docs docs/_build/html \
 ```
 
 The page is then marked "not for release" and `noindex`; the fixture carries
-`"placeholder": true`, which the build refuses without `andrey_placeholder`. The examples on the page
-are [`site/example.py`](../site/example.py) and [`site/interface.py`](../site/interface.py), run at
-build time: the page shows what they print and draws the graphs they return.
+`"placeholder": true`, which the build refuses without `andrey_placeholder`. The example on the page
+is [`site/example.py`](../site/example.py), run at build time: the page shows what it prints and
+draws the graph it returns.
+
+## The methods catalog
+
+[`docs/methods.md`](docs/methods.md), Methods in the navbar, is a plain documentation page: a
+title, the count of supported and experimental methods (from `_methods_text()` in
+`docs/conf.py`), and two tables. "Start from your data" (`your-data`) has a row per kind of data a
+method reads (`MethodSpec.data_kinds`, row `data-<kind>`): what the kind means, the method to
+start with, the graph it returns, and how many methods of each family read it, each family linked
+to its section. Below, a section per family (`family-<family>`) holds a row per method
+(`method-<name>`). `catalog_start()` and `catalog_families()` in `site/build.py` write both from
+the registry and the published summaries into `_generated/`. The tables take the documentation's
+table style, and their `stacked` class stacks each row on a phone, as the API reference's summary
+tables do (`andrey.css`). The page loads no script and no style of its own.
+
+The method to start with follows the homepage's featured rule (`featured_among()` over
+`feature_ranks()`; `featured_methods()` gives each family's): among the supported methods whose
+shown setting (`default_settings()`) reaches a size every package ran with a graph that beats the
+empty one, the one compared with the most packages, then the largest such size, then registry
+order. For a kind of data, `start_with()` applies it in the first family that reads the kind, among
+the methods that need it (`needs()`), else among those that read it.
 
 ## The blog
 

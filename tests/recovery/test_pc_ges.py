@@ -7,6 +7,7 @@ import andrey
 from andrey import data
 from andrey.constraint.pc import pc as pc_engine
 from andrey.core import ARROW
+from andrey.metrics import shd, to_cpdag
 from andrey.search.ges import ges as search_ges
 from andrey.search.operators import max_parents_in_class
 from tests.recovery.helpers import datagen
@@ -113,6 +114,50 @@ def test_ges_does_not_depend_on_the_data_scale():
     x = datagen.generate("gauss_5v")
     want = andrey.ges(x).structure.to_numpy()
     np.testing.assert_array_equal(andrey.ges(x * 1e-85).structure.to_numpy(), want)
+
+
+#: A strictly increasing map for each column, in turn.
+MONOTONE = (
+    np.exp,
+    lambda x: x**3,
+    lambda x: np.log(x - x.min() + 1.0),
+    np.sinh,
+    lambda x: x + x**3,
+    lambda x: -np.exp(-x),
+)
+
+
+def distorted(x: np.ndarray) -> np.ndarray:
+    return np.stack([MONOTONE[j % len(MONOTONE)](x[:, j]) for j in range(x.shape[1])], axis=1)
+
+
+@pytest.mark.parametrize("name", ["ges", "gfci"])
+def test_the_rank_based_score_recovers_gaussian_data_and_ignores_a_monotone_distortion(name):
+    """On linear-Gaussian data the rank-based score finds about the graph the BIC finds, far from
+    the empty graph; after a strictly increasing map of each column the BIC's errors grow past the
+    empty graph's, and the rank-based score returns the same result as on the Gaussian data."""
+    fit = getattr(andrey, name)
+    rank = {"score_func": "normal_scores"}
+    if name == "gfci":
+        rank["indep_test"] = "normal_scores"
+    errors = []
+    for seed in range(10):
+        sample = data.sample_scm(d=8, n=500, seed=seed, density=2.0)
+        x = np.asarray(sample.data)
+        truth = sample.graph.to_pag() if name == "gfci" else to_cpdag(sample.graph)
+        gaussian = fit(x, **rank)
+        assert fit(distorted(x), **rank) == gaussian
+        bic, distorted_bic = fit(x).structure, fit(distorted(x)).structure
+        empty = np.count_nonzero(sample.graph.to_numpy())
+        errors.append(
+            (shd(gaussian.structure, truth), shd(bic, truth), shd(distorted_bic, truth), empty)
+        )
+    rank_errors, bic_errors, distorted_errors, empty_errors = np.sum(errors, axis=0)
+    # Over the 10 graphs of 8 true edges: ges 23 errors with the rank-based score, 25 with the BIC,
+    # 84 with the BIC after the maps; gfci 22, 22, and 76; the empty graph 80.
+    assert rank_errors < empty_errors / 2
+    assert abs(rank_errors - bic_errors) <= 3
+    assert distorted_errors >= 3 * rank_errors
 
 
 def fan_in(causes: int, n: int = 2000) -> np.ndarray:

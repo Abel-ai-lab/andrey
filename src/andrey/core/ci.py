@@ -86,7 +86,7 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
-from scipy.special import chdtrc, gammaln, ndtr, ndtri, stdtr
+from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
 from . import categorical, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
@@ -774,20 +774,8 @@ class NormalScores(FisherZ):
         arr = np.asarray(data, dtype=np.float64)
         scores = arr
         if arr.ndim == 2 and np.isfinite(arr).all():
-            scores = normal_scores(arr)
+            scores = stats.normal_scores(arr)
         super().__init__(scores)
-
-
-def normal_scores(data: np.ndarray) -> np.ndarray:
-    """Each column of the finite ``(n_samples, n_features)`` ``data`` as its normal scores.
-
-    The scores are ``Phi^-1(rank / (n + 1))`` (van der Waerden), with tied values sharing their
-    average rank: a column's scores depend on it only through its ranks.
-    """
-    from scipy.stats import rankdata
-
-    arr = np.asarray(data, dtype=np.float64)
-    return ndtri(rankdata(arr, axis=0) / (arr.shape[0] + 1.0))
 
 
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
