@@ -790,12 +790,13 @@ def gs(
     a pass drops none. A test whose conditioning set is unchanged since the variable's last test is
     not run again. With exact tests, the result is the true Markov blanket [1]_ [2]_.
 
-    Variables whose strengths agree to nine decimals go to the column whose rank, computed from the
-    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
-    unless two columns are identical. The strength is the absolute partial correlation for
-    ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests, as the papers order the variables by their probability of
-    dependence [1]_.
+    The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
+    to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
+    the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
+    order, as the papers order the variables by their probability of dependence [1]_. Variables
+    whose strengths agree go to the column whose rank, computed from the data, comes first, as for
+    :func:`~andrey.hc`, so the sets do not depend on the column order unless two columns are
+    identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
