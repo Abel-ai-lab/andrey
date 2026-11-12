@@ -12,7 +12,8 @@ An answer is a ``(d, d)`` array. For sets, ``answer[t, j] != 0`` puts ``j`` in t
 skeleton it is the graph's symmetric 0/1 adjacency, and for the CPDAG a 0/1 adjacency or endpoint
 marks, as :func:`andrey_bench.contracts.structure_from_adjacency` reads them.
 
-The module imports NumPy only, except :func:`answer_structure`, which imports Andrey when called.
+The module imports NumPy only, except :func:`answer_structure` and :func:`true_set`, which import
+Andrey when called.
 """
 
 from __future__ import annotations
@@ -105,28 +106,18 @@ def sets_of(answer: np.ndarray, targets: list[int]) -> dict[int, list[int]]:
     return {int(t): [int(j) for j in np.flatnonzero(answer[t]) if j != t] for t in targets}
 
 
-def _parents_children(marks: np.ndarray) -> tuple[list[set[int]], list[set[int]]]:
-    """The parents and the children of every node of a DAG's endpoint marks."""
-    marks = np.asarray(marks)
-    d = marks.shape[0]
-    # `marks[j, i]` is the mark at j of the edge between i and j: an arrowhead at j is `i -> j`.
-    arrow = marks == _ARROW
-    parents = [{int(i) for i in np.flatnonzero(arrow[j]) if i != j} for j in range(d)]
-    children = [{int(i) for i in np.flatnonzero(arrow[:, j]) if i != j} for j in range(d)]
-    return parents, children
-
-
 def true_set(marks: np.ndarray, target: int, kind: str) -> list[int]:
     """The true set of `target` in the DAG `marks` (endpoint marks): ``kind`` ``"pc"`` is its
-    parents and children, ``"mb"`` those and its children's other parents."""
+    parents and children, ``"mb"`` those and its children's other parents, the oracle answers of
+    :func:`andrey.metrics.target_oracle`."""
+    from andrey import GraphStructure
+    from andrey.metrics import target_oracle
+
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
-    parents, children = _parents_children(marks)
-    members = parents[target] | children[target]
-    if kind == "mb":
-        for child in children[target]:
-            members |= parents[child]
-    return sorted(members - {target})
+    dag = GraphStructure.from_numpy(np.asarray(marks), kind="dag")
+    answer = "markov_blanket" if kind == "mb" else "parents_and_children"
+    return sorted(target_oracle(dag, target, answer).neighbors(target).tolist())
 
 
 def true_graph(marks: np.ndarray, structure: str) -> np.ndarray:

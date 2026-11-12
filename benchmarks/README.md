@@ -343,6 +343,31 @@ built untimed in the parent, once per dataset. Its cost grows about 8x per doubl
 CPDAG estimate is scored as a PAG without canonicalization. Its tails and undirected edges count
 against the PAG's circles. Use PAG methods and the empty graph on these datasets.
 
+### Local answers
+
+A local method answers questions: whether a variable is in a target's set, which mark an edge has
+at the target, whether a pair's effect is nonzero or identifiable, which set to adjust for. Score
+each answer against the oracle answer, the method's own definition applied to the true graph:
+`andrey.metrics.target_oracle` for a target, `effect_oracle` for a pair (or the method run with a
+d-separation oracle in place of its test, for a method whose answer its procedure defines).
+
+- **Outcomes.** Each query is correct, wrong, incomplete, or abstained
+  (`andrey.metrics.answer_scores`). "Cannot tell" is incomplete where the oracle decides and correct
+  where the oracle cannot either; an undirected edge or a circle where the oracle directs the edge
+  is incomplete, never wrong. A decided answer where the oracle cannot tell is wrong. A set answer
+  answers every candidate, so its wrong answers are its missing and extra members.
+- **Net score and floor.** The net score is correct minus wrong. Its floor is the better of always
+  abstaining (0) and always giving the most common oracle answer on the same queries: the empty set
+  for a set, and abstaining for ancestor claims, whose base rate is at most 1/2 in any DAG.
+- **Gate.** `andrey_bench.local_eval.gate` pairs each dataset's net rate with the floor policy's and
+  passes when the bootstrap 95% interval of the mean difference lies above 0, with the release
+  cards' rule (`andrey_bench.pairing.compare`): 10,000 resamples, at least 10 datasets. A timeout or
+  an error fails the gate; it is never an abstention.
+- **Two methods.** `local_eval.paired_risk` compares their risk only on the queries both answered,
+  paired by dataset, so a method that abstains on hard queries does not buy a lower risk.
+  `local_eval.risk_coverage` traces the risk as a ranked answer is cut by confidence, and
+  `local_eval.wilson_95` gives the interval of a claim precision.
+
 ### Where the clock starts
 
 Only `fit` is timed. Package imports, interpreter startup, and library loading belong in an optional
