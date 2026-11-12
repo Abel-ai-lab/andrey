@@ -138,7 +138,11 @@ def _reach(direct: np.ndarray) -> np.ndarray:
 
 
 def claim_scores(
-    estimated: object, true: object, *, pairs: Iterable[tuple[str | int, str | int]] | None = None
+    estimated: object,
+    true: object,
+    *,
+    pairs: Iterable[tuple[str | int, str | int]] | None = None,
+    claim_values: Iterable[bool] = (True,),
 ) -> dict[str, Any]:
     """Score the decided ``effects`` records of an answer against the true DAG.
 
@@ -150,9 +154,10 @@ def claim_scores(
     With ``pairs``, the candidate pairs the claims are drawn from, each pair is also a query of
     :func:`~andrey.metrics.answer_scores`: a claim is its answer, an undecided record answers
     "cannot tell" (incomplete), and a pair with no record is abstained. The base-rate policy
-    makes the answer's own kind of claim about every pair: for ancestor claims its net rate is
-    ``2b - 1`` with ``b`` the share of pairs whose treatment is an ancestor of the outcome, at
-    most 1/2 in any DAG, so the floor is abstaining unless the answer also claims zero effects.
+    makes one of the method's kinds of claim (``claim_values``) about every pair: for ancestor
+    claims its net rate is ``2b - 1`` with ``b`` the share of pairs whose treatment is an ancestor
+    of the outcome, at most 1/2 in any DAG, so the floor is abstaining unless the method also
+    claims zero effects.
 
     Parameters
     ----------
@@ -166,6 +171,10 @@ def claim_scores(
         The ordered (treatment, outcome) pairs the claims are drawn from, named as the records
         name them. Every record's pair must be among them, and the records must share one
         ``estimand``.
+    claim_values : iterable of bool, default=(True,)
+        With ``pairs``, the claims the method makes: ``(True,)`` for claims that an effect is
+        nonzero, such as ancestor claims; ``(True, False)`` for a method that also claims zero
+        effects. It sets the base-rate policy, so it is the method's, never read from one answer.
 
     Returns
     -------
@@ -228,8 +237,7 @@ def claim_scores(
     for a, b in pairs:
         key = (_position(a, labels, len(m), "pairs"), _position(b, labels, len(m), "pairs"))
         oracle[key] = bool(truth[key])
-    kinds = sorted({value for value in answers.values() if value is not None})
-    return {**scores, **answer_scores(answers, oracle, choices=kinds)}
+    return {**scores, **answer_scores(answers, oracle, choices=tuple(claim_values))}
 
 
 def true_dag(true: object) -> GraphStructure:

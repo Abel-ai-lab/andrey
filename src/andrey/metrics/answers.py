@@ -164,8 +164,10 @@ def pooled_answer_scores(scores: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Pool several :func:`answer_scores` results into one, as if their queries were one set.
 
     The counts add up. A constant answer keeps one value across the pool, so its net is the sum
-    of its nets; where a part did not list it among its choices, no oracle answer there equals
-    it, and it counts as wrong on every query of that part (``"cannot tell"``: incomplete).
+    of its nets. Pool results computed with the same ``choices``: where a part did not list a
+    constant answer (its default choices hold only the oracle answers it has), it counts as wrong
+    on every query of that part (``"cannot tell"``: incomplete), which holds only when no oracle
+    answer there equals it.
 
     Parameters
     ----------

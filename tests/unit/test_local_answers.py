@@ -325,6 +325,20 @@ def test_ancestor_claims_against_their_base_rate():
     assert (s["net"], s["abstained"], s["coverage"]) == (1, 5, pytest.approx(1 / 6))
     with pytest.raises(ValueError, match="oracle lacks"):
         claim_scores(one, dag, pairs=[("A", "B")])
+    # A dataset with no claims pools as abstaining, not as a policy that never answers right.
+    parts = [claim_scores(one, dag, pairs=pairs), claim_scores([], dag, pairs=pairs)]
+    keys = [k for k in parts[0] if k in pooled_answer_scores(parts)]
+    union = answer_scores(
+        {("A", "C", 0): True},
+        {(a, b, part): truth for part in (0, 1) for (a, b), truth in _ancestry(dag, pairs).items()},
+        choices=(True,),
+    )
+    assert {k: pooled_answer_scores(parts)[k] for k in keys} == {k: union[k] for k in keys}
+
+
+def _ancestry(dag: GraphStructure, pairs: list) -> dict:
+    """Whether the first of each pair is an ancestor of the second."""
+    return {(a, b): a in dag.ancestors(b) for a, b in pairs}
 
 
 def _claim(dag: GraphStructure, a: str, b: str) -> dict:
