@@ -5,14 +5,12 @@
 
 Every number on the homepage comes from a release's published benchmark summary (``RELEASES``) or
 from the method registry. A method measured against the same package in two summaries shows the
-newer summary's rows (:func:`newest`). Each registry family shows one method, the one
-:func:`featured_methods` picks, timed against every package compared with it, beside the outcome
-its release card records. The README, the live demo, and the homepage's description state
-``CLAIM``, which carries no number; :func:`claim_sentence` words the first summary's headline. The
-live demo's charts and tables (``apps/build_assets.py``) and the README's claims
-(``apps/build_launch.py``) come from the same functions. A summary outside
-``benchmarks/published/`` loads only as a placeholder, which marks the page as not for release.
-Links are relative to the site root.
+newer summary's rows (:func:`newest`). The speed and accuracy sections show one method per
+registry family, the one :func:`featured_methods` picks, beside every package compared with it. The
+README, the live demo, and the homepage's description state ``CLAIM``, which carries no number;
+:func:`claim_sentence` words the first summary's headline. The method counts come from the method
+registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks
+the page as not for release. Links are relative to the site root.
 """
 
 from __future__ import annotations
@@ -25,14 +23,15 @@ import math
 import re
 import runpy
 import tempfile
+import warnings
 import xml.etree.ElementTree as ET
 from collections import Counter
 from html import escape
 from pathlib import Path
+from typing import get_args
 
 import networkx as nx
 import numpy as np
-import yaml
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
@@ -40,7 +39,9 @@ from pygments.lexers import get_lexer_by_name
 import andrey.viz
 from andrey import GraphStructure
 from andrey.cli import main as andrey_cli
+from andrey.core.structure import Kind
 from andrey.spec import DATA_KINDS, get_spec, list_specs
+from andrey.spec.concepts import BLANKET_STRUCTURES
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -74,6 +75,7 @@ SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 palette_block = runpy.run_path(str(DOCS / "palette_css.py"))["palette_block"]
 # The number formats the live demo shares.
 _formatting = runpy.run_path(str(SITE / "formatting.py"))
+_why_fast = runpy.run_path(str(SITE / "why_fast.py"))
 # Each art's description, its images' alt text (site/covers.py).
 cover_alt = runpy.run_path(str(SITE / "covers.py"))["cover_alt"]
 ratio_text, seconds_text, number_text = (
@@ -1515,6 +1517,11 @@ def returns_text(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
     return spec.output.graph_kind.upper()
 
 
+def first_clause(summary: str) -> str:
+    """The registry summary up to its first colon, semicolon, or sentence end."""
+    return re.split(r"(?<=[a-z)]{2})\. |[:;] ", summary, maxsplit=1)[0].rstrip(".")
+
+
 # ---- the example, the wordmark, and the page --------------------------------------------------
 def drawing(
     structure,
@@ -1586,7 +1593,163 @@ def run_example() -> tuple[str, str, str]:
     return code, printed, drawing(structure, label, parts_layout(structure), size=(360, 260))
 
 
+# The three graphs site/interface.py draws from one table, in the order the page shows them: each
+# method's name, the kind of graph it returns, and what that kind says about the sprinkler network.
+# The methods answer differently only on season-rain and season-sprinkler, and the drawings' edge
+# colors (undirected, circle, directed) carry the difference.
+INTERFACE_CAPTIONS = {
+    "direct_lingam": (
+        "DirectLiNGAM",
+        "DAG",
+        "One direction for every edge: non-Gaussian noise settles each one.",
+    ),
+    "pc": (
+        "PC",
+        "CPDAG",
+        "The data cannot say which way the two edges from season point, so they stay plain lines.",
+    ),
+    "fci": (
+        "FCI",
+        "PAG",
+        "Circles on both ends: either direction, or a hidden common cause, fits the data.",
+    ),
+}
+# The two drawings of VARMA-LiNGAM's graph over the lawn's days, after the three.
+TEMPORAL_CAPTIONS = (
+    (
+        "Graph over time",
+        "from VARMA-LiNGAM. Rain wets the lawn the same day; the sprinkler wets it the next day, "
+        "and a dry lawn turns the sprinkler on the next day.",
+    ),
+    (
+        "Cyclic graph",
+        "the same graph with time collapsed. The sprinkler and the lawn drive each other, though "
+        "every arrow over time points forward.",
+    ),
+)
+# Every kind a supported method returns as a GraphStructure (andrey.core.structure.Kind), in the
+# homepage's words, then the graphs over time a TemporalStructure holds. A MAG comes from a
+# conversion, GraphStructure.to_mag, never from a method. The homepage shows supported methods only,
+# so a kind that only experimental methods return is not on it. A skeleton, the adjacencies of a
+# causal graph, is not itself a causal graph, so the homepage does not name it: MMPC returns one by
+# default, and the blanket methods with structure="skeleton" or "moral".
+GRAPH_KINDS = {"dag": "DAGs", "cpdag": "CPDAGs", "pag": "PAGs", "digraph": "cyclic graphs"}
+CONVERSION_KINDS = {"mag"}
+SKELETON_KINDS = {"undirected"}
+TEMPORAL_KIND = "graphs over time"
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
+
+
+def experimental_kinds() -> set[str]:
+    """The graph kinds that only experimental methods return: the kinds their specs declare and
+    the kinds of the graphs their ``structure`` can name."""
+    specs = list_specs()
+    supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
+    experimental = {spec.output.graph_kind for spec in specs if spec.status == "experimental"}
+    for spec in specs:
+        structures = [p.choices for p in spec.params if p.concept == "structure" and p.choices]
+        if spec.status == "experimental" and structures:
+            experimental |= {BLANKET_STRUCTURES[choice] for choice in structures[0]}
+    return experimental - supported
+
+
+def graph_kinds() -> list[str]:
+    """Every kind of causal graph the supported methods return, in the homepage's words."""
+    skipped = CONVERSION_KINDS | SKELETON_KINDS | experimental_kinds()
+    kinds = [kind for kind in get_args(Kind) if kind not in skipped]
+    if set(kinds) != GRAPH_KINDS.keys():
+        raise ValueError(f"name every graph kind in GRAPH_KINDS: {sorted(kinds)}")
+    return [GRAPH_KINDS[kind] for kind in kinds] + [TEMPORAL_KIND]
+
+
+def graph_title() -> str:
+    """The graphs tile's and dialog's title: how many kinds of causal graph, in words."""
+    return f"{NUMBER_WORDS[len(graph_kinds())].capitalize()} kinds of causal graph"
+
+
+# Where each of the lawn's variables sits within its day, as (column, row): the rain left of the
+# lawn it wets, the sprinkler above the lawn, so the edges between the days cross clear of the
+# labels under the nodes.
+DAY_SPOTS = {"rain": (0, 0.45), "wet": (1, 0.45), "sprinkler": (1, 0)}
+
+
+def two_days(temporal) -> tuple[GraphStructure, dict[int, tuple[float, float]]]:
+    """A graph over time with lags 0 and 1 drawn as two days side by side, each variable once a
+    day (``DAY_SPOTS``): the same-day edges within each day and the lag-1 edges from the first day
+    into the second."""
+    if max(temporal.lags) > 1:
+        raise ValueError(f"two days hold lags 0 and 1, not {temporal.lags}")
+    summary = temporal.summary_graph()
+    p = len(temporal.labels)
+    marks = np.zeros((2 * p, 2 * p), dtype=int)
+    for i in range(p):
+        for j in range(p):
+            for lag in summary.lags_of(i, j):
+                arrows = [(i, j), (p + i, p + j)] if lag == 0 else [(i, p + j)]
+                for a, b in arrows:
+                    marks[a, b], marks[b, a] = andrey.viz.TAIL, andrey.viz.ARROW
+    labels = [f"{name}(t-1)" for name in temporal.labels]
+    labels += [f"{name}(t)" for name in temporal.labels]
+    columns = 1 + max(x for x, _ in DAY_SPOTS.values())  # a day's
+    positions = {
+        day * p + i: ((day * columns + x) / (2 * columns - 1), y)
+        for day in (0, 1)
+        for i, (x, y) in enumerate(DAY_SPOTS[name] for name in temporal.labels)
+    }
+    return GraphStructure.from_numpy(marks, kind="dag", labels=labels), positions
+
+
+def run_interface() -> tuple[str, str, str]:
+    """Run ``site/interface.py``; return the loop it shows, what it prints, and a figure for each
+    kind of causal graph: one per method on the lawn's table, then the graph over the lawn's days
+    and the same graph with time collapsed."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)  # VARMA-LiNGAM is experimental
+        source, printed, namespace = run_script("interface.py")
+    graphs = namespace["graphs"]
+    if graphs.keys() != INTERFACE_CAPTIONS.keys():
+        raise ValueError(f"caption every method site/interface.py runs: {sorted(graphs)}")
+    # The page shows the loop; the line that keeps each graph for the drawings is the build's.
+    loop = source[source.index("for learn in") : source.index("\n\n", source.index("for learn in"))]
+    shown = "\n".join(line for line in loop.splitlines() if "graphs[" not in line)
+    # One layout for all three, from the DAG, so the drawings differ only in their edge marks.
+    positions = andrey.viz.layout(graphs["direct_lingam"])
+    for key, (name, kind, _) in INTERFACE_CAPTIONS.items():
+        if graphs[key].kind != kind.lower():
+            raise ValueError(f"{name} returns a {graphs[key].kind}, not the captioned {kind}")
+    over_time = namespace["over_time"]
+    days, day_positions = two_days(over_time)
+    summary = over_time.summary_graph()
+    if summary.kind != "digraph":
+        raise ValueError(f"the collapsed graph is a {summary.kind}, not a cyclic graph")
+    # The collapsed graph in one row, its variables in the days' order.
+    p = len(over_time.labels)
+    rows = {i: (i / max(1, p - 1), 0.5) for i in range(p)}
+    drawn = [
+        (
+            graphs[key],
+            f"The {kind} {name} returns",
+            positions,
+            f"<strong>{kind}</strong>, from {name}. {escape(what)}",
+        )
+        for key, (name, kind, what) in INTERFACE_CAPTIONS.items()
+    ] + [
+        (
+            structure,
+            f"The {kind.lower()} VARMA-LiNGAM returns",
+            where,
+            f"<strong>{kind}</strong>, {escape(what)}",
+        )
+        for (structure, where), (kind, what) in zip(
+            [(days, day_positions), (summary, rows)], TEMPORAL_CAPTIONS, strict=True
+        )
+    ]
+    figures = "".join(
+        f'<figure class="interface-figure">{drawing(structure, label, where, size=(300, 210))}'
+        f"<figcaption>{caption}</figcaption></figure>"
+        for structure, label, where, caption in drawn
+    )
+    return shown, printed, figures
 
 
 # Each edge as [source, target, type], named by the CSV header: the rows oriented_edges() returns.
@@ -1639,11 +1802,124 @@ def agent_frames() -> list[tuple[str, list[str], int]]:
     ]
 
 
-# The art each band of the homepage lies on (site/brand/art-<name>.jpg): the hero's, the band that
-# leads from the families to the methods catalog, and the agents band's.
+def agent_demo(frames: list[tuple[str, list[str], int]], figure: str) -> str:
+    """The agent's three steps in a row, then its session in a terminal beside the graph it
+    returned.
+
+    Every line is in the page; the page script only reveals them in turn, and without it, or with
+    reduced motion, the session is shown whole.
+    """
+    count = len(frames[0][1]) + frames[0][2]
+    steps = (
+        (
+            "Find a method",
+            f"<code>andrey list</code> names all {count} methods, with the graph each returns.",
+        ),
+        (
+            "Read its contract",
+            "<code>andrey run pc --help --json</code> gives each parameter's type, "
+            "default, and meaning as JSON Schema.",
+        ),
+        ("Run it", "The run prints the graph as JSON, its nodes named by the data's header row."),
+    )
+    shown = []
+    for command, lines, more in frames:
+        lexer = "json" if lines[0].startswith(("{", "[")) else "text"
+        body = [
+            f'<span class="ln" style="--i: {i}">{code_html(line, lexer)}</span>'
+            for i, line in enumerate(lines)
+        ]
+        if more:
+            body.append(f'<span class="ln elide" style="--i: {len(lines)}">... {more} more</span>')
+        shown.append(
+            '<div class="frame"><div class="cmd"><span class="prompt">$</span> '
+            f'<span class="cmd-text">{escape(command)}</span></div>'
+            f'<div class="out hl">{"".join(body)}</div><span class="exit">exit 0</span></div>'
+        )
+    return (
+        '<div class="agent-demo"><ol class="agent-steps">'
+        + "".join(f'<li class="agent-step"><b>{t}</b><p>{text}</p></li>' for t, text in steps)
+        + '</ol><div class="agent-run"><div class="term"><div class="term-bar window-bar">'
+        '<button class="term-replay" type="button" hidden>Replay'
+        '</button></div><div class="term-body" tabindex="0" role="region" '
+        f'aria-label="Agent session">{"".join(shown)}</div></div><figure class="agent-graph">'
+        f"{figure}<figcaption>The graph in that JSON, drawn with <code>andrey.viz.draw</code>."
+        "</figcaption></figure></div></div>"
+    )
+
+
+# Icons from Feather (MIT, https://github.com/feathericons/feather), and the robot from Lucide (ISC,
+# https://github.com/lucide-icons/lucide), drawn at one size and stroke.
+ICON = {
+    "terminal": '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+    "bot": (
+        '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>'
+        '<path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'
+    ),
+    "chart": (
+        '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>'
+        '<line x1="6" y1="20" x2="6" y2="14"/>'
+    ),
+    "graph": (
+        '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/>'
+        '<circle cx="18" cy="19" r="3"/>'
+        '<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>'
+        '<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>'
+    ),
+    "code": '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    "check": '<polyline points="20 6 9 17 4 12"/>',
+    "zap": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/>'
+    '<circle cx="12" cy="12" r="2"/>',
+    "minus": '<line x1="5" y1="12" x2="19" y2="12"/>',
+    "half": '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+    "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+}
+# The documentation pages a first visit wants, in the order the band lists them.
+DOC_PAGES = (
+    (
+        "terminal",
+        "docs/guides/getting-started.html",
+        "Getting started",
+        "Install, then recover your first graph.",
+    ),
+    (
+        "graph",
+        "docs/guides/graph-types.html",
+        "Graph types",
+        "What a DAG, CPDAG, PAG, or temporal graph claims.",
+    ),
+    ("code", "docs/api.html", "API reference", "Every method, structure, and command."),
+    (
+        "chart",
+        "docs/benchmarks.html",
+        "Release cards",
+        "Timings, accuracy, limits, and how to rerun them.",
+    ),
+)
+
+
+def glyph(icon: str) -> str:
+    """One line symbol, inheriting the color of the text beside it."""
+    return (
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICON[icon]}</svg>'
+    )
+
+
+def chip(icon: str, url: str, text: str, *, primary: bool = False) -> str:
+    """A link with its symbol, boxed; the hero uses one treatment for all of them."""
+    kind = "chip chip--primary" if primary else "chip"
+    return f'<a class="{kind}" href="{escape(url)}">{glyph(icon)}{escape(text)}</a>'
+
+
+# The hero's art (site/brand/art-<name>.jpg), which the first section's title shares, the art of
+# "From data to graph" and of the documentation, and each bento tile's (site/brand/bento/
+# <name>.jpg): a crop of a cover's art at twice the tile's size.
 HERO_ART = "lanes"
-METHODS_ART = "methods"
-AGENTS_ART = "agentic"
+EXAMPLE_ART = "start"
+DOCS_ART = "docs"
+TILE_SIZES = {"4": (768, 416), "6": (1168, 416)}
 PRIORITY = ' fetchpriority="high"'
 
 
@@ -1656,68 +1932,34 @@ def picture(path: str, attrs: str) -> str:
     )
 
 
-def band_art(art: str, *, priority: bool = False) -> str:
-    """A band's art behind its type, with its description as the alt text; only the first
-    screen's art loads before the rest."""
+def cover_frame(art: str, *, priority: bool = False) -> str:
+    """An art in a frame of its own proportions, with the sweep where its art has one, so the
+    sweep lies on the art at every crop. Only the first screen's art loads before the rest."""
     load = PRIORITY if priority else ' loading="lazy"'
-    return picture(
-        f"art-{art}",
-        f'class="band-art" alt="{escape(cover_alt(art), quote=True)}" width="1600" '
-        f'height="640"{load}',
+    return (
+        '<div class="cover-frame">'
+        + picture(
+            f"art-{art}",
+            f'alt="{escape(cover_alt(art), quote=True)}" width="1600" height="640"{load}',
+        )
+        + f"{sweep(art) if art in SWEPT else ''}</div>"
     )
 
 
-# The methods catalog, which the hero, the families, and the next steps lead to.
-CATALOG = "docs/methods.html"
-# The release cards the homepage shows, newest first.
-LATEST_CARDS = 4
-RELEASE_CARDS = DOCS / "docs" / "benchmarks"
+def hero_art() -> str:
+    """The hero's art, the fast lanes: it stays on the screen while the hero's type scrolls away
+    and the first section's title comes up over it."""
+    return cover_frame(HERO_ART, priority=True)
 
 
-def release_versions() -> list[str]:
-    """Every release card's version, newest first."""
-    found = [p.stem for p in RELEASE_CARDS.glob("*.md") if re.fullmatch(r"\d+\.\d+\.\d+", p.stem)]
-    return sorted(found, key=version_key, reverse=True)
-
-
-def release_card(version: str) -> dict[str, str]:
-    """A release card's version, theme (its title after the colon, if it has one), summary (its
-    description after the dash), and cover: the release's own art in
-    ``docs/_static/release-cards/``, or none, where the card shows the default cover."""
-    text = (RELEASE_CARDS / f"{version}.md").read_text(encoding="utf-8")
-    front = yaml.safe_load(text.split("---")[1])
-    title = re.search(r"^# (.+)$", text, re.M)[1]
-    theme = title.split(":", 1)[1].strip() if ":" in title else ""
-    summary = " ".join(front["description"].split()).split(" - ", 1)[-1]
-    art = DOCS / "_static" / "release-cards" / f"{version}.jpg"
-    return {
-        "version": version,
-        "theme": theme[:1].upper() + theme[1:],
-        "summary": summary[:1].upper() + summary[1:],
-        "cover": f"_static/release-cards/{version}.jpg" if art.exists() else "",
-    }
-
-
-def latest_cards() -> str:
-    """The newest ``LATEST_CARDS`` release cards as tiles: the cover, or the default cover's
-    stipple ground with the version, then the version, the theme, and the summary."""
-    out = []
-    for card in map(release_card, release_versions()[:LATEST_CARDS]):
-        version = card["version"]
-        if card["cover"]:
-            cover = (
-                f'<img class="card-cover" src="{card["cover"]}" alt="" width="864" '
-                'height="1119" loading="lazy">'
-            )
-        else:
-            cover = f'<span class="card-cover card-ground" aria-hidden="true">{version}</span>'
-        theme = f" <span>{escape(card['theme'])}</span>" if card["theme"] else ""
-        out.append(
-            f'<li><a href="{card_href(version)}">{cover}<span class="card-text"><b>{version}'
-            f'{theme}</b><span class="card-summary">{escape(card["summary"])}</span></span>'
-            "</a></li>"
-        )
-    return "".join(out)
+def tile_art(name: str, size: str) -> str:
+    """A tile's art, behind its text: a crop of the art of the same name."""
+    width, height = TILE_SIZES[size]
+    return picture(
+        f"bento/{name}",
+        f'class="tile-art" alt="{escape(cover_alt(name), quote=True)}" width="{width}" '
+        f'height="{height}" loading="lazy"',
+    )
 
 
 # The prompt that installs the agent skill, as the README and the FAQ give it.
@@ -1749,7 +1991,7 @@ def agent_logo(name: str) -> str:
 
 
 def agent_pill() -> str:
-    """The pill in "Built for agents": it copies ``AGENT_PROMPT`` to paste into a coding agent
+    """The pill above the headline: it copies ``AGENT_PROMPT`` to paste into a coding agent
     (``prompt.js``), and without the script it leads to the FAQ answer that gives the prompt."""
     logos = "".join(agent_logo(name) for name in AGENTS)
     return (
@@ -1758,6 +2000,22 @@ def agent_pill() -> str:
         '<span class="agent-pill__label">Onboard your agent<span class="agent-pill__more"> to '
         'Andrey</span></span><span class="agent-logos" aria-hidden="true">'
         f"{logos}</span></a>"
+    )
+
+
+def hero_chips() -> str:
+    """The buttons beside the install line: Get started, and the live demo once its Space is
+    public."""
+    start = chip("terminal", "docs/guides/getting-started.html", "Get started", primary=True)
+    return start + (chip("graph", DEMO_URL, "Live demo") if DEMO_URL else "")
+
+
+def docs_grid() -> str:
+    """The documentation band's four entries, each a page with one line about it."""
+    return "".join(
+        f'<li><a class="doc-link" href="{escape(url)}">{glyph(icon)}{escape(text)}</a>'
+        f"<span>{escape(blurb)}</span></li>"
+        for icon, url, text, blurb in DOC_PAGES
     )
 
 
@@ -1775,6 +2033,191 @@ def more_than(value: float) -> tuple[str, float]:
     return ("More than" if value > shown else "At least"), shown
 
 
+def plus() -> str:
+    """The round plus a tile carries when it opens more than it shows."""
+    return f'<span class="wf-plus" aria-hidden="true">{_why_fast["PLUS"]}</span>'
+
+
+# The page's four sections, each a word of the headline: its id, title, cover art (site/brand/
+# art-*.jpg), and the picture its card in the hero shows, with its size: a tile's crop
+# (site/brand/bento/*.jpg), or the cover itself where the crop is cobalt only and would lose the
+# art's amber.
+ACTS = (
+    ("accelerated", "Accelerated", "lanes", ("bento/lanes.jpg", TILE_SIZES["6"])),
+    ("accurate", "Accurate", "contour", ("art-contour.jpg", (1600, 640))),
+    ("agentic", "Agentic", "agentic", ("bento/agentic.jpg", TILE_SIZES["6"])),
+    ("all-in-one", "All-in-one", "methods", ("bento/methods.jpg", TILE_SIZES["6"])),
+)
+
+
+def act_claims(featured: dict[str, dict]) -> dict[str, tuple[str, str]]:
+    """Each section's claim, from the summaries and the registry: a short form for its card in the
+    hero, and the sentence under its title. Speed is ``CLAIM``, with no number. Accuracy is said
+    of the featured methods (:func:`featured_methods`), the ones its figure shows, and the build
+    stops when one has more errors than a package it is compared with there."""
+    worse = sorted(
+        {e["name"] for e in featured.values() for _, r in e["cells"] if outcome(r) in WORSE}
+    )
+    if worse:
+        raise ValueError(f"the Accurate claim does not hold for {', '.join(worse)}")
+    count = sum(spec.status == "supported" for spec in list_specs())
+    kinds = NUMBER_WORDS[len(graph_kinds())]
+    return {
+        "accelerated": ("The fastest package", CLAIM.replace("fastest", "<b>fastest</b>")),
+        "accurate": ("Just as accurate", "<b>Just as accurate</b> as other popular packages."),
+        "agentic": (
+            "Built for agents",
+            "A command line that never prompts and answers in JSON, so an agent can run it alone.",
+        ),
+        "all-in-one": (
+            f"{count} methods, {kinds} kinds of graph",
+            f"<b>{count} supported methods</b> for every kind of data, and {kinds} kinds of causal"
+            " graph.",
+        ),
+    }
+
+
+def act_cards(claims: dict[str, tuple[str, str]]) -> str:
+    """The hero's four cards, one per section: its art, its title, and its claim's short form."""
+    return "".join(
+        f'<li class="act-card"><a href="#{key}">'
+        + picture(
+            image.removesuffix(".jpg"),
+            f'alt="{escape(cover_alt(art), quote=True)}" width="{width}" height="{height}"',
+        )
+        + f"<b>{title}</b><span>{escape(claims[key][0])}</span></a></li>"
+        for key, title, art, (image, (width, height)) in ACTS
+    )
+
+
+# The covers whose amber streak, trail, arm, arrow, edge, or beam a trace of light sweeps along,
+# bottom to tip, or a level beam from left to right (``streak``).
+SWEPT = ("lanes", "contour", "agentic", "methods", "start", "docs")
+
+
+def streak(art: str, points: int = 16) -> list[tuple[float, float]]:
+    """The centerline of an art's amber streak, or its trail of amber dots, in its 1600 x 640
+    frame from the bottom to the tip, or, for a level beam, from left to right, the way its light
+    travels: the warm pixels cut into ``points`` equal bands along the streak's longer extent, and
+    each band's median point, so the path follows a bend and runs through a dotted trail's dots.
+    Fails when the art has no streak to follow."""
+    from PIL import Image  # the docs group's; the unit tests import this module without it
+
+    with Image.open(SITE / "brand" / f"art-{art}.jpg") as image:
+        rgb = np.asarray(image.convert("RGB"), dtype=float)
+    warm = (rgb[..., 0] - rgb[..., 2] > 40) & (rgb[..., 0] > 120)
+    ys, xs = np.nonzero(warm)
+    if len(xs) == 0 or max(np.ptp(xs), np.ptp(ys)) < min(warm.shape) / 2:
+        raise ValueError(f"art-{art}.jpg has no amber streak to sweep along")
+    along = ys if np.ptp(ys) > np.ptp(xs) else xs
+    edges = np.linspace(along.min(), along.max(), points + 1)
+    path = []
+    for low, high in zip(edges[:-1], edges[1:], strict=True):
+        band = (along >= low) & (along <= high)
+        if band.any():
+            path.append((float(np.median(xs[band])), float(np.median(ys[band]))))
+    if np.ptp(ys) < np.ptp(xs) / 8:
+        return path  # level: the bands run left to right
+    return path if path[0][1] > path[-1][1] else path[::-1]
+
+
+def sweep(art: str) -> str:
+    """The trace that sweeps along ``art``'s streak: a soft glow and a paler core on the same path,
+    in the art's own frame, so it lies on the streak at every crop. The page script runs it while
+    the cover is on the screen (``tiles.js``)."""
+    d = "M" + " L".join(f"{x:.0f} {y:.0f}" for x, y in streak(art))
+    return (
+        '<svg class="cover-sweep" viewBox="0 0 1600 640" preserveAspectRatio="none" '
+        'aria-hidden="true" focusable="false"><defs>'
+        f'<filter id="sweep-{art}-glow" x="-10%" y="-10%" width="120%" height="120%">'
+        '<feGaussianBlur stdDeviation="13"/></filter>'
+        f'<filter id="sweep-{art}-core"><feGaussianBlur stdDeviation="2.4"/></filter></defs>'
+        f'<path class="sweep-glow" d="{d}" pathLength="100" filter="url(#sweep-{art}-glow)"/>'
+        f'<path class="sweep-core" d="{d}" pathLength="100" filter="url(#sweep-{art}-core)"/></svg>'
+    )
+
+
+def act_covers(claims: dict[str, tuple[str, str]]) -> dict[str, str]:
+    """Each section's opening: its art at full bleed, its title, and its claim. The section whose
+    art is the hero's opens on the hero's art instead, which stays on the screen into it."""
+    covers = {}
+    for key, title, art, _ in ACTS:
+        head = (
+            f'<div class="act-head"><h2 id="{key}-title" class="reveal">{title}</h2>'
+            f'<p class="act-claim reveal">{claims[key][1]}</p></div>'
+        )
+        covers[key] = (
+            f'<div class="act-cover act-cover--hero">{head}</div>'
+            if art == HERO_ART
+            else f'<div class="section-cover act-cover"><div class="cover-art" aria-hidden="true">'
+            f"{cover_frame(art)}</div>{head}</div>"
+        )
+    return covers
+
+
+def example_cover() -> str:
+    """The opening of "From data to graph", inside the last section: its art, its title, and its
+    line."""
+    return (
+        '<div class="section-cover act-cover act-cover--sub" id="data-to-graph">'
+        f'<div class="cover-art" aria-hidden="true">{cover_frame(EXAMPLE_ART)}</div>'
+        '<div class="act-head"><h3 class="reveal">From data to graph</h3>'
+        '<p class="act-claim reveal">From a table of measurements to its causal graph, in a few '
+        "lines of Python.</p></div></div>"
+    )
+
+
+def docs_cover() -> str:
+    """The documentation's opening: its art and its title."""
+    return (
+        '<div class="section-cover act-cover">'
+        f'<div class="cover-art" aria-hidden="true">{cover_frame(DOCS_ART)}</div>'
+        '<div class="act-head"><h2 id="docs-title" class="reveal">Documentation</h2></div></div>'
+    )
+
+
+def glass_tile(span: str, title: str, text: str, glass: str, *, key: str = "") -> str:
+    """A tile whose evidence sits on a glass card under its title. It opens the dialog ``key``
+    when that holds more than the tile shows; without one, it is a box and carries no plus. The
+    card is decorative where the dialog says it in full."""
+    hidden = ' aria-hidden="true"' if key else ""
+    body = (
+        f'<h3 class="tile-title">{title}</h3>'
+        + (f'<p class="tile-text">{text}</p>' if text else "")
+        + f'<div class="tile-glass"{hidden}>{glass}</div>'
+    )
+    if not key:
+        return f'<li class="tile tile--{span} tile--glass"><div class="tile-face">{body}</div></li>'
+    return (
+        f'<li class="tile tile--{span} tile--glass"><a class="tile-face" href="#{key}" '
+        f'data-tile="{key}">{body}{plus()}</a></li>'
+    )
+
+
+def speed_tiles(featured: dict[str, dict]) -> str:
+    """Accelerated's evidence: each featured method's fit time beside every package's
+    (:func:`featured_bars`), and beside it where the speed comes from."""
+    return glass_tile("7", "Fit time", "", featured_bars(featured, "s", seconds_text)) + (
+        '<li class="bento-note"><h3>Why Andrey is fast</h3>'
+        "<p>It does many things at once, never computes twice, skips what can't matter, and "
+        "uses the hardware you have.</p>"
+        '<p><a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is so fast</a>'
+        "</p></li>"
+    )
+
+
+def accuracy_tiles(featured: dict[str, dict]) -> str:
+    """Accurate's evidence: each featured method's errors beside every package's
+    (:func:`featured_bars`), and beside it where every method's errors are: the release cards."""
+    return glass_tile(
+        "7", "Errors against the true graph", "", featured_bars(featured, "errors", number_text)
+    ) + (
+        '<li class="bento-note"><h3>Tested against the true graphs</h3>'
+        "<p>Every release is tested against the graphs that generated the data.</p>"
+        '<p><a href="docs/benchmarks.html">Release cards</a></p></li>'
+    )
+
+
 def terminal(frames: list[tuple[str, list[str], int]], shown: int = 3) -> str:
     """Commands and the first lines each prints, as in a terminal."""
     lines = []
@@ -1785,346 +2228,81 @@ def terminal(frames: list[tuple[str, list[str], int]], shown: int = 3) -> str:
             lines.append(
                 f'<span class="elide">... {more + max(len(printed) - shown, 0)} more</span>'
             )
-    return f'<pre class="term">{chr(10).join(lines)}</pre>'
+    return f'<pre class="tile-term">{chr(10).join(lines)}</pre>'
 
 
-# ---- one featured method per family ---------------------------------------------------------
-# Comparators that are a method's authors' research code, not a package: they stay in the charts
-# and on their release cards, and they do not count among the packages a method is compared with.
-RESEARCH_CODE = {
-    "LOCI authors' code, LOCI-H",
-    "SCORE authors' code",
-    "NOTEARS authors' code",
-    "authors' R RESIT",
-}
-# Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
-# or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty
-# graph, whose F1 is 0.
-F1_FAMILIES = {"temporal"}
+def agent_tile(frames: list[tuple[str, list[str], int]]) -> str:
+    """An agent's session at the command line, from the list of methods to the graph, as one tile
+    across the row. It opens the agents dialog, which plays the session step by step beside the
+    graph it returns."""
+    return glass_tile(
+        "wide",
+        "Find a method, read it, run it",
+        "",
+        terminal(frames, shown=4),
+        key="agents",
+    )
 
 
-def default_settings(summaries: list[dict]) -> dict[str, tuple[str, list[dict]]]:
-    """Per registry method, the setting it is shown under and that setting's comparisons: the
-    chart (:func:`time_groups`) whose name ``SHOWN_SETTINGS`` lists, else the shortest-named one,
-    the first among equals. The name is the one ``SHOWN_SETTINGS`` gives, or the chart's."""
-    found: dict[str, tuple[str, list[dict]]] = {}
-    for name, methods in time_groups(summaries):
-        shown = found.get(methods[0]["spec"])
-        if shown is None or (
-            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
-        ):
-            found[methods[0]["spec"]] = (name, methods)
-    return {spec: (SHOWN_SETTINGS.get(n, n), ms) for spec, (n, ms) in found.items()}
+def names_only(figures: str) -> str:
+    """The graph figures with each caption cut to its method's name."""
+    return re.sub(
+        r"<figcaption><strong>(.*?)</strong>.*?</figcaption>",
+        r"<figcaption>\1</figcaption>",
+        figures,
+        flags=re.S,
+    )
 
 
-def shared_rows(methods: list[dict]) -> dict[int, list[dict]]:
-    """Each size at which every comparison in ``methods`` has both fit times and both graphs'
-    errors, smallest first, with each comparison's row there: at the largest sample size where a
-    lane measures several, the last listed among equal ones."""
-    by_size = [{r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods]
-    keys = ("andrey_s", "comparator_s", "andrey_errors", "comparator_errors")
-    out = {}
-    for d in sorted(by_size[0]):
-        rows = [sizes.get(d) for sizes in by_size]
-        if all(row is not None and all(row[k] is not None for k in keys) for row in rows):
-            out[d] = rows
-    return out
-
-
-def beats_empty(family: str, row: dict) -> bool:
-    """Whether Andrey's graph beats the empty graph in ``row``: fewer errors than the empty graph,
-    or in ``F1_FAMILIES`` a link F1 above 0."""
-    if family in F1_FAMILIES:
-        return (row["andrey_f1"] or 0) > 0
-    return row["empty_errors"] is not None and row["andrey_errors"] < row["empty_errors"]
-
-
-def compared_packages(summaries: list[dict]) -> dict[str, set[str]]:
-    """Per supported registry method, the packages its published comparisons name, in any
-    setting, by :func:`package_name`; ``RESEARCH_CODE`` is not a package."""
-    out: dict[str, set[str]] = {}
-    for m in supported(summaries):
-        if m["comparator"] not in RESEARCH_CODE:
-            out.setdefault(m["spec"], set()).add(package_name(m["comparator"]))
-    return out
-
-
-def feature_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
-    """Each supported method that can be featured, by registry name: the packages it is compared
-    with (:func:`compared_packages`) and its reach, the largest size at which every package in its
-    shown setting (:func:`default_settings`) ran and Andrey's graph beats the empty graph
-    (:func:`beats_empty`). A method with no such size is left out."""
-    packages = compared_packages(summaries)
-    ranks = {}
-    for spec, (_, methods) in default_settings(summaries).items():
-        family = methods[0]["family"]
-        sizes = [d for d, rows in shared_rows(methods).items() if beats_empty(family, rows[0])]
-        if sizes:
-            ranks[spec] = (len(packages.get(spec, ())), sizes[-1])
-    return ranks
-
-
-def featured_among(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
-    """The method to feature among ``names``: of those ``ranks`` holds (:func:`feature_ranks`),
-    the one compared with the most packages, then the one with the largest reach, then the first
-    in registry order; None when ``ranks`` holds none. The rule reads coverage, not the result of
-    a comparison."""
-    order = {s.name: i for i, s in enumerate(list_specs())}
-    found = [name for name in names if name in ranks]
-    return min(found, key=lambda n: (-ranks[n][0], -ranks[n][1], order[n]), default=None)
-
-
-def featured_methods(summaries: list[dict]) -> dict[str, dict]:
-    """The method each registry family features (:func:`featured_among` over the family's
-    methods), in ``SPEC_FAMILIES`` order, as the homepage and the methods catalog show it; a family
-    without one is left out. Each entry gives the method's registry name (``spec``), its shown
-    ``name``, its ``packages``, and its reach as ``size`` in ``unit``, with the ``release`` and
-    the ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row."""
-    ranks = feature_ranks(summaries)
-    settings = default_settings(summaries)
-    out = {}
-    for family in SPEC_FAMILIES:
-        spec = featured_among(ranks, [s.name for s in list_specs() if s.family == family])
-        if spec is None:
-            continue
-        name, methods = settings[spec]
-        packages, d = ranks[spec]
-        out[family] = {
-            "spec": spec,
-            "name": name,
-            "packages": packages,
-            "size": d,
-            "unit": methods[0]["unit"],
-            "release": max((m["release"] for m in methods), key=version_key),
-            "cells": list(zip(methods, shared_rows(methods)[d], strict=True)),
-        }
-    return out
-
-
-def version_key(version: str) -> tuple[int, ...]:
-    """A release's version for sorting: "0.10.0" after "0.9.0"."""
-    return tuple(int(part) for part in version.split("."))
-
-
-# How each row's note words the outcome at its size: the verdict its release card records
-# (``card_verdict``: "tie" where the paired 95% interval of the difference in errors contains 0),
-# or, where the card records none, the two error counts on the same datasets, as
-# :func:`recorded_outcomes` reads them.
-OUTCOME_WORDS = {
-    "tie": ("Ties", ""),
-    "better": ("Fewer errors", "than"),
-    "worse": ("More errors", "than"),
-    "same": ("Same errors", "as"),
-    "fewer": ("Fewer errors", "than"),
-    "more": ("More errors", "than"),
-}
-
-
-def outcome(row: dict) -> str:
-    """The outcome a row records for Andrey against the other package: the release card's
-    verdict, or else the error counts compared."""
-    if row["card_verdict"] in ("tie", "better", "worse"):
-        return row["card_verdict"]
-    ours, theirs = row["andrey_errors"], row["comparator_errors"]
-    return "same" if abs(ours - theirs) < 1e-9 else "fewer" if ours < theirs else "more"
-
-
-def shape(kind: str, cx: float, cy: float, r: float) -> str:
-    """A package's marker, as SVG path data centered on (cx, cy)."""
-    if kind == "square":
-        return f"M{cx - r:.1f} {cy - r:.1f}h{2 * r:.1f}v{2 * r:.1f}h{-2 * r:.1f}Z"
-    if kind == "triangle":
-        return f"M{cx:.1f} {cy - 1.2 * r:.1f}L{cx + r:.1f} {cy + 0.8 * r:.1f}H{cx - r:.1f}Z"
-    if kind == "diamond":
-        k = 1.3 * r
-        return (
-            f"M{cx:.1f} {cy - k:.1f}L{cx + k:.1f} {cy:.1f}"
-            f"L{cx:.1f} {cy + k:.1f}L{cx - k:.1f} {cy:.1f}Z"
-        )
-    if kind == "cross":
-        return (
-            f"M{cx - r:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r:.1f}"
-            f"M{cx + r:.1f} {cy - r:.1f}L{cx - r:.1f} {cy + r:.1f}"
-        )
-    if kind == "triangle_down":
-        return f"M{cx:.1f} {cy + 1.2 * r:.1f}L{cx + r:.1f} {cy - 0.8 * r:.1f}H{cx - r:.1f}Z"
-    tips = [math.pi / 2 + i * 4 * math.pi / 5 for i in range(5)]
+def coverage_tiles(graphs: str) -> str:
+    """Andrey beside other packages (:func:`comparison_table`), its supported methods by family
+    and kind of data (:func:`families_table`), and the kinds of causal graph its methods
+    return."""
     return (
-        "M"
-        + "L".join(
-            f"{cx + 1.2 * r * math.cos(a):.1f} {cy - 1.2 * r * math.sin(a):.1f}" for a in tips
+        glass_tile(
+            "wide",
+            "Package comparison",
+            '<a href="docs/comparison.html">Full package comparison</a>',
+            comparison_table(),
         )
-        + "Z"
+        + glass_tile(
+            "wide",
+            "Methods by kind of data",
+            "",
+            f'<div class="matrix-card">{families_table()}</div>',
+        )
+        + glass_tile(
+            "wide",
+            graph_title(),
+            "",
+            f'<div class="glass-graphs">{names_only(graphs)}</div>',
+            key="graphs",
+        )
     )
 
 
-# The marks of the other packages, in the order the rows first name them, so each package keeps
-# one shape in every row; Andrey is the filled dot.
-LEDGER_SHAPES = ("square", "diamond", "triangle", "cross", "star", "triangle_down")
-
-
-def ledger_rows(featured: dict[str, dict]) -> list[dict]:
-    """Each family's featured method (:func:`featured_methods`) as a ledger row: its name, family,
-    size, release, Andrey's fit time, and each other package's time and outcome there
-    (:func:`outcome`), the packages in the order their comparisons are listed."""
-    rows = []
-    for family, entry in featured.items():
-        cells = entry["cells"]
-        rows.append(
-            {
-                **entry,
-                "family": family,
-                "label": SPEC_FAMILIES[family],
-                "seconds": cells[0][1]["andrey_s"],
-                "others": [
-                    (package_name(m["comparator"]), r["comparator_s"], outcome(r)) for m, r in cells
-                ],
-            }
-        )
-    return rows
-
-
-def ledger_axis(rows: list[dict]) -> tuple[int, int]:
-    """The rows' shared log axis of seconds: the whole decades around every time they show."""
-    times = [t for row in rows for t in (row["seconds"], *(o[1] for o in row["others"]))]
-    return math.floor(math.log10(min(times))), math.ceil(math.log10(max(times)))
-
-
-def ledger_x(seconds: float, axis: tuple[int, int], width: float, pad: float) -> float:
-    lo, hi = axis
-    return pad + (math.log10(seconds) - lo) / (hi - lo) * (width - 2 * pad)
-
-
-def ledger_mark(kind: str, x: float, y: float, ours: bool) -> str:
-    """Andrey's filled dot, or another package's hollow shape (:func:`shape`)."""
-    if ours:
-        return f'<circle class="pt ours" cx="{x:.1f}" cy="{y:.1f}" r="5.5"/>'
-    return f'<path class="pt theirs" d="{shape(kind, x, y, 4.6)}"/>'
-
-
-def ledger_ticks(axis: tuple[int, int], width: int, pad: int) -> str:
-    """The shared axis's labels, a decade apart, as an SVG strip of its own."""
-    ticks = "".join(
-        f'<text x="{ledger_x(10.0**e, axis, width, pad):.1f}" y="14" text-anchor="middle">'
-        f"{10.0**e:,g} s</text>"
-        for e in range(axis[0], axis[1] + 1)
-    )
+def tile(key: str, size: str, body: str, *, kind: str = "") -> str:
+    """One bento tile: a link that opens the dialog ``key`` and, without script, jumps to the same
+    id, where the dialog's content is shown in the page."""
+    classes = f"tile tile--{size}" + (f" tile--{kind}" if kind else "")
     return (
-        f'<svg class="l-axis" viewBox="0 0 {width} 20" aria-hidden="true" focusable="false">'
-        f"{ticks}</svg>"
+        f'<li class="{classes}"><a class="tile-face" href="#{key}" data-tile="{key}">{body}{plus()}'
+        "</a></li>"
     )
 
 
-def ledger_strip(row: dict, marks: dict[str, str], axis: tuple[int, int], *, wide: bool) -> str:
-    """One row's times on the shared axis: a mark per package and a band from Andrey's time to
-    the slowest. The wide strip labels each mark with its package and time, in the first free
-    lane above or below the line; the narrow one draws the marks only, its times in the text."""
-    width, pad, height, y = (580, 30, 56, 28) if wide else (340, 24, 28, 14)
-    points = [("Andrey", row["seconds"], True)] + [(p, t, False) for p, t, _ in row["others"]]
-    xs = [ledger_x(t, axis, width, pad) for _, t, _ in points]
-    said = ", ".join(f"{p} {seconds_text(t)}" for p, t, _ in points)
-    label = f"Fit time of {row['name']} at {row['size']:,} {row['unit']}: {said}"
-    out = [
-        f'<svg class="l-strip" viewBox="0 0 {width} {height}" role="img" '
-        f'aria-label="{escape(label, quote=True)}">'
-        if wide
-        else f'<svg class="l-strip" viewBox="0 0 {width} {height}" aria-hidden="true" '
-        'focusable="false">'
-    ]
-    for e in range(axis[0], axis[1] + 1):
-        x = ledger_x(10.0**e, axis, width, pad)
-        out.append(f'<line class="grid" x1="{x:.1f}" x2="{x:.1f}" y1="2" y2="{height - 2}"/>')
-    out.append(f'<line class="band" x1="{xs[0]:.1f}" x2="{max(xs):.1f}" y1="{y}" y2="{y}"/>')
-    for (package, _, ours), x in reversed(list(zip(points, xs, strict=True))):
-        out.append(ledger_mark(marks.get(package, ""), x, y, ours))
-    if wide:
-        lanes: dict[int, list[tuple[float, float]]] = {y - 12: [], y + 20: []}
-        for (package, seconds, ours), x in zip(points, xs, strict=True):
-            text = f"{package} {seconds_text(seconds)}"
-            w = len(text) * 12 * 0.56
-            x0 = min(max(x - w / 2, 0), width - w)
-            lane = next(
-                (
-                    ly
-                    for ly, taken in lanes.items()
-                    if all(x0 + w + 10 < a or x0 > b + 10 for a, b in taken)
-                ),
-                y + 20,
-            )
-            lanes[lane].append((x0, x0 + w))
-            out.append(
-                f'<text class="lbl{" ours" if ours else ""}" x="{x0:.1f}" y="{lane}">'
-                f'{escape(package)} <tspan class="t">{seconds_text(seconds)}</tspan></text>'
-            )
-    return "".join(out) + "</svg>"
-
-
-def ledger_note(featured: dict[str, dict]) -> str:
-    """The ledger's footnote: how each row is chosen, and how its notes read, naming only the
-    kinds of outcome the rows show."""
-    kinds = {outcome(row) for entry in featured.values() for _, row in entry["cells"]}
-    f1 = [entry["name"] for family, entry in featured.items() if family in F1_FAMILIES]
-    text = (
-        "Each family's method is the supported one compared with the most packages, at the "
-        "largest size every package ran where Andrey's graph has fewer errors than the empty graph"
-        + (f" ({listed(f1)}: a link F1 above 0)" if f1 else "")
-        + "."
+def dialog_head(key: str, title: str, intro: str = "") -> str:
+    """The start of a tile's dialog, its heading and close button; ``DIALOG_TAIL`` ends it."""
+    return (
+        f'<dialog class="wf tile-dialog" id="{key}" aria-labelledby="{key}-title">'
+        f'<div class="wf-top"><div><h2 id="{key}-title">{escape(title)}</h2>'
+        f"{f'<p>{intro}</p>' if intro else ''}</div>"
+        f'<button class="wf-close" type="button" aria-label="Close">{_why_fast["CLOSE"]}'
+        '</button></div><div class="tile-body">'
     )
-    if kinds & {"tie", "better", "worse"}:
-        text += (
-            " A note is the verdict of the row's release card; it ties where the paired 95% "
-            "interval of the difference in errors contains 0."
-        )
-    if kinds & {"same", "fewer", "more"}:
-        text += (
-            " Where the card records no verdict, the note compares the two packages' error "
-            "counts on the same datasets."
-        )
-    return text
 
 
-def ledger(featured: dict[str, dict]) -> str:
-    """The featured methods, a row each on one log axis of seconds: the method, its family and
-    size, and its release card; the times; and each other package's outcome there."""
-    rows = ledger_rows(featured)
-    axis = ledger_axis(rows)
-    packages = dict.fromkeys(p for row in rows for p, _, _ in row["others"])
-    if len(packages) > len(LEDGER_SHAPES):
-        raise ValueError(f"give each of the {len(packages)} packages a shape in LEDGER_SHAPES")
-    marks = dict(zip(packages, LEDGER_SHAPES, strict=False))
-
-    def key(package: str) -> str:
-        kind = "" if package == "Andrey" else marks[package]
-        return (
-            '<svg class="km" viewBox="0 0 14 14" aria-hidden="true" focusable="false">'
-            f"{ledger_mark(kind, 7, 7, package == 'Andrey')}</svg>"
-        )
-
-    narrow = f'<div class="l-axis-sm" aria-hidden="true">{ledger_ticks(axis, 340, 24)}</div>'
-    out = [
-        '<div class="l-head" aria-hidden="true"><span>Method</span>'
-        f"<div>{ledger_ticks(axis, 580, 30)}</div><span>Accuracy at that size</span></div>",
-        narrow,
-    ]
-    for row in rows:
-        notes = "".join(
-            f'<li class="v v--{kind}"><b>{OUTCOME_WORDS[kind][0]}</b>'
-            f"{' ' + OUTCOME_WORDS[kind][1] if OUTCOME_WORDS[kind][1] else ''} "
-            f"{escape(package)}</li>"
-            for package, _, kind in row["others"]
-        )
-        times = [("Andrey", row["seconds"])] + [(p, t) for p, t, _ in row["others"]]
-        values = "".join(f"<li>{key(p)}{escape(p)} <b>{seconds_text(t)}</b></li>" for p, t in times)
-        out.append(
-            f'<div class="l-row" id="featured-{row["family"]}"><div class="l-name">'
-            f'<div class="l-n1"><b>{escape(row["name"])}</b><a href="{card_href(row["release"])}">'
-            f"{row['release']} card</a></div><span>{escape(row['label'])}, "
-            f"{row['size']:,} {row['unit']}</span></div>"
-            f'<div class="l-lg">{ledger_strip(row, marks, axis, wide=True)}</div>'
-            f'<div class="l-sm">{ledger_strip(row, marks, axis, wide=False)}'
-            f'<ul class="l-vals">{values}</ul></div><ul class="l-acc">{notes}</ul></div>'
-        )
-    return "".join(out) + narrow
+DIALOG_TAIL = "</div></dialog>"
 
 
 def package_name(comparator: str) -> str:
@@ -2136,400 +2314,8 @@ def package_name(comparator: str) -> str:
     return name
 
 
-def card_href(release: str) -> str:
-    """The card for ``release``, or the release cards page if no card exists."""
-    page = DOCS / "docs" / "benchmarks" / f"{release}.md"
-    return f"docs/benchmarks/{release}.html" if page.exists() else "docs/benchmarks.html"
-
-
-# The docs' code colors (pydata-sphinx-theme's defaults), so code reads the same on every page.
-CODE_STYLES = {"light": "a11y-high-contrast-light", "dark": "a11y-high-contrast-dark"}
-
-
-def code_html(source: str, language: str) -> str:
-    """Source as highlighted HTML for a ``<pre class="hl"><code>``, by Pygments."""
-    return highlight(source, get_lexer_by_name(language), HtmlFormatter(nowrap=True)).rstrip()
-
-
-def code_css(scope: str, theme: str) -> str:
-    """One theme's token colors under ``scope``; the page's own code-block frame stays as it is."""
-    rules = HtmlFormatter(style=CODE_STYLES[theme]).get_style_defs(".hl").splitlines()
-    return "\n".join(f"{scope}{rule}" for rule in rules if rule.startswith(".hl ."))
-
-
-def tokens_css() -> str:
-    """CSS custom properties for both palettes, and the code colors for each: the system theme, or
-    the one the docs stored."""
-    return "\n\n".join(
-        [
-            "/* Generated by site/build.py from andrey.viz.theme; do not edit. */",
-            palette_block(":root", andrey.viz.LIGHT),
-            code_css("", "light"),
-            "@media (prefers-color-scheme: dark) {\n"
-            + palette_block(':root:not([data-theme="light"])', andrey.viz.DARK)
-            + "\n"
-            + code_css(':root:not([data-theme="light"]) ', "dark")
-            + "\n}",
-            palette_block(':root[data-theme="dark"]', andrey.viz.DARK),
-            code_css(':root[data-theme="dark"] ', "dark"),
-        ]
-    )
-
-
-def homepage_code_css() -> str:
-    """The code colors in both themes, keyed on the ``data-theme`` that the navbar's switch sets."""
-    return code_css("", "light") + "\n" + code_css('html[data-theme="dark"] ', "dark")
-
-
-# The methods the homepage's description names; every other registered method counts as "more".
-DESCRIPTION_METHODS = ("PC", "GES", "FCI")
-
-
-def page_description(summaries: list[dict]) -> str:
-    """The homepage's summary for search results and link previews, as plain text."""
-    registered = {spec.name for spec in list_specs()}
-    if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
-        raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
-    return (
-        f"Causal discovery for Python and AI agents. Learn causal graphs with {named} and "
-        f"{more} more methods, on CPU or GPU. {CLAIM}"
-    )
-
-
-def abel_mark() -> str:
-    """Abel's mark, the leaf of its logotype, as inline SVG in the text color around it."""
-    logotype = (ROOT / "site" / "brand" / "abel-logo-white.svg").read_text(encoding="utf-8")
-    paths = re.findall(r'<path d="([^"]+)"', logotype)
-    if len(paths) != 4:  # the three letters, then the mark
-        raise ValueError(f"expected the logotype's four paths, got {len(paths)}")
-    return (
-        '<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true" focusable="false">'
-        f'<path d="{paths[-1]}" fill="currentColor"/></svg>'
-    )
-
-
-def lede() -> str:
-    """The hero's paragraph: the claim, then the supported methods and the families from the
-    registry."""
-    specs = list_specs()
-    supported_count = sum(s.status == "supported" for s in specs)
-    families = len({s.family for s in specs})
-    return (
-        f"<b>{escape(CLAIM)}</b> {supported_count} supported methods in "
-        f"{NUMBER_WORDS[families]} families learn causal graphs from your data, on CPU or GPU, "
-        "from Python or from an agent's command line."
-    )
-
-
-def cards_intro(summaries: list[dict]) -> str:
-    """What the release cards hold: how many supported methods they compare with other
-    packages, out of the registry's supported methods."""
-    compared = len({m["spec"] for m in supported(summaries)})
-    total = sum(s.status == "supported" for s in list_specs())
-    share = f"all {total}" if compared == total else f"{compared} of the {total}"
-    return (
-        "Each row comes from a release card; together the cards compare "
-        f"{share} supported methods with other packages."
-    )
-
-
-# Each family in one line, under its name in the families table (wide screens only).
-FAMILY_LINES = {
-    "constraint": "Tests which variables are independent, then removes and orients edges.",
-    "score": "Searches for the graph that scores best on the data.",
-    "permutation": "Searches over orderings of the variables and reads the graph from the best.",
-    "functional": "Uses the shape of the noise or of the effect to direct every edge.",
-    "temporal": "Finds lagged and same-step effects in time series and panels.",
-    "latent": "Allows hidden common causes and shows where they may act.",
-    "pairwise": "Decides which of two variables causes the other.",
-}
-
-
-def family_kinds() -> dict[str, dict[str, int]]:
-    """For each family, in ``SPEC_FAMILIES`` order, how many of its supported methods read each
-    kind of data (``MethodSpec.data_kinds``), in ``DATA_KINDS`` order."""
-    specs = [s for s in list_specs() if s.status == "supported"]
-    return {
-        family: {
-            k: sum(s.family == family and k in s.data_kinds for s in specs) for k in DATA_KINDS
-        }
-        for family in SPEC_FAMILIES
-    }
-
-
-def families_table() -> str:
-    """The families, by the data they read: a row per family, linked to its table on the methods
-    page, and a column per kind of data, linked to its row there; a dot in each cell, sized by the
-    number of supported methods it counts."""
-    specs = [s for s in list_specs() if s.status == "supported"]
-    head = "".join(
-        f'<th scope="col"><a href="{CATALOG}#{kind_anchor(k)}"><span>'
-        f"{escape(DATA_KIND_TEXT[k][0])}</span></a></th>"
-        for k in DATA_KINDS
-    )
-    rows = []
-    for family, counts in family_kinds().items():
-        total = sum(s.family == family for s in specs)
-        cells = "".join(
-            f'<td><span class="dot" style="--n:{n}">{n}</span></td>'
-            if n
-            else '<td class="none"><span class="visually-hidden">0</span></td>'
-            for n in counts.values()
-        )
-        rows.append(
-            f'<tr><th scope="row"><a href="{CATALOG}#family-{family}">'
-            f"{escape(SPEC_FAMILIES[family])}</a>"
-            f'<span class="ct">{total}<span class="visually-hidden"> supported methods</span>'
-            f'</span><span class="ln">{escape(FAMILY_LINES[family])}</span></th>{cells}</tr>'
-        )
-    return (
-        '<table class="matrix"><thead><tr><th scope="col"><span class="visually-hidden">Family'
-        f"</span></th>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
-    )
-
-
-def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, str]:
-    """Everything the homepage template shows, as HTML, from the first release's summary and the
-    later releases' published ones."""
-    fastest(summary)
-    summaries = release_summaries(summary)
-    featured = featured_methods(summaries)
-    code, printed, figure = run_example()
-    banner = (
-        '<p class="placeholder-banner" role="note">Placeholder numbers, copied from the '
-        "documentation's benchmarks page. Not for release.</p>"
-    )
-    return {
-        "title": escape(SEARCH_TITLE),
-        # Plain text: docs/conf.py escapes it into the page's description and link-preview tags.
-        "description": page_description(summaries),
-        "robots": '<meta name="robots" content="noindex">' if placeholder else "",
-        "banner": banner if placeholder else "",
-        "lede": lede(),
-        # The first screen's art, which the page asks for before its stylesheets load.
-        "hero_image": f"_static/art-{HERO_ART}.avif",
-        "hero_art": band_art(HERO_ART, priority=True),
-        "methods_art": band_art(METHODS_ART),
-        "agents_art": band_art(AGENTS_ART),
-        "ledger": ledger(featured),
-        "ledger_note": escape(ledger_note(featured)),
-        "catalog": CATALOG,
-        "families": families_table(),
-        "cards_intro": cards_intro(summaries),
-        "cards": latest_cards(),
-        "card_count": str(len(release_versions())),
-        "example_code": code_html(code.rstrip(), "python"),
-        "example_output": escape(printed),
-        "example_figure": figure,
-        "agent_pill": agent_pill(),
-        "terminal": terminal(agent_frames()),
-        "style": homepage_code_css(),
-    }
-
-
-# ---- the method to start with on each kind of data ---------------------------------------------
-# The kinds of data a method that reads them cannot do without: one its result implies, or a list
-# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
-NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
-
-
-def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """Whether ``spec`` cannot run without data of ``kind``: a required ``env`` input, or a kind
-    in ``NEEDED_KINDS`` that it reads."""
-    if kind == "environments":
-        return any(i.name == "env" and i.required for i in spec.data.inputs)
-    return kind in NEEDED_KINDS and kind in spec.data_kinds
-
-
-def start_with(ranks: dict[str, tuple[int, int]], kind: str) -> str | None:
-    """The method to start with on data of ``kind``, from :func:`feature_ranks`: in the first
-    family, in ``SPEC_FAMILIES`` order, where :func:`featured_among` finds one, its pick among the
-    methods that need the kind (:func:`needs`), or among those that read it when none needs it."""
-    for family in SPEC_FAMILIES:
-        readers = [s for s in list_specs() if s.family == family and kind in s.data_kinds]
-        needing = [s.name for s in readers if needs(s, kind)]
-        pick = featured_among(ranks, needing or [s.name for s in readers])
-        if pick:
-            return pick
-    return None
-
-
-# ---- the methods catalog (docs/methods.html; its links are relative to docs/) --------------------
-# Each kind of data (andrey.spec.DATA_KINDS): its label and the line that says what it means.
-DATA_KIND_TEXT = {
-    "continuous": ("Continuous", "Numbers on a scale, one column per variable"),
-    "categorical": ("Categorical", "Labels, such as yes and no, coded as whole numbers"),
-    "mixed": ("Mixed", "Some columns numbers, some labels"),
-    "missing": ("Missing values", "Some cells are empty"),
-    "environments": (
-        "Several environments",
-        "Rows from experiments, interventions, or sites, each labeled",
-    ),
-    "datasets": ("Several datasets", "One table per group or time point, same columns"),
-    "hidden_causes": ("Hidden causes", "Some common causes are not measured"),
-    "time_series": ("Time series", "One row per time step"),
-    "two_variables": ("Two variables", "Which one causes the other?"),
-}
-# Each graph a method returns (returns_text): its section of the graph types guide.
-GRAPH_SECTIONS = {
-    "DAG": "dag-a-directed-model",
-    "CPDAG": "cpdag-an-equivalence-class",
-    "PAG": "pag-uncertainty-with-hidden-variables",
-    "Undirected graph": "undirected-graphs-adjacency-without-direction",
-    "Temporal graph": "temporal-graphs",
-    "Two-node DAG": "dag-a-directed-model",
-}
-
-
-def first_clause(summary: str) -> str:
-    """The registry summary up to its first colon, semicolon, or sentence end."""
-    return re.split(r"(?<=[a-z)]{2})\. |[:;] ", summary, maxsplit=1)[0].rstrip(".")
-
-
-def purpose(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """What a method is for, in one line: the registry summary's first clause, or what follows
-    its colon where that clause is only the method's name ("NOTEARS: least squares ...")."""
-    text = first_clause(spec.summary)
-    if len(text.split()) <= 2 and ":" in spec.summary:
-        text = re.split(r"[;.] |, by ", spec.summary.split(":", 1)[1].strip())[0]
-    return text[0].upper() + text[1:]
-
-
-def kind_anchor(kind: str) -> str:
-    return "data-" + kind.replace("_", "-")
-
-
-def compared(summaries: list[dict]) -> dict[str, tuple[list[str], list[str]]]:
-    """Each supported method's published comparisons: what it is compared with, packages and
-    authors' code by :func:`package_name` in the summaries' order, and the releases whose cards
-    hold them, oldest first."""
-    packages: dict[str, dict[str, None]] = {}
-    releases: dict[str, set[str]] = {}
-    for method in supported(summaries):
-        packages.setdefault(method["spec"], {})[package_name(method["comparator"])] = None
-        releases.setdefault(method["spec"], set()).add(method["release"])
-    return {
-        name: (list(packages[name]), sorted(releases[name], key=version_key)) for name in packages
-    }
-
-
-def card_link(release: str) -> str:
-    """A link to ``release``'s card from docs/, or to the release cards page if it has none."""
-    return card_href(release).removeprefix("docs/")
-
-
-def cards_text(releases: list[str]) -> str:
-    links = [f'<a href="{card_link(r)}">{r}</a>' for r in releases]
-    return f"{listed(links)} release card{'s' if len(links) > 1 else ''}"
-
-
-def display_name(name: str, names: dict[str, str]) -> str:
-    """A method's name as a table shows it: its prose name, capitalized ("Hill climbing")."""
-    prose = names[name]
-    return prose[0].upper() + prose[1:]
-
-
-def method_cell(spec, names: dict[str, str]) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
-    """A method's name, linked to its API entry, and its function in code."""
-    call = spec.name.replace("_", "_<wbr>")
-    return (
-        f'<a href="api/andrey.{spec.name}.html">{escape(display_name(spec.name, names))}</a> '
-        f'<code class="docutils literal notranslate">andrey.{call}</code>'
-    )
-
-
-def table_html(head: list[str], rows: list[str]) -> str:
-    """A table in the documentation's style, which stacks each row on a phone."""
-    cells = "".join(f'<th scope="col">{label}</th>' for label in head)
-    return (
-        '<div class="pst-scrollable-table-container"><table class="table stacked">'
-        f"<thead><tr>{cells}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
-    )
-
-
-def catalog_start(summaries: list[dict], names: dict[str, str]) -> str:
-    """The catalog's start table: one row per kind of data a method reads (``data-<kind>``), with
-    what the kind means, the method to start with (:func:`start_with`), the graph it returns, and
-    how many methods of each family read the kind, one family a line."""
-    specs = list_specs()
-    ranks = feature_ranks(summaries)
-    rows = []
-    for kind in DATA_KINDS:
-        readers = [s for s in specs if kind in s.data_kinds]
-        if not readers:
-            continue
-        label, hint = DATA_KIND_TEXT[kind]
-        start = get_spec(start_with(ranks, kind))
-        graph = returns_text(start)
-        families = [
-            f'<span class="nowrap"><a href="#family-{family}">{family_label}</a> '
-            f"{sum(s.family == family for s in readers)}</span>"
-            for family, family_label in SPEC_FAMILIES.items()
-            if any(s.family == family for s in readers)
-        ]
-        rows.append(
-            f'<tr id="{kind_anchor(kind)}"><td><strong>{label}</strong><br>{hint}</td>'
-            f"<td>{method_cell(start, names)}</td>"
-            f'<td><a href="guides/graph-types.html#{GRAPH_SECTIONS[graph]}">{graph}</a></td>'
-            f"<td>{'<br>'.join(families)}</td></tr>"
-        )
-    return table_html(["Your data", "Start with", "Returns", "Methods that read it"], rows) + "\n"
-
-
-def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
-    """The catalog's family tables, as MyST: one section per family (``family-<family>``),
-    opening with the method it features (:func:`featured_methods`), and one row per method
-    (``method-<name>``): its name, an Experimental badge where it is experimental, and what it
-    is for, then the kinds of data it reads, the graph it returns, and its comparisons with other
-    packages."""
-    specs = list_specs()
-    starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
-    found = compared(summaries)
-    badge = ' <span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
-    out = []
-    for family, label in SPEC_FAMILIES.items():
-        members = [s for s in specs if s.family == family]
-        if not members:
-            continue
-        rows = []
-        for s in members:
-            labels = [DATA_KIND_TEXT[k][0] for k in s.data_kinds]
-            reads = ", ".join([labels[0], *(text.lower() for text in labels[1:])])
-            if s.name in found:
-                packages, releases = found[s.name]
-                comp = f"{escape(listed(packages))}<br>{cards_text(releases)}"
-            else:
-                comp = "Not compared yet"
-            rows.append(
-                f'<tr id="method-{s.name}"><td>{method_cell(s, names)}'
-                f"{badge if s.status == 'experimental' else ''}<br>{escape(purpose(s))}</td>"
-                f"<td>{reads}</td><td>{returns_text(s)}</td><td>{comp}</td></tr>"
-            )
-        experimental = sum(s.status == "experimental" for s in members)
-        count = f"{len(members)} method{'s' if len(members) > 1 else ''}"
-        count += f", {experimental} experimental" if experimental else ""
-        start = (
-            f' Start with <a href="#method-{starts[family]}">'
-            f"{escape(display_name(starts[family], names))}</a>."
-            if family in starts
-            else ""
-        )
-        out += [
-            f"(family-{family})=",
-            f"### {label}",
-            "",
-            "```{raw} html",
-            f"<p>{count}.{start}</p>"
-            + table_html(["Method", "Reads", "Returns", "Compared with"], rows),
-            "```",
-            "",
-        ]
-    return "\n".join(out)
-
-
-# ---- compared with other packages (docs/comparison.html; its links are relative to docs/) -------
-# Andrey beside other packages. Feature marks come from released code
+# ---- compared with other packages ------------------------------------------------------------
+# Andrey compared with other packages. Feature marks come from released code
 # (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1). Hooks for
 # custom tests or scores do not count as implementations. Features only on a development branch
 # do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
@@ -2538,8 +2324,12 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
 # data is a yes when a method takes each row's environment or the intervention targets.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
-# Each mark's word in the table.
-MARKS = {"yes": "Yes", "part": "Partly", "no": "No"}
+# Each mark's icon on the homepage, its words for screen readers, and its README symbol.
+MARKS = {
+    "yes": ("check", "Yes", "\u2713"),
+    "part": ("half", "Partly", "\u25d0"),
+    "no": ("x", "No", "\u2717"),
+}
 # Table sections in order, each with measured rows (``measured_rows``) followed by feature marks.
 SECTIONS = ("Coverage", "Real data", "Speed", "Agentic")
 # Each entry holds a section, an attribute, marks in PEERS order, and notes keyed by package
@@ -2663,8 +2453,10 @@ METHOD_COUNTS = {
 
 
 def measured_rows() -> list[tuple[str, str, list[str]]]:
-    """Measured rows as (section, label, values in PEERS order). Speed has no pooled value across
-    methods; the release cards compare each method separately."""
+    """Measured rows as (section, label, values in PEERS order).
+
+    Speed has no pooled value across methods; the speed figures compare each method separately.
+    """
     return [("Coverage", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS])]
 
 
@@ -2683,6 +2475,66 @@ def comparison_notes() -> list[tuple[str, str, str, str]]:
             if package in row_notes:
                 notes.append((feature, package, mark, row_notes[package]))
     return notes
+
+
+def alone(marks: tuple[str, ...]) -> bool:
+    """Whether only Andrey, the first of ``PEERS``, has a feature in full."""
+    return marks[0] == "yes" and "yes" not in marks[1:]
+
+
+def comparison_table() -> str:
+    """The homepage's comparison, a column per package in ``PEERS``: the measured rows
+    (:func:`measured_rows`), then the features only Andrey has in full (:func:`alone`), by section.
+    The comparison page (:func:`comparison_page`) has every feature and the notes; here each
+    partial mark keeps its note as text for screen readers and as a tooltip."""
+    notes = {(f, p): note for f, p, _, note in comparison_notes()}
+    head = "".join(
+        f'<th scope="col"{" class=ct-ours" if p == "Andrey" else ""}>{escape(p)}</th>'
+        for p in PEERS
+    )
+    measured = measured_rows()
+    rows = []
+    for section in SECTIONS:
+        group = [r for r in measured if r[0] == section]
+        features = [r for r in COMPARISON if r[0] == section and alone(r[2])]
+        if not group and not features:
+            continue
+        rows.append(
+            f'<tr class="compare-group"><th scope="colgroup" colspan="{1 + len(PEERS)}">'
+            f"{section}</th></tr>"
+        )
+        for _, label, values in group:
+            cells = "".join(
+                f'<td class="value{" ct-ours" if p == "Andrey" else ""}">{v}</td>'
+                for p, v in zip(PEERS, values, strict=True)
+            )
+            name = escape(label)
+            if label == "Distinct methods":
+                name = f'<a href="{CATALOG}">{name}</a>'
+            rows.append(f'<tr class="compare-alone"><th scope="row">{name}</th>{cells}</tr>')
+        for _, feature, marks, _ in features:
+            cells = []
+            for package, mark in zip(PEERS, marks, strict=True):
+                icon, word, _ = MARKS[mark]
+                note = notes.get((feature, package))
+                said = f"{word}: {escape(note)}" if note else word
+                tip = f' title="{escape(note)}"' if note else ""
+                ours = " ct-ours" if package == "Andrey" else ""
+                cells.append(
+                    f'<td class="mark mark--{mark}{ours}"{tip}>{glyph(icon)}'
+                    f'<span class="visually-hidden">{said}</span></td>'
+                )
+            # Only Andrey has it, so its mark is the row's one amber.
+            rows.append(
+                f'<tr class="compare-alone"><th scope="row">{escape(feature)}</th>'
+                f"{''.join(cells)}</tr>"
+            )
+    return (
+        '<p class="compare-hint">Scroll to see all packages.</p>'
+        '<div class="table-scroll" role="region" aria-label="Feature comparison" tabindex="0">'
+        '<table class="compare">'
+        f"<thead><tr><td></td>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def comparison_source() -> str:
@@ -2719,7 +2571,7 @@ def comparison_page() -> str:
             for package, mark in zip(PEERS, marks, strict=True):
                 k = numbers.get((feature, package))
                 ref = f'<sup><a href="#comparison-note-{k}">{k}</a></sup>' if k else ""
-                cells.append(f"<td{ours if package == 'Andrey' else ''}>{MARKS[mark]}{ref}</td>")
+                cells.append(f"<td{ours if package == 'Andrey' else ''}>{MARKS[mark][1]}{ref}</td>")
             rows.append(f"<tr><td>{escape(feature)}</td>{''.join(cells)}</tr>")
     listed_notes = "".join(
         f'<li id="comparison-note-{k}"><strong>{escape(feature)}, {escape(package)}.</strong> '
@@ -2762,3 +2614,528 @@ def comparison_page() -> str:
             "",
         ]
     )
+
+
+# The docs' code colors (pydata-sphinx-theme's defaults), so code reads the same on every page.
+CODE_STYLES = {"light": "a11y-high-contrast-light", "dark": "a11y-high-contrast-dark"}
+
+
+def code_html(source: str, language: str) -> str:
+    """Source as highlighted HTML for a ``<pre class="hl"><code>``, by Pygments."""
+    return highlight(source, get_lexer_by_name(language), HtmlFormatter(nowrap=True)).rstrip()
+
+
+def code_css(scope: str, theme: str) -> str:
+    """One theme's token colors under ``scope``; the page's own code-block frame stays as it is."""
+    rules = HtmlFormatter(style=CODE_STYLES[theme]).get_style_defs(".hl").splitlines()
+    return "\n".join(f"{scope}{rule}" for rule in rules if rule.startswith(".hl ."))
+
+
+def tokens_css() -> str:
+    """CSS custom properties for both palettes, and the code colors for each: the system theme, or
+    the one the docs stored."""
+    return "\n\n".join(
+        [
+            "/* Generated by site/build.py from andrey.viz.theme; do not edit. */",
+            palette_block(":root", andrey.viz.LIGHT),
+            code_css("", "light"),
+            "@media (prefers-color-scheme: dark) {\n"
+            + palette_block(':root:not([data-theme="light"])', andrey.viz.DARK)
+            + "\n"
+            + code_css(':root:not([data-theme="light"]) ', "dark")
+            + "\n}",
+            palette_block(':root[data-theme="dark"]', andrey.viz.DARK),
+            code_css(':root[data-theme="dark"] ', "dark"),
+        ]
+    )
+
+
+def homepage_code_css() -> str:
+    """The code colors in both themes, keyed on the ``data-theme`` that the navbar's switch sets."""
+    return code_css("", "light") + "\n" + code_css('html[data-theme="dark"] ', "dark")
+
+
+# The methods the homepage's description names; every other registered method counts as "more".
+DESCRIPTION_METHODS = ("PC", "GES", "FCI")
+
+
+def page_description(summaries: list[dict]) -> str:
+    """The homepage's summary for search results and link previews, as plain text."""
+    registered = {spec.name for spec in list_specs()}
+    if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
+        raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
+    named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
+    return (
+        f"Causal discovery for Python and AI agents. Learn causal graphs with {named} and "
+        f"{more} more methods, on CPU or GPU. {CLAIM}"
+    )
+
+
+def abel_mark() -> str:
+    """Abel's mark, the leaf of its logotype, as inline SVG in the text color around it."""
+    logotype = (ROOT / "site" / "brand" / "abel-logo-white.svg").read_text(encoding="utf-8")
+    paths = re.findall(r'<path d="([^"]+)"', logotype)
+    if len(paths) != 4:  # the three letters, then the mark
+        raise ValueError(f"expected the logotype's four paths, got {len(paths)}")
+    return (
+        '<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true" focusable="false">'
+        f'<path d="{paths[-1]}" fill="currentColor"/></svg>'
+    )
+
+
+def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, str]:
+    """Everything the homepage template shows, as HTML, from the first release's summary and the
+    later releases' published ones."""
+    fastest(summary)
+    summaries = release_summaries(summary)
+    code, printed, figure = run_example()
+    _, _, interface_figures = run_interface()
+    featured = featured_methods(summaries)
+    claims = act_claims(featured)
+    frames = agent_frames()
+    banner = (
+        '<p class="placeholder-banner" role="note">Placeholder numbers, copied from the '
+        "documentation's benchmarks page. Not for release.</p>"
+    )
+    return {
+        "title": escape(SEARCH_TITLE),
+        # Plain text: docs/conf.py escapes it into the page's description and link-preview tags.
+        "description": page_description(summaries),
+        "robots": '<meta name="robots" content="noindex">' if placeholder else "",
+        "banner": banner if placeholder else "",
+        "agent_pill": agent_pill(),
+        # The first screen's art, which the page asks for before its stylesheets load.
+        "hero_image": f"_static/art-{HERO_ART}.avif",
+        "hero_chips": hero_chips(),
+        "hero_art": hero_art(),
+        "tile_art": tile_art,
+        "plus": plus(),
+        "act_cards": act_cards(claims),
+        "act_covers": act_covers(claims),
+        "example_cover": example_cover(),
+        "docs_cover": docs_cover(),
+        "speed_tiles": speed_tiles(featured),
+        "accuracy_tiles": accuracy_tiles(featured),
+        "agent_tile": agent_tile(frames),
+        "coverage_tiles": coverage_tiles(interface_figures),
+        "dialog_head": dialog_head,
+        "dialog_tail": DIALOG_TAIL,
+        "method_count": str(len(list_specs())),
+        "graph_title": graph_title(),
+        "interface_figures": interface_figures,
+        "example_code": code_html(code.rstrip(), "python"),
+        "example_output": escape(printed),
+        "example_figure": figure,
+        "agent_demo": agent_demo(frames, figure),
+        "docs_grid": docs_grid(),
+        "style": homepage_code_css(),
+    }
+
+
+# ---- one featured method per family ---------------------------------------------------------
+# Comparators that are a method's authors' research code, not a package: they stay in the charts
+# and on their release cards, and they do not count among the packages a method is compared with.
+RESEARCH_CODE = {
+    "LOCI authors' code, LOCI-H",
+    "SCORE authors' code",
+    "NOTEARS authors' code",
+    "authors' R RESIT",
+}
+# Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
+# or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty
+# graph, whose F1 is 0.
+F1_FAMILIES = {"temporal"}
+
+
+def default_settings(summaries: list[dict]) -> dict[str, tuple[str, list[dict]]]:
+    """Per registry method, the setting it is shown under and that setting's comparisons: the
+    chart (:func:`time_groups`) whose name ``SHOWN_SETTINGS`` lists, else the shortest-named one,
+    the first among equals. The name is the one ``SHOWN_SETTINGS`` gives, or the chart's."""
+    found: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in time_groups(summaries):
+        shown = found.get(methods[0]["spec"])
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
+        ):
+            found[methods[0]["spec"]] = (name, methods)
+    return {spec: (SHOWN_SETTINGS.get(n, n), ms) for spec, (n, ms) in found.items()}
+
+
+def shared_rows(methods: list[dict]) -> dict[int, list[dict]]:
+    """Each size at which every comparison in ``methods`` has both fit times and both graphs'
+    errors, smallest first, with each comparison's row there: at the largest sample size where a
+    lane measures several, the last listed among equal ones."""
+    by_size = [{r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods]
+    keys = ("andrey_s", "comparator_s", "andrey_errors", "comparator_errors")
+    out = {}
+    for d in sorted(by_size[0]):
+        rows = [sizes.get(d) for sizes in by_size]
+        if all(row is not None and all(row[k] is not None for k in keys) for row in rows):
+            out[d] = rows
+    return out
+
+
+def beats_empty(family: str, row: dict) -> bool:
+    """Whether Andrey's graph beats the empty graph in ``row``: fewer errors than the empty graph,
+    or in ``F1_FAMILIES`` a link F1 above 0."""
+    if family in F1_FAMILIES:
+        return (row["andrey_f1"] or 0) > 0
+    return row["empty_errors"] is not None and row["andrey_errors"] < row["empty_errors"]
+
+
+def compared_packages(summaries: list[dict]) -> dict[str, set[str]]:
+    """Per supported registry method, the packages its published comparisons name, in any
+    setting, by :func:`package_name`; ``RESEARCH_CODE`` is not a package."""
+    out: dict[str, set[str]] = {}
+    for m in supported(summaries):
+        if m["comparator"] not in RESEARCH_CODE:
+            out.setdefault(m["spec"], set()).add(package_name(m["comparator"]))
+    return out
+
+
+def feature_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
+    """Each supported method that can be featured, by registry name: the packages it is compared
+    with (:func:`compared_packages`) and its reach, the largest size at which every package in its
+    shown setting (:func:`default_settings`) ran and Andrey's graph beats the empty graph
+    (:func:`beats_empty`). A method with no such size is left out."""
+    packages = compared_packages(summaries)
+    ranks = {}
+    for spec, (_, methods) in default_settings(summaries).items():
+        family = methods[0]["family"]
+        sizes = [d for d, rows in shared_rows(methods).items() if beats_empty(family, rows[0])]
+        if sizes:
+            ranks[spec] = (len(packages.get(spec, ())), sizes[-1])
+    return ranks
+
+
+def featured_among(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
+    """The method to feature among ``names``: of those ``ranks`` holds (:func:`feature_ranks`),
+    the one compared with the most packages, then the one with the largest reach, then the first
+    in registry order; None when ``ranks`` holds none. The rule reads coverage, not the result of
+    a comparison."""
+    order = {s.name: i for i, s in enumerate(list_specs())}
+    found = [name for name in names if name in ranks]
+    return min(found, key=lambda n: (-ranks[n][0], -ranks[n][1], order[n]), default=None)
+
+
+def featured_methods(summaries: list[dict]) -> dict[str, dict]:
+    """The method each registry family features (:func:`featured_among` over the family's
+    methods), in ``SPEC_FAMILIES`` order, as the homepage and the methods catalog show it; a family
+    without one is left out. Each entry gives the method's registry name (``spec``), its shown
+    ``name``, its ``packages``, and its reach as ``size`` in ``unit``, with the ``release`` and
+    the ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row."""
+    ranks = feature_ranks(summaries)
+    settings = default_settings(summaries)
+    out = {}
+    for family in SPEC_FAMILIES:
+        spec = featured_among(ranks, [s.name for s in list_specs() if s.family == family])
+        if spec is None:
+            continue
+        name, methods = settings[spec]
+        packages, d = ranks[spec]
+        out[family] = {
+            "spec": spec,
+            "name": name,
+            "packages": packages,
+            "size": d,
+            "unit": methods[0]["unit"],
+            "release": max((m["release"] for m in methods), key=version_key),
+            "cells": list(zip(methods, shared_rows(methods)[d], strict=True)),
+        }
+    return out
+
+
+def version_key(version: str) -> tuple[int, ...]:
+    """A release's version for sorting: "0.10.0" after "0.9.0"."""
+    return tuple(int(part) for part in version.split("."))
+
+
+# ---- the featured methods' figures ------------------------------------------------------------
+# The outcomes :func:`outcome` gives where Andrey has more errors than the other package.
+WORSE = {"worse", "more"}
+
+
+def outcome(row: dict) -> str:
+    """The outcome a row records for Andrey against the other package: its release card's verdict
+    (``card_verdict``: "tie" where the paired 95% interval of the difference in errors contains 0),
+    or where the card records none, the two error counts on the same datasets: "same", "fewer",
+    or "more"."""
+    if row["card_verdict"] in ("tie", "better", "worse"):
+        return row["card_verdict"]
+    ours, theirs = row["andrey_errors"], row["comparator_errors"]
+    return "same" if abs(ours - theirs) < 1e-9 else "fewer" if ours < theirs else "more"
+
+
+def featured_bars(featured: dict[str, dict], measure: str, text) -> str:  # noqa: ANN001
+    """A row per featured method (:func:`featured_methods`) at the size it is shown: Andrey's bar
+    in the accent, then each other package's, on the row's own scale from zero, each labeled with
+    its package and its value in ``text``. ``measure`` names the rows' fields: ``s`` for the fit
+    time, ``errors`` for the errors against the true graph."""
+    rows = []
+    for entry in featured.values():
+        cells = entry["cells"]
+        values = [("Andrey", cells[0][1][f"andrey_{measure}"])]
+        values += [(package_name(m["comparator"]), r[f"comparator_{measure}"]) for m, r in cells]
+        top = max(value for _, value in values) or 1
+        bars = "".join(
+            f'<div class="err-bar{" err-bar--andrey" if k == 0 else ""}"><span>{escape(who)}'
+            f'</span><i style="--f: {value / top:.4f}"></i><b>{escape(text(value))}</b></div>'
+            for k, (who, value) in enumerate(values)
+        )
+        rows.append(
+            f'<li><p class="err-head"><b>{escape(entry["name"])}</b>'
+            f"<span>{entry['size']:,} {escape(entry['unit'])}</span></p>{bars}</li>"
+        )
+    return f'<ol class="err-pairs">{"".join(rows)}</ol>'
+
+
+# ---- the families, by the kinds of data their methods read -----------------------------------
+CATALOG = "docs/methods.html"
+FAMILY_LINES = {
+    "constraint": "Tests which variables are independent, then removes and orients edges.",
+    "score": "Searches for the graph that scores best on the data.",
+    "permutation": "Searches over orderings of the variables and reads the graph from the best.",
+    "functional": "Uses the shape of the noise or of the effect to direct every edge.",
+    "temporal": "Finds lagged and same-step effects in time series and panels.",
+    "latent": "Allows hidden common causes and shows where they may act.",
+    "pairwise": "Decides which of two variables causes the other.",
+}
+
+
+def family_kinds() -> dict[str, dict[str, int]]:
+    """For each family, in ``SPEC_FAMILIES`` order, how many of its supported methods read each
+    kind of data (``MethodSpec.data_kinds``), in ``DATA_KINDS`` order."""
+    specs = [s for s in list_specs() if s.status == "supported"]
+    return {
+        family: {
+            k: sum(s.family == family and k in s.data_kinds for s in specs) for k in DATA_KINDS
+        }
+        for family in SPEC_FAMILIES
+    }
+
+
+def families_table() -> str:
+    """The families, by the data they read: a row per family, linked to its table on the methods
+    page, and a column per kind of data, linked to its row there; a dot in each cell, sized by the
+    number of supported methods it counts."""
+    specs = [s for s in list_specs() if s.status == "supported"]
+    head = "".join(
+        f'<th scope="col"><a href="{CATALOG}#{kind_anchor(k)}"><span>'
+        f"{escape(DATA_KIND_TEXT[k][0])}</span></a></th>"
+        for k in DATA_KINDS
+    )
+    rows = []
+    for family, counts in family_kinds().items():
+        total = sum(s.family == family for s in specs)
+        cells = "".join(
+            f'<td><span class="dot" style="--n:{n}">{n}</span></td>'
+            if n
+            else '<td class="none"><span class="visually-hidden">0</span></td>'
+            for n in counts.values()
+        )
+        rows.append(
+            f'<tr><th scope="row"><a href="{CATALOG}#family-{family}">'
+            f"{escape(SPEC_FAMILIES[family])}</a>"
+            f'<span class="ct">{total}<span class="visually-hidden"> supported methods</span>'
+            f'</span><span class="ln">{escape(FAMILY_LINES[family])}</span></th>{cells}</tr>'
+        )
+    return (
+        '<table class="matrix"><thead><tr><th scope="col"><span class="visually-hidden">Family'
+        f"</span></th>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
+# ---- the method to start with on each kind of data ---------------------------------------------
+# The kinds of data a method that reads them cannot do without: one its result implies, or a list
+# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
+NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
+
+
+def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """Whether ``spec`` cannot run without data of ``kind``: a required ``env`` input, or a kind
+    in ``NEEDED_KINDS`` that it reads."""
+    if kind == "environments":
+        return any(i.name == "env" and i.required for i in spec.data.inputs)
+    return kind in NEEDED_KINDS and kind in spec.data_kinds
+
+
+def start_with(ranks: dict[str, tuple[int, int]], kind: str) -> str | None:
+    """The method to start with on data of ``kind``, from :func:`feature_ranks`: in the first
+    family, in ``SPEC_FAMILIES`` order, where :func:`featured_among` finds one, its pick among the
+    methods that need the kind (:func:`needs`), or among those that read it when none needs it."""
+    for family in SPEC_FAMILIES:
+        readers = [s for s in list_specs() if s.family == family and kind in s.data_kinds]
+        needing = [s.name for s in readers if needs(s, kind)]
+        pick = featured_among(ranks, needing or [s.name for s in readers])
+        if pick:
+            return pick
+    return None
+
+
+# ---- the methods catalog (docs/methods.html; its links are relative to docs/) --------------------
+# Each kind of data (andrey.spec.DATA_KINDS): its label and the line that says what it means.
+DATA_KIND_TEXT = {
+    "continuous": ("Continuous", "Numbers on a scale, one column per variable"),
+    "categorical": ("Categorical", "Labels, such as yes and no, coded as whole numbers"),
+    "mixed": ("Mixed", "Some columns numbers, some labels"),
+    "missing": ("Missing values", "Some cells are empty"),
+    "environments": (
+        "Several environments",
+        "Rows from experiments, interventions, or sites, each labeled",
+    ),
+    "datasets": ("Several datasets", "One table per group or time point, same columns"),
+    "hidden_causes": ("Hidden causes", "Some common causes are not measured"),
+    "time_series": ("Time series", "One row per time step"),
+    "two_variables": ("Two variables", "Which one causes the other?"),
+}
+# Each graph a method returns (returns_text): its section of the graph types guide.
+GRAPH_SECTIONS = {
+    "DAG": "dag-a-directed-model",
+    "CPDAG": "cpdag-an-equivalence-class",
+    "PAG": "pag-uncertainty-with-hidden-variables",
+    "Undirected graph": "undirected-graphs-adjacency-without-direction",
+    "Temporal graph": "temporal-graphs",
+    "Two-node DAG": "dag-a-directed-model",
+}
+
+
+def purpose(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """What a method is for, in one line: the registry summary's first clause, or what follows
+    its colon where that clause is only the method's name ("NOTEARS: least squares ...")."""
+    text = first_clause(spec.summary)
+    if len(text.split()) <= 2 and ":" in spec.summary:
+        text = re.split(r"[;.] |, by ", spec.summary.split(":", 1)[1].strip())[0]
+    return text[0].upper() + text[1:]
+
+
+def kind_anchor(kind: str) -> str:
+    return "data-" + kind.replace("_", "-")
+
+
+def compared(summaries: list[dict]) -> dict[str, tuple[list[str], list[str]]]:
+    """Each supported method's published comparisons: what it is compared with, packages and
+    authors' code by :func:`package_name` in the summaries' order, and the releases whose cards
+    hold them, oldest first."""
+    packages: dict[str, dict[str, None]] = {}
+    releases: dict[str, set[str]] = {}
+    for method in supported(summaries):
+        packages.setdefault(method["spec"], {})[package_name(method["comparator"])] = None
+        releases.setdefault(method["spec"], set()).add(method["release"])
+    return {
+        name: (list(packages[name]), sorted(releases[name], key=version_key)) for name in packages
+    }
+
+
+def card_link(release: str) -> str:
+    """A link to ``release``'s card from docs/, or to the release cards page if it has none."""
+    page = DOCS / "docs" / "benchmarks" / f"{release}.md"
+    return f"benchmarks/{release}.html" if page.exists() else "benchmarks.html"
+
+
+def cards_text(releases: list[str]) -> str:
+    links = [f'<a href="{card_link(r)}">{r}</a>' for r in releases]
+    return f"{listed(links)} release card{'s' if len(links) > 1 else ''}"
+
+
+def display_name(name: str, names: dict[str, str]) -> str:
+    """A method's name as a table shows it: its prose name, capitalized ("Hill climbing")."""
+    prose = names[name]
+    return prose[0].upper() + prose[1:]
+
+
+def method_cell(spec, names: dict[str, str]) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """A method's name, linked to its API entry, and its function in code."""
+    call = spec.name.replace("_", "_<wbr>")
+    return (
+        f'<a href="api/andrey.{spec.name}.html">{escape(display_name(spec.name, names))}</a> '
+        f'<code class="docutils literal notranslate">andrey.{call}</code>'
+    )
+
+
+def table_html(head: list[str], rows: list[str]) -> str:
+    """A table in the documentation's style, which stacks each row on a phone."""
+    cells = "".join(f'<th scope="col">{label}</th>' for label in head)
+    return (
+        '<div class="pst-scrollable-table-container"><table class="table stacked">'
+        f"<thead><tr>{cells}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def catalog_start(summaries: list[dict], names: dict[str, str]) -> str:
+    """The catalog's start table: one row per kind of data a method reads (``data-<kind>``), with
+    what the kind means, the method to start with (:func:`start_with`), the graph it returns, and
+    how many methods of each family read the kind, one family a line."""
+    specs = list_specs()
+    ranks = feature_ranks(summaries)
+    rows = []
+    for kind in DATA_KINDS:
+        readers = [s for s in specs if kind in s.data_kinds]
+        if not readers:
+            continue
+        label, hint = DATA_KIND_TEXT[kind]
+        start = get_spec(start_with(ranks, kind))
+        graph = returns_text(start)
+        families = [
+            f'<span class="nowrap"><a href="#family-{family}">{family_label}</a> '
+            f"{sum(s.family == family for s in readers)}</span>"
+            for family, family_label in SPEC_FAMILIES.items()
+            if any(s.family == family for s in readers)
+        ]
+        rows.append(
+            f'<tr id="{kind_anchor(kind)}"><td><strong>{label}</strong><br>{hint}</td>'
+            f"<td>{method_cell(start, names)}</td>"
+            f'<td><a href="guides/graph-types.html#{GRAPH_SECTIONS[graph]}">{graph}</a></td>'
+            f"<td>{'<br>'.join(families)}</td></tr>"
+        )
+    return table_html(["Data", "Method", "Graph", "Families"], rows) + "\n"
+
+
+def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
+    """The catalog's family tables, as MyST: one section per family (``family-<family>``),
+    opening with the method it features (:func:`featured_methods`), and one row per method
+    (``method-<name>``): its name, an Experimental badge where it is experimental, and what it
+    is for, then the kinds of data it reads, the graph it returns, and its comparisons with other
+    packages."""
+    specs = list_specs()
+    starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
+    found = compared(summaries)
+    badge = ' <span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
+    out = []
+    for family, label in SPEC_FAMILIES.items():
+        members = [s for s in specs if s.family == family]
+        if not members:
+            continue
+        rows = []
+        for s in members:
+            labels = [DATA_KIND_TEXT[k][0] for k in s.data_kinds]
+            reads = ", ".join([labels[0], *(text.lower() for text in labels[1:])])
+            if s.name in found:
+                packages, releases = found[s.name]
+                comp = f"{escape(listed(packages))}<br>{cards_text(releases)}"
+            else:
+                comp = "Not compared yet"
+            rows.append(
+                f'<tr id="method-{s.name}"><td>{method_cell(s, names)}'
+                f"{badge if s.status == 'experimental' else ''}<br>{escape(purpose(s))}</td>"
+                f"<td>{reads}</td><td>{returns_text(s)}</td><td>{comp}</td></tr>"
+            )
+        experimental = sum(s.status == "experimental" for s in members)
+        count = f"{len(members)} method{'s' if len(members) > 1 else ''}"
+        count += f", {experimental} experimental" if experimental else ""
+        start = (
+            f' Start with <a href="#method-{starts[family]}">'
+            f"{escape(display_name(starts[family], names))}</a>."
+            if family in starts
+            else ""
+        )
+        out += [
+            f"(family-{family})=",
+            f"### {label}",
+            "",
+            "```{raw} html",
+            f"<p>{count}.{start}</p>"
+            + table_html(["Method", "Data", "Graph", "Compared with"], rows),
+            "```",
+            "",
+        ]
+    return "\n".join(out)

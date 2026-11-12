@@ -51,8 +51,8 @@ over art (SemiBold, white). Code uses the system's monospace font.
 
 The light theme is ink on paper and the dark theme pale ink on night. Cobalt marks links, selection,
 and the art's ground; navy is the art's deep ground and the footer's; amber
-is the sole accent. Over the art the accent is the ground's amber; a word in amber on the paper
-takes `amber_text`, darker in the light theme so display type keeps a 3:1 contrast. The website uses
+is the sole accent. Over the art the accent is the ground's amber; amber on the paper takes
+`amber_text`, darker in the light theme so it keeps a 3:1 contrast. The website uses
 the `--andrey-ground-*` and `--andrey-*` custom properties (`site/grain.py`,
 `docs/palette_css.py`); no stylesheet specifies a hex value.
 
@@ -106,7 +106,7 @@ Each token is a field of `Palette`, with one value in `andrey.viz.LIGHT` and one
 | `edge_undirected` | orientation unknown (CPDAG) |
 | `edge_bidirected` | a hidden common cause (PAG) |
 | `edge_partial` | a circle endpoint (PAG) |
-| `amber_text` | a word in amber on `paper`, such as the homepage's "fast": darker in the light theme |
+| `amber_text` | amber on `paper`, such as Andrey's marks in the homepage's comparison: darker in the light theme |
 
 ### Charts
 
