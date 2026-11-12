@@ -135,7 +135,7 @@ names its pull request.
   data. On categorical data their blankets can change for some targets, and so can the graphs of
   `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
-  pooled F1 is never lower. ([#968])
+  pooled F1 is never lower. ([#969])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2673,7 +2673,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#968]: https://github.com/Abel-ai-lab/Andrey/pull/968
+[#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
 [#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
