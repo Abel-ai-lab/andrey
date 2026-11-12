@@ -1629,7 +1629,9 @@ def hiton_pc(
     test per subset of the current set, so the cost grows with the size of the set, up to
     ``max_depth`` members at a time, and the symmetry check runs the search once more for each
     member. The CPDAG tests every subset of the smaller blanket for each unshielded triple, so a
-    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests.
+    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
