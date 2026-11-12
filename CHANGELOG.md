@@ -35,12 +35,12 @@ names its pull request.
   target and for each of its parents and children, then admits each child's other parent when a
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
-  ([#955])
+  ([#957])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
   its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
-  is absent. ([#955])
+  is absent. ([#957])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2624,7 +2624,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#955]: https://github.com/Abel-ai-lab/Andrey/pull/955
+[#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
 [#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
 [#931]: https://github.com/Abel-ai-lab/Andrey/pull/931
