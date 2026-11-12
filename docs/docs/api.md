@@ -135,13 +135,13 @@ Other data raises a `ValueError` that names the argument and, for a bad cell, it
 single column gives a one-node graph.
 
 % concept: missing
-`pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `mmpc`, `pcmci`, `pcmciplus`, and
-`lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a
-CSV file: each conditional-independence test reads only the rows where all of its variables are
-observed (test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the
-rows where both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the
-median rows a test read. Their argument `missing` names the handling: `"testwise"` is test-wise
-deletion, and `None`, the default, picks the method's default handling, `"testwise"`;
+`pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `pcmci`,
+`pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or
+`N/A` field of a CSV file: each conditional-independence test reads only the rows where all of its
+variables are observed (test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`,
+which read the rows where both columns are observed; `metadata["rows_tested"]` gives the fewest
+(`min`) and the median rows a test read. Their argument `missing` names the handling: `"testwise"`
+is test-wise deletion, and `None`, the default, picks the method's default handling, `"testwise"`;
 `metadata["missing"]` records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC
 (Tu et al., 2019) finds the parents of each missingness indicator and tests again the edges they
 could have kept. `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`,
@@ -171,10 +171,10 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same
-`indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data,
-`"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and
-the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
+`fast_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take
+the same `indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous
+data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data,
+and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
 dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
@@ -185,27 +185,28 @@ reports only p-values is ordered by its p-value, smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`,
-`ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
-`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
-and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
-parameter says how it honors them. Every required edge is in the result, whatever its weight, test,
-or score says. For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause`
-at time `t - lag` to `effect` at time `t`. Three more parts state causal paths and hidden common
-causes: `required_paths` and `forbidden_paths` list the pairs `(cause, effect)` with and without a
-directed path from `cause` to `effect`, and `confounded` the pairs with a hidden common cause. `pc`,
-`cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`,
-`inter_iamb`, `gs`, and `mmpc` with `structure="cpdag"` and no `target` honor `required_paths` and
-`forbidden_paths`: the result is the MPDAG of the DAGs of the class found that meet them (Fang et
-al. 2025), and `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`,
-`gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a required
-path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before Zhang's
-rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair. These
-marks and checks assume no selection bias. `lpcmci` takes each claim with its lag. `direct_lingam`
-and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the order search's
-prior knowledge (Shimizu et al. 2011, Section 3.4).
+`fast_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
+`grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
+`score_matching`, `nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`,
+`dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a
+{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
+temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
+in the result, whatever its weight, test, or score says. For the time-series methods, an edge
+`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`. Three
+more parts state causal paths and hidden common causes: `required_paths` and `forbidden_paths` list
+the pairs `(cause, effect)` with and without a directed path from `cause` to `effect`, and
+`confounded` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu`,
+`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, `gs`, `fast_iamb`, and
+`mmpc` with `structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`: the
+result is the MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
+`metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`,
+`boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a required path
+makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before Zhang's rules
+(Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair. These marks and
+checks assume no selection bias. `lpcmci` takes each claim with its lag. `direct_lingam` and
+`multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the order search's prior
+knowledge (Shimizu et al. 2011, Section 3.4).
 
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
@@ -216,7 +217,7 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. In an experimental
-method, such as `gs`, both are experimental. An experimental part warns with
+method, such as `gs` or `fast_iamb`, both are experimental. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
@@ -224,33 +225,33 @@ says less than an edge and so directs less: when you know the edge itself, state
 
 Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
 raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
-graph a fit finds does not meet: the tests remove an edge on the only path a required path needs,
-or the class found has no DAG without a path a forbidden path denies. The fit then keeps its graph,
+graph a fit finds does not meet: the tests remove an edge on the only path a required path needs, or
+the class found has no DAG without a path a forbidden path denies. The fit then keeps its graph,
 drops each such claim, warns once with `KnowledgeWarning`, naming the claims, and lists them in
-`metadata["unmet_knowledge"]`, each `[part, a, b]`, or `[part, a, b, lag]` for `lpcmci`; the list
-is empty when every claim is met. A CPDAG method takes the claims in order, `required_paths` and
-then `forbidden_paths`, each by column position, and keeps a claim when some DAG of the class meets
-it together with those kept before it. A PAG method drops a required path that `forbidden` or the
-tiers deny on an adjacent pair before the rules, and then each claim the final PAG does not meet.
-A method given a part it does not honor raises `NotImplementedError`, naming the methods that
-honor it, and so do `iamb`, `inter_iamb`, `gs`, and `mmpc` given the paths with a `target` or an
+`metadata["unmet_knowledge"]`, each `[part, a, b]`, or `[part, a, b, lag]` for `lpcmci`; the list is
+empty when every claim is met. A CPDAG method takes the claims in order, `required_paths` and then
+`forbidden_paths`, each by column position, and keeps a claim when some DAG of the class meets it
+together with those kept before it. A PAG method drops a required path that `forbidden` or the tiers
+deny on an adjacent pair before the rules, and then each claim the final PAG does not meet. A method
+given a part it does not honor raises `NotImplementedError`, naming the methods that honor it, and
+so do `iamb`, `inter_iamb`, `gs`, `fast_iamb`, and `mmpc` given the paths with a `target` or an
 undirected `structure`.
 
-A search that directs edges by tests (`pc`, `cdnod`, `iamb`, `inter_iamb`, `gs`, `mmpc`) can return
-a CPDAG with no consistent extension when its tests contradict each other on finite data. Such a
-graph stands for no DAG, and no published result says how a path claim restricts it. A claim then
-acts on one edge: in any DAG that joins `a` and `b` by an edge, `a` causes `b` exactly when the edge
-is `a -> b` (Fang and He 2020; Fang et al. 2025). A claim on a pair joined by an undirected edge
-directs it, `a -> b` for a required path and `b -> a` for a forbidden one, and Meek's rules follow
-(Meek 1995). A claim is dropped, and listed in `metadata["unmet_knowledge"]`, when its pair is not
-adjacent, when its edge is directed the other way, and when it conflicts with other claims: claims
-that ask for both directions of one edge, and claims whose edges would lie on a directed cycle with
-the graph's directed edges and the edges the other claims ask for, are all dropped. The claims left
-are applied together, so neither their order nor the column order changes the result.
-`metadata["edge_claims"]` lists the claims applied to an edge this way, each `[part, a, b]`, and is
-empty when the graph has a consistent extension. The result is not guaranteed to stand for a DAG, as
-the graph found did not. The score-based and permutation searches return the CPDAG of a DAG, which
-always has a consistent extension. [Background
+A search that directs edges by tests (`pc`, `cdnod`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`,
+`mmpc`) can return a CPDAG with no consistent extension when its tests contradict each other on
+finite data. Such a graph stands for no DAG, and no published result says how a path claim restricts
+it. A claim then acts on one edge: in any DAG that joins `a` and `b` by an edge, `a` causes `b`
+exactly when the edge is `a -> b` (Fang and He 2020; Fang et al. 2025). A claim on a pair joined by
+an undirected edge directs it, `a -> b` for a required path and `b -> a` for a forbidden one, and
+Meek's rules follow (Meek 1995). A claim is dropped, and listed in `metadata["unmet_knowledge"]`,
+when its pair is not adjacent, when its edge is directed the other way, and when it conflicts with
+other claims: claims that ask for both directions of one edge, and claims whose edges would lie on a
+directed cycle with the graph's directed edges and the edges the other claims ask for, are all
+dropped. The claims left are applied together, so neither their order nor the column order changes
+the result. `metadata["edge_claims"]` lists the claims applied to an edge this way, each `[part, a,
+b]`, and is empty when the graph has a consistent extension. The result is not guaranteed to stand
+for a DAG, as the graph found did not. The score-based and permutation searches return the CPDAG of
+a DAG, which always has a consistent extension. [Background
 knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -288,12 +289,13 @@ in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and `camuv` take `max_depth`,
-the maximum conditioning-set size of their conditional-independence tests; `None`, the default, sets
-no cap. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`, and `jpcmciplus`
-their PC1 step; the blankets of `iamb`, `inter_iamb`, and `gs` stop growing at the cap. `rcd`'s cap
-is the most variables it regresses out together, and `camuv`'s the most variables a sink test adds
-together as a variable's candidate parents, each with a default of 2, its paper's setting.
+`fast_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and `camuv` take
+`max_depth`, the maximum conditioning-set size of their conditional-independence tests; `None`, the
+default, sets no cap. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`, and
+`jpcmciplus` their PC1 step; the blankets of `iamb`, `inter_iamb`, `gs`, and `fast_iamb` stop
+growing at the cap. `rcd`'s cap is the most variables it regresses out together, and `camuv`'s the
+most variables a sink test adds together as a variable's candidate parents, each with a default of
+2, its paper's setting.
 
 % concept: max_p_global
 `lpcmci`, `pcmciplus`, and `jpcmciplus` take `max_p_global`, tigramite's name for the most
@@ -304,15 +306,15 @@ caps by phase: `max_depth` caps the lagged phase, whose sets hold no default con
 both ends.
 
 % concept: structure
-`iamb`, `inter_iamb`, `gs`, and `mmpc` take `structure`, the graph they return without a `target`.
-`"cpdag"` is the CPDAG of the Grow-Shrink structure learner (Margaritis 2003): the skeleton, with
-each unshielded triple tested for a collider and Meek's rules applied. `"skeleton"` is the same
-adjacencies, undirected. `iamb`, `inter_iamb`, and `gs` default to `"cpdag"` and also take
-`"moral"`, the moral graph, each variable joined to its Markov blanket, a child's other parents
-included. `mmpc` defaults to `"skeleton"`, the graph its sets give; its parents-and-children sets
-hold no child's other parents, so it has no moral graph. These are the defaults of the corresponding
-learners of the R package bnlearn. With a `target`, each returns that variable's set, whatever
-`structure` is.
+`iamb`, `inter_iamb`, `gs`, `fast_iamb`, and `mmpc` take `structure`, the graph they return without
+a `target`. `"cpdag"` is the CPDAG of the Grow-Shrink structure learner (Margaritis 2003): the
+skeleton, with each unshielded triple tested for a collider and Meek's rules applied. `"skeleton"`
+is the same adjacencies, undirected. `iamb`, `inter_iamb`, `gs`, and `fast_iamb` default to
+`"cpdag"` and also take `"moral"`, the moral graph, each variable joined to its Markov blanket, a
+child's other parents included. `mmpc` defaults to `"skeleton"`, the graph its sets give; its
+parents-and-children sets hold no child's other parents, so it has no moral graph. These are the
+defaults of the corresponding learners of the R package bnlearn. With a `target`, each returns that
+variable's set, whatever `structure` is.
 
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` take `collider_rule`, which
@@ -352,16 +354,16 @@ tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`,
-`ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1
-that fixes their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when
-it is unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and
-`grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on every fit, the
-methods that test independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or
-`"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also
-with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes
-nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on
-`ANDREY_SEED`. Every other method is deterministic and takes no seed.
+`fast_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`,
+`grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from
+0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured seed,
+`ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart from
+`boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
+every fit, the methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and
+`ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise
+`seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend
+on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -697,6 +699,7 @@ in a process.
 
    dagma
    gs
+   fast_iamb
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -715,6 +718,12 @@ adds each at once when a test finds it dependent given the blanket so far, in pa
 joins, where `iamb` adds the most dependent variable at each step. Without a `target` it joins
 the blankets into the same CPDAG, skeleton, or moral graph. It is experimental until its
 comparison with bnlearn's `gs` is published.
+
+Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round
+tests every variable outside the blanket, adds all those that test dependent at once, the most
+dependent first, while the data hold more than five rows per cell of the next test's table on
+categorical data, and then shrinks the blanket. It takes the arguments of `iamb` and is
+experimental until its comparison with bnlearn's `fast.iamb` is published.
 
 A method becomes supported once it has:
 
@@ -777,12 +786,13 @@ and gives that test's p-value exactly; `normal_scores` therefore ranks each colu
 its query reads; a registered test works the same way, built anew for each
 query.
 
-`iamb`, `inter_iamb`, `gs`, and `mmpc` record in `metadata["n_tests"]` how many tests the fit
-evaluated: one for each query whose p-value a test computed, so a query answered again from a kept
-answer, as the chi-square tests keep their marginal answers, is not a new test. A query a test
-computes together with others counts as well, even when the search reads only some of the answers.
-To count the tests in your own code, run it inside {py:func}`~andrey.core.ci.counting_tests`; a test
-you register counts the queries it reports through {py:func}`~andrey.core.ci.count_tests`.
+`iamb`, `inter_iamb`, `gs`, `fast_iamb`, and `mmpc` record in `metadata["n_tests"]` how many tests
+the fit evaluated: one for each query whose p-value a test computed, so a query answered again from
+a kept answer, as the chi-square tests keep their marginal answers, is not a new test. A query a
+test computes together with others counts as well, even when the search reads only some of the
+answers. To count the tests in your own code, run it inside
+{py:func}`~andrey.core.ci.counting_tests`; a test you register counts the queries it reports through
+{py:func}`~andrey.core.ci.count_tests`.
 
 ```{eval-rst}
 .. currentmodule:: andrey.core

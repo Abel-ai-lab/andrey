@@ -1021,11 +1021,13 @@ def fast_iamb(
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
 
-    Notes ----- **When to use.** Fast-IAMB suits i.i.d. observational data with no unmeasured common
-    causes, in which every independence follows from the graph (faithfulness) [1]_. Its paper runs
-    it on categorical data with a G-square test [1]_; the default Fisher-Z test assumes continuous
-    data with linear effects and Gaussian noise, and the other tests read categorical or mixed data
-    or detect nonlinear effects, as :func:`~andrey.pc` describes. It is designed to run fewer tests
+    Notes
+    -----
+    **When to use.** Fast-IAMB suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its paper runs it on
+    categorical data with a G-square test [1]_; the default Fisher-Z test assumes continuous data
+    with linear effects and Gaussian noise, and the other tests read categorical or mixed data or
+    detect nonlinear effects, as :func:`~andrey.pc` describes. It is designed to run fewer tests
     than :func:`~andrey.iamb` by adding several variables after each round of tests [1]_, and every
     test conditions on the whole current blanket, so it suits variables with small blankets. With
     ``target``, it returns an undirected graph joining ``target`` to each member of its Markov
