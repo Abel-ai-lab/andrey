@@ -47,7 +47,7 @@ names its pull request.
   Maathuis (2022) that gives the least-squares estimate its smallest asymptotic variance in a
   linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
   against a true graph: its validity, and its precision and recall against the optimal set.
-  ([#PRNUM])
+  ([#939])
 
 ### Changed
 
@@ -2532,6 +2532,7 @@ First alpha release.
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
 [#932]: https://github.com/Abel-ai-lab/Andrey/pull/932
+[#939]: https://github.com/Abel-ai-lab/Andrey/pull/939
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
