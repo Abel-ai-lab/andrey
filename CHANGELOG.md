@@ -39,7 +39,7 @@ names its pull request.
   base-rate answer; `target_answer_scores`, `effect_scores`, `claim_scores(pairs=)`, and
   `pooled_answer_scores` apply it to targets, pairs, and claims. The benchmark harness adds the gate
   on the net score, paired risk on the queries two methods both answered, and risk-coverage
-  tables. ([#PR])
+  tables. ([#932])
 
 ### Changed
 
@@ -2523,6 +2523,7 @@ First alpha release.
 [#917]: https://github.com/Abel-ai-lab/andrey/pull/917
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
+[#932]: https://github.com/Abel-ai-lab/Andrey/pull/932
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
