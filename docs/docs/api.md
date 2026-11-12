@@ -14,69 +14,33 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with these
-exceptions: `cdnod` and `fci_jci` also take `env`, each row's environment, and `ges`, `hc`, `tabu`,
-`boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci` take it optionally, `gies`, `igsp`, and
-`ut_igsp` also take `env` with `targets`, the variables intervened on in each environment, `gnies`
-takes `env` and learns the targets, `icp` also takes `env` and `target`, the variable whose parents
-it finds, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
-list of datasets and returns one result per dataset. The first argument of every method is `data`;
-`andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
-dataset. Each method is either supported or experimental; `andrey list` prints the status.
+Every method has the same shape:
+
+- **Data in.** The first argument, `data`, is a table: a pandas DataFrame, whose column names
+  become the node labels, or a NumPy array with one row per sample and one column per variable.
+  `jpcmciplus`, `longitudinal_lingam`, and `multi_group_direct_lingam` take a list of tables
+  instead.
+- **One call.** Each method is one function, such as `andrey.pc(data)`, with its settings as
+  keyword arguments. `andrey run pc --data data.csv` runs it from the shell, with `--data` once per
+  table for a method that takes a list ([Command-line interface](#command-line-interface)).
+- **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
+  `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
+  causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
+  the test, the score, and the seed in `out.metadata`.
+- **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
+  other packages and checked against known graphs before each release; an
+  [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
+- **Tests and scores.** A method that tests conditional independence takes `indep_test`, and one
+  that scores graphs takes `score_func`. Left as `None`, each is picked from the column types, as
+  described below; [Conditional-independence tests](#conditional-independence-tests) lists the
+  tests.
 
 % concept: env
 `boss`, `boss_fci`, `cdnod`, `fci_jci`, `ges`, `gfci`, `gies`, `gnies`, `grasp`, `grasp_fci`, `hc`,
-`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, with one meaning: one label
-per row, text or finite numbers, or the name of a column of a DataFrame `data`, which is then not a
-variable, or, with `env` left out, the data given as one table per environment (see below).
-`andrey run` reads it from `--env`, a column of `--data` or a file. A label that is missing or
-infinite raises a `ValueError`. The methods read `env` in one of two ways. `gies`, `gnies`, `igsp`,
-and `ut_igsp` read it as interventions: each distinct label is one environment, which changes the
-mechanisms of its targets, known or learned, and leaves the others as they are. `icp` reads it as
-interventions on any variables, as long as they leave the mechanism of its `target` alone. `cdnod`,
-`fci_jci`, `boss`, `grasp`, `ges`, `hc`, `tabu`, `boss_fci`, `grasp_fci`, and `gfci` read it as a
-context variable that no data variable causes, the environment index, which joins the search as one
-more variable; a numeric label, such as a time step, stays a number.
-
-`gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
-variables, by name or position, with `[]` for an observational environment; as the name of a column
-whose cells give each row's variables, from whose distinct values `env` follows when you leave it
-out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
-`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
-environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
-the mapping leaves out or gives `None` as one whose targets it learns, and still needs an
-observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
-environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
-names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
-it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
-its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
-unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
-`targets` in `--config`, and reads an `--env` of whole numbers as integers.
-
-```python
-out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
-out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
-out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
-out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
-out = andrey.boss(data, "site")  # BOSS with the same index; boss(data) fits without env
-out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
-out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
-```
-
-In Python, every method that takes `env` also takes each environment's rows apart as `data`, in
-place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
-`0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
-mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
-the first one's order, and a column of the `category` type in each keeps it, with every
-DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
-of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
-label.
-
-```python
-out = andrey.gies([observed, knockout], targets={0: [], 1: ["x"]})
-out = andrey.ut_igsp({"control": control, "drug": drug}, targets={"control": [], "drug": None})
-```
+`icp`, `igsp`, `tabu`, and `ut_igsp` take `env`, each row's environment, and `gies`, `gnies`,
+`icp`, `igsp`, and `ut_igsp` also take `targets`, the variables intervened on in each environment.
+[Environments and interventions](guides/getting-started.md#environments-and-interventions) gives
+the forms both take, how each method reads them, and how to pass each environment as its own table.
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
 outside its range or not one of its choices raises `ValueError`, each with a message that names the
@@ -102,8 +66,9 @@ picks the edges by BIC over the whole Lasso path, so for a given causal order it
 edges in any unit of the data. A step that would read the units only through a numerical shortcut,
 such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
-units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
-least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as their pages describe.
+units. Rescaling each column by its own positive factor changes the graph of no method but
+{{ reads_units_names }}, whose published algorithms read the units, as their pages describe. The
+causal order of `ica_lingam`, for example, reads the magnitudes of its unmixing matrix.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or
 `"discrete_bic"`, read text, boolean, and `category` columns as categories and need whole numbers in
 a column of numbers, each distinct value of a column one category. Every method that takes
@@ -412,9 +377,9 @@ the lowest penalty of its solution path.
 n_parents)` to each variable's score, a penalty that grows with the number of variables. `gfci`,
 `boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and the others to `1.0`;
 {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its default
-differs. Only `score_func="bic"` adds the term, so passing `ebic_gamma` with another score, named or
-picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a `"bic"` fit
-used. `gnies`, which has one score, always adds it.
+differs. Only `score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with
+another score, named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the
+value a `"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
@@ -818,6 +783,43 @@ answers. To count the tests in your own code, run it inside
 
 .. currentmodule:: andrey
 ```
+
+### Rank-based score
+
+`score_func="normal_scores"` is experimental; {{ rank_score_names }} take it. It replaces each
+column by its normal scores, the transformation of `indep_test="normal_scores"`, and scores them
+with the linear-Gaussian BIC, `penalty_discount` and `ebic_gamma` included. Its model is the
+nonparanormal, or Gaussian copula, model of Liu, Lafferty, and Wasserman: each column is an unknown
+strictly increasing function of a latent variable, and the latent variables follow a linear-Gaussian
+model of the graph. Use it for continuous data that are Gaussian only after such a transformation of
+each column. A column's normal scores depend on it only through its ranks, so a strictly increasing
+transformation of any column leaves the score, and so the graph, unchanged; on data that are
+Gaussian already, it ranks graphs almost as `"bic"` does. Neither option sets the other:
+`indep_test="normal_scores"` alone keeps the default score, `"bic"`. In a method that takes both,
+pass both, and the test and the score read one model; then a strictly increasing transformation of
+any column leaves the graph unchanged.
+
+We estimate the latent correlations by the correlations of the normal scores. Nandy, Hauser and
+Maathuis estimate them from Spearman's or Kendall's rank correlation, transformed, which estimates
+the same latent correlation under the model, and prove GES and its restricted hybrid ARGES
+consistent in high dimensions with that score; Harris and Drton prove the same for PC with a
+rank-based test. With `ges`, the score is a published variant, with our estimate in place of
+theirs. With the other searches and hybrids, it is the analogous construction, not a result those
+papers prove.
+
+Ties lose information: a column with few distinct values has few distinct scores, and a column
+whose ranks repeat another's, such as `x` and `exp(x)`, is a copy and raises a `ValueError`, as
+copies do. Ranks see a dependence only through its monotone part. The model is one distribution of
+continuous columns, so the score takes no `env`, which is why `gies` does not offer it, no
+`missing="em"`, and no column declared categorical; each raises a `ValueError` that says so.
+
+- Liu, Lafferty, and Wasserman (2009), The Nonparanormal: Semiparametric Estimation of High
+  Dimensional Undirected Graphs, Journal of Machine Learning Research 10: the model.
+- Harris and Drton (2013), PC Algorithm for Nonparanormal Graphical Models, Journal of Machine
+  Learning Research 14: the rank-based test in PC.
+- Nandy, Hauser, and Maathuis (2018), High-Dimensional Consistency in Score-Based and Hybrid
+  Structure Learning, The Annals of Statistics 46(6A), Section 7: the rank-based score in GES and
+  ARGES.
 
 ## Graph structures
 
@@ -1457,7 +1459,9 @@ In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum`
 `exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
 former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
 and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
-each method gives it. `andrey run` rejects a value out of range before the fit.
+each method gives it. `andrey run` rejects a value out of range before the fit. Each method's
+contract and its row of `andrey list` give `data_kinds`, the kinds of data it reads, as the
+[methods catalog](methods.md) lists them.
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

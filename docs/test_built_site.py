@@ -36,6 +36,7 @@ import andrey.data.mixed
 import andrey.data.real
 import andrey.data.scm
 import andrey.metrics
+import andrey.spec
 import andrey.viz
 import andrey.viz.mpl  # importable without matplotlib (it is imported lazily, inside the functions)
 
@@ -82,13 +83,14 @@ DESCRIPTION_LENGTH = 160
 # The header's links, by the text they show, and the page each must reach from any page.
 HEADER = {
     "Docs": "docs/index.html",
+    "Methods": "docs/methods.html",
     "Examples": "docs/examples/index.html",
     "Blog": "blog/index.html",
     "FAQ": "docs/faq.html",
 }
 # The header's sections in the order they read; Release cards, which carries the newest release's
 # dot, is checked on its own.
-NAV = ["Docs", "Examples", "Blog", "Release cards", "FAQ"]
+NAV = ["Docs", "Methods", "Examples", "Blog", "Release cards", "FAQ"]
 # The Examples gallery's section of demos, where the demos' old gallery sends the reader.
 DEMOS = "docs/examples/index.html#interactive-demos"
 # Each moved page's old address and the address it sends the reader to.
@@ -257,21 +259,28 @@ def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(htm
             assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
 
 
-def test_every_homepage_tile_leads_to_details_that_are_built(html):
+def test_every_homepage_link_and_picture_is_built(html):
     home = (html / "index.html").read_text(encoding="utf-8")
-    tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
-    assert tiles and len(tiles) == len(set(tiles))  # one tile for each dialog
+    main = home[home.index('<main id="main-content">') : home.index("</main>")]
+    targets = re.findall(r'(?:href|src|srcset)="([^"]+)"', main)
     problems = []
-    for href in tiles:
+    for href in targets:
+        if href.startswith(("http", "mailto:", "data:")):
+            continue
         if href.startswith("#"):
-            if f'<dialog class="wf tile-dialog" id="{href[1:]}"' not in home:
-                problems.append(f"{href}: no dialog holds its details")
-        elif not _resolve(html, html / "index.html", href).is_file():
+            target, fragment = html / "index.html", href[1:]
+        else:
+            target, _, fragment = (
+                _resolve(html, html / "index.html", href),
+                *href.partition("#")[1:],
+            )
+        if not target.is_file():
             problems.append(f"{href}: not built")
-    for script in ("tiles.js", "prompt.js"):
-        if f"{script}" not in home or not (html / "_static" / script).is_file():
-            problems.append(f"{script}: not loaded or not built")
-    assert not problems, "\n".join(problems)
+        elif fragment and f'id="{fragment}"' not in target.read_text(encoding="utf-8"):
+            problems.append(f"{href}: no element has that id")
+    if "prompt.js" not in home or not (html / "_static" / "prompt.js").is_file():
+        problems.append("prompt.js: not loaded or not built")
+    assert targets and not problems, "\n".join(problems)
 
 
 # The section's line icon before a header link's name.
@@ -364,6 +373,56 @@ def test_every_docs_page_finds_itself_in_its_sidebar_and_edits_a_tracked_file(ht
             if path not in tracked:
                 problems.append(f"{name}: Edit this page opens {path}, which git does not track")
     assert not problems, "\n".join(problems)
+
+
+def test_every_link_in_the_methods_catalog_arrives(html):
+    # The catalog's links are generated: each leads to a built page and to an anchor on it.
+    page = html / "docs" / "methods.html"
+    text = page.read_text(encoding="utf-8")
+    links = _Links()
+    links.feed(text[text.index("<article") : text.index("</article>")])
+    hrefs = {href for _, href in links.found if not href.startswith(("http:", "https:"))}
+    assert any(href.startswith("#family-") for href in hrefs)
+    # The homepage links the start table, and each kind of data's row can be linked.
+    kinds = {kind for spec in andrey.spec.list_specs() for kind in spec.data_kinds}
+    for anchor in ["your-data", *(f"data-{kind.replace('_', '-')}" for kind in kinds)]:
+        assert f'id="{anchor}"' in text, anchor
+    missing = []
+    for href in sorted(hrefs):
+        target = _resolve(html, page, href)
+        anchor = href.partition("#")[2]
+        if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
+            missing.append(href)
+    assert not missing, missing
+    # Its count line gives the registry's supported and experimental methods apart.
+    statuses = [spec.status for spec in andrey.spec.list_specs()]
+    supported, experimental = statuses.count("supported"), statuses.count("experimental")
+    words = " ".join(re.sub(r"<[^>]+>", " ", text).split())
+    assert f"{supported} supported methods and {experimental} experimental" in words
+
+
+def test_the_comparison_page_counts_as_the_homepage_does_and_its_links_arrive(html):
+    page = html / "docs" / "comparison.html"
+    text = page.read_text(encoding="utf-8")
+    article = text[text.index("<article") : text.index("</article>")]
+    links = _Links()
+    links.feed(article)
+    missing = []
+    for href in sorted({href for _, href in links.found if not href.startswith("http")}):
+        target = _resolve(html, page, href)
+        anchor = href.partition("#")[2]
+        if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
+            missing.append(href)
+    assert not missing, missing
+    # The homepage's supported methods are the ones the page counts, less those that count with
+    # the method they extend; the table's Andrey cell is that count.
+    home = (html / "index.html").read_text(encoding="utf-8")
+    supported = re.search(r"(\d+) supported methods in", home)[1]
+    words = " ".join(re.sub(r"<[^>]+>", " ", article).split())
+    counted = re.search(rf"Andrey[’']s {supported} supported methods count as (\d+)", words)
+    assert counted, "the page does not count the homepage's supported methods"
+    cell = re.search(r'Distinct methods</td><td class="ct-ours">(\d+)</td>', article)
+    assert cell and cell[1] == counted[1]
 
 
 def test_every_page_has_a_built_favicon_and_link_preview_card(html):

@@ -17,6 +17,7 @@ import numpy as np
 from andrey.api._adapt import (
     categorical_metadata,
     check_categories,
+    check_rank_env,
     check_same_data,
     column_labels,
     column_namer,
@@ -946,6 +947,7 @@ def fci_hybrid(
     assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
     check_same_data(name, score_func, indep_test)
+    check_rank_env(name, score_func, env)
     data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
         data,
@@ -1037,8 +1039,14 @@ def gfci(
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
         numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
-        BIC for mixed data. ``None`` picks from the declared column types, as for
-        :func:`~andrey.ges`.
+        BIC for mixed data. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits. With
+        ``indep_test="normal_scores"`` both phases read one nonparanormal model, and a strictly
+        increasing transformation of any column leaves the graph unchanged; the consistency results
+        for the rank-based test and score cover PC, GES, and ARGES, so with this search it is the
+        analogous construction, not a proven result. ``None`` picks from the declared column types,
+        as for :func:`~andrey.ges`.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
@@ -1049,8 +1057,8 @@ def gfci(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
-        raises ``ValueError``. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
