@@ -67,6 +67,11 @@ uv run --no-sync ty check                 # types
 uv run --no-sync pytest tests             # every test, including the drift guards
 ```
 
+The suite takes about half an hour on one core. `-n auto --dist loadfile` runs it on every core,
+as CI does, with the same tests and results; `--dist loadfile` keeps the tests of one file on one
+worker, so they share its fixtures. `-n 0` runs without workers, one test at a time, to debug a
+failure. Run `tests/gpu` without `-n`: the workers would share one GPU.
+
 `prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml`, including
 gitleaks, to this checkout, so they run on every commit; `prek run --all-files` runs them once.
 
