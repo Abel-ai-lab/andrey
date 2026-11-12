@@ -45,18 +45,20 @@ earlier build. Download links keep their plain addresses.
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
 only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the hero's art, the sections' claims and tiles, the figures, and the tables. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the
-page's never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
+the hero's art, the sections' claims and tiles, the figures, and the tables.
+`site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the page's
+never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
 speed charts, which the posts and the release cards share.
 
 The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", the
 install lines, each with a copy button that `prompt.js` shows (without script the command is
-plain text), Get started, and a card per section. A pill above the headline copies the prompt that installs the
-agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside
-the marks of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT). The
-sections follow the headline's words, then All-in-one (`ACTS` in `site/build.py`). Each opens on its
-art at full bleed with its title and its claim (`act_covers()`), then shows its evidence: tiles,
-each with a figure of its own, and a note in plain type where the evidence is a list (`bento-note`).
+plain text), Get started, and a card per section. A pill above the headline copies the prompt
+that installs the agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and
+the FAQ give, beside the marks of coding agents and open models (`AGENTS`, Lobe Icons in
+`site/agents/`, MIT). The sections follow the headline's words, then All-in-one (`ACTS` in
+`site/build.py`). Each opens on its art at full bleed with its title and its claim
+(`act_covers()`), then shows its evidence: tiles, each with a figure of its own, and a note in
+plain type beside a figure (`bento-note`).
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
 screen as Accelerated's title appears, until the speed panel rises over the art.
 
