@@ -37,6 +37,12 @@ names its pull request.
   increasing transformation of any column leaves the graph unchanged. Defaults do not change:
   `indep_test="normal_scores"` alone keeps the default score. The score takes no `env` and no
   `missing="em"`. ([#928])
+- The methods catalog, Methods in the navbar: "Start from your data" gives, for each kind of data,
+  the method to start with, the graph it returns, and how many methods of each family read it, and
+  every method is listed by family with the data it reads, the graph it returns, its status, and the
+  release cards that compare it. Each method's `--help --json` contract and its `andrey list` row
+  give `data_kinds`, the kinds of data it reads, which the registry derives from its tests and
+  scores, its `missing` argument, its inputs, and its result. ([#920])
 
 ### Fixed
 
@@ -2234,6 +2240,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.17.0...HEAD
 [0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
@@ -2518,3 +2525,4 @@ First alpha release.
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
+[#920]: https://github.com/Abel-ai-lab/andrey/pull/920

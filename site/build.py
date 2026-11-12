@@ -41,7 +41,7 @@ import andrey.viz
 from andrey import GraphStructure
 from andrey.cli import main as andrey_cli
 from andrey.core.structure import Kind
-from andrey.spec import list_specs
+from andrey.spec import DATA_KINDS, get_spec, list_specs
 from andrey.spec.concepts import BLANKET_STRUCTURES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -612,8 +612,8 @@ NOT_IN_ACCURACY_CLAIM = {
     "SCORE authors' code",
     "NOTEARS authors' code",
 }
-# The package each comparator names in the speed panel's legend, without the version or setting
-# its release card gives; every other comparator is a package's name already.
+# The package each comparator names, without the version or setting its release card gives;
+# every other comparator is a package's name already.
 PACKAGE_NAMES = {
     "CAM 1.0": "CAM",
     "InvariantCausalPrediction 0.8": "InvariantCausalPrediction",
@@ -624,6 +624,9 @@ PACKAGE_NAMES = {
     "tetrad-lib 7.6.10 BossFci": "Tetrad",
     "tetrad-lib 7.6.10 GraspFci": "Tetrad",
     "tigramite 5.2.10.1": "tigramite",
+    "gnies 0.3.3": "gnies",
+    "CausalNex 0.12.2": "CausalNex",
+    "graphical-model-learning 0.1a8": "graphical-model-learning",
     "LOCI authors' code, LOCI-H": "LOCI authors' code",
 }
 # The summary lanes that measure each graph size at several sample sizes.
@@ -3208,3 +3211,313 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "docs_grid": docs_grid(),
         "style": homepage_code_css(),
     }
+
+
+# ---- one featured method per family ---------------------------------------------------------
+# Comparators that are a method's authors' research code, not a package: they stay in the charts
+# and on their release cards, and they do not count among the packages a method is compared with.
+RESEARCH_CODE = {
+    "LOCI authors' code, LOCI-H",
+    "SCORE authors' code",
+    "NOTEARS authors' code",
+    "authors' R RESIT",
+}
+
+
+def default_settings(summaries: list[dict]) -> dict[str, tuple[str, list[dict]]]:
+    """Per registry method, the setting it is shown under and that setting's comparisons: the
+    chart (:func:`time_groups`) whose name ``SHOWN_SETTINGS`` lists, else the shortest-named one,
+    the first among equals. The name is the one ``SHOWN_SETTINGS`` gives, or the chart's."""
+    found: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in time_groups(summaries):
+        shown = found.get(methods[0]["spec"])
+        if shown is None or (
+            shown[0] not in SHOWN_SETTINGS and (name in SHOWN_SETTINGS or len(name) < len(shown[0]))
+        ):
+            found[methods[0]["spec"]] = (name, methods)
+    return {spec: (SHOWN_SETTINGS.get(n, n), ms) for spec, (n, ms) in found.items()}
+
+
+def shared_rows(methods: list[dict]) -> dict[int, list[dict]]:
+    """Each size at which every comparison in ``methods`` has both fit times and both graphs'
+    errors, smallest first, with each comparison's row there: at the largest sample size where a
+    lane measures several, the last listed among equal ones."""
+    by_size = [{r["d"]: r for r in sorted(m["rows"], key=lambda r: r["n"] or 0)} for m in methods]
+    keys = ("andrey_s", "comparator_s", "andrey_errors", "comparator_errors")
+    out = {}
+    for d in sorted(by_size[0]):
+        rows = [sizes.get(d) for sizes in by_size]
+        if all(row is not None and all(row[k] is not None for k in keys) for row in rows):
+            out[d] = rows
+    return out
+
+
+def beats_empty(family: str, row: dict) -> bool:
+    """Whether Andrey's graph beats the empty graph in ``row``: fewer errors than the empty graph,
+    or in ``F1_FAMILIES`` a link F1 above 0."""
+    if family in F1_FAMILIES:
+        return (row["andrey_f1"] or 0) > 0
+    return row["empty_errors"] is not None and row["andrey_errors"] < row["empty_errors"]
+
+
+def compared_packages(summaries: list[dict]) -> dict[str, set[str]]:
+    """Per supported registry method, the packages its published comparisons name, in any
+    setting, by :func:`package_name`; ``RESEARCH_CODE`` is not a package."""
+    out: dict[str, set[str]] = {}
+    for m in supported(summaries):
+        if m["comparator"] not in RESEARCH_CODE:
+            out.setdefault(m["spec"], set()).add(package_name(m["comparator"]))
+    return out
+
+
+def feature_ranks(summaries: list[dict]) -> dict[str, tuple[int, int]]:
+    """Each supported method that can be featured, by registry name: the packages it is compared
+    with (:func:`compared_packages`) and its reach, the largest size at which every package in its
+    shown setting (:func:`default_settings`) ran and Andrey's graph beats the empty graph
+    (:func:`beats_empty`). A method with no such size is left out."""
+    packages = compared_packages(summaries)
+    ranks = {}
+    for spec, (_, methods) in default_settings(summaries).items():
+        family = methods[0]["family"]
+        sizes = [d for d, rows in shared_rows(methods).items() if beats_empty(family, rows[0])]
+        if sizes:
+            ranks[spec] = (len(packages.get(spec, ())), sizes[-1])
+    return ranks
+
+
+def featured_among(ranks: dict[str, tuple[int, int]], names: list[str]) -> str | None:
+    """The method to feature among ``names``: of those ``ranks`` holds (:func:`feature_ranks`),
+    the one compared with the most packages, then the one with the largest reach, then the first
+    in registry order; None when ``ranks`` holds none. The rule reads coverage, not the result of
+    a comparison."""
+    order = {s.name: i for i, s in enumerate(list_specs())}
+    found = [name for name in names if name in ranks]
+    return min(found, key=lambda n: (-ranks[n][0], -ranks[n][1], order[n]), default=None)
+
+
+def featured_methods(summaries: list[dict]) -> dict[str, dict]:
+    """The method each registry family features (:func:`featured_among` over the family's
+    methods), in ``SPEC_FAMILIES`` order, as the homepage and the methods catalog show it; a family
+    without one is left out. Each entry gives the method's registry name (``spec``), its shown
+    ``name``, its ``packages``, and its reach as ``size`` in ``unit``, with the ``release`` and
+    the ``(comparison, row)`` pairs at that size, Andrey's time and errors in each row."""
+    ranks = feature_ranks(summaries)
+    settings = default_settings(summaries)
+    out = {}
+    for family in SPEC_FAMILIES:
+        spec = featured_among(ranks, [s.name for s in list_specs() if s.family == family])
+        if spec is None:
+            continue
+        name, methods = settings[spec]
+        packages, d = ranks[spec]
+        out[family] = {
+            "spec": spec,
+            "name": name,
+            "packages": packages,
+            "size": d,
+            "unit": methods[0]["unit"],
+            "release": max((m["release"] for m in methods), key=version_key),
+            "cells": list(zip(methods, shared_rows(methods)[d], strict=True)),
+        }
+    return out
+
+
+def version_key(version: str) -> tuple[int, ...]:
+    """A release's version for sorting: "0.10.0" after "0.9.0"."""
+    return tuple(int(part) for part in version.split("."))
+
+
+# ---- the method to start with on each kind of data ---------------------------------------------
+# The kinds of data a method that reads them cannot do without: one its result implies, or a list
+# of datasets. A required ``env`` input is the other way a method needs a kind (:func:`needs`).
+NEEDED_KINDS = {"datasets", "hidden_causes", "time_series", "two_variables"}
+
+
+def needs(spec, kind: str) -> bool:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """Whether ``spec`` cannot run without data of ``kind``: a required ``env`` input, or a kind
+    in ``NEEDED_KINDS`` that it reads."""
+    if kind == "environments":
+        return any(i.name == "env" and i.required for i in spec.data.inputs)
+    return kind in NEEDED_KINDS and kind in spec.data_kinds
+
+
+def start_with(ranks: dict[str, tuple[int, int]], kind: str) -> str | None:
+    """The method to start with on data of ``kind``, from :func:`feature_ranks`: in the first
+    family, in ``SPEC_FAMILIES`` order, where :func:`featured_among` finds one, its pick among the
+    methods that need the kind (:func:`needs`), or among those that read it when none needs it."""
+    for family in SPEC_FAMILIES:
+        readers = [s for s in list_specs() if s.family == family and kind in s.data_kinds]
+        needing = [s.name for s in readers if needs(s, kind)]
+        pick = featured_among(ranks, needing or [s.name for s in readers])
+        if pick:
+            return pick
+    return None
+
+
+# ---- the methods catalog (docs/methods.html; its links are relative to docs/) --------------------
+# Each kind of data (andrey.spec.DATA_KINDS): its label and the line that says what it means.
+DATA_KIND_TEXT = {
+    "continuous": ("Continuous", "Numbers on a scale, one column per variable"),
+    "categorical": ("Categorical", "Labels, such as yes and no, coded as whole numbers"),
+    "mixed": ("Mixed", "Some columns numbers, some labels"),
+    "missing": ("Missing values", "Some cells are empty"),
+    "environments": (
+        "Several environments",
+        "Rows from experiments, interventions, or sites, each labeled",
+    ),
+    "datasets": ("Several datasets", "One table per group or time point, same columns"),
+    "hidden_causes": ("Hidden causes", "Some common causes are not measured"),
+    "time_series": ("Time series", "One row per time step"),
+    "two_variables": ("Two variables", "Which one causes the other?"),
+}
+# Each graph a method returns (returns_text): its section of the graph types guide.
+GRAPH_SECTIONS = {
+    "DAG": "dag-a-directed-model",
+    "CPDAG": "cpdag-an-equivalence-class",
+    "PAG": "pag-uncertainty-with-hidden-variables",
+    "Undirected graph": "undirected-graphs-adjacency-without-direction",
+    "Temporal graph": "temporal-graphs",
+    "Two-node DAG": "dag-a-directed-model",
+}
+
+
+def purpose(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """What a method is for, in one line: the registry summary's first clause, or what follows
+    its colon where that clause is only the method's name ("NOTEARS: least squares ...")."""
+    text = first_clause(spec.summary)
+    if len(text.split()) <= 2 and ":" in spec.summary:
+        text = re.split(r"[;.] |, by ", spec.summary.split(":", 1)[1].strip())[0]
+    return text[0].upper() + text[1:]
+
+
+def kind_anchor(kind: str) -> str:
+    return "data-" + kind.replace("_", "-")
+
+
+def compared(summaries: list[dict]) -> dict[str, tuple[list[str], list[str]]]:
+    """Each supported method's published comparisons: what it is compared with, packages and
+    authors' code by :func:`package_name` in the summaries' order, and the releases whose cards
+    hold them, oldest first."""
+    packages: dict[str, dict[str, None]] = {}
+    releases: dict[str, set[str]] = {}
+    for method in supported(summaries):
+        packages.setdefault(method["spec"], {})[package_name(method["comparator"])] = None
+        releases.setdefault(method["spec"], set()).add(method["release"])
+    return {
+        name: (list(packages[name]), sorted(releases[name], key=version_key)) for name in packages
+    }
+
+
+def card_link(release: str) -> str:
+    """A link to ``release``'s card from docs/, or to the release cards page if it has none."""
+    page = DOCS / "docs" / "benchmarks" / f"{release}.md"
+    return f"benchmarks/{release}.html" if page.exists() else "benchmarks.html"
+
+
+def cards_text(releases: list[str]) -> str:
+    links = [f'<a href="{card_link(r)}">{r}</a>' for r in releases]
+    return f"{listed(links)} release card{'s' if len(links) > 1 else ''}"
+
+
+def display_name(name: str, names: dict[str, str]) -> str:
+    """A method's name as a table shows it: its prose name, capitalized ("Hill climbing")."""
+    prose = names[name]
+    return prose[0].upper() + prose[1:]
+
+
+def method_cell(spec, names: dict[str, str]) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
+    """A method's name, linked to its API entry, and its function in code."""
+    call = spec.name.replace("_", "_<wbr>")
+    return (
+        f'<a href="api/andrey.{spec.name}.html">{escape(display_name(spec.name, names))}</a> '
+        f'<code class="docutils literal notranslate">andrey.{call}</code>'
+    )
+
+
+def table_html(head: list[str], rows: list[str]) -> str:
+    """A table in the documentation's style, which stacks each row on a phone."""
+    cells = "".join(f'<th scope="col">{label}</th>' for label in head)
+    return (
+        '<div class="pst-scrollable-table-container"><table class="table stacked">'
+        f"<thead><tr>{cells}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def catalog_start(summaries: list[dict], names: dict[str, str]) -> str:
+    """The catalog's start table: one row per kind of data a method reads (``data-<kind>``), with
+    what the kind means, the method to start with (:func:`start_with`), the graph it returns, and
+    how many methods of each family read the kind, one family a line."""
+    specs = list_specs()
+    ranks = feature_ranks(summaries)
+    rows = []
+    for kind in DATA_KINDS:
+        readers = [s for s in specs if kind in s.data_kinds]
+        if not readers:
+            continue
+        label, hint = DATA_KIND_TEXT[kind]
+        start = get_spec(start_with(ranks, kind))
+        graph = returns_text(start)
+        families = [
+            f'<span class="nowrap"><a href="#family-{family}">{family_label}</a> '
+            f"{sum(s.family == family for s in readers)}</span>"
+            for family, family_label in SPEC_FAMILIES.items()
+            if any(s.family == family for s in readers)
+        ]
+        rows.append(
+            f'<tr id="{kind_anchor(kind)}"><td><strong>{label}</strong><br>{hint}</td>'
+            f"<td>{method_cell(start, names)}</td>"
+            f'<td><a href="guides/graph-types.html#{GRAPH_SECTIONS[graph]}">{graph}</a></td>'
+            f"<td>{'<br>'.join(families)}</td></tr>"
+        )
+    return table_html(["Your data", "Start with", "Returns", "Methods that read it"], rows) + "\n"
+
+
+def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
+    """The catalog's family tables, as MyST: one section per family (``family-<family>``),
+    opening with the method it features (:func:`featured_methods`), and one row per method
+    (``method-<name>``): its name, an Experimental badge where it is experimental, and what it
+    is for, then the kinds of data it reads, the graph it returns, and its comparisons with other
+    packages."""
+    specs = list_specs()
+    starts = {family: entry["spec"] for family, entry in featured_methods(summaries).items()}
+    found = compared(summaries)
+    badge = ' <span class="sd-badge sd-outline-muted sd-text-muted">Experimental</span>'
+    out = []
+    for family, label in SPEC_FAMILIES.items():
+        members = [s for s in specs if s.family == family]
+        if not members:
+            continue
+        rows = []
+        for s in members:
+            labels = [DATA_KIND_TEXT[k][0] for k in s.data_kinds]
+            reads = ", ".join([labels[0], *(text.lower() for text in labels[1:])])
+            if s.name in found:
+                packages, releases = found[s.name]
+                comp = f"{escape(listed(packages))}<br>{cards_text(releases)}"
+            else:
+                comp = "Not compared yet"
+            rows.append(
+                f'<tr id="method-{s.name}"><td>{method_cell(s, names)}'
+                f"{badge if s.status == 'experimental' else ''}<br>{escape(purpose(s))}</td>"
+                f"<td>{reads}</td><td>{returns_text(s)}</td><td>{comp}</td></tr>"
+            )
+        experimental = sum(s.status == "experimental" for s in members)
+        count = f"{len(members)} method{'s' if len(members) > 1 else ''}"
+        count += f", {experimental} experimental" if experimental else ""
+        start = (
+            f' Start with <a href="#method-{starts[family]}">'
+            f"{escape(display_name(starts[family], names))}</a>."
+            if family in starts
+            else ""
+        )
+        out += [
+            f"(family-{family})=",
+            f"### {label}",
+            "",
+            "```{raw} html",
+            f"<p>{count}.{start}</p>"
+            + table_html(["Method", "Reads", "Returns", "Compared with"], rows),
+            "```",
+            "",
+        ]
+    return "\n".join(out)

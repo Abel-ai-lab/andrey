@@ -230,6 +230,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "determinism": spec.determinism,
         "accel": spec.accel,
         "seeded": spec.seeded,
+        "data_kinds": list(spec.data_kinds),
         "dropped_args": list(spec.dropped_args),
         "data": {
             "layout": spec.data.layout,

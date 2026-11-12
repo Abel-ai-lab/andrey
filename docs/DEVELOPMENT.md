@@ -10,10 +10,10 @@ meta:
 `andrey.abel.ai` is one Sphinx project, this folder: the homepage at `/`, the blog at `/blog/`, and
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
 configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
-pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
-Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
-the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
-the brand are in [`DESIGN.md`](../DESIGN.md).
+pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Methods,
+Examples, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API
+and the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art,
+and the brand are in [`DESIGN.md`](../DESIGN.md).
 
 ## Build
 
@@ -134,6 +134,26 @@ The page is then marked "not for release" and `noindex`; the fixture carries
 `"placeholder": true`, which the build refuses without `andrey_placeholder`. The examples on the page
 are [`site/example.py`](../site/example.py) and [`site/interface.py`](../site/interface.py), run at
 build time: the page shows what they print and draws the graphs they return.
+
+## The methods catalog
+
+[`docs/methods.md`](docs/methods.md), Methods in the navbar, is a plain documentation page: a
+title, the count of supported and experimental methods (from `_methods_text()` in
+`docs/conf.py`), and two tables. "Start from your data" (`your-data`) has a row per kind of data a
+method reads (`MethodSpec.data_kinds`, row `data-<kind>`): what the kind means, the method to
+start with, the graph it returns, and how many methods of each family read it, each family linked
+to its section. Below, a section per family (`family-<family>`) holds a row per method
+(`method-<name>`). `catalog_start()` and `catalog_families()` in `site/build.py` write both from
+the registry and the published summaries into `_generated/`. The tables take the documentation's
+table style, and their `stacked` class stacks each row on a phone, as the API reference's summary
+tables do (`andrey.css`). The page loads no script and no style of its own.
+
+The method to start with follows the homepage's featured rule (`featured_among()` over
+`feature_ranks()`; `featured_methods()` gives each family's): among the supported methods whose
+shown setting (`default_settings()`) reaches a size every package ran with a graph that beats the
+empty one, the one compared with the most packages, then the largest such size, then registry
+order. For a kind of data, `start_with()` applies it in the first family that reads the kind, among
+the methods that need it (`needs()`), else among those that read it.
 
 ## The blog
 

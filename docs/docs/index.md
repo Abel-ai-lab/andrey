@@ -66,6 +66,8 @@ What changed in each release.
   claims, and which methods fit which assumptions.
 - [Examples](examples/index): notebooks that run one method or task each, and demos of methods to
   step through in your browser.
+- [Methods](methods.md): the method to start with for each kind of data, and every method by
+  family, with the data it reads and the graph it returns.
 - [API reference](api.md): methods, graph structures, and visualization.
 - [CLI reference](api.md#command-line-interface): run methods from the shell.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
@@ -92,6 +94,7 @@ What changed in each release.
 
 guides/index
 examples/index
+methods
 api
 configuration
 benchmarks
