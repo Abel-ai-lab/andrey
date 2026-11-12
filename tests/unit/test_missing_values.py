@@ -502,8 +502,8 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     else:
         assert "drop the rows that hold one" in str(error.value)
         assert (
-            "pc, fci, cdnod, fci_jci, iamb, inter_iamb, gs, fast_iamb, mmpc, hiton_pc, or hiton_mb"
-            in str(error.value)
+            "pc, fci, cdnod, fci_jci, iamb, inter_iamb, gs, fast_iamb, mmpc, hiton_pc, hiton_mb, "
+            "or y_structures" in str(error.value)
         )
         assert 'missing="em"' not in str(error.value)
 
