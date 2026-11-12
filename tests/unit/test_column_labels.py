@@ -125,6 +125,15 @@ def test_columns_named_alike_as_text_raise_before_the_fit(spec):
         getattr(andrey, spec.name)(*inputs(spec, frames))
 
 
+def labeled_settings(name: str) -> dict:
+    """The fit settings of ``name`` with a required target named by its label, so that it follows
+    its column."""
+    settings = fit_settings(name)
+    if isinstance(settings.get("target"), int):
+        settings["target"] = COLUMNS[settings["target"]]
+    return settings
+
+
 def named_marks(out) -> list[dict]:
     """Each graph of a result as ``{(label, label): mark}``, which no column order changes."""
     found = []
@@ -151,7 +160,7 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     def fit(columns: list[str]):
         frames = [frame(seed)[columns] for seed in range(3)]
         return getattr(andrey, spec.name)(
-            *inputs(spec, frames), **fit_settings(spec.name), **CONTEXT.get(spec.name, {})
+            *inputs(spec, frames), **labeled_settings(spec.name), **CONTEXT.get(spec.name, {})
         )
 
     want = named_marks(fit(COLUMNS))
@@ -171,7 +180,7 @@ def test_reordering_the_columns_of_data_with_missing_values_relabels_the_result(
 
     def fit(columns: list[str]):
         frames = [frame(seed).mask(cells)[columns] for seed in range(3)]
-        return getattr(andrey, spec.name)(*inputs(spec, frames))
+        return getattr(andrey, spec.name)(*inputs(spec, frames), **labeled_settings(spec.name))
 
     want = named_marks(fit(COLUMNS))
     pair = spec.family == "pairwise"  # a pair test reads the first two columns, which swap

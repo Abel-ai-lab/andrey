@@ -47,6 +47,7 @@ TESTWISE_METHODS = (
     "mmpc",
     "hiton_pc",
     "hiton_mb",
+    "mb_by_mb",
     "y_structures",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")

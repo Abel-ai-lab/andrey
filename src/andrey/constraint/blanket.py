@@ -3,9 +3,10 @@
 :func:`andrey.hiton_pc`, and :func:`andrey.hiton_mb`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
-learners Grow-Shrink and Fast-IAMB, :func:`parents_children` the forward and backward phases of
-MMPC, the ``"hiton_pc"`` learner semi-interleaved HITON-PC, and the ``"hiton_mb"`` learner
-semi-interleaved HITON-MB, HITON-PC followed by the spouse step. :func:`blanket_graph` and
+learners Grow-Shrink and Fast-IAMB, the ``"iamb_forward"`` learner IAMB's grow phase alone,
+:func:`parents_children` the forward and backward phases of MMPC, the ``"hiton_pc"`` learner
+semi-interleaved HITON-PC, and the ``"hiton_mb"`` learner semi-interleaved HITON-MB, HITON-PC
+followed by the spouse step. :func:`blanket_graph` and
 :func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set
 (the AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`,
 :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
@@ -14,9 +15,10 @@ semi-interleaved HITON-MB, HITON-PC followed by the spouse step. :func:`blanket_
 set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
 returned set.
 
-:data:`LEARNERS` names each learner and its kind: a ``"blanket"`` learner returns a Markov blanket,
-a ``"pc"`` learner the parents and children before the symmetry check, and a ``"pc_spouses"``
-learner runs a ``"pc"`` learner and adds the spouses (:meth:`LocalSearch.spouses`). A
+:data:`LEARNERS` names each learner and its kind: a ``"blanket"`` learner returns a Markov blanket
+(``"iamb_forward"`` a set that holds it under correct tests), a ``"pc"`` learner the parents and
+children before the symmetry check, and a ``"pc_spouses"`` learner runs a ``"pc"`` learner and
+adds the spouses (:meth:`LocalSearch.spouses`). A
 :class:`LocalSearch` runs the learners over one test, each learner for each target at most once,
 and gives a target's parents and children, Markov blanket, and separating sets
 (:meth:`LocalSearch.local`); :func:`local_search` builds one over the data. Every candidate a
@@ -204,11 +206,17 @@ def markov_blanket(
 
 
 def _grow_shrink(
-    search: LocalSearch, target: int, sepsets: Sepsets | None, *, interleaved: bool
+    search: LocalSearch,
+    target: int,
+    sepsets: Sepsets | None,
+    *,
+    interleaved: bool,
+    shrink: bool = True,
 ) -> list[int]:
     """:func:`markov_blanket` on the engine: each grow step is one :meth:`LocalSearch.scan` of the
     candidates given the blanket, and :meth:`LocalSearch.strongest` picks the candidate whose
-    strength, rounded to ``KEY_DP`` decimals, is the largest."""
+    strength, rounded to ``KEY_DP`` decimals, is the largest. Without ``shrink``, IAMB's grow phase
+    alone: no member is tested again, so the set may hold variables outside the blanket."""
     alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
     required = _required(constraints, target, search.ranks)
     blanket: list[int] = list(required)
@@ -231,7 +239,7 @@ def _grow_shrink(
             if state in seen:
                 break
             seen.add(state)
-    if not interleaved:
+    if shrink and not interleaved:
         _shrink(search, target, blanket, required, sepsets)
     if sepsets is not None:
         for x in blanket:
@@ -975,6 +983,13 @@ def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bo
     return _grow_shrink(search, target, sepsets, interleaved=interleaved)
 
 
+def _iamb_forward(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """IAMB's grow phase without its shrink, the blanket learner of MB-by-MB's runs (Wang, Zhou,
+    Zhao, and Geng 2014, Sections 3.4 and 5): a variable added in error stays, so the set holds
+    the blanket under correct tests and may hold more."""
+    return _grow_shrink(search, target, sepsets, interleaved=False, shrink=False)
+
+
 def _mmpc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     return _max_min(search, target, sepsets)
 
@@ -983,6 +998,7 @@ def _mmpc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
 LEARNERS: dict[str, Learner] = {
     "iamb": Learner("blanket", partial(_iamb, interleaved=False)),
     "inter_iamb": Learner("blanket", partial(_iamb, interleaved=True)),
+    "iamb_forward": Learner("blanket", _iamb_forward),
     "mmpc": Learner("pc", _mmpc),
     "gs": Learner("blanket", _gs),
     "fast_iamb": Learner("blanket", _fast_iamb),
