@@ -72,6 +72,7 @@ def test_method_schema_matches_spec(name):
             assert entry["enum"] == expected
 
     assert schema["status"] == spec.status
+    assert schema["data_kinds"] == list(spec.data_kinds)
 
     # Data inputs surface a flag; the CLI example runs this method.
     assert [i["name"] for i in schema["data"]["inputs"]] == [i.name for i in spec.data.inputs]

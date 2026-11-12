@@ -25,7 +25,7 @@ import pytest
 import andrey.viz
 from andrey import GraphStructure
 from andrey.core.structure import TAIL
-from andrey.spec import get_spec, list_specs
+from andrey.spec import DATA_KINDS, get_spec, list_specs
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -717,6 +717,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("index") == ([], [])
     assert marks("docs/index") == (["Docs"], ["Docs"])
     assert marks("docs/guides/getting-started") == (["Docs"], [])
+    assert marks("docs/methods") == (["Methods"], ["Methods"])
     assert marks("docs/examples/index") == (["Examples"], ["Examples"])
     assert marks("docs/examples/quick_start") == (["Examples"], [])
     assert marks("docs/examples/pc-replay") == (["Examples"], [])
@@ -1292,6 +1293,7 @@ def test_the_citation_title_is_the_tagline(cards):
 
 @pytest.fixture(scope="module")
 def published():
+    """Every release's published summary, as the site build loads them."""
     if not build.SUMMARY.exists():
         pytest.skip("the published summary is absent")
     return build.release_summaries(build.load_summary(build.SUMMARY))
@@ -1489,3 +1491,79 @@ def test_the_word_fast_moves_only_without_reduced_motion_and_only_by_translate_a
     assert css.rfind("@media (prefers-reduced-motion: no-preference)", 0, use) > css.rfind(
         "\n}\n", 0, use
     )
+
+
+# ---- the methods catalog -------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def catalog(published, conf):
+    """The catalog's start table and family tables, built as docs/conf.py builds them."""
+    names = conf["PROSE_NAMES"]
+    return build.catalog_start(published, names), build.catalog_families(published, names)
+
+
+def _read(spec_name: str, kind: str) -> bool:
+    return kind in get_spec(spec_name).data_kinds
+
+
+def test_the_catalog_lists_every_method_once_in_its_family(catalog):
+    _, table = catalog
+    _, *sections = re.split(r"^\(family-(\w+)\)=$", table, flags=re.M)
+    families = sections[::2]
+    assert families == [f for f in build.SPEC_FAMILIES if any(s.family == f for s in list_specs())]
+    rows = {
+        name: family
+        for family, section in zip(families, sections[1::2], strict=True)
+        for name in re.findall(r'<tr id="method-(\w+)">', section)
+    }
+    found = re.findall(r'<tr id="method-(\w+)">', table)
+    assert sorted(found) == sorted(s.name for s in list_specs())
+    assert all(get_spec(name).family == family for name, family in rows.items())
+    # Each row links its API entry.
+    for spec in list_specs():
+        assert f'href="api/andrey.{spec.name}.html"' in table
+
+
+def test_the_start_table_has_a_row_for_exactly_the_kinds_of_data_the_registry_uses(catalog):
+    start, _ = catalog
+    used = [k for k in DATA_KINDS if any(k in s.data_kinds for s in list_specs())]
+    assert re.findall(r'<tr id="([\w-]+)">', start) == [build.kind_anchor(k) for k in used]
+    # Each kind has its words, and each graph a method returns its section of the guide.
+    assert set(build.DATA_KIND_TEXT) == set(DATA_KINDS)
+    assert {build.returns_text(s) for s in list_specs()} <= set(build.GRAPH_SECTIONS)
+
+
+def test_each_kind_starts_with_its_method_and_counts_every_method_that_reads_it(catalog, published):
+    start, _ = catalog
+    ranks = build.feature_ranks(published)
+    for row in start.split("<tr id=")[1:]:
+        kind = next(k for k in DATA_KINDS if row.startswith(f'"{build.kind_anchor(k)}"'))
+        assert f'href="api/andrey.{build.start_with(ranks, kind)}.html"' in row
+        counts = {f: int(n) for f, n in re.findall(r'href="#family-(\w+)">[^<]+</a> (\d+)', row)}
+        readers = [s.family for s in list_specs() if kind in s.data_kinds]
+        assert counts == {f: readers.count(f) for f in set(readers)}, kind
+
+
+def test_every_method_to_start_with_is_supported_and_reads_its_data(published):
+    featured = build.featured_methods(published)
+    for family, entry in featured.items():
+        spec = get_spec(entry["spec"])
+        assert spec.family == family and spec.status == "supported"
+    ranks = build.feature_ranks(published)
+    for kind in DATA_KINDS:
+        name = build.start_with(ranks, kind)
+        assert get_spec(name).status == "supported" and _read(name, kind), kind
+        # One that needs the kind goes before one that only reads it, within its family.
+        needing = [
+            s for s in list_specs() if s.family == get_spec(name).family and build.needs(s, kind)
+        ]
+        assert not any(s.name in ranks for s in needing) or build.needs(get_spec(name), kind)
+
+
+def test_a_kind_starts_with_the_featured_rule_in_the_first_family_that_reads_it():
+    ranks = {"pc": (6, 400), "fci": (1, 400), "gfci": (1, 180), "cdnod": (1, 50), "ges": (2, 200)}
+    assert build.start_with(ranks, "categorical") == "pc"
+    assert build.start_with(ranks, "hidden_causes") == "fci"  # PC returns no PAG
+    assert (
+        build.start_with(ranks, "environments") == "cdnod"
+    )  # needs env; GFCI takes it as an option
+    assert build.start_with({"ges": (2, 200)}, "environments") == "ges"  # the next family

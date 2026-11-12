@@ -14,6 +14,37 @@ names its pull request.
 
 - `andrey.viz.Palette` has `amber_text`, the amber of a word set on the paper: darker in the light
   theme, so display type keeps a 3:1 contrast. ([#919])
+- `MethodSpec.reads_units` marks the methods whose default fit reads the columns' units: `calm`,
+  `dagma`, `dynotears`, `ica_lingam`, and `notears`. The tests now fit every method on data with
+  each column rescaled by its own factor, with environments, interventions, mixed data, time series,
+  and panels, and require the same graph from every other method; the methods that read the data
+  only through `indep_test="normal_scores"` keep their graph under a strictly increasing transform
+  of each column, and those that take `"chisq"` or `"gsq"` under an order-preserving recoding of
+  each column's categories. ([#910])
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method, how each requirement is checked, and where the exceptions are recorded. The
+  examples page opens with a numbered learning path through the notebooks, and the API reference
+  opens with the shape of the API; the details of `env` and `targets` moved to the
+  [getting-started guide](https://andrey.abel.ai/docs/guides/getting-started.html#environments-and-interventions).
+  ([#904])
+- A [concepts guide](https://andrey.abel.ai/docs/guides/concepts.html) states causal discovery
+  formally: the model, what the data identify, what each kind of graph claims, and which methods
+  fit which assumptions. It opens the learning path, and the quick-start notebook states its model
+  in one equation. ([#904])
+- `score_func="normal_scores"`, experimental, is the linear-Gaussian BIC on each column's normal
+  scores: the score of the nonparanormal model, for continuous data that are Gaussian only after an
+  unknown increasing transformation of each column. `ges`, `xges`, `hc`, `tabu`, `exact_search`,
+  `boss`, `grasp`, `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take it. With
+  `indep_test="normal_scores"` as well, the test and the score read one model, and a strictly
+  increasing transformation of any column leaves the graph unchanged. Defaults do not change:
+  `indep_test="normal_scores"` alone keeps the default score. The score takes no `env` and no
+  `missing="em"`. ([#928])
+- The methods catalog, Methods in the navbar: "Start from your data" gives, for each kind of data,
+  the method to start with, the graph it returns, and how many methods of each family read it, and
+  every method is listed by family with the data it reads, the graph it returns, its status, and the
+  release cards that compare it. Each method's `--help --json` contract and its `andrey list` row
+  give `data_kinds`, the kinds of data it reads, which the registry derives from its tests and
+  scores, its `missing` argument, its inputs, and its result. ([#920])
 
 ### Changed
 
@@ -21,6 +52,10 @@ names its pull request.
   with the most packages, timed against every package on one axis, beside the outcome its release
   card records. The newest four release cards, the Sachs example, a band for agents, and five next
   steps follow; the full list of methods is in the API reference. ([#919])
+
+### Fixed
+
+- A page with math no longer scrolls sideways on a phone. ([#904])
 
 ## [0.17.0] - 2026-11-11
 
@@ -2214,6 +2249,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.17.0...HEAD
 [0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
@@ -2490,9 +2526,13 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#910]: https://github.com/Abel-ai-lab/andrey/pull/910
+[#904]: https://github.com/Abel-ai-lab/andrey/pull/904
+[#928]: https://github.com/Abel-ai-lab/andrey/pull/928
 [#919]: https://github.com/Abel-ai-lab/andrey/pull/919
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
+[#920]: https://github.com/Abel-ai-lab/andrey/pull/920

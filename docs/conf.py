@@ -243,6 +243,7 @@ LLMS_SECTIONS = (
         (
             "docs/index",
             "docs/guides/getting-started",
+            "docs/guides/concepts",
             "docs/faq",
             "docs/api",
             "docs/configuration",
@@ -258,7 +259,7 @@ LLMS_SECTIONS = (
 PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
-    # release to the changelog, then Docs, Examples, Blog, and FAQ, then search, theme, and GitHub.
+    # release to the changelog, then the site's sections, then search, theme, and GitHub.
     "navbar_start": ["site-logo", "site-version"],
     "navbar_center": ["site-nav"],
     "navbar_align": "left",
@@ -309,6 +310,7 @@ NAV_SECTIONS = {
 NAV_REFERENCE = ("Reference", "code")
 # The reference pages' icons in the documentation tree (_templates/nav-icons.html).
 NAV_ICONS = {
+    "docs/methods": "grid",
     "docs/api": "braces",
     "docs/configuration": "sliders",
     "docs/benchmarks": "chart",
@@ -534,11 +536,28 @@ PROSE_NAMES = {
     "camuv": "CAM-UV",
 }
 
+
+def _takes(spec, name: str, choice: str) -> bool:
+    """Whether the method's parameter ``name`` takes ``choice``."""
+    return any(p.name == name and choice in (p.choices or ()) for p in spec.params)
+
+
 # The method lists the pages print, each the methods a registry predicate selects:
 # ``{{ <key>_methods }}`` in prose names and ``{{ <key>_names }}`` in code names.
 METHOD_LISTS = {
     "indep_test": lambda s: any(p.name == "indep_test" for p in s.params),
     "score_func": lambda s: any(p.name == "score_func" for p in s.params),
+    "rank_score": lambda s: _takes(s, "score_func", "normal_scores"),
+    # The rank-based test with no score, and the rank-based score with no test.
+    "rank_test_only": lambda s: (
+        _takes(s, "indep_test", "normal_scores")
+        and not any(p.name == "score_func" for p in s.params)
+    ),
+    "rank_score_only": lambda s: (
+        _takes(s, "score_func", "normal_scores")
+        and not any(p.name == "indep_test" for p in s.params)
+    ),
+    "test_and_score": lambda s: {"indep_test", "score_func"} <= {p.name for p in s.params},
     "no_knowledge": lambda s: not s.knowledge,
     "ordering": lambda s: s.output.has_ordering,
     "weighted": lambda s: s.output.weighted,
@@ -549,6 +568,30 @@ METHOD_LISTS = {
     ),
     "missing": lambda s: s.data.missing,
     "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
+    # The rows of the concepts guide's table, by the assumptions and the graph returned.
+    "class_cpdag": lambda s: (
+        s.output.graph_kind in ("cpdag", "undirected")
+        and not any(p.type == "targets" for p in s.params)
+        and not any(i.name == "env" and i.required for i in s.data.inputs)
+    ),
+    "skeleton": lambda s: s.output.graph_kind == "undirected",
+    "class_pag": lambda s: (
+        s.output.graph_kind == "pag"
+        and s.family != "latent"
+        and not any(i.name == "env" and i.required for i in s.data.inputs)
+    ),
+    "identified_dag": lambda s: (
+        s.output.graph_kind == "dag" and s.family in ("functional", "pairwise")
+    ),
+    "optimized_dag": lambda s: s.output.graph_kind == "dag" and s.family == "score",
+    "latent": lambda s: s.family == "latent",
+    "latent_nodes": lambda s: s.output.has_latents,
+    "temporal": lambda s: s.output.structure_type == "temporal",
+    "env_index": lambda s: (
+        any(i.name == "env" for i in s.data.inputs)
+        and not any(p.type == "targets" for p in s.params)
+    ),
+    "reads_units": lambda s: s.reads_units,
 }
 
 
@@ -562,15 +605,18 @@ def _listed(items: list[str]) -> str:
 
 
 def _methods_text() -> dict[str, str]:
-    """The method count and tiers, for the FAQ, and the method lists of `METHOD_LISTS`."""
+    """The method count and tiers, for the FAQ and the methods catalog, and the method lists of
+    `METHOD_LISTS`."""
     specs = list_specs()
     stale = set(PROSE_NAMES) - {s.name for s in specs}
     if stale:
         raise ConfigError(f"PROSE_NAMES has names no method has: {sorted(stale)}")
     supported = [f"`{s.name}`" for s in specs if s.status == "supported"]
+    experimental = len(specs) - len(supported)
     text = {
         "method_count": f"{len(specs)} methods",
         "n_supported": str(len(supported)),
+        "experimental_count": f"{experimental} experimental method{'s' * (experimental != 1)}",
         "supported_methods": _listed(supported),
     }
     for key, selects in METHOD_LISTS.items():
@@ -648,6 +694,11 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / "brand" / name, data)
     _write(GENERATED / "brand-colors.html", _brand_colors())
     _write(GENERATED / "column-order.md", _column_order_table())
+    # The methods catalog (docs/methods.md): its start table and its family tables, from the
+    # registry and the published comparisons.
+    summaries = site.release_summaries(summary)
+    _write(GENERATED / "methods-start.html", site.catalog_start(summaries, PROSE_NAMES))
+    _write(GENERATED / "methods-families.md", site.catalog_families(summaries, PROSE_NAMES))
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage and non-post

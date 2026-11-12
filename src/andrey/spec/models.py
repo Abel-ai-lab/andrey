@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import math
 import reprlib
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from andrey.core.ci import CONTINUOUS_INDEP_TESTS, DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
+from andrey.core.ci_missing import EM, EM_SUPPORTED
 from andrey.core.knowledge import EDGE_PARTS, KnowledgePart
+from andrey.core.score import DISCRETE_SCORES, LINEAR_SCORES, MIXED_SCORES
 
 Family = Literal[
     "constraint", "score", "permutation", "functional", "temporal", "latent", "pairwise"
@@ -38,6 +41,21 @@ InputKind = Literal[
 ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge", "targets"]
 
 EnvGroup = Literal["backend", "reproducibility", "determinism", "data"]
+# The kinds of data a method reads (MethodSpec.data_kinds), in the order the pages list them:
+# column types, missing values, data from several environments or datasets, and the settings its
+# result implies.
+DataKind = Literal[
+    "continuous",
+    "categorical",
+    "mixed",
+    "missing",
+    "environments",
+    "datasets",
+    "hidden_causes",
+    "time_series",
+    "two_variables",
+]
+DATA_KINDS: tuple[DataKind, ...] = get_args(DataKind)
 
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
 
@@ -242,6 +260,10 @@ class MethodSpec(Spec):
     accel: Accel
     status: Status
     column_order: ColumnOrder
+    # The published algorithm reads the columns' units, so rescaling a column can change the
+    # default fit's graph; every other method returns the same graph whatever factor rescales each
+    # column.
+    reads_units: bool = False
     tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
     order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
@@ -266,6 +288,41 @@ class MethodSpec(Spec):
     def determinism(self) -> Determinism:
         """``stochastic`` for a seeded method, else ``deterministic``."""
         return "stochastic" if self.seeded else "deterministic"
+
+    @property
+    def data_kinds(self) -> tuple[DataKind, ...]:
+        """The kinds of data the method reads, in :data:`DATA_KINDS` order, derived from the spec.
+
+        - ``continuous``: a method without a test or score models continuous columns; one with
+          a test or score reads them when it offers a continuous test or the linear-Gaussian BIC.
+        - ``categorical`` and ``mixed``: it offers a categorical or a mixed-data test or score.
+        - ``missing``: it accepts missing values in a supported way, by test-wise deletion
+          (``data.missing``) or by structural EM where EM is supported for it.
+        - ``environments``: it takes ``env``, the environment of each row; ``datasets``: it takes
+          a list of datasets over the same variables (a panel input).
+        - ``hidden_causes``: its graph allows hidden common causes: a PAG or a MAG, latent nodes,
+          or the ``confounded`` part of background knowledge.
+        - ``time_series``: it returns a graph over time; ``two_variables``: it decides the
+          direction between two variables (the pairwise family).
+        """
+        tests = [p for p in self.params if p.name in ("indep_test", "score_func")]
+        offered = {choice for p in tests for choice in p.choices or ()}
+        missing = next((p.choices or () for p in self.params if p.name == "missing"), None)
+        em = missing is not None and EM in missing and self.name in EM_SUPPORTED
+        found = {
+            "continuous": not tests or bool(offered & {*CONTINUOUS_INDEP_TESTS, *LINEAR_SCORES}),
+            "categorical": bool(offered & {*DISCRETE_INDEP_TESTS, *DISCRETE_SCORES}),
+            "mixed": bool(offered & {*MIXED_INDEP_TESTS, *MIXED_SCORES}),
+            "missing": missing is not None and (self.data.missing or em),
+            "environments": any(i.name == "env" for i in self.data.inputs),
+            "datasets": any(i.kind == "panel" for i in self.data.inputs),
+            "hidden_causes": self.output.graph_kind in ("pag", "mag")
+            or self.output.has_latents
+            or "confounded" in self.knowledge,
+            "time_series": self.output.structure_type == "temporal",
+            "two_variables": self.family == "pairwise",
+        }
+        return tuple(kind for kind in DATA_KINDS if found[kind])
 
     @property
     def knowledge(self) -> tuple[KnowledgePart, ...]:

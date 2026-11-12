@@ -12,6 +12,7 @@ from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
+from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -72,10 +73,16 @@ _COLLIDER_ORDER = ParamSpec(
     nullable=True,
 )
 _PENALTY_DISCOUNT = concept_param("penalty_discount")
+#: The scores of categorical and mixed data, and how null picks a score.
+_OTHER_SCORES = (
+    "bdeu = BDeu and discrete_bic = multinomial BIC, for categorical data coded by whole numbers; "
+    "degen_gauss and cond_gauss = degenerate and conditional Gaussian BIC, for mixed data. "
+    + _DECLARED.format(every="bdeu", fallback="bic")
+)
 _SCORE_DOC = (
-    "Local score: bic = linear-Gaussian BIC; bdeu = BDeu and discrete_bic = multinomial BIC, "
-    "for categorical data coded by whole numbers; degen_gauss and cond_gauss = degenerate and "
-    "conditional Gaussian BIC, for mixed data. " + _DECLARED.format(every="bdeu", fallback="bic")
+    "Local score: bic = linear-Gaussian BIC; normal_scores = experimental, bic on each column's "
+    "normal scores, for continuous data whose columns are monotone transformations of Gaussian "
+    "variables, with no env and no missing values; " + _OTHER_SCORES
 )
 _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
 _EBIC_GAMMA = concept_param("ebic_gamma")
@@ -672,8 +679,9 @@ _add(
             ),
             concept_param(
                 "score_func",
-                doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
-                "on it.",
+                choices=tuple(s for s in SCORES if s not in RANK_SCORES),
+                doc="Local score: bic = linear-Gaussian BIC; " + _OTHER_SCORES + " Each variable "
+                "is scored on the rows without an intervention on it.",
             ),
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -987,6 +995,7 @@ _add(
         accel="torch",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "Repeats on one machine with one torch version; on another platform the graph "
@@ -1168,6 +1177,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1227,6 +1237,7 @@ _add(
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(
@@ -1788,6 +1799,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels_if_converged",
+        reads_units=True,
         tie_break=True,
         order_note=(
             "At few rows per variable, FastICA can reach another solution under a new "
@@ -2483,6 +2495,7 @@ _add(
         accel="numpy",
         status="supported",
         column_order="relabels",
+        reads_units=True,
         tie_break=True,
         params=(
             concept_param(

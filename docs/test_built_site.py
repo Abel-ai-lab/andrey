@@ -36,6 +36,7 @@ import andrey.data.mixed
 import andrey.data.real
 import andrey.data.scm
 import andrey.metrics
+import andrey.spec
 import andrey.viz
 import andrey.viz.mpl  # importable without matplotlib (it is imported lazily, inside the functions)
 
@@ -82,13 +83,14 @@ DESCRIPTION_LENGTH = 160
 # The header's links, by the text they show, and the page each must reach from any page.
 HEADER = {
     "Docs": "docs/index.html",
+    "Methods": "docs/methods.html",
     "Examples": "docs/examples/index.html",
     "Blog": "blog/index.html",
     "FAQ": "docs/faq.html",
 }
 # The header's sections in the order they read; Release cards, which carries the newest release's
 # dot, is checked on its own.
-NAV = ["Docs", "Examples", "Blog", "Release cards", "FAQ"]
+NAV = ["Docs", "Methods", "Examples", "Blog", "Release cards", "FAQ"]
 # The Examples gallery's section of demos, where the demos' old gallery sends the reader.
 DEMOS = "docs/examples/index.html#interactive-demos"
 # Each moved page's old address and the address it sends the reader to.
@@ -371,6 +373,32 @@ def test_every_docs_page_finds_itself_in_its_sidebar_and_edits_a_tracked_file(ht
             if path not in tracked:
                 problems.append(f"{name}: Edit this page opens {path}, which git does not track")
     assert not problems, "\n".join(problems)
+
+
+def test_every_link_in_the_methods_catalog_arrives(html):
+    # The catalog's links are generated: each leads to a built page and to an anchor on it.
+    page = html / "docs" / "methods.html"
+    text = page.read_text(encoding="utf-8")
+    links = _Links()
+    links.feed(text[text.index("<article") : text.index("</article>")])
+    hrefs = {href for _, href in links.found if not href.startswith(("http:", "https:"))}
+    assert any(href.startswith("#family-") for href in hrefs)
+    # The homepage links the start table, and each kind of data's row can be linked.
+    kinds = {kind for spec in andrey.spec.list_specs() for kind in spec.data_kinds}
+    for anchor in ["your-data", *(f"data-{kind.replace('_', '-')}" for kind in kinds)]:
+        assert f'id="{anchor}"' in text, anchor
+    missing = []
+    for href in sorted(hrefs):
+        target = _resolve(html, page, href)
+        anchor = href.partition("#")[2]
+        if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
+            missing.append(href)
+    assert not missing, missing
+    # Its count line gives the registry's supported and experimental methods apart.
+    statuses = [spec.status for spec in andrey.spec.list_specs()]
+    supported, experimental = statuses.count("supported"), statuses.count("experimental")
+    words = " ".join(re.sub(r"<[^>]+>", " ", text).split())
+    assert f"{supported} supported methods and {experimental} experimental" in words
 
 
 def test_every_page_has_a_built_favicon_and_link_preview_card(html):

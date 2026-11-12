@@ -1,24 +1,54 @@
 # Contributing to Andrey
 
-This page covers reporting a problem, setting up, and what a pull request needs.
-[`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/andrey/blob/main/DEVELOPMENT.md) explains how the
-code fits together and how to make common changes, such as adding a method;
-[`docs/DEVELOPMENT.md`](https://github.com/Abel-ai-lab/andrey/blob/main/docs/DEVELOPMENT.md)
+Thank you for helping. This page lists the ways you can help, then walks through one contribution
+from a fork to a merged pull request. You do not need to know the code base to start.
+[`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md) explains how the
+code fits together, how to make common changes such as adding a method, and how a release is put
+together;
+[`docs/DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/docs/DEVELOPMENT.md)
 covers the website.
+
+## Ways to help
+
+Every item here is useful, and the first ones take minutes:
+
+- **Tell us where it fails.** Run a method on your data, and open an issue when a result looks
+  wrong, a call is confusing, or an error message does not say what to do.
+- **Improve a page.** Fix a typo, rewrite a sentence you had to read twice, or add the example a
+  guide is missing. The guides are Markdown files under `docs/docs/`.
+- **Add an example.** A notebook under `examples/` that applies a method to a public dataset and
+  says what the result means.
+- **Add a reference to a comparison.** Our benchmarks compare each method with its authors' code
+  or a standard package. If you know another implementation, tell us, or add its arm to the
+  comparison ([`benchmarks/README.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/README.md)).
+- **Pick up an open issue.** The issues labeled
+  [`good first issue`](https://github.com/Abel-ai-lab/Andrey/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22)
+  are small and say what done looks like;
+  [`help wanted`](https://github.com/Abel-ai-lab/Andrey/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22)
+  marks larger ones.
+- **Propose a method.** See [Propose a method](#propose-a-method) below.
+
+For anything larger than a small fix, open an issue first and say you would like to work on it. We
+agree on the scope there, and your pull request then closes that issue. This saves you from
+writing code that does not fit.
 
 ## Report a problem
 
 Open an issue with the bug or feature form in the
-[issue tracker](https://github.com/Abel-ai-lab/andrey/issues/new/choose); a new method has its own
-form (see below). For a wrong result,
-include the call, the shape of the data, and the output of `andrey config`.
+[issue tracker](https://github.com/Abel-ai-lab/Andrey/issues/new/choose). For a wrong result,
+include:
+
+- the call you made;
+- the shape of the data (rows, columns, and the column types);
+- what you expected and what you got;
+- the output of `andrey config`, which lists your versions and settings.
 
 ## Propose a method
 
 Andrey implements methods that are validated and peer-reviewed; it does not develop new ones. A new
 method is developed in its own repository, with its evidence and a paper, and joins Andrey after
 that. To propose one, open an issue with the
-[method form](https://github.com/Abel-ai-lab/andrey/issues/new?template=method.yml) and give its
+[method form](https://github.com/Abel-ai-lab/Andrey/issues/new?template=method.yml) and give its
 spec:
 
 - the peer-reviewed paper that defines the method;
@@ -28,23 +58,105 @@ spec:
 
 A method joins Andrey as experimental and becomes supported once it is compared with its authors'
 implementation in that setting
-([`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/andrey/blob/main/DEVELOPMENT.md#test-a-method)).
+([`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#test-a-method)).
 
-## Set up
+## Make a change, step by step
 
-The project uses [`uv`](https://docs.astral.sh/uv/). An editable install with the dev tooling:
+### 1. Fork and clone
+
+Fork [Abel-ai-lab/Andrey](https://github.com/Abel-ai-lab/Andrey) to your account with the **Fork**
+button, then clone your fork and add the original repository as `upstream`:
 
 ```shell
-git clone https://github.com/Abel-ai-lab/andrey
-cd andrey
-uv sync                       # base + dev group (ruff, ty, pytest)
-uv sync --extra torch         # optional: the torch backend (CPU by default; see below)
+git clone https://github.com/<your-username>/Andrey.git
+cd Andrey
+git remote add upstream https://github.com/Abel-ai-lab/Andrey.git
 ```
 
-The published wheel is torch-free, and `uv sync --extra torch` installs the CPU build of torch:
-`uv sync` resolves one lock for every machine, so it cannot pick a build for the local GPU. For a
-GPU build, replace torch after syncing. `--torch-backend=auto` reads the installed driver and picks
-the matching wheel:
+### 2. Install
+
+The project uses [`uv`](https://docs.astral.sh/uv/). One command creates the environment with
+Andrey installed in editable mode and the development tools (`ruff`, `ty`, `pytest`):
+
+```shell
+uv sync
+uv run python -c "import andrey; print(andrey.__version__)"
+```
+
+### 3. Create a branch
+
+Work for the next release is collected on a branch named `release/<x.y.z>`, not on `main`. Start
+your branch from it:
+
+```shell
+git fetch upstream
+git branch -r --list "upstream/release/*"      # the release branch, for example upstream/release/0.18.0
+git switch -c fix-readme-typo upstream/release/<x.y.z>
+```
+
+If two release branches are listed, use the one with the higher version, or ask in the issue.
+
+### 4. Make the change
+
+- Keep one change per pull request, with the tests that show it works.
+- When the public API changes, update its docstrings and the API reference (`docs/docs/api.md`) in
+  the same pull request.
+- Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal
+  and may change without notice; do not import them from outside the package.
+- Code, data, and assets copied from another project keep their license notice, as
+  `site/brand/fonts/OFL.txt` does for the site's fonts.
+
+[`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#common-changes)
+has a recipe for each common change.
+
+### 5. Run the checks
+
+These are the checks CI runs on your pull request, so running them first saves a round trip:
+
+```shell
+uv sync --all-extras                      # the optional methods' tests need the extras
+uv run --no-sync ruff format --check .    # formatting (`ruff format .` fixes it)
+uv run --no-sync ruff check .             # lint
+uv run --no-sync ty check                 # types
+uv run --no-sync pytest tests             # every test
+```
+
+For a change to one page or one function, the tests next to it are enough to start with, for
+example `uv run pytest tests/unit -k <name>`; CI runs everything.
+
+`prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml` to your
+checkout, so formatting, lint, and a scan for secrets run on every commit.
+
+### 6. Open the pull request
+
+Push your branch to your fork and open a pull request against the release branch you started from:
+
+```shell
+git push -u origin fix-readme-typo
+```
+
+On GitHub, choose **Compare & pull request**, set the base to `release/<x.y.z>`, and fill in the
+two headings of the form:
+
+- **What and why**: what the change does and the issue it closes, for example `Closes #123`.
+- **How it was checked**: the tests you ran, the docs you built, or the results you compared.
+
+A fix or a feature also adds one bullet under `## [Unreleased]` in `CHANGELOG.md`. If you are
+unsure how to write it, leave it out and say so; a maintainer adds it. A maintainer also sets the
+label and the milestone.
+
+### 7. Review and merge
+
+CI runs on the pull request, from a fork too, and a maintainer reviews it. When it is approved, we
+squash-merge it into the release branch, and it ships with that release. Your first merged pull
+request is credited under New contributors in the release notes.
+
+## The GPU build of PyTorch
+
+You need this only to work on the GPU paths. The published wheel is torch-free, and
+`uv sync --extra torch` installs the CPU build of torch: `uv sync` resolves one lock for every
+machine, so it cannot pick a build for the local GPU. For a GPU build, replace torch after syncing.
+`--torch-backend=auto` reads the installed driver and picks the matching wheel:
 
 ```shell
 uv sync --extra torch
@@ -54,69 +166,3 @@ uv run --no-sync python -c "import torch; print(torch.__version__, torch.cuda.is
 
 The GPU build lives only in the active `.venv`; a later `uv sync` restores the locked CPU build, so
 run with `uv run --no-sync` until then.
-
-## Before a pull request
-
-Run the checks CI runs. The optional methods' tests need the extras:
-
-```shell
-uv sync --all-extras
-uv run --no-sync ruff format --check .    # formatting
-uv run --no-sync ruff check .             # lint
-uv run --no-sync ty check                 # types
-uv run --no-sync pytest tests             # every test, including the drift guards
-```
-
-`prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml`, including
-gitleaks, to this checkout, so they run on every commit; `prek run --all-files` runs them once.
-
-## Pull requests
-
-- One change per pull request, with the tests that show it works.
-- A pull request targets the branch of the release it ships in, `release/<x.y.z>`, not `main`. The
-  release pull request, from that branch to `main`, is the only one that merges to `main`; the
-  release's tag follows it. A required check, `release-branch`, fails a pull request into `main`
-  from any other branch, or from a release branch whose `pyproject.toml` version is not the
-  branch's `<x.y.z>`, since the tag and the site take the package's version (a post release,
-  `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
-  fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`); the release
-  pull request runs the quality gate (`qa/README.md`), also required, once for the whole release.
-  Dependabot's version updates target the active release branch (`target-branch` in
-  `.github/dependabot.yml`), which each release moves to the next one.
-- When the public API changes, update its docstrings and the API reference
-  (`docs/docs/api.md`) in the same pull request.
-- Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal
-  and may change without notice; do not import them from outside the package.
-- Code, data, and assets copied from another project keep their license notice, as
-  `site/brand/fonts/OFL.txt` does for the site's fonts.
-
-## Labels, milestones, and the changelog
-
-Every pull request has exactly one type label, which also gives its section in the release notes:
-
-| Label | For | Release-notes section |
-|---|---|---|
-| `feature` | a new method, option, or speed-up | Added |
-| `bug` | a fix | Fixed |
-| `docs` | docs, the website, and the blog | Documentation |
-| `chore` | CI, tests, build, and refactors | Chores |
-| `dependencies` | dependency updates; Dependabot sets it | Dependencies |
-
-Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
-Breaking. A third, `release`, marks a release's pull request and the issue that tracks its
-checklist; the release notes leave the release pull request out. Every pull request also has a
-milestone, the release it ships in. The labels and the milestone are set when the pull request is
-opened or reviewed, and a `feature` or `bug` pull request adds a bullet under `## [Unreleased]` in
-`CHANGELOG.md` that ends with a link to it, `([#<number>])`, defined at the end of the file.
-
-`CHANGELOG.md` is the record of each release. Before the release pull request merges, the
-maintainer (or an agent) lists the milestone's pull requests with
-`gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
-CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
-the notes GitHub generates by label (`.github/release.yml`). The same pass refreshes the stored
-intersphinx inventories that the docs build falls back on (`docs/DEVELOPMENT.md`) and commits any
-that changed:
-
-```shell
-uv run --group docs python scripts/refresh_intersphinx.py
-```

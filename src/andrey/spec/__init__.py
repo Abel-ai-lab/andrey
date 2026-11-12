@@ -16,6 +16,7 @@ from .generate import (
     to_json_schema,
 )
 from .models import (
+    DATA_KINDS,
     DataSpec,
     EnvVarSpec,
     InputSpec,
@@ -32,6 +33,7 @@ __all__ = [
     "ParamSpec",
     "OutputSpec",
     "EnvVarSpec",
+    "DATA_KINDS",
     "REGISTRY",
     "get_spec",
     "list_specs",
