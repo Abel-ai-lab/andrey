@@ -50,8 +50,10 @@ names its pull request.
 
 - The homepage is about half as long and names one method per family: the supported method compared
   with the most packages, timed against every package on one axis, beside the outcome its release
-  card records. The newest four release cards, the Sachs example, a band for agents, and five next
-  steps follow; the full list of methods is in the API reference. ([#919])
+  card records. The newest four release cards, a table of the families by the kinds of data their
+  methods read, the Sachs example, a band for agents, and five next steps follow, and the install
+  line has a copy button. The comparison with causal-learn, Tetrad, pcalg, and bnlearn moved from
+  the homepage to its own [page](https://andrey.abel.ai/docs/comparison.html). ([#919])
 
 ### Fixed
 

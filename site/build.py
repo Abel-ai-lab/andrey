@@ -1668,7 +1668,7 @@ def band_art(art: str, *, priority: bool = False) -> str:
 
 
 # The methods catalog, which the hero, the families, and the next steps lead to.
-CATALOG = "docs/api.html#structure-learning-methods"
+CATALOG = "docs/methods.html"
 # The release cards the homepage shows, newest first.
 LATEST_CARDS = 4
 RELEASE_CARDS = DOCS / "docs" / "benchmarks"
@@ -2234,6 +2234,61 @@ def cards_intro(summaries: list[dict]) -> str:
     )
 
 
+# Each family in one line, under its name in the families table (wide screens only).
+FAMILY_LINES = {
+    "constraint": "Tests which variables are independent, then removes and orients edges.",
+    "score": "Searches for the graph that scores best on the data.",
+    "permutation": "Searches over orderings of the variables and reads the graph from the best.",
+    "functional": "Uses the shape of the noise or of the effect to direct every edge.",
+    "temporal": "Finds lagged and same-step effects in time series and panels.",
+    "latent": "Allows hidden common causes and shows where they may act.",
+    "pairwise": "Decides which of two variables causes the other.",
+}
+
+
+def family_kinds() -> dict[str, dict[str, int]]:
+    """For each family, in ``SPEC_FAMILIES`` order, how many of its supported methods read each
+    kind of data (``MethodSpec.data_kinds``), in ``DATA_KINDS`` order."""
+    specs = [s for s in list_specs() if s.status == "supported"]
+    return {
+        family: {
+            k: sum(s.family == family and k in s.data_kinds for s in specs) for k in DATA_KINDS
+        }
+        for family in SPEC_FAMILIES
+    }
+
+
+def families_table() -> str:
+    """The families, by the data they read: a row per family, linked to its table on the methods
+    page, and a column per kind of data, linked to its row there; a dot in each cell, sized by the
+    number of supported methods it counts."""
+    specs = [s for s in list_specs() if s.status == "supported"]
+    head = "".join(
+        f'<th scope="col"><a href="{CATALOG}#{kind_anchor(k)}"><span>'
+        f"{escape(DATA_KIND_TEXT[k][0])}</span></a></th>"
+        for k in DATA_KINDS
+    )
+    rows = []
+    for family, counts in family_kinds().items():
+        total = sum(s.family == family for s in specs)
+        cells = "".join(
+            f'<td><span class="dot" style="--n:{n}">{n}</span></td>'
+            if n
+            else '<td class="none"><span class="visually-hidden">0</span></td>'
+            for n in counts.values()
+        )
+        rows.append(
+            f'<tr><th scope="row"><a href="{CATALOG}#family-{family}">'
+            f"{escape(SPEC_FAMILIES[family])}</a>"
+            f'<span class="ct">{total}<span class="visually-hidden"> supported methods</span>'
+            f'</span><span class="ln">{escape(FAMILY_LINES[family])}</span></th>{cells}</tr>'
+        )
+    return (
+        '<table class="matrix"><thead><tr><th scope="col"><span class="visually-hidden">Family'
+        f"</span></th>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
 def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, str]:
     """Everything the homepage template shows, as HTML, from the first release's summary and the
     later releases' published ones."""
@@ -2260,7 +2315,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "ledger": ledger(featured),
         "ledger_note": escape(ledger_note(featured)),
         "catalog": CATALOG,
-        "families": "",
+        "families": families_table(),
         "cards_intro": cards_intro(summaries),
         "cards": latest_cards(),
         "card_count": str(len(release_versions())),
@@ -2471,3 +2526,239 @@ def catalog_families(summaries: list[dict], names: dict[str, str]) -> str:
             "",
         ]
     return "\n".join(out)
+
+
+# ---- compared with other packages (docs/comparison.html; its links are relative to docs/) -------
+# Andrey beside other packages. Feature marks come from released code
+# (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1). Hooks for
+# custom tests or scores do not count as implementations. Features only on a development branch
+# do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
+# benchmarks use each package's README, documentation, and release notes. A real-data feature is
+# a yes when the package's main learners have it, and partly when only some do. Interventional
+# data is a yes when a method takes each row's environment or the intervention targets.
+PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
+PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
+# Each mark's word in the table.
+MARKS = {"yes": "Yes", "part": "Partly", "no": "No"}
+# Table sections in order, each with measured rows (``measured_rows``) followed by feature marks.
+SECTIONS = ("Coverage", "Real data", "Speed", "Agentic")
+# Each entry holds a section, an attribute, marks in PEERS order, and notes keyed by package
+# for every "part" mark. Attribute labels are brief; the notes give details.
+COMPARISON = (
+    ("Coverage", "Temporal data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Coverage",
+        "Mixed data",
+        ("yes", "part", "yes", "no", "yes"),
+        {
+            "causal-learn": "No mixed-data test or score; only KCI and the generalized score "
+            "take category codes, and neither is built for them.",
+        },
+    ),
+    ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Coverage",
+        "Interventional data",
+        ("yes", "part", "part", "yes", "part"),
+        {
+            "causal-learn": "CD-NOD only, for data from several domains, with no targets.",
+            "Tetrad": "Intervention variables tagged in a metadata file join the first knowledge "
+            "tier as ordinary variables; no method takes the targets.",
+            "bnlearn": "The mbde score only, for categorical data in its score-based searches.",
+        },
+    ),
+    (
+        "Real data",
+        "Missing values",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "PC and CD-NOD only, with the Fisher-z test."},
+    ),
+    (
+        "Real data",
+        "Background knowledge",
+        ("yes", "part", "yes", "part", "yes"),
+        {
+            "causal-learn": "PC, FCI, CD-NOD, the LiNGAM methods, and exact search; GES, BOSS, "
+            "and GRaSP take none.",
+            "pcalg": "Fixed adjacencies only, with no directions or tiers.",
+        },
+    ),
+    (
+        "Real data",
+        "Edge confidence",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "Bootstrap edge probabilities for the LiNGAM methods only."},
+    ),
+    (
+        "Speed",
+        "CPU parallelization",
+        ("yes", "part", "part", "part", "part"),
+        {
+            "causal-learn": "Several CPU cores for RLCD and the FastKCI test only.",
+            "Tetrad": "Several threads for FGES, BOSS, GFCI, and PC's adjacency search.",
+            "pcalg": "Several cores for the skeleton step of its stable.fast method only.",
+            "bnlearn": "A cluster for its constraint-based methods and DirectLiNGAM only.",
+        },
+    ),
+    (
+        "Speed",
+        "GPU acceleration",
+        ("yes", "part", "no", "no", "no"),
+        {"causal-learn": "CALM only."},
+    ),
+    (
+        "Coverage",
+        "Permutation invariance",
+        ("yes", "no", "part", "no", "no"),
+        {
+            "Tetrad": "PC and FCI follow the variables' names; BOSS, GRaSP, and GIN changed with "
+            "the column order.",
+        },
+    ),
+    (
+        "Agentic",
+        "JSON command line",
+        ("yes", "no", "part", "no", "no"),
+        {"Tetrad": "causal-cmd writes the graph, and only the graph, to a JSON file."},
+    ),
+    (
+        "Agentic",
+        "Schema for every method",
+        ("yes", "no", "part", "no", "no"),
+        {"Tetrad": "Typed parameter defaults and bounds, in an HTML manual."},
+    ),
+    (
+        "Agentic",
+        "Agent skill",
+        ("yes", "no", "part", "no", "no"),
+        {"Tetrad": "py-tetrad's development branch has a skill and guides; no release has them."},
+    ),
+    (
+        "Speed",
+        "Open benchmarks",
+        ("yes", "no", "no", "no", "no"),
+        {},
+    ),
+)
+# Distinct methods per package, each a published algorithm that returns a whole graph, counted
+# once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
+# score or test in the same search, a wrapper, and a search that only orients a given graph count
+# with the method they extend, or not at all. Andrey's count is the supported methods of its
+# registry: gies runs ges's search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a
+# variant of iamb, and mmhc is rsmax2 with its default phases, as bnlearn's are counted. The others
+# are read from each package's released code.
+COUNTED_WITH = {
+    "gies": "ges",
+    "multi_group_direct_lingam": "direct_lingam",
+    "inter_iamb": "iamb",
+    "mmhc": "rsmax2",
+}
+METHOD_COUNTS = {
+    "Andrey": sum(s.status != "experimental" and s.name not in COUNTED_WITH for s in list_specs()),
+    "causal-learn": 21,
+    "Tetrad": 21,
+    "pcalg": 8,
+    "bnlearn": 10,
+}
+
+
+def measured_rows() -> list[tuple[str, str, list[str]]]:
+    """Measured rows as (section, label, values in PEERS order). Speed has no pooled value across
+    methods; the release cards compare each method separately."""
+    return [("Coverage", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS])]
+
+
+def comparison_notes() -> list[tuple[str, str, str, str]]:
+    """Check the table and number its notes: (feature, package, mark, note) in reading order."""
+    notes = []
+    for _, feature, marks, row_notes in COMPARISON:
+        if len(marks) != len(PEERS) or set(marks) - MARKS.keys():
+            raise ValueError(f"{feature!r}: give one of {sorted(MARKS)} for each of {PEERS}")
+        if set(row_notes) - set(PEERS):
+            unknown = set(row_notes) - set(PEERS)
+            raise ValueError(f"{feature!r}: notes name unknown packages {unknown}")
+        for package, mark in zip(PEERS, marks):
+            if mark == "part" and package not in row_notes:
+                raise ValueError(f"{feature!r}: say what {package} covers in part")
+            if package in row_notes:
+                notes.append((feature, package, mark, row_notes[package]))
+    return notes
+
+
+def comparison_source() -> str:
+    """What the table's marks were read from."""
+    return f"Read from each package's released code: {PEER_VERSIONS}."
+
+
+def comparison_page() -> str:
+    """The comparison page's table and notes, as MyST: a column per package in ``PEERS``, Andrey's
+    first and tinted, a group of rows per section, each mark a word, each partial mark numbered to
+    its note under the table, then how the distinct methods are counted."""
+    # The notes in reading order: by section, then as COMPARISON lists them.
+    section = {feature: sec for sec, feature, _, _ in COMPARISON}
+    notes = sorted(comparison_notes(), key=lambda n: SECTIONS.index(section[n[0]]))
+    numbers = {(f, p): k for k, (f, p, _, _) in enumerate(notes, 1)}
+    ours = ' class="ct-ours"'
+    head = "".join(
+        f'<th scope="col"{ours if p == "Andrey" else ""}>{escape(p)}</th>' for p in PEERS
+    )
+    measured = measured_rows()
+    # Every body cell is a td, so the rows keep the documentation table's card; a section's name
+    # heads its rows in bold.
+    rows = []
+    for group in SECTIONS:
+        rows.append(f'<tr><td colspan="{1 + len(PEERS)}"><strong>{group}</strong></td></tr>')
+        for _, label, values in (r for r in measured if r[0] == group):
+            cells = "".join(
+                f"<td{ours if p == 'Andrey' else ''}>{v}</td>"
+                for p, v in zip(PEERS, values, strict=True)
+            )
+            rows.append(f"<tr><td>{escape(label)}</td>{cells}</tr>")
+        for _, feature, marks, _ in (r for r in COMPARISON if r[0] == group):
+            cells = []
+            for package, mark in zip(PEERS, marks, strict=True):
+                k = numbers.get((feature, package))
+                ref = f'<sup><a href="#comparison-note-{k}">{k}</a></sup>' if k else ""
+                cells.append(f"<td{ours if package == 'Andrey' else ''}>{MARKS[mark]}{ref}</td>")
+            rows.append(f"<tr><td>{escape(feature)}</td>{''.join(cells)}</tr>")
+    listed_notes = "".join(
+        f'<li id="comparison-note-{k}"><strong>{escape(feature)}, {escape(package)}.</strong> '
+        f"{escape(note)}</li>"
+        for k, (feature, package, _, note) in enumerate(notes, 1)
+    )
+    supported_count = sum(s.status == "supported" for s in list_specs())
+    pairs = listed([f"`{name}` with `{base}`" for name, base in COUNTED_WITH.items()])
+    return "\n".join(
+        [
+            "```{raw} html",
+            '<div class="pst-scrollable-table-container"><table class="table">'
+            f"<thead><tr><td></td>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>",
+            "```",
+            "",
+            comparison_source(),
+            "",
+            "## Notes",
+            "",
+            "```{raw} html",
+            f"<ol>{listed_notes}</ol>",
+            "```",
+            "",
+            "## How the table is read",
+            "",
+            "- **Distinct methods** counts each published algorithm that returns a whole graph "
+            "once. A variant chosen by an argument, a version for several datasets, another score "
+            "or test in the same search, and a wrapper count with the method they extend; a "
+            f"search that only orients a given graph does not count. Andrey's {supported_count} "
+            f"supported methods count as {METHOD_COUNTS['Andrey']}: {pairs}. Experimental methods "
+            "do not count.",
+            "- A feature counts when a released version has it. A hook for your own test or score "
+            "is not an implementation, and a feature only on a development branch is not released.",
+            "- A real-data feature is a yes when the package's main learners have it, and partly "
+            "when only some do. Interventional data is a yes when a method takes each row's "
+            "environment or the intervention targets.",
+            "- Permutation invariance comes from the measurements in the "
+            "[0.7.0 post](../blog/20261019-andrey-0-7-0.md#how-andrey-compares), and open "
+            "benchmarks from each package's README, documentation, and release notes.",
+            "",
+        ]
+    )

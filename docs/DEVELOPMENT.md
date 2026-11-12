@@ -50,7 +50,8 @@ never meet. It reads top to bottom, each value computed when the site is built:
 
 - The hero, on the lanes art (`HERO_ART`): "Fast causal discovery in Python, built for agents.",
   the claim (`CLAIM`) with the supported methods and families counted from the registry, the
-  install line (pip or uv, a pair of radio buttons), Get started, and the methods.
+  install line (pip or uv, a pair of radio buttons, and a copy button that `prompt.js` shows; without
+  script the command is plain text), Get started, and the methods page.
 - One method per registry family, a row each on one log axis of seconds (`ledger()`). The method is
   the one `featured_methods()` picks: the supported method compared with the most packages
   (`compared_packages()`, any setting, research code in `RESEARCH_CODE` not counted); among equals,
@@ -60,18 +61,30 @@ never meet. It reads top to bottom, each value computed when the site is built:
   give the card's verdict (`card_verdict`), or where the card records none, the two error counts
   compared (`outcome()`, `OUTCOME_WORDS`). The ranking is `feature_ranks()` and
   `featured_among()`, which pick among any list of methods, so the methods catalog shares it.
+  Under the rows: the speed post and the comparison page.
 - The newest four release cards (`latest_cards()`): each card's cover from
   `docs/_static/release-cards/`, or the default tile for a release without art, then its theme and
   description from the card's own page.
-- The families, by the kinds of data their methods read, from the registry, ending in a band on the
-  methods art (`METHODS_ART`) that leads to the methods catalog (`CATALOG`).
+- The families, by the kinds of data their methods read (`families_table()`): a row per family,
+  linked to its table on the methods page (`CATALOG`), with its line from `FAMILY_LINES`; a column
+  per kind in `DATA_KINDS`, linked to its row there; and in each cell a dot sized by the number of
+  the family's supported methods whose `data_kinds` hold the kind. On a phone the column labels
+  stand upright and the lines drop. The section ends in a band on the methods art (`METHODS_ART`)
+  that leads to the methods page's "Start from your data".
 - From data to graph: the Sachs example's code, output, and graph.
 - Built for agents, on the agentic art (`AGENTS_ART`): the command line's own JSON from an agent's
   session (`agent_frames()`), and a pill that copies the prompt that installs the agent skill
   (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside the marks
   of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT).
-- Where to next: getting started, the learning path, the methods catalog, the release cards, and
-  the contributing guide.
+- Where to next: getting started, the concepts guide and the learning path (the examples index),
+  the methods page, the release cards, and the contributing guide's "Ways to help".
+
+The comparison page, [`docs/comparison.md`](docs/comparison.md), sets Andrey beside causal-learn,
+Tetrad, pcalg, and bnlearn in the documentation's table style. `comparison_page()` in
+`site/build.py` writes its table and notes into `_generated/`: a mark per package for each feature
+in `COMPARISON` (read from the released versions in `PEER_VERSIONS`), the distinct methods per
+package (`METHOD_COUNTS`; Andrey's are its supported methods less `COUNTED_WITH`), and a numbered
+note for each partial mark, without which the build stops.
 
 On a phone each art is a strip above its type, which sits on the paper; from 48rem the type sits on
 the art's left side over a navy scrim, the same in both themes. The word "fast" is amber, slanted,

@@ -401,6 +401,30 @@ def test_every_link_in_the_methods_catalog_arrives(html):
     assert f"{supported} supported methods and {experimental} experimental" in words
 
 
+def test_the_comparison_page_counts_as_the_homepage_does_and_its_links_arrive(html):
+    page = html / "docs" / "comparison.html"
+    text = page.read_text(encoding="utf-8")
+    article = text[text.index("<article") : text.index("</article>")]
+    links = _Links()
+    links.feed(article)
+    missing = []
+    for href in sorted({href for _, href in links.found if not href.startswith("http")}):
+        target = _resolve(html, page, href)
+        anchor = href.partition("#")[2]
+        if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
+            missing.append(href)
+    assert not missing, missing
+    # The homepage's supported methods are the ones the page counts, less those that count with
+    # the method they extend; the table's Andrey cell is that count.
+    home = (html / "index.html").read_text(encoding="utf-8")
+    supported = re.search(r"(\d+) supported methods in", home)[1]
+    words = " ".join(re.sub(r"<[^>]+>", " ", article).split())
+    counted = re.search(rf"Andrey[’']s {supported} supported methods count as (\d+)", words)
+    assert counted, "the page does not count the homepage's supported methods"
+    cell = re.search(r'Distinct methods</td><td class="ct-ours">(\d+)</td>', article)
+    assert cell and cell[1] == counted[1]
+
+
 def test_every_page_has_a_built_favicon_and_link_preview_card(html):
     problems = []
     for page, text in _pages(html):

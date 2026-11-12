@@ -1466,6 +1466,79 @@ def test_every_homepage_link_leads_to_a_page_the_site_builds(published_page):
         assert link.endswith(".html") and any(p.exists() for p in sources), link
 
 
+def test_the_families_table_counts_each_familys_supported_methods_by_the_data_they_read(
+    published_page,
+):
+    table = re.search(r'<table class="matrix">(.*?)</table>', published_page, re.S)[1]
+    head, body = table.split("</thead>")
+    # A column per kind of data the registry knows, each linked to its row on the methods page.
+    kinds = re.findall(r'href="docs/methods\.html#data-([\w-]+)"', head)
+    assert kinds == [k.replace("_", "-") for k in DATA_KINDS]
+    # A row per family, linked to its table there, with a count per kind equal to the registry's.
+    supported = [s for s in list_specs() if s.status == "supported"]
+    rows = re.findall(r"<tr>(.*?)</tr>", body, re.S)
+    families = [re.search(r'href="docs/methods\.html#family-(\w+)"', r)[1] for r in rows]
+    assert families == list(build.SPEC_FAMILIES)
+    for family, row in zip(families, rows, strict=True):
+        members = [s for s in supported if s.family == family]
+        assert re.search(r'<span class="ct">(\d+)<', row)[1] == str(len(members))
+        cells = [int(n) for n in re.findall(r"<td[^>]*>.*?(\d+)</span></td>", row)]
+        assert cells == [sum(k in s.data_kinds for s in members) for k in DATA_KINDS], family
+        assert all(n <= len(members) for n in cells)
+
+
+def test_the_install_line_reads_without_script_and_its_button_copies_the_chosen_line(
+    published_page,
+):
+    install = re.search(r'<div class="install".*?</button>\s*</div>', published_page, re.S)[0]
+    # Without script the button stays hidden and each command is plain text on the page.
+    button = re.search(r"<button[^>]*>", install)[0]
+    assert re.search(r"\shidden\b", button)
+    # prompt.js copies the line named by the checked radio button's value.
+    values = re.findall(r'name="installer"[^>]*value="(\w+)"', install)
+    assert values == ["pip", "uv"]
+    for value in values:
+        assert re.search(rf'class="install-line install-line--{value}"><code>[^<]+</code>', install)
+    script = (ROOT / "site" / "assets" / "prompt.js").read_text()
+    assert ".install-copy" in script and "input:checked" in script
+
+
+def test_every_partial_mark_on_the_comparison_page_says_what_it_covers():
+    page = build.comparison_page()
+    notes = build.comparison_notes()
+    # Each note once, numbered in the order the table reads.
+    refs = [int(k) for k in re.findall(r'<sup><a href="#comparison-note-(\d+)">', page)]
+    assert refs == list(range(1, len(notes) + 1))
+    for k in refs:
+        assert f'<li id="comparison-note-{k}">' in page
+    bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
+    original, build.COMPARISON = build.COMPARISON, tuple(bad)
+    try:
+        with pytest.raises(ValueError, match="covers in part"):
+            build.comparison_notes()
+    finally:
+        build.COMPARISON = original
+
+
+def test_the_comparison_page_has_a_mark_for_every_package_and_counts_andrey_from_the_registry():
+    page = build.comparison_page()
+    table = re.search(r"<table.*?</table>", page, re.S)[0]
+    head = re.findall(r'<th scope="col"( class="ct-ours")?>([^<]+)</th>', table)
+    assert [name for _, name in head] == list(build.PEERS) and head[0][1] == "Andrey"
+    assert [bool(ours) for ours, _ in head] == [True] + [False] * (len(build.PEERS) - 1)
+    rows = re.findall(r"<tr><td>([^<]+)</td>(.*?)</tr>", table, re.S)
+    assert len(rows) == len(build.COMPARISON) + len(build.measured_rows())
+    for label, cells in rows:
+        assert len(re.findall(r"<td", cells)) == len(build.PEERS), label
+    # Andrey's distinct methods are the supported ones, less those that count with another.
+    names = {s.name for s in list_specs() if s.status == "supported"}
+    assert set(build.COUNTED_WITH) | set(build.COUNTED_WITH.values()) <= names
+    distinct = dict(rows)["Distinct methods"]
+    ours = re.search(r'<td class="ct-ours">(\d+)</td>', distinct)[1]
+    assert int(ours) == len(names) - len(build.COUNTED_WITH)
+    assert f"Andrey's {len(names)} supported methods count as {ours}" in page
+
+
 def test_amber_text_reads_on_the_paper_in_both_themes():
     def luminance(color):
         rgb = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]

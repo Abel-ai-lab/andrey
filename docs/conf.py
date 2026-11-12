@@ -314,6 +314,7 @@ NAV_ICONS = {
     "docs/api": "braces",
     "docs/configuration": "sliders",
     "docs/benchmarks": "chart",
+    "docs/comparison": "columns",
     "docs/faq": "help",
     "docs/changelog": "history",
     "docs/roadmap": "map",
@@ -699,6 +700,8 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     summaries = site.release_summaries(summary)
     _write(GENERATED / "methods-start.html", site.catalog_start(summaries, PROSE_NAMES))
     _write(GENERATED / "methods-families.md", site.catalog_families(summaries, PROSE_NAMES))
+    # Andrey beside other packages (docs/comparison.md).
+    _write(GENERATED / "comparison.md", site.comparison_page())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage and non-post

@@ -32,12 +32,19 @@
       <p class="lede">{{ home.lede }}</p>
       <div class="actions">
         <div class="install" role="group" aria-label="Install">
-          <input class="visually-hidden" type="radio" name="installer" id="installer-pip" checked>
+          <input class="visually-hidden" type="radio" name="installer" id="installer-pip" value="pip"
+            checked>
           <label for="installer-pip">pip</label>
-          <input class="visually-hidden" type="radio" name="installer" id="installer-uv">
+          <input class="visually-hidden" type="radio" name="installer" id="installer-uv" value="uv">
           <label for="installer-uv">uv</label>
           <div class="install-line install-line--pip"><code>pip install andrey-core</code></div>
           <div class="install-line install-line--uv"><code>uv add andrey-core</code></div>
+          {#- Shown and wired by prompt.js; without script the command is selectable text. #}
+          <button class="install-copy" type="button" aria-label="Copy the command" title="Copy"
+            hidden><svg class="install-copy__idle" viewBox="0 0 24 24" aria-hidden="true"><rect
+            x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><svg
+            class="install-copy__done" viewBox="0 0 24 24" aria-hidden="true"><path
+            d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
         </div>
         <a class="btn btn--primary" href="docs/guides/getting-started.html">Get started</a>
         <a class="btn btn--quiet" href="{{ home.catalog }}">Browse the methods</a>
@@ -56,7 +63,10 @@
       <div class="ledger">{{ home.ledger }}</div>
       <div class="l-foot">
         <p>{{ home.ledger_note }}</p>
-        <ul><li><a href="blog/20261008-why-andrey-is-fast.html">Why Andrey is fast</a></li></ul>
+        <ul>
+          <li><a href="blog/20261008-why-andrey-is-fast.html">Why Andrey is fast</a></li>
+          <li><a href="docs/comparison.html">Compared with other packages</a></li>
+        </ul>
       </div>
     </div>
     <div class="cards-head">
@@ -71,14 +81,17 @@
 
   <section class="sec wrap" id="families" aria-labelledby="families-title">
     <h2 id="families-title">The families, by the data they read</h2>
+    <p class="sub">A dot counts the supported methods in a family that read that kind of data.
+      Every method takes a table and returns a graph, so trying another is a one-line change.</p>
     {{ home.families }}
+    <p class="matrix-note">Read from each method's inputs and the choices of its test or score.</p>
     <div class="band band--methods">
       {{ home.methods_art }}
       <div class="band-body">
         <h3>Start from your data</h3>
-        <p>The methods catalog starts from the kind of data you have: see where to start, the
-          graph you get, and the code to run.</p>
-        <a class="btn" href="{{ home.catalog }}">Open the methods catalog</a>
+        <p>The methods page names the method to start with for each kind of data, the graph it
+          returns, and how many methods of each family read it.</p>
+        <a class="btn" href="{{ home.catalog }}#your-data">Find where to start</a>
       </div>
     </div>
   </section>
@@ -127,15 +140,17 @@
     <div class="routes">
       <a class="route" href="docs/guides/getting-started.html"><b>Start</b><span>Install Andrey
         and recover your first graph in five minutes.</span><em>Getting started</em></a>
-      <a class="route" href="docs/examples/index.html"><b>Learn</b><span>The example notebooks
-        in order, from your first graph to checking a result.</span><em>Learning path</em></a>
-      <a class="route" href="{{ home.catalog }}"><b>Find a method</b><span>Every method,
-        supported or experimental, by your data and the graph you need.</span><em>Methods
-        catalog</em></a>
+      {#- Two pages, so the route is not one link: the concepts, then the notebooks in order. #}
+      <div class="route"><b>Learn</b><span>What causal discovery assumes and what each graph
+        claims, then the example notebooks in order.</span><em><a
+        href="docs/guides/concepts.html">Concepts</a><a href="docs/examples/index.html">Learning
+        path</a></em></div>
+      <a class="route" href="{{ home.catalog }}"><b>Find a method</b><span>Every method by
+        family, and where to start for the kind of data you have.</span><em>Methods</em></a>
       <a class="route" href="docs/benchmarks.html"><b>See the evidence</b><span>Every release
         timed and scored against other packages, with how to rerun it.</span><em>Release
         cards</em></a>
-      <a class="route" href="docs/guides/contributing.html"><b>Help</b><span>Report a bug, add a
+      <a class="route" href="docs/guides/contributing.html#ways-to-help"><b>Help</b><span>Report a bug, add a
         dataset, compare a method, or improve a page.</span><em>Ways to help</em></a>
     </div>
   </section>
