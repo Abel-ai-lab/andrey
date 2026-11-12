@@ -2167,7 +2167,8 @@ def mmmb(
     target, for each of its parents and children, and, for the symmetry check, for each of their
     members, so its cost grows with the sets two steps from the target. The CPDAG tests every
     subset of the smaller blanket for each unshielded triple, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests.
+    holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
