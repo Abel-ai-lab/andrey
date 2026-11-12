@@ -47,6 +47,7 @@ TESTWISE_METHODS = (
     "mmpc",
     "hiton_pc",
     "hiton_mb",
+    "mmmb",
     "mb_by_mb",
     "y_structures",
 )
