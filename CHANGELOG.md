@@ -36,6 +36,11 @@ names its pull request.
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
   ([#955])
+- The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
+  its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
+  the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
+  fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
+  is absent. ([#955])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,

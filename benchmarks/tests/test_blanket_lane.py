@@ -4,7 +4,7 @@ The checks that need no R run everywhere: the packing of an answer, the true set
 DAG, the scores of fixed cases, Andrey's adapter against the facade it calls (and the table that
 adds a learner by name against the facade's own choices), the cells and the field of a run, and one
 smoke run of the driver with Andrey's solutions. The bnlearn adapter's checks that need R are in
-``test_adapters_bnlearn_blanket.py``.
+``test_adapters_bnlearn_blanket.py``, and Causal Explorer's in ``test_adapters_causal_explorer.py``.
 """
 
 from __future__ import annotations
@@ -25,7 +25,11 @@ import blanket_cpu  # noqa: E402
 
 import andrey  # noqa: E402
 from andrey_bench import blanket_lane as lane  # noqa: E402
-from andrey_bench.adapters import andrey_blanket, bnlearn_blanket  # noqa: E402
+from andrey_bench.adapters import (  # noqa: E402
+    andrey_blanket,
+    bnlearn_blanket,
+    causal_explorer_blanket,
+)
 from andrey_bench.adapters.andrey_blanket import LEARNERS, AndreyBlanket, Learner  # noqa: E402
 
 ASIA = Path(__file__).resolve().parents[2] / "tests" / "unit" / "fixtures" / "asia.bif.gz"
@@ -306,12 +310,19 @@ def test_params_are_complete_json_and_the_adapter_pickles():
 
 
 def test_every_learner_with_a_reference_names_a_function_of_the_table():
+    """Each learner has a reference, bnlearn's function or the authors' Causal Explorer function,
+    which learns the same kind of set."""
     assert set(bnlearn_blanket.COUNTERPART.values()) <= set(bnlearn_blanket.FUNCTIONS)
-    assert set(LEARNERS) <= set(bnlearn_blanket.COUNTERPART)
+    authors = causal_explorer_blanket.COUNTERPART
+    assert set(authors.values()) <= set(causal_explorer_blanket.FUNCTIONS)
+    assert set(LEARNERS) <= set(bnlearn_blanket.COUNTERPART) | set(authors)
     for learner, function in bnlearn_blanket.COUNTERPART.items():
         kind = bnlearn_blanket.FUNCTIONS[function].kind
         if learner in LEARNERS:
             assert kind == LEARNERS[learner].kind
+    for learner, function in authors.items():
+        if learner in LEARNERS:
+            assert causal_explorer_blanket.FUNCTIONS[function] == LEARNERS[learner].kind
 
 
 def test_the_test_option_picks_bnlearns_form_and_the_run_records_it():
@@ -406,7 +417,9 @@ def test_the_field_pairs_each_learner_with_its_bnlearn_function():
     assert names[-1] == "baseline.empty"
     for learner in andrey_blanket.available():
         assert f"andrey.{learner}" in names
-        assert blanket_cpu.reference_name(f"andrey.{learner}", None) in names
+        reference = blanket_cpu.reference_name(f"andrey.{learner}", None)
+        assert (reference is None) == (learner not in bnlearn_blanket.COUNTERPART)
+        assert reference is None or reference in names
     assert {"bnlearn.pc-stable.mb", "bnlearn.pc-stable.pc"} <= set(names)
     assert len(names) == len(set(names))
     assert blanket_cpu.reference_name("bnlearn.iamb", None) is None

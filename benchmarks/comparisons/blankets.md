@@ -1,10 +1,12 @@
 # Markov blankets, and parents and children
 
 `blanket_cpu.py` compares Andrey's learners of Markov blankets (`iamb`, `inter_iamb`) and of parents
-and children (`mmpc`) with bnlearn's, on the set each learns at a target and on the graph the sets
-give. A learner joins the lane by being named in `LEARNERS` of
-`andrey_bench/adapters/andrey_blanket.py`, and its reference by being named in `COUNTERPART` of
-`andrey_bench/adapters/bnlearn_blanket.py`; the driver runs every learner the installed Andrey has.
+and children (`mmpc`) with bnlearn's, and HITON-PC and HITON-MB with the authors' Causal Explorer, on
+the set each learns at a target and on the graph the sets give. A learner joins the lane by being
+named in `LEARNERS` of `andrey_bench/adapters/andrey_blanket.py`, and its reference by being named in
+`COUNTERPART` of `andrey_bench/adapters/bnlearn_blanket.py` or
+`andrey_bench/adapters/causal_explorer_blanket.py`; the driver runs every learner the installed
+Andrey has.
 
 ## Data
 
@@ -30,10 +32,26 @@ The default cells are three networks and two Gaussian sizes, each at two sample 
 | `gs` | `learn.mb(method = "gs")` | `gs` |
 | `fast_iamb` | `learn.mb(method = "fast.iamb")` | `fast.iamb` |
 | `hiton_pc` | `learn.nbr(method = "si.hiton.pc")`, kept as for `mmpc` | `si.hiton.pc` |
+| `hiton_mb` | none | none |
 
-The last three rows are for learners the lane is ready for: once a learner is named in `LEARNERS`
-and the installed Andrey has it, it runs beside the function in its row. `hiton_mb`, `mmmb`, and `pcmb` have
-no bnlearn function.
+A learner runs beside the function in its row once it is named in `LEARNERS` and the installed
+Andrey has it. `hiton_mb`, `mmmb`, and `pcmb` have no bnlearn function.
+
+The authors of HITON-PC, HITON-MB, and MMMB distribute their code as Causal Explorer 1.5, a MATLAB
+toolbox under a non-commercial license. The lane runs it as a reference only:
+`start_causal_explorer.sh` fetches the public repository at a pinned commit into
+`benchmarks/.causal-explorer`, which git ignores, and the adapter calls it through MATLAB in batch,
+one MATLAB process per fit, for every target. It answers for targets only and reports no test
+count, and its wall time includes MATLAB's start. Without MATLAB or the toolbox the lane leaves the
+arm out, so nothing about it runs in CI.
+
+| Andrey | Causal Explorer 1.5, at a target |
+|---|---|
+| `hiton_pc` | `Causal_Explorer('HITON_PC', ...)`, kept as for `mmpc` |
+| `hiton_mb` | `Causal_Explorer('HITON_MB', ...)` |
+| `mmmb` | `Causal_Explorer('MMMB', ..., 'MMPC', options)` |
+
+The last row is ready for `mmmb`: it runs once the installed Andrey has it.
 
 bnlearn's `pc.stable` is read at a target as well, once per fit: `mb()` of its CPDAG for a
 blanket, `nbr()` for parents and children, the answer a graph learner gives to the same question.
@@ -68,6 +86,15 @@ from Andrey's and how the lane lines them up. The ones that decide a comparison:
   Andrey's `mmpc(target=)` keeps a member only when the member's own search holds the target. The
   lane applies the same rule to bnlearn, and counts the tests of those searches. A blanket has no
   such rule on either side.
+- **Causal Explorer.** Its HITON functions take the test (`'g2'` for `gsq`), `alpha` as the
+  threshold, and the largest conditioning set as their last argument, the paper's max-k, which
+  Andrey's `max_depth` is; no limit passes the number of variables less one. Its G-square test takes
+  empty cells out of the degrees of freedom and runs only with at least five rows per cell of its
+  table, the rule Andrey's HITON learners follow. MMMB takes `alpha` as `options.threshold`, the
+  limit as `options.maxK`, and five rows per cell as `options.epc`, a cap on the conditioning sets
+  with no off switch. Categorical columns are coded from 0 over their observed levels. There is no
+  counterpart of `chisq`; the toolbox's manual takes Fisher's z (`'z'`) for HITON only with a
+  categorical target, and MMMB reads categorical data only.
 - **Ties.** bnlearn orders candidates of equal strength by column, Andrey by a rank computed from
   the data, so where several p-values agree, for example when they underflow to zero, the two can
   add variables in a different order and end with different sets. This is a known cause of
@@ -86,7 +113,8 @@ its targets. A set is scored against the true set of its kind, per target and po
   and `mean_` takes each ratio over the targets where it is defined.
 - the number of tests of each search where the package reports it. bnlearn reports them per
   search; a package that reports none has `NO_COUNT` (-1) in the row.
-- `same`, in the summary: the targets where a learner's set is the set of its bnlearn counterpart.
+- `same`, in the summary: the targets where a learner's set is the set of its bnlearn counterpart,
+  and `authors` the targets where it is the set of its Causal Explorer counterpart.
 
 `--mode graph` fits once per dataset and `--structures` (`moral`, `skeleton`, and `cpdag`, each
 where a learner offers it) and scores the graph's adjacencies, `precision`, `recall`, `f1`, and
@@ -94,7 +122,9 @@ where a learner offers it) and scores the graph's adjacencies, `precision`, `rec
 
 ## Run
 
-Load R as [The R lane](../README.md#the-r-lane) describes, with bnlearn 5.2.1 in the library, then:
+Load R as [The R lane](../README.md#the-r-lane) describes, with bnlearn 5.2.1 in the library, and
+for the Causal Explorer arm put `matlab` on the `PATH`, run `benchmarks/start_causal_explorer.sh`,
+and export what it prints; then:
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/blanket_cpu.py --out outputs/blanket-smoke --smoke
