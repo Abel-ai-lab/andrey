@@ -550,6 +550,19 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         "experimental",
     ),
     (
+        "fast_iamb",
+        "One variable's Markov blanket by Fast-IAMB: each round tests every variable outside the "
+        "blanket given it and adds the dependent ones, the most dependent first, while the data "
+        "hold more than five rows per cell of the next test's table (categorical data), then "
+        "shrinks. With target=null, every variable's blanket joined into a CPDAG by the "
+        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Yaramakala & Margaritis 2005", "Margaritis 2003"),
+        "experimental",
+    ),
+    (
         "mmpc",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
@@ -2981,6 +2994,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
     "gs": _BLANKET_RULE,
+    "fast_iamb": _BLANKET_RULE,
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
@@ -3069,6 +3083,7 @@ _PATH_METHODS = (
     "iamb",
     "inter_iamb",
     "gs",
+    "fast_iamb",
     "mmpc",
 )
 _PATH_RULE = (
@@ -3262,6 +3277,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "gs": ("target", "markov_blanket"),
+    "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(

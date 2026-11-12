@@ -34,7 +34,17 @@ if TYPE_CHECKING:
 
 #: The methods that accept missing values, by deleting rows per test, named by the refusal of
 #: every other method.
-TESTWISE_METHODS = ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "mmpc")
+TESTWISE_METHODS = (
+    "pc",
+    "fci",
+    "cdnod",
+    "fci_jci",
+    "iamb",
+    "inter_iamb",
+    "gs",
+    "fast_iamb",
+    "mmpc",
+)
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")
 
