@@ -30,6 +30,14 @@ benchmarks/.loci/
 benchmarks/.notears/
 # The authors' SCORE code that benchmarks/start_stein.sh fetches, read from disk and never committed.
 benchmarks/.score/
+# The authors' LDECC code that benchmarks/start_ldecc.sh fetches, read from disk and never committed.
+benchmarks/.ldecc/
+# The authors' LDP and LD3 code that benchmarks/start_maasch.sh fetches, read from disk and never
+# committed.
+benchmarks/.maasch/
+# The authors' SNAP and LOAD code that benchmarks/start_schubert.sh fetches, read from disk and never
+# committed.
+benchmarks/.schubert/
 env/
 
 .vscode/
