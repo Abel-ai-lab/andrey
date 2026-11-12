@@ -1849,8 +1849,8 @@ def hiton_mb(
     parents and children hold it [1]_ [4]_, the ``y`` in the order they joined, and it joins at the
     first one that admits it; a ``y`` already in the separating set is not tested, as that test
     repeats the one that separated the two. The paper defines HITON-MB with the symmetry check of
-    HITON-PC [1]_, which this search runs; its experiments ran the search without it [1]_. With
-    exact tests, the result is the true Markov blanket [1]_.
+    HITON-PC [1]_, which this search runs; its experiments ran their searches without the check
+    unless they say otherwise [1]_. With exact tests, the result is the true Markov blanket [1]_.
 
     On categorical data, a test runs only when ``data`` holds at least five rows per cell of its
     contingency table, the reliability rule of [1]_, whose threshold the paper leaves open and its
