@@ -278,9 +278,24 @@ def test_every_homepage_link_and_picture_is_built(html):
             problems.append(f"{href}: not built")
         elif fragment and f'id="{fragment}"' not in target.read_text(encoding="utf-8"):
             problems.append(f"{href}: no element has that id")
-    if "prompt.js" not in home or not (html / "_static" / "prompt.js").is_file():
-        problems.append("prompt.js: not loaded or not built")
+    for script in ("tiles.js", "prompt.js"):
+        if script not in home or not (html / "_static" / script).is_file():
+            problems.append(f"{script}: not loaded or not built")
     assert targets and not problems, "\n".join(problems)
+
+
+def test_every_homepage_tile_leads_to_details_that_are_built(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
+    assert tiles and len(tiles) == len(set(tiles))  # one tile for each dialog
+    problems = []
+    for href in tiles:
+        if href.startswith("#"):
+            if f'<dialog class="wf tile-dialog" id="{href[1:]}"' not in home:
+                problems.append(f"{href}: no dialog holds its details")
+        elif not _resolve(html, html / "index.html", href).is_file():
+            problems.append(f"{href}: not built")
+    assert not problems, "\n".join(problems)
 
 
 # The section's line icon before a header link's name.
@@ -401,7 +416,7 @@ def test_every_link_in_the_methods_catalog_arrives(html):
     assert f"{supported} supported methods and {experimental} experimental" in words
 
 
-def test_the_comparison_page_counts_as_the_homepage_does_and_its_links_arrive(html):
+def test_the_comparison_page_counts_from_the_registry_and_its_links_arrive(html):
     page = html / "docs" / "comparison.html"
     text = page.read_text(encoding="utf-8")
     article = text[text.index("<article") : text.index("</article>")]
@@ -414,10 +429,9 @@ def test_the_comparison_page_counts_as_the_homepage_does_and_its_links_arrive(ht
         if not target.is_file() or (anchor and f'id="{anchor}"' not in target.read_text("utf-8")):
             missing.append(href)
     assert not missing, missing
-    # The homepage's supported methods are the ones the page counts, less those that count with
+    # The registry's supported methods are the ones the page counts, less those that count with
     # the method they extend; the table's Andrey cell is that count.
-    home = (html / "index.html").read_text(encoding="utf-8")
-    supported = re.search(r"(\d+) supported methods in", home)[1]
+    supported = sum(s.status == "supported" for s in andrey.spec.list_specs())
     words = " ".join(re.sub(r"<[^>]+>", " ", article).split())
     counted = re.search(rf"Andrey[’']s {supported} supported methods count as (\d+)", words)
     assert counted, "the page does not count the homepage's supported methods"

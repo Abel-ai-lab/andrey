@@ -682,12 +682,15 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     site.fastest(summary)
     # The homepage and non-post pages share the repository's social preview.
     _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
-    # An AVIF copy of each brand art, which the homepage offers before the JPEG; one already
-    # written from the same JPEG is kept, since encoding takes seconds.
-    for jpeg in BRAND.glob("art-*.jpg"):
+    # An AVIF copy of each brand art and tile crop, which the homepage offers before the JPEG;
+    # one already written from the same JPEG is kept, since encoding takes seconds.
+    for jpeg in [*BRAND.glob("art-*.jpg"), *(BRAND / "bento").glob("*.jpg")]:
         avif = GENERATED / "static" / jpeg.relative_to(BRAND).with_suffix(".avif")
         if not avif.exists() or avif.stat().st_mtime < jpeg.stat().st_mtime:
             _write_bytes(avif, _avif(jpeg))
+    # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
+    for name, tile in cards.grain.hero_tiles():
+        _write_bytes(GENERATED / "static" / name, tile)
     # A release cover or tile that names neither art nor the default (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
     # Brand kit downloads (`_static/brand/`) and colors from the palette.
@@ -1087,7 +1090,8 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
-        css, js = ["figures.css", "site.css"], ["prompt.js"]
+        context["newest_post"] = _newest_post_card(app)
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "prompt.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks, nine earlier posts to a page.
         css, js = ["benchmarks.css", "blog.css"], ["paginate.js"]
@@ -1441,6 +1445,25 @@ def _thumb_file(app, docname: str) -> str:  # noqa: ANN001
     image = f"assets/thumbs/{docname.removeprefix('blog/')}.jpg"
     _write_bytes(pathlib.Path(app.outdir) / image, cards.thumb_jpeg(_cover_kind(app, docname)))
     return image
+
+
+def _newest_post_card(app) -> str:  # noqa: ANN001
+    """The homepage's documentation band leads with the newest post, as the blog's front page
+    does (``_newest_first``): its cover, its date, its title, and its description, linking to
+    it. The cover is the post's art alone, so the title is in the text."""
+    docname = _newest_first(_dated_posts(app))[0]
+    post = next(post for post in _blog(app).posts if post.docname == docname)
+    image, _ = _cover_file(app, docname)
+    description = html.escape((app.env.metadata[docname].get("description") or "").strip())
+    return (
+        f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
+        f'<img src="{image}" alt="{html.escape(cards.cover_alt(_cover_kind(app, docname)))}" '
+        f'width="{cards.COVER_W}" height="{cards.COVER_H}" '
+        'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
+        f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
+        f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
+        f"<span>{description}</span></span></a>"
+    )
 
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
