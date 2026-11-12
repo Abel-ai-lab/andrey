@@ -8,7 +8,23 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
-## [Unreleased]
+## [0.17.1] - 2026-11-12
+
+### Highlights
+
+- The homepage is half as long and shows one method per family, each timed against every package
+  that runs it. A new Methods page lists every method by the kind of data it reads and by family,
+  and the comparison with other packages is a docs page. ([#919], [#920])
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method and how each requirement is checked. New tests fit every method with each column
+  rescaled by its own factor and require the same graph; the five methods whose published
+  algorithms read the units are marked in the registry. ([#904], [#910])
+- `score_func="normal_scores"`, experimental, scores each column's normal scores, so the score
+  searches and the hybrids keep their graph when a column goes through an increasing transform
+  such as a logarithm. ([#928])
+- The docs are easier to enter: a concepts guide states causal discovery formally, the examples
+  open with a numbered learning path, and the contributing guide walks from a fork to a merged pull
+  request. ([#904])
 
 ### Added
 
@@ -2251,7 +2267,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.17.0...HEAD
+[0.17.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0

@@ -20,18 +20,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.17.0
+## ⭐ What's new in 0.17.1
 
-0.17.0 adds SCORE and NoGAM, which read the causal order of nonlinear data with additive noise from
-the score, the gradient of its log density. Neither made more errors than its reference
-implementation, and both are supported. NOTEARS and AGES are supported too. The release also
-continues the work from 0.16.0. EM for missing data follows Friedman's alternating scheme and is
-supported in GES, BOSS, and GRaSP. Path and confounder claims are supported in more methods.
-`andrey.data` draws more noise families and mechanisms.
+0.17.1 makes Andrey easier to enter and states its standards. The homepage shows one method per
+family, and a Methods page lists every method by the kind of data it reads. A standards page says
+what we require of every method and how we check it, with new tests that rescale each column and
+require the same graph. The docs gain a concepts guide and a learning path, and
+`score_func="normal_scores"`, experimental, keeps a search's graph under increasing transforms of a
+column. 0.17.0 added SCORE, NoGAM, and AGES.
 
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)** · Posts:
-**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
-**[Ready for real data](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)**
+**[Methods](https://andrey.abel.ai/docs/methods.html)** ·
+**[Standards](https://andrey.abel.ai/docs/standards.html)** ·
+**[0.17.0 release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)**
 
 ---
 
@@ -190,7 +190,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.17.0},
+  version = {0.17.1},
   url = {https://andrey.abel.ai},
 }
 ```
