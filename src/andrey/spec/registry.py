@@ -512,7 +512,7 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-for _name, _summary, _key, _structure, _kind, _refs in (
+for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
         "iamb",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
@@ -523,6 +523,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
+        "supported",
     ),
     (
         "inter_iamb",
@@ -533,6 +534,20 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
+        "supported",
+    ),
+    (
+        "gs",
+        "One variable's Markov blanket by Grow-Shrink: the other variables visited in one fixed "
+        "order, the most dependent first, each added at once when a conditional-independence test "
+        "finds it dependent given the blanket so far, in passes until none joins, then a shrink. "
+        "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
+        "structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Margaritis & Thrun 2000", "Margaritis 2003"),
+        "experimental",
     ),
     (
         "mmpc",
@@ -552,6 +567,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
         ),
         "undirected",
         ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
+        "supported",
     ),
 ):
     _add(
@@ -566,7 +582,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             accel="numpy",
-            status="supported",
+            status=_status,
             column_order="relabels",
             tie_break=True,
             params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
@@ -2964,6 +2980,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
+    "gs": _BLANKET_RULE,
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
@@ -3051,6 +3068,7 @@ _PATH_METHODS = (
     "exact_search",
     "iamb",
     "inter_iamb",
+    "gs",
     "mmpc",
 )
 _PATH_RULE = (
@@ -3243,6 +3261,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
+    "gs": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(

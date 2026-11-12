@@ -410,19 +410,19 @@ of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI
 The result honors every part: a required edge is there and directed, a forbidden one is not, and a
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
-of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
-graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
-`structure="moral"`, a choice of `iamb` and `inter_iamb`: a required edge is there without a
+of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, GS, and MMPC return
+undirected graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
+`structure="moral"`, a choice of `iamb`, `inter_iamb`, and `gs`: a required edge is there without a
 direction, and tiers and edges forbidden one way, which constrain orientation, do not change them.
-With `structure="cpdag"`, the default of `iamb` and `inter_iamb`, they direct the edges the
-knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
-and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
-earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
+With `structure="cpdag"`, the default of `iamb`, `inter_iamb`, and `gs`, they direct the edges the
+knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a` and can
+leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an earlier
+tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
 directions close a cycle over the edges the search kept raises one after the adjacency search.
 Labels stay attached to their columns, so the same knowledge fits the table in any column order. A
 label is the column name as text: name a column called `1` with `"1"`, as the integer `1` is the
-second column. On the command line, give a JSON object inline or as a file:
-`andrey run pc --data data.csv knowledge=knowledge.json`.
+second column. On the command line, give a JSON object inline or as a file: `andrey run pc --data
+data.csv knowledge=knowledge.json`.
 
 Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
 in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in

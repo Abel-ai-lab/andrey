@@ -1,9 +1,10 @@
-"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, and MMPC.
+"""Recovery checks for the local-structure calls: IAMB, Inter-IAMB, GS, and MMPC.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
 each structure its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
-to the true ones, and on one recorded case each structure is the graph bnlearn returns.
+to the true ones, and on one recorded case each structure is the graph bnlearn returns. GS's sets
+beat the empty answer on continuous and categorical data, and a fit repeats.
 """
 
 from __future__ import annotations
@@ -23,8 +24,8 @@ from andrey.core.orient import dag2cpdag
 from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
-METHODS = ["iamb", "inter_iamb", "mmpc"]
-KEY = {"iamb": "markov_blanket", "inter_iamb": "markov_blanket", "mmpc": "parents_and_children"}
+METHODS = ["iamb", "inter_iamb", "gs", "mmpc"]
+KEY = {m: "parents_and_children" if m == "mmpc" else "markov_blanket" for m in METHODS}
 #: Each method's outputs, from its spec.
 STRUCTURES = {
     m: next(p.choices for p in REGISTRY[m].params if p.name == "structure") for m in METHODS
@@ -88,6 +89,9 @@ def _collider() -> pd.DataFrame:
         ("inter_iamb", "a", {"b", "c"}),
         ("mmpc", "a", {"c"}),
         ("iamb", "c", {"a", "b", "d"}),
+        ("gs", "a", {"b", "c"}),
+        ("gs", "c", {"a", "b", "d"}),
+        ("gs", "d", {"c"}),
         ("mmpc", "d", {"c"}),
     ],
 )
@@ -167,7 +171,7 @@ def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure
 
 
 @pytest.mark.parametrize("seed", range(3))
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs"])
 def test_the_skeleton_is_a_subgraph_of_the_moral_graph(method, seed):
     sample = _er_sample(20, seed)
     fit = functools.partial(getattr(andrey, method), sample.data)
@@ -203,7 +207,11 @@ def test_the_moral_graph_joins_a_childs_parents_and_the_skeleton_does_not():
     """The blankets' graph joins a and b, the parents of c; the skeleton and MMPC's do not."""
     frame = _collider()
     true_edges = {frozenset("ac"), frozenset("bc"), frozenset("cd")}
-    for out in (andrey.iamb(frame, structure="moral"), andrey.inter_iamb(frame, structure="moral")):
+    for out in (
+        andrey.iamb(frame, structure="moral"),
+        andrey.inter_iamb(frame, structure="moral"),
+        andrey.gs(frame, structure="moral"),
+    ):
         assert frozenset("ab") in {frozenset(e[:2]) for e in out.structure.oriented_edges()}
     for method in METHODS:
         for structure in STRUCTURES[method]:
@@ -222,7 +230,8 @@ def _two_colliders() -> pd.DataFrame:
 
 
 #: bnlearn 5.2.1's graphs on :func:`_two_colliders` with ``test="zf"`` and ``alpha=0.05``: each
-#: variable's ``learn.mb`` joined by the AND rule, ``undirected=TRUE``, and the default.
+#: variable's ``learn.mb`` joined by the AND rule, ``undirected=TRUE``, and the default; ``gs``
+#: gives the same graphs.
 BNLEARN_RECORDED = {
     "moral": {"a - b", "a - c", "b - c", "c - d", "d - e", "d - f", "e - f"},
     "skeleton": {"a - c", "b - c", "c - d", "d - f", "e - f"},
@@ -242,7 +251,7 @@ def test_each_structure_matches_bnlearn_on_a_recorded_case(method, structure):
 
 #: The graph each of bnlearn 5.2.1's learners returns by default: ``undirected = FALSE`` for
 #: ``iamb`` and ``inter.iamb``, ``TRUE`` for ``mmpc``.
-BNLEARN_DEFAULT = {"iamb": "cpdag", "inter_iamb": "cpdag", "mmpc": "skeleton"}
+BNLEARN_DEFAULT = {"iamb": "cpdag", "inter_iamb": "cpdag", "gs": "cpdag", "mmpc": "skeleton"}
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -269,6 +278,37 @@ def test_a_target_gives_its_set_whatever_the_structure(method):
         out = getattr(andrey, method)(frame, target="c", structure=structure)
         assert out.metadata == base.metadata
         assert out.structure.kind == "undirected"
+
+
+def _gs_sample(kind: str):
+    """Linear-Gaussian data on 20 variables, or categorical data on 10, with their settings."""
+    if kind == "gaussian":
+        return _er_sample(20, 0), {}
+    return data.sample_discrete(d=10, n=3000, seed=1, density=2.0), {"indep_test": "chisq"}
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_gs_sets_beat_the_empty_answer(kind):
+    """Summed over every target, the members GS gets wrong, missing or extra, are at most half the
+    true blanket members, which is what the empty answer gets wrong."""
+    sample, settings = _gs_sample(kind)
+    oracle = DSeparation(sample.graph)
+    wrong = members = 0
+    for v in range(sample.data.shape[1]):
+        got = set(andrey.gs(sample.data, target=v, **settings).metadata["markov_blanket"])
+        want = oracle.markov_blanket(v)
+        wrong, members = wrong + len(got ^ want), members + len(want)
+    assert members and wrong <= members / 2
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "categorical"])
+def test_a_gs_fit_repeats(kind):
+    sample, settings = _gs_sample(kind)
+    for target in (None, 3):
+        first = andrey.gs(sample.data, target=target, **settings)
+        again = andrey.gs(sample.data, target=target, **settings)
+        assert first.structure.oriented_edges() == again.structure.oriented_edges()
+        assert first.metadata == again.metadata
 
 
 # ---- background knowledge ------------------------------------------------------------------------
