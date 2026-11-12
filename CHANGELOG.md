@@ -36,6 +36,14 @@ names its pull request.
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
   ([#957])
+- `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
+  authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
+  parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
+  check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
+  children, then admits a variable as a spouse when a test finds it dependent on the target given
+  the set that separated the two and a parent or child of the target whose own set holds the
+  variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
+  ([#965])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
   experimental: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
@@ -44,7 +52,7 @@ names its pull request.
   `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
   runs it beside the authors' code. ([#959])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
-  its HITON-PC and HITON-MB, and MMMB for `mmmb` when it ships, called through MATLAB in batch with
+  its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
   is absent. ([#957])
@@ -2649,6 +2657,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957

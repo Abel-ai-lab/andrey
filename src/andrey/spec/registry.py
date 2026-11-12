@@ -548,6 +548,7 @@ _OWN_DEPTH = {
 #: What a set learner's target answer holds beyond its one set.
 _OWN_OUTPUT = {
     "hiton_mb": "; metadata['parents_and_children'] lists the parents and children alone",
+    "mmmb": "; metadata['parents_and_children'] lists the parents and children alone",
 }
 for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
@@ -651,6 +652,25 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Aliferis et al. 2010", "Margaritis 2003"),
+        "experimental",
+    ),
+    (
+        "mmmb",
+        "One variable's Markov blanket by MMMB in its authors' corrected form: MMPC's parents and "
+        "children of the target and of each of them, with the symmetry check, then each child's "
+        "other parent admitted by one conditional-independence test given the set that separated "
+        "it from the target and a common neighbor. With target=null, every variable's sets joined "
+        "into a CPDAG by the Grow-Shrink structure learner, or into the skeleton or the moral "
+        "graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        (
+            "Tsamardinos, Aliferis & Statnikov 2003",
+            "Tsamardinos, Brown & Aliferis 2006",
+            "Aliferis et al. 2010",
+            "Margaritis 2003",
+        ),
         "experimental",
     ),
 ):
@@ -3267,6 +3287,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hiton_mb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
     "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
+    "mmmb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
+    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
     "mb_by_mb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent never shares an edge. Every edge a tier or an edge "
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
@@ -3367,6 +3390,7 @@ _PATH_METHODS = (
     "mmpc",
     "hiton_pc",
     "hiton_mb",
+    "mmmb",
 )
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
@@ -3563,6 +3587,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "mmpc": ("target", "parents_and_children"),
     "hiton_pc": ("target", "parents_and_children"),
     "hiton_mb": ("target", "markov_blanket", "parents_and_children"),
+    "mmmb": ("target", "markov_blanket", "parents_and_children"),
     "mb_by_mb": ("target", "parents", "children", "undirected"),
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),

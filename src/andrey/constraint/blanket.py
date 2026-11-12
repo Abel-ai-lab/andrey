@@ -1,16 +1,16 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
 :func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, :func:`andrey.mmpc`,
-:func:`andrey.hiton_pc`, and :func:`andrey.hiton_mb`.
+:func:`andrey.hiton_pc`, :func:`andrey.hiton_mb`, and :func:`andrey.mmmb`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
 learners Grow-Shrink and Fast-IAMB, the ``"iamb_forward"`` learner IAMB's grow phase alone, the
 ``"total_conditioning"`` learner a test of each variable given all the others,
 :func:`parents_children` the forward and backward phases of MMPC, the ``"hiton_pc"`` learner
-semi-interleaved HITON-PC, and the ``"hiton_mb"`` learner semi-interleaved HITON-MB, HITON-PC
-followed by the spouse step. :func:`blanket_graph` and
-:func:`mmpc_sets` run them for every variable. Keeping a pair when each lies in the other's set
-(the AND rule) gives the moral graph and the skeleton that :func:`andrey.calm`,
-:func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
+semi-interleaved HITON-PC, the ``"hiton_mb"`` learner semi-interleaved HITON-MB, HITON-PC
+followed by the spouse step, and the ``"mmmb"`` learner MMMB, MMPC followed by the same step.
+:func:`blanket_graph` and :func:`mmpc_sets` run them for every variable. Keeping a pair when each
+lies in the other's set (the AND rule) gives the moral graph and the skeleton that
+:func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
 :class:`~andrey.core.ci.CITest`, and background knowledge as
 :class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
 set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
@@ -1051,6 +1051,7 @@ LEARNERS: dict[str, Learner] = {
     "hiton_pc": Learner("pc", _hiton_pc),
     "hiton_mb": Learner("pc_spouses", pc="hiton_pc", cell_rows=HITON_CELL_ROWS),
     "total_conditioning": Learner("blanket", _total_conditioning),
+    "mmmb": Learner("pc_spouses", pc="mmpc"),
 }
 
 
