@@ -93,8 +93,10 @@ from Andrey's and how the lane lines them up. The ones that decide a comparison:
   table, the rule Andrey's HITON learners follow. MMMB takes `alpha` as `options.threshold`, the
   limit as `options.maxK`, and five rows per cell as `options.epc`, a cap on the conditioning sets
   with no off switch. Categorical columns are coded from 0 over their observed levels. There is no
-  counterpart of `chisq`; the toolbox's manual takes Fisher's z (`'z'`) for HITON only with a
-  categorical target, and MMMB reads categorical data only.
+  counterpart of `chisq`, and none on continuous data: the toolbox's manual takes Fisher's z
+  (`'z'`) in HITON only with a categorical target, and MMMB reads categorical data only. On
+  linear-Gaussian data with a continuous target, its HITON-PC and HITON-MB with `'z'` returned every
+  other variable for every target, so the Gaussian cells run without the arm.
 - **Ties.** bnlearn orders candidates of equal strength by column, Andrey by a rank computed from
   the data, so where several p-values agree, for example when they underflow to zero, the two can
   add variables in a different order and end with different sets. This is a known cause of

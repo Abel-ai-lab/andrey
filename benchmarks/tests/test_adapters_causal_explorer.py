@@ -28,10 +28,8 @@ _SETTINGS = blanket_cpu.Settings("gsq", True, 0.05, None)
 
 def test_categorical_columns_are_coded_from_zero_over_their_observed_levels():
     X = np.array([[3, 0.5], [7, 0.5], [3, 2.0], [9, 0.5]])
-    codes, counts = ce.encode(X, discrete=True)
+    codes, counts = ce.encode(X)
     assert codes.tolist() == [[0, 0], [1, 0], [0, 1], [2, 0]] and counts == [3, 2]
-    same, none = ce.encode(X, discrete=False)
-    assert np.array_equal(same, X) and none == []
 
 
 @pytest.mark.parametrize(
@@ -39,7 +37,6 @@ def test_categorical_columns_are_coded_from_zero_over_their_observed_levels():
     [
         ("HITON_PC", "gsq", None, {"statistic": "g2", "max_k": 5}),
         ("HITON_MB", "gsq", 3, {"statistic": "g2", "max_k": 3}),
-        ("HITON_MB", "fisherz", 2, {"statistic": "z", "max_k": 2}),
         ("MMMB", "gsq", None, {"statistic": "g2", "max_k": 5, "epc": 5}),
     ],
 )
@@ -58,8 +55,9 @@ def test_each_setting_reaches_the_toolbox(function, test, depth, want):
 def test_a_setting_without_a_counterpart_is_refused():
     with pytest.raises(ValueError, match="takes the tests"):
         CausalExplorerBlanket("HITON_PC", indep_test="chisq")
-    with pytest.raises(ValueError, match="takes the tests"):
-        CausalExplorerBlanket("MMMB", indep_test="fisherz")
+    for function in ce.FUNCTIONS:
+        with pytest.raises(ValueError, match="takes the tests"):
+            CausalExplorerBlanket(function, indep_test="fisherz")
     with pytest.raises(ValueError, match="function must be one of"):
         CausalExplorerBlanket("IAMB", indep_test="gsq")
 
@@ -100,7 +98,7 @@ def test_the_arm_is_absent_without_matlab_or_the_toolbox(monkeypatch, tmp_path):
 
 def test_the_field_pairs_the_hiton_learners_with_the_authors_functions():
     """In target mode, on categorical data, each learner with a Causal Explorer counterpart runs
-    beside it; the whole-graph runs have none."""
+    beside it; the whole-graph runs and continuous data have none."""
     cell = blanket_cpu.Cell.parse("net:asia:200")
     names = [a.name for a in blanket_cpu.field(cell, _SETTINGS, None, causal_explorer=True)]
     for learner in ("hiton_pc", "hiton_mb"):
@@ -109,7 +107,8 @@ def test_the_field_pairs_the_hiton_learners_with_the_authors_functions():
     assert blanket_cpu.authors_name("andrey.iamb") is None
     assert blanket_cpu.authors_name("andrey.hiton_mb") == "causal-explorer.hiton-mb"
     graph = blanket_cpu.field(cell, _SETTINGS, "skeleton", causal_explorer=True)
-    assert not [a for a in graph if a.package == "causal-explorer"]
+    gauss = blanket_cpu.field(blanket_cpu.Cell.parse("gauss:8:200"), _SETTINGS, None, True)
+    assert not [a for a in graph + gauss if a.package == "causal-explorer"]
 
 
 needs_matlab = pytest.mark.skipif(not ce.available(), reason="no matlab or Causal Explorer")

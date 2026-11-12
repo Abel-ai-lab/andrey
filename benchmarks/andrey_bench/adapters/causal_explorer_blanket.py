@@ -17,15 +17,16 @@ measure. The toolbox reports no test count.
 
 The settings the lane passes, and how each reaches the toolbox:
 
-- **Data.** Each categorical column is coded ``0..k-1`` over its observed values, and
-  ``domain_counts`` holds each ``k``, the number of levels Andrey's tests read. Continuous data go
-  as they are, with ``domain_counts = []``.
+- **Data.** Categorical only. Each column is coded ``0..k-1`` over its observed values, and
+  ``domain_counts`` holds each ``k``, the number of levels Andrey's tests read.
 - **Test.** ``gsq`` is the toolbox's ``'g2'``, its G-square test, which takes the empty cells out
   of the degrees of freedom and runs a test only with at least five rows per cell of its table.
   Andrey's ``gsq`` takes the mean of the statistic under a shuffle as the degrees of freedom, and
-  HITON's tests in Andrey run with the same five rows per cell. ``fisherz`` is ``'z'``, which the
-  toolbox's manual takes only with a categorical target for HITON; MMMB reads categorical data
-  only. ``chisq`` has no counterpart.
+  HITON's tests in Andrey run with the same five rows per cell. ``chisq`` has no counterpart. The
+  toolbox's Fisher's z (``'z'``) takes a categorical target in HITON-PC and HITON-MB, by its
+  manual, and MMMB reads categorical data only, so continuous data have no counterpart: on
+  linear-Gaussian data with a continuous target, HITON-PC and HITON-MB with ``'z'`` returned every
+  other variable for every target.
 - **Significance level.** ``alpha`` is the ``threshold``, a p-value, for every function.
 - **Conditioning sets.** ``max_depth`` is HITON's last argument, the largest conditioning set, and
   MMMB's ``maxK``; ``None`` (no cap) passes ``d - 1``. MMMB also caps the size by its own rule of
@@ -71,10 +72,10 @@ FUNCTIONS: dict[str, str] = {"HITON_PC": "pc", "HITON_MB": "mb", "MMMB": "mb"}
 #: The function that runs the algorithm of each learner of Andrey, by the learner's name.
 COUNTERPART: dict[str, str] = {"hiton_pc": "HITON_PC", "hiton_mb": "HITON_MB", "mmmb": "MMMB"}
 
-#: The toolbox's statistic for each of Andrey's tests, by function.
+#: The toolbox's statistic for each of Andrey's tests, by function: G-square on categorical data.
 TESTS: dict[str, dict[str, str]] = {
-    "HITON_PC": {"gsq": "g2", "fisherz": "z"},
-    "HITON_MB": {"gsq": "g2", "fisherz": "z"},
+    "HITON_PC": {"gsq": "g2"},
+    "HITON_MB": {"gsq": "g2"},
     "MMMB": {"gsq": "g2"},
 }
 
@@ -92,8 +93,7 @@ RUNNER = r"""function andrey_ce_run(toolbox, io)
 addpath(fullfile(toolbox, 'causal_explorer'));
 cfg = jsondecode(fileread(fullfile(io, 'config.json')));
 data = load(fullfile(io, 'data.txt'), '-ascii');
-dc = cfg.domain_counts;
-if isempty(dc), dc = []; else, dc = dc(:)'; end
+dc = cfg.domain_counts(:)';
 fid = fopen(fullfile(io, 'out.txt'), 'w');
 fprintf(fid, 'matlab\t%s\n', version);
 for t = cfg.targets(:)'
@@ -140,15 +140,10 @@ def environment() -> dict[str, Any]:
     }
 
 
-def encode(data: np.ndarray, discrete: bool) -> tuple[np.ndarray, list[int]]:
-    """The data as the toolbox reads it, and ``domain_counts``.
-
-    A categorical column becomes the codes ``0..k-1`` of its observed values in ascending order,
-    and its count is ``k``; continuous data stay as they are, with no counts.
-    """
+def encode(data: np.ndarray) -> tuple[np.ndarray, list[int]]:
+    """The categorical data as the toolbox reads it, and ``domain_counts``: each column becomes the
+    codes ``0..k-1`` of its observed values in ascending order, and its count is ``k``."""
     X = np.asarray(data, dtype=np.float64)
-    if not discrete:
-        return X, []
     codes = np.empty(X.shape, dtype=np.int64)
     counts = []
     for j in range(X.shape[1]):
@@ -267,12 +262,12 @@ class CausalExplorerBlanket:
         if toolbox is None or matlab is None:
             raise RuntimeError(f"Causal Explorer needs matlab on the PATH and ${TOOLBOX_ENV}")
         targets = [int(t) for t in targets]
-        X, counts = encode(data, discrete=self.indep_test != "fisherz")
+        X, counts = encode(data)
         d = X.shape[1]
         asked = list(range(d)) if self.symmetry else targets
         with tempfile.TemporaryDirectory(prefix="andrey-ce-") as raw:
             io = Path(raw)
-            np.savetxt(io / "data.txt", X, fmt="%d" if counts else "%.17g")
+            np.savetxt(io / "data.txt", X, fmt="%d")
             (io / "config.json").write_text(json.dumps(self.config(d, asked, counts)))
             (io / "andrey_ce_run.m").write_text(RUNNER)
             call = f"addpath('{io}'); andrey_ce_run('{toolbox}', '{io}')"
