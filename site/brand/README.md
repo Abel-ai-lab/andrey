@@ -15,12 +15,12 @@
     dotted trail ends on the lower summit and an amber one climbs to a glowing star on the higher.
   - `art-hourglass.jpg`: 0.4.0, an hourglass in navy lines, cropped by the frame's top and bottom,
     its amber sand falling in a fine stream from the upper bulb to the lower: one way only.
-  - `art-agentic.jpg`: the homepage's "agentic", an orrery in pale engraved rings tilted across
-    the frame, a small directed graph on its rings, and one amber arm from its hidden center
+  - `art-agentic.jpg`: the homepage's "Built for agents", an orrery in pale engraved rings tilted
+    across the frame, a small directed graph on its rings, and one amber arm from its hidden center
     steering one node.
-  - `art-start.jpg` and `art-docs.jpg`: the homepage's "From data to graph" (data points
-    gathering into a small graph, one arrow amber) and its documentation (an atlas's pages fanning
-    open, one edge amber).
+  - `art-start.jpg` and `art-docs.jpg`: data points gathering into a small graph, one arrow amber,
+    and an atlas's pages fanning open, one edge amber; drawn for getting started and the
+    documentation, and free for a post.
   - `art-tide.jpg`: 0.5.0, the moon over a swelling sea, drawn in engraved lines: each swell
     crests a little after the one before, and the moon's lower half and its glitter path on the
     waves are amber. `art-tide-center.jpg` is the same art with the moon in the middle, the post's
@@ -48,18 +48,9 @@
     three lamps on curved arms from the left, above, and the right, each lighting another facet
     and casting its own shadow across the plinth. The right-hand lamp and the facet it lights are
     amber.
-  - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
-    fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
-    crop to the cover's size, so it is softer than the others until the art is drawn again at
-    full size.
-- `bento/<art>.jpg`: the homepage's bento tiles, each a crop of an art at twice its tile's size
-  (1168 x 416 for a wide tile, 768 x 416 for a narrow one), in the same tones. The crops of the
-  covers above keep their names; the others are drawn for their tile: `hardware` (a honeycomb of
-  cells, one lit), `constraint` (a web of threads, most cut), `permutation` (a row of slabs, one
-  lifted out), `lingam` (dunes leaning one way), `accuracy` (a sighting reticle over a graph),
-  `graphs` (many streams braided into one), `compare` (a level balance), and `methods` (a prism
-  fanning one beam into many rays). A narrow tile's art, and any tile that shows a number, is
-  cobalt only, so the number is its one amber.
+  - `art-methods.jpg`: the homepage's band that leads to the methods catalog, a prism fanning one
+    beam into many rays, the level ray out of the prism drawn amber. It is scaled up from a
+    smaller crop, so it is softer than the others until the art is drawn again at full size.
 - The release cards' covers (`docs/_static/release-cards/<release>.jpg`) are tall versions of the
   same art, in the same tones, with calm areas where the card's text sits. A release without art
   takes the default cover, drawn in CSS from `wordmark-dark.svg` on navy, and needs no file here.

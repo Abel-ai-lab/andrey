@@ -289,6 +289,12 @@ def test_em_takes_the_linear_gaussian_bic_only(name):
         getattr(andrey, name)(x, score_func="bdeu", missing="em")
 
 
+@pytest.mark.parametrize("name", ["ges", "xges", "hc", "tabu", "exact_search", "boss", "grasp"])
+def test_em_refuses_the_rank_based_score(name):
+    with pytest.raises(ValueError, match=rf'^{name}: missing="em" .*score_func must be "bic"'):
+        getattr(andrey, name)(_gaps(_chain(), 0.1), score_func="normal_scores", missing="em")
+
+
 @pytest.mark.parametrize("name", ["ges", "hc", "tabu", "boss", "grasp"])
 def test_em_takes_no_environments(name):
     with pytest.raises(ValueError, match=rf'^{name}: missing="em" takes no env'):

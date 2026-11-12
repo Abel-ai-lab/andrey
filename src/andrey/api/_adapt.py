@@ -18,6 +18,7 @@ from andrey.core.score import (
     DISCRETE_SCORES,
     LINEAR_SCORES,
     MIXED_SCORES,
+    RANK_SCORES,
     CopiedColumnsError,
     copies_error,
     copies_message,
@@ -291,8 +292,8 @@ def check_same_data(method: str, score_func: str, indep_test: str) -> None:
             f"{method}'s score and test must read the data alike: score_func='bdeu' or "
             "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
             "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
-            f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
+            "'cond_gauss' for mixed data, or 'bic' or 'normal_scores' with a test of "
+            f"continuous data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
 
 
@@ -594,6 +595,22 @@ def check_em(name: str, missing: str | None, score_func: str | None, env: object
         )
 
 
+def check_rank_env(name: str, score_func: str | None, env: object) -> None:
+    """Raise ``ValueError`` for ``score_func="normal_scores"`` with an ``env``.
+
+    The score reads each column's normal scores, ranked over every row. Pooled over environments
+    that shift a variable, a column mixes its environments' distributions, so its normal scores
+    are no longer Gaussian, and the linear-Gaussian BIC on them is no longer the nonparanormal
+    model's score.
+    """
+    if score_func in RANK_SCORES and env is not None:
+        raise ValueError(
+            f'{name}: score_func="normal_scores" models one distribution through the ranks of each '
+            "column, so it takes no env: ranked over several environments, a column mixes their "
+            'distributions; fit each environment alone, or pass score_func="bic"'
+        )
+
+
 def fit_missing(
     X: np.ndarray,
     missing: str | None,
@@ -653,6 +670,7 @@ def cpdag_search(
     """
     assert score_func is not None  # method_spec picks it from the column types
     check_em(name, missing, score_func, env)
+    check_rank_env(name, score_func, env)
     data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
         data,

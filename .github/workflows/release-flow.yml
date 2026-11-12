@@ -1,7 +1,8 @@
 name: release-flow
 
-# Only a release branch merges to main (CONTRIBUTING.md, Pull requests): a pull request into main
-# from any other branch fails this check, which the main ruleset requires, and so does a release
+# Only a release branch merges to main (DEVELOPMENT.md, Releases, labels, and the changelog): a pull
+# request into main from any other branch fails this check, which the main ruleset requires, and so
+# does a release
 # branch whose package version is not the branch's <x.y.z>: the tag and the site take it. A post
 # release, release/<x.y.z>.post<n>, fixes the site or the docs of the release on main: it keeps
 # main's <x.y.z> and changes nothing under src/, so no package code ships under an old version.

@@ -156,6 +156,20 @@ def test_parallel_matches_serial_under_ebic(monkeypatch):
     assert not np.array_equal(plain_structure.to_numpy(), serial_structure.to_numpy())
 
 
+@pytest.mark.parametrize("method", ["ges", "gfci"])
+def test_parallel_matches_serial_under_the_rank_based_score(monkeypatch, method):
+    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
+    created = _spy_pool(monkeypatch)
+    x = _GES_PARALLEL_SEM**3
+    fit = getattr(andrey, method)
+    serial = fit(x, score_func="normal_scores")
+    with backend.config(n_jobs=_GES_WORKERS):
+        parallel = fit(x, score_func="normal_scores")
+    assert sum(created) >= 1, "the pool never opened -- the comparison would be serial vs serial"
+    assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy())
+    assert serial.metadata.get("score") == parallel.metadata.get("score")
+
+
 def test_parallel_arm_tracks_the_penalty(monkeypatch):
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
     created = _spy_pool(monkeypatch)
