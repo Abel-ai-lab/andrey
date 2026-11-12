@@ -23,6 +23,12 @@ names its pull request.
   the blanket and adds those that test dependent together, the most dependent first, while a
   categorical test's table holds more than five rows per cell, then shrinks the blanket once.
   ([#935])
+- `andrey.hiton_pc`, the semi-interleaved HITON-PC learner of parents and children (Aliferis et al.
+  2010), experimental, with the arguments and metadata of `mmpc` and `max_depth=3` by default. It
+  orders the candidates once by their unconditional test, tests each newcomer against the subsets
+  of the members before it, tests every member again once all have joined, and keeps a member only
+  when the target is in that member's own set. On categorical data a test runs only with at least
+  five rows per cell of its table. ([#950])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2606,6 +2612,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
 [#931]: https://github.com/Abel-ai-lab/Andrey/pull/931
 [#927]: https://github.com/Abel-ai-lab/andrey/pull/927
