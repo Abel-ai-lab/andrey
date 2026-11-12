@@ -43,7 +43,7 @@ names its pull request.
   children, then admits a variable as a spouse when a test finds it dependent on the target given
   the set that separated the two and a parent or child of the target whose own set holds the
   variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
-  ([#962])
+  ([#965])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
   experimental: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
@@ -2647,7 +2647,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#962]: https://github.com/Abel-ai-lab/Andrey/pull/962
+[#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
 [#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
