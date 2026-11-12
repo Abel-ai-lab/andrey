@@ -73,7 +73,7 @@ names its pull request.
   conditioning, a test of each variable given all the others, as in the paper's runs
   (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
   takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. The benchmark lane of
-  MMB-by-MMB runs it beside the authors' code. ([#PR])
+  MMB-by-MMB runs it beside the authors' code. ([#966])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2666,6 +2666,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
