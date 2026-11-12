@@ -15,7 +15,7 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, concept_param
+from .concepts import CONCEPTS, REQUIRED_TARGET, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -652,6 +652,56 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             references=_refs,
         )
     )
+
+# --- target-centered: the edges at one variable ------------------------------------------------
+
+_add(
+    MethodSpec(
+        name="mb_by_mb",
+        family="constraint",
+        summary="The direct causes and direct effects of one variable, the edges at it in the "
+        "CPDAG, by sequential local learning: its Markov blanket and the local structure over it, "
+        "then a neighbor's, one blanket at a time, until no further blanket can direct an edge "
+        "at the target. For one variable of a large graph with small blankets.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at target alone, with the directions the CPDAG gives them; "
+            "metadata['parents'], metadata['children'], and metadata['undirected'] list the "
+            "columns joined to it, and metadata['blankets_learned'] the variables whose blanket "
+            "the search learned, in order",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            REQUIRED_TARGET,
+            concept_param(
+                "blanket",
+                default="iamb_forward",
+                doc="The Markov blanket learner run for each variable the search visits: "
+                "iamb_forward = IAMB's grow phase without its shrink, the learner of Wang et al. "
+                "2014's runs, which keeps a variable added in error rather than lose a member; the "
+                "others are the functions of those names.",
+            ),
+            _ALPHA,
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param(
+                "max_depth",
+                default=5,
+                doc="The maximum conditioning-set size of the local structures' tests, at least 0: "
+                "0 runs only unconditional tests there, and null sets no limit. Wang et al. 2014 "
+                "leave the cap open and run MB-by-MB with 5, the default; the blanket learner "
+                "conditions on its whole current set, uncapped.",
+            ),
+        ),
+        references=("Wang, Zhou, Zhao & Geng 2014", "Meek 1995"),
+    )
+)
 
 # --- score-based ----------------------------------------------------------------------------------
 
@@ -3057,6 +3107,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hiton_pc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
+    "mb_by_mb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent never shares an edge. Every edge a tier or an edge "
+    "forbidden one way directs is directed as each local structure joins the growing graph, over "
+    "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
+    "forbidden_paths raise NotImplementedError.",
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
@@ -3340,6 +3395,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     "hiton_pc": ("target", "parents_and_children"),
+    "mb_by_mb": ("target", "parents", "children", "undirected"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

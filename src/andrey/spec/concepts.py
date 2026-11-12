@@ -115,6 +115,7 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
 CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
     *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "mmhc", "rsmax2"),
+    "mb_by_mb",
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -601,6 +602,16 @@ _CONCEPTS = (
         ),
         deviations=(
             Deviation(
+                method="mb_by_mb",
+                name="max_depth",
+                default=5,
+                reason="Wang et al. 2014 leave the cap open and run MB-by-MB with 5 in every "
+                "experiment, a cap on the local structures' tests: the complexity they state "
+                "bounds those tests by it and the blanket learner's grow phase by the blanket "
+                "alone. null runs it uncapped.",
+                fragment="local structures' tests",
+            ),
+            Deviation(
                 method="hiton_pc",
                 name="max_depth",
                 default=3,
@@ -686,6 +697,7 @@ _CONCEPTS = (
                 "fast_iamb",
                 "mmpc",
                 "hiton_pc",
+                "mb_by_mb",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -1063,6 +1075,7 @@ _CONCEPTS = (
             "fast_iamb",
             "mmpc",
             "hiton_pc",
+            "mb_by_mb",
             *PCMCI_FAMILY,
             "anm",
             "pnl",
@@ -1243,7 +1256,7 @@ _CONCEPTS = (
             *_exempt(
                 "A Markov-blanket search, with no place for a context variable; cdnod is the "
                 "test-based search that takes env.",
-                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
+                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "mb_by_mb"),
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
@@ -1320,6 +1333,9 @@ _CONCEPTS = (
         ),
         fragment="cpdag",
         suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
+        exempt=_exempt(
+            "Answers for one target: the edges at it, as its CPDAG holds them.", "mb_by_mb"
+        ),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
             Deviation(
@@ -1359,7 +1375,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp", "mb_by_mb"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1416,8 +1432,9 @@ _CONCEPTS = (
     Concept(
         key="blanket",
         summary="The Markov blanket learner a method runs as one of its steps, by the name of its "
-        "public function. A method offers the learners its proof allows, so its choices may be "
-        "fewer than every learner's.",
+        "public function, or iamb_forward, IAMB's grow phase without its shrink (Wang et al. "
+        "2014). A method offers the learners its proof allows, so its choices may be fewer than "
+        "every learner's.",
         param=_template(
             "blanket",
             "str",
@@ -1428,8 +1445,18 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=(),
+        suitable=("mb_by_mb",),
         others_exempt="Runs no Markov blanket learner as a step.",
+        deviations=(
+            Deviation(
+                method="mb_by_mb",
+                name="blanket",
+                default="iamb_forward",
+                reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
+                "to keep a variable added in error rather than lose a member; any blanket "
+                "learner, or a superset of the blanket, satisfies its proof.",
+            ),
+        ),
     ),
     Concept(
         key="target_answer",
@@ -1438,7 +1465,7 @@ _CONCEPTS = (
         "undirected for a set, so an absent edge away from the target means nothing. "
         "metadata['target'] names the target, and each set the fit learns is a list of columns "
         "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "icp", "mb_by_mb"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1446,7 +1473,7 @@ _CONCEPTS = (
         summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
         "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
         "query whose p-value a test computed, none for a query answered from a kept answer.",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"),
+        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "mb_by_mb"),
         others_exempt="Does not report its test count.",
     ),
     Concept(
@@ -1454,7 +1481,7 @@ _CONCEPTS = (
         summary="A method that learns the Markov blankets of several variables in turn lists them "
         "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
         "of blankets it needed is the list's length.",
-        suitable=(),
+        suitable=("mb_by_mb",),
         others_exempt="Learns no sequence of Markov blankets.",
     ),
     Concept(
@@ -1501,6 +1528,11 @@ _CONCEPTS = (
                 "fast_iamb",
                 "mmpc",
                 "hiton_pc",
+            ),
+            *_exempt(
+                "Each local structure decides a triple by the separating set of its endpoints, "
+                "as MB-by-MB states (Wang et al. 2014); no vote over several sets.",
+                "mb_by_mb",
             ),
         ),
         others_exempt="No separating-set orientation.",

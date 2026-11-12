@@ -101,10 +101,10 @@ single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`,
-`pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty,
-`NA`, or `N/A` field of a CSV file: each conditional-independence test reads only the rows where all
-of its variables are observed (test-wise deletion), and so do the pair tests `anm`, `pnl`, and
-`loci`, which read the rows where both columns are observed; `metadata["rows_tested"]` gives the
+`mb_by_mb`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or
+an empty, `NA`, or `N/A` field of a CSV file: each conditional-independence test reads only the rows
+where all of its variables are observed (test-wise deletion), and so do the pair tests `anm`, `pnl`,
+and `loci`, which read the rows where both columns are observed; `metadata["rows_tested"]` gives the
 fewest (`min`) and the median rows a test read. Their argument `missing` names the handling:
 `"testwise"` is test-wise deletion, and `None`, the default, picks the method's default handling,
 `"testwise"`; `metadata["missing"]` records the one a fit used. `pc` also takes `missing="mvpc"`:
@@ -136,23 +136,24 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and
-`lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for
-continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for
-mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks from
-the declared column types, `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and
-nonlinear tests, as its dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`,
-and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
-A test you register that reports only p-values is ordered by its p-value, smallest first.
+`fast_iamb`, `mmpc`, `hiton_pc`, `mb_by_mb`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`,
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
+`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"`
+and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and
+`"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default,
+picks from the declared column types, `"fisherz"` for continuous data. `jpcmciplus` takes the
+continuous and nonlinear tests, as its dummies enter a test as numeric columns. `pcmci`,
+`pcmciplus`, `jpcmciplus`, and `lpcmci` run each test on the lagged values of the series, and order
+the candidate conditions by the test's statistic, as tigramite does: the partial correlation, the
+chi-square statistic, the likelihood ratio, CMIknn's conditional mutual information estimate, or
+GPDC's distance correlation. A test you register that reports only p-values is ordered by its
+p-value, smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`,
-`boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
-`score_matching`, `nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
+`fast_iamb`, `mmpc`, `hiton_pc`, `mb_by_mb`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`,
+`rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`,
+`resit`, `score_matching`, `nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
 `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`,
 `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a
 {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
@@ -255,10 +256,12 @@ in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and
-`camuv` take `max_depth`, the maximum conditioning-set size of their conditional-independence tests;
-`None`, the default, sets no cap, except in `hiton_pc`, whose default 3 is the cap of its paper's
-Markov-blanket experiments. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`,
+`fast_iamb`, `mmpc`, `hiton_pc`, `mb_by_mb`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`,
+`rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
+conditional-independence tests; `None`, the default, sets no cap, except in `hiton_pc`, whose
+default 3 is the cap of its paper's Markov-blanket experiments, and in `mb_by_mb`, whose default 5
+is the cap of its paper's runs on its local structures' tests; its blanket learner conditions on its
+whole current set, uncapped. `mmhc` and `rsmax2` cap their restrict phase and `pcmci`, `pcmciplus`,
 and `jpcmciplus` their PC1 step; the blankets of `iamb`, `inter_iamb`, `gs`, and `fast_iamb` stop
 growing at the cap. `rcd`'s cap is the most variables it regresses out together, and `camuv`'s the
 most variables a sink test adds together as a variable's candidate parents, each with a default of
@@ -321,16 +324,16 @@ tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`,
-`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole
-number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured
-seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart
-from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
-every fit, the methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and
-`ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise
-`seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend
-on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
+`fast_iamb`, `mmpc`, `hiton_pc`, `mb_by_mb`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`,
+`lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a
+whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the
+configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
+exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a
+random order on every fit, the methods that test independence draw random numbers only under
+`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing
+values, `igsp` and `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts`
+above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives
+`seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -668,6 +671,7 @@ in a process.
    gs
    fast_iamb
    hiton_pc
+   mb_by_mb
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -678,6 +682,13 @@ the empty graph at its default settings, which is why it is experimental. The
 [0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+MB-by-MB (Wang et al. 2014) answers for one `target`: it learns the target's Markov blanket and the
+local structure over it, then a neighbor's, one blanket at a time, until no further blanket can
+direct an edge at the target, and returns the edges the target has in the CPDAG with their
+directions. `metadata["parents"]`, `metadata["children"]`, and `metadata["undirected"]` list the
+columns joined to the target, and `metadata["blankets_learned"]` the variables whose blanket it
+learned, in order. No reference implementation exists to compare it with.
 
 GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does,
 by growing the blanket with conditional-independence tests and then shrinking it, and takes the
@@ -762,11 +773,11 @@ and gives that test's p-value exactly; `normal_scores` therefore ranks each colu
 its query reads; a registered test works the same way, built anew for each
 query.
 
-`iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, and `hiton_pc` record in `metadata["n_tests"]` how
-many tests the fit evaluated: one for each query whose p-value a test computed, so a query answered
-again from a kept answer, as the chi-square tests keep their marginal answers, is not a new test. A
-query a test computes together with others counts as well, even when the search reads only some of
-the answers. To count the tests in your own code, run it inside
+`iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, and `mb_by_mb` record in
+`metadata["n_tests"]` how many tests the fit evaluated: one for each query whose p-value a test
+computed, so a query answered again from a kept answer, as the chi-square tests keep their marginal
+answers, is not a new test. A query a test computes together with others counts as well, even when
+the search reads only some of the answers. To count the tests in your own code, run it inside
 {py:func}`~andrey.core.ci.counting_tests`; a test you register counts the queries it reports through
 {py:func}`~andrey.core.ci.count_tests`.
 

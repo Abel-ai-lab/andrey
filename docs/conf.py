@@ -499,6 +499,7 @@ PROSE_NAMES = {
     "fast_iamb": "Fast-IAMB",
     "mmpc": "MMPC",
     "hiton_pc": "HITON-PC",
+    "mb_by_mb": "MB-by-MB",
     "ges": "GES",
     "gies": "GIES",
     "gnies": "GnIES",

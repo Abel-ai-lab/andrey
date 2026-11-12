@@ -29,6 +29,13 @@ names its pull request.
   of the members before it, tests every member again once all have joined, and keeps a member only
   when the target is in that member's own set. On categorical data a test runs only with at least
   five rows per cell of its table. ([#950])
+- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014), experimental: the direct causes and direct
+  effects of one target, the edges the target has in the CPDAG with their directions, learned one
+  Markov blanket at a time outward from the target until no further blanket can direct one of
+  them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
+  `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
+  as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners), and
+  `max_depth=5` by default, the cap of those runs. ([#PRNUM])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,

@@ -15,8 +15,8 @@ SHORT = {
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
 }
-#: The arguments a method needs beyond its inputs: ICP's target, by position.
-REQUIRED = {"icp": {"target": 2}}
+#: The arguments a method needs beyond its inputs: the target of ICP and MB-by-MB, by position.
+REQUIRED = {"icp": {"target": 2}, "mb_by_mb": {"target": 2}}
 
 
 def fit_settings(method: str) -> dict:

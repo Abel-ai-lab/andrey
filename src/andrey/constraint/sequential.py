@@ -255,6 +255,8 @@ def sequential(
     blanket: str,
     rules: Rules = MB_BY_MB,
     cache: Cache | None = None,
+    *,
+    local_depth: int | None = None,
 ) -> Result:
     """Learn the edges at ``target`` and their marks, one Markov blanket at a time.
 
@@ -262,6 +264,8 @@ def sequential(
     blanket; a learner of parents and children alone is refused. ``rules`` holds the choices of
     :class:`Rules`. ``cache`` carries the blankets, local structures, and separating sets of earlier
     runs over the same ``search`` and receives this run's; it is :attr:`Result.cache`.
+    ``local_depth`` caps the conditioning sets of the local structures alone, below the search's
+    ``max_depth``, which caps every test, the blanket learner's included.
 
     Each step takes the waitlist's head ``x`` and learns ``MB(x)``. ``L_x`` is a cached local
     structure, else the substructure of a done variable's ``L_y`` when ``MB+(x)`` lies inside
@@ -269,7 +273,10 @@ def sequential(
     of ``MB(x)`` is done, else learned from the data (:func:`learn_local`) ([1]_ Step 3, [2]_
     Alg. 1, [3]_ Alg. 11). Then :func:`merge`, :func:`orient`, the waitlist (:func:`extend`), and
     the stop rule. With the CPDAG rules, an edge whose two ends got arrowheads, from v-structures
-    that disagree, is left undirected at the end.
+    that disagree, is left undirected at the end. With the CPDAG rules and ``search`` constraints
+    that direct edges (tiers, edges forbidden one way), each step directs those edges after the
+    merge, over any arrowhead a v-structure put on them (:func:`direct`), and Meek's rule R4 joins
+    R1-R3.
 
     Raises
     ------
@@ -280,6 +287,10 @@ def sequential(
         raise ValueError(f"{blanket!r} learns parents and children, not a Markov blanket")
     cache = Cache() if cache is None else cache
     network = Network(CIRCLE if rules.orient == "pag" else TAIL)
+    decided = None
+    if rules.orient == "meek" and search.constraints is not None:
+        decided = search.constraints.decided()
+        decided = decided if decided.any() else None
     waitlist, done, learned = [target], [], []
     stopped = "empty"
     with counting_tests() as tests, search.pinned():
@@ -295,9 +306,11 @@ def sequential(
             if rules.expand == "blanket":
                 extend(waitlist, mb, done)
             done.append(x)
-            local = _local_structure(search, x, mb, rules.local, cache, network, done)
+            local = _local_structure(search, x, mb, rules.local, cache, network, done, local_depth)
             merge(network, local, x)
-            orient(network, cache.sepsets, rules.orient, search)
+            if decided is not None:
+                direct(network, decided)
+            orient(network, cache.sepsets, rules.orient, search, rule4=decided is not None)
             if rules.expand == "adjacent":
                 adjacent = set(network.neighbors(x))
                 extend(waitlist, [y for y in mb if y in adjacent], done)
@@ -332,6 +345,7 @@ def _local_structure(
     cache: Cache,
     network: Network,
     done: list[int],
+    depth: int | None = None,
 ) -> LocalGraph:
     """``L_x`` by the cases of :func:`sequential`, kept in ``cache``."""
     if x in cache.local:
@@ -346,13 +360,19 @@ def _local_structure(
         if set(mb) <= set(done):
             local = network.local(sorted(nodes))
         else:
-            local = learn_local(search, x, mb, how, cache)
+            local = learn_local(search, x, mb, how, cache, depth=depth)
     cache.local[x] = local
     return local
 
 
 def learn_local(
-    search: LocalSearch, x: int, mb: Sequence[int], how: str, cache: Cache | None = None
+    search: LocalSearch,
+    x: int,
+    mb: Sequence[int],
+    how: str,
+    cache: Cache | None = None,
+    *,
+    depth: int | None = None,
 ) -> LocalGraph:
     """The local structure over ``MB+(x)``, ``x`` with its blanket ``mb``, learned from the data.
 
@@ -363,9 +383,10 @@ def learn_local(
     can), and a pair that some set of that size separates is removed after the level, with the set
     of the largest p-value, ties to the set whose ranks come first
     (:meth:`~andrey.constraint.blanket.LocalSearch.largest_sets`). No test conditions on more than
-    the search's ``max_depth`` variables. With knowledge, a pair it makes non-adjacent is never
-    adjacent and a required one is never tested. A triple ``a - b - c`` with ``a``, ``c`` separated
-    is a collider when ``b`` is not in their set. Each set found goes into ``cache``.
+    the search's ``max_depth`` variables, nor on more than ``depth``. With knowledge, a pair it
+    makes non-adjacent is never adjacent and a required one is never tested. A triple
+    ``a - b - c`` with ``a``, ``c`` separated is a collider when ``b`` is not in their set. Each set
+    found goes into ``cache``.
     """
     nodes = tuple(sorted({x, *mb}))
     constraints = search.constraints
@@ -375,8 +396,10 @@ def learn_local(
     fixed = {p for p in adjacent if required is not None and required[p]}
     blanket = sorted(mb)
     sepsets: dict[Pair, tuple[int, ...]] = {}
+    caps = [c for c in (search.max_depth, depth) if c is not None]
+    cap = min(caps) if caps else None
     size = 0
-    while search.max_depth is None or size <= search.max_depth:
+    while cap is None or size <= cap:
         neighbors = {v: {u for p in adjacent if v in p for u in p if u != v} for v in nodes}
         removed: list[tuple[Pair, tuple[int, ...]]] = []
         tested = False
@@ -454,6 +477,17 @@ def merge(network: Network, local: LocalGraph, x: int) -> None:
             network.arrow(b, c)
 
 
+def direct(network: Network, decided: np.ndarray) -> None:
+    """Direct in place each edge of ``network`` that ``decided`` directs, ``decided[u, v]`` meaning
+    ``u -> v`` (:meth:`~andrey.core.knowledge.Constraints.decided`: a tier or an edge forbidden one
+    way), over any arrowhead a v-structure put on it."""
+    nodes = network.nodes
+    marks = network.marks
+    rows, cols = np.nonzero(decided[np.ix_(nodes, nodes)] & (marks != NULL))
+    marks[rows, cols] = TAIL
+    marks[cols, rows] = ARROW
+
+
 def _apart(network: Network, sepsets: Mapping[Pair, tuple[int, ...]]) -> np.ndarray:
     """``[i, j]``: ``network.nodes[i]`` and ``[j]`` share no edge and a test separated them."""
     nodes = network.nodes
@@ -489,10 +523,16 @@ def unknown_triples(network: Network, sepsets: Mapping[Pair, tuple[int, ...]]) -
 
 
 def orient(
-    network: Network, sepsets: Mapping[Pair, tuple[int, ...]], how: str, search: LocalSearch
+    network: Network,
+    sepsets: Mapping[Pair, tuple[int, ...]],
+    how: str,
+    search: LocalSearch,
+    *,
+    rule4: bool = False,
 ) -> None:
-    """Orient ``network`` in place: with ``how="meek"`` by Meek's rules R1-R3 [1]_, with
-    ``how="pag"`` by the FCI rules without selection bias [2]_.
+    """Orient ``network`` in place: with ``how="meek"`` by Meek's rules R1-R3 [1]_, and R4 with
+    ``rule4`` (for edges background knowledge directed), with ``how="pag"`` by the FCI rules
+    without selection bias [2]_.
 
     The rules read a non-adjacency only for a pair a test separated, and an unshielded triple as a
     non-collider only when that test's set holds its middle (:func:`unknown_triples`). The FCI
@@ -502,7 +542,7 @@ def orient(
         return
     unknown = unknown_triples(network, sepsets)
     if how == "meek":
-        network.marks[...] = meek(network.marks, ambiguous=unknown)
+        network.marks[...] = meek(network.marks, rule4=rule4, ambiguous=unknown)
         return
     nodes, index = network.nodes, network.index
     local_sepsets = {}
