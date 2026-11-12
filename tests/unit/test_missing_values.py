@@ -29,6 +29,7 @@ from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import REQUIRED
 
 SUPPORTED = [name for name, spec in REGISTRY.items() if spec.data.missing]
 REFUSED = [name for name, spec in REGISTRY.items() if not spec.data.missing]
@@ -395,6 +396,7 @@ def test_a_lagged_design_reads_the_steps_its_lagged_variables_share():
 
 def _fit(name: str, x, **kwargs):
     fit = getattr(andrey, name)
+    kwargs = {**REQUIRED.get(name, {}), **kwargs}
     if name in ("cdnod", "fci_jci"):
         return fit(x, np.repeat([0.0, 1.0], len(x) // 2 + 1)[: len(x)], **kwargs)
     if REGISTRY[name].family == "pairwise":  # a pair test reads two columns
@@ -502,8 +504,8 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     else:
         assert "drop the rows that hold one" in str(error.value)
         assert (
-            "pc, fci, cdnod, fci_jci, iamb, inter_iamb, gs, fast_iamb, mmpc, hiton_pc, or hiton_mb"
-            in str(error.value)
+            "pc, fci, cdnod, fci_jci, iamb, inter_iamb, gs, fast_iamb, mmpc, hiton_pc, hiton_mb, "
+            "or mb_by_mb" in str(error.value)
         )
         assert 'missing="em"' not in str(error.value)
 

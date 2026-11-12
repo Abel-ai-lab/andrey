@@ -41,6 +41,14 @@ names its pull request.
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
   is absent. ([#957])
+- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014), experimental: the direct causes and direct
+  effects of one target, the edges the target has in the CPDAG with their directions, learned one
+  Markov blanket at a time outward from the target until no further blanket can direct one of
+  them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
+  `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
+  as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
+  `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
+  caps every test, as in the other learners, and sets no cap by default. ([#956])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2624,6 +2632,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
 [#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
 [#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935

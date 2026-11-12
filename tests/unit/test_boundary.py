@@ -15,6 +15,7 @@ from andrey.api import _boundary, _boundary_table
 from andrey.api._boundary import CAP_STOPS, Ladder, measured, past_boundary, warn_past_boundary
 from andrey.core import backend
 from andrey.spec import REGISTRY
+from tests.unit.methods import requires_target
 
 ROOT = Path(__file__).resolve().parents[2]
 PAIRS = ("anm", "pnl")
@@ -139,16 +140,15 @@ class _Checked(Exception):
 
 def _call(method: str, data: np.ndarray) -> object:
     """Fit ``method`` on ``data``: two environments for cdnod, fci_jci, gnies, and icp, two or three
-    copies for a panel."""
-    if method in ("cdnod", "fci_jci", "gnies"):
-        return getattr(andrey, method)(data, env=np.arange(len(data)) % 2)
-    if method == "icp":
-        return andrey.icp(data, env=np.arange(len(data)) % 2, target=0)
+    copies for a panel, and the first column as the target of a method that requires one."""
+    required = {"target": 0} if requires_target(method) else {}
+    if method in ("cdnod", "fci_jci", "gnies", "icp"):
+        return getattr(andrey, method)(data, env=np.arange(len(data)) % 2, **required)
     if method == "jpcmciplus":  # it checks the datasets stacked
         return andrey.jpcmciplus([data, data, data])
     if method in ("multi_group_direct_lingam", "longitudinal_lingam"):
         return getattr(andrey, method)([data, data + 1, data * 2])
-    return getattr(andrey, method)(data)
+    return getattr(andrey, method)(data, **required)
 
 
 @pytest.mark.parametrize("method", sorted(REGISTRY))

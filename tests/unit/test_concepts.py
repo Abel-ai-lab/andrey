@@ -354,7 +354,7 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
-            *("mmpc", "hiton_pc", "hiton_mb", "mmhc", "rsmax2"),
+            *("mmpc", "hiton_pc", "hiton_mb", "mb_by_mb", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
@@ -582,6 +582,10 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
     return table
 
 
+#: A target-centered method answers for the edges at its target, so the target is the edge's end.
+EDGE_TARGET = {"mb_by_mb": {"target": "y"}}
+
+
 def required_edge_is_kept(method: str, kind: str) -> bool:
     """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
     spec = REGISTRY[method]
@@ -592,7 +596,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = facade(method)(
-            *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
+            *args_for(method, tables),
+            knowledge=knowledge,
+            **SERIES_SETTINGS.get(method, {}),
+            **EDGE_TARGET.get(method, {}),
         )
     out = out[0] if isinstance(out, list) else out
     s = out.structure
@@ -975,6 +982,7 @@ CI_CASES = {
     "mmpc": [{}, {"target": 0}],
     "hiton_pc": [{}, {"target": 0}],
     "hiton_mb": [{}, {"target": 0}],
+    "mb_by_mb": [{"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
     "pcmci": [{}],
