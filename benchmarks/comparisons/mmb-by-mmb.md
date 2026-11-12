@@ -1,11 +1,11 @@
 # MMB-by-MMB
 
 `mmb_by_mmb_cpu.py` measures what a method learns about one target when some variables are hidden.
-It runs the authors' MMB-by-MMB code, pcalg's RFCI, and Andrey's FCI on the simulation of the
-method's paper (Xie, Li, Wu, Zeng, Liu, and Geng, 2024, Section 5.1), and it scores the edges at
-the target, with both endpoint marks, against the PAG of the observed variables. The lane is built
-for the methods that answer for one target as well: its data, its scores, and the contract of an
-adapter (below) serve `mb_by_mb`, `cmb`, and `mmb_by_mmb`.
+It runs Andrey's `mmb_by_mmb`, the authors' MMB-by-MMB code, pcalg's RFCI, and Andrey's FCI on the
+simulation of the method's paper (Xie, Li, Wu, Zeng, Liu, and Geng, 2024, Section 5.1), and it
+scores the edges at the target, with both endpoint marks, against the PAG of the observed variables.
+The lane is built for the methods that answer for one target as well: its data, its scores, and the
+contract of an adapter (below) serve `mb_by_mb`, `cmb`, and `mmb_by_mmb`.
 
 ## Data
 
@@ -36,6 +36,10 @@ The model is a published network, read as a linear-Gaussian structural model
 
 Every solution runs at `alpha = 0.01`, the value of the authors' example; the paper states none.
 
+- `andrey.mmb_by_mmb` and `andrey.mmb_by_mmb.iamb` run `andrey.mmb_by_mmb` with Fisher's z test
+  (`indep_test="fisherz"`) and the blanket learner `"total_conditioning"`, the paper's, or
+  `"iamb"`. They fit once per target, and the answer holds the marks at the target and the fit's
+  `metadata["n_tests"]`.
 - `mmb-by-mmb.authors` is the authors' code, `fengxie009/MMB-by-MMB` at a pinned commit, run
   unmodified in an environment of its own with `maxK = 10`. It has no license, so
   `benchmarks/start_mmb.sh` downloads its five files, checks each SHA-256, and keeps them out of the

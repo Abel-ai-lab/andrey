@@ -39,6 +39,11 @@ from .models import ParamSpec, ParamType, Spec
 #: The learners a method's ``blanket`` can name: every Markov blanket learner of
 #: :data:`~andrey.constraint.blanket.LEARNERS`, the parents-and-children learners left out.
 BLANKET_LEARNERS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if row.kind != "pc")
+#: The learners ``mmb_by_mmb`` can name: those that find the blanket with hidden variables too,
+#: total conditioning and the grow-shrink learners, whose correctness rests on properties
+#: m-separation keeps (Pellet and Elisseeff 2008); the forward phase alone returns a superset and
+#: HITON-MB assembles the blanket from a DAG's parents, children, and spouses.
+MMB_BLANKETS: tuple[str, ...] = ("total_conditioning", "gs", "iamb", "inter_iamb", "fast_iamb")
 
 #: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
 #: each.
@@ -115,7 +120,7 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
 CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
     *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
-    *("mb_by_mb", "mmhc", "rsmax2"),
+    *("mb_by_mb", "mmb_by_mmb", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -231,6 +236,12 @@ _CONCEPTS = (
                 default=0.01,
                 reason="0.01 is the level of the method's published simulations (Versteeg, Zhang "
                 "and Mooij 2022, Appendix C.2).",
+            ),
+            Deviation(
+                method="mmb_by_mmb",
+                name="alpha",
+                default=0.01,
+                reason="Xie et al. 2024 state no level; 0.01 is the level of their code.",
             ),
             Deviation(
                 method="rcd",
@@ -709,6 +720,7 @@ _CONCEPTS = (
                 "hiton_mb",
                 "mmmb",
                 "mb_by_mb",
+                "mmb_by_mmb",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -1105,6 +1117,7 @@ _CONCEPTS = (
             "mmmb",
             "y_structures",
             "mb_by_mb",
+            "mmb_by_mmb",
             *PCMCI_FAMILY,
             "anm",
             "pnl",
@@ -1287,6 +1300,7 @@ _CONCEPTS = (
                 "test-based search that takes env.",
                 *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
                 "mb_by_mb",
+                "mmb_by_mmb",
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
@@ -1368,8 +1382,13 @@ _CONCEPTS = (
         ),
         fragment="cpdag",
         suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
-        exempt=_exempt(
-            "Answers for one target: the edges at it, as its CPDAG holds them.", "mb_by_mb"
+        exempt=(
+            *_exempt(
+                "Answers for one target: the edges at it, as its CPDAG holds them.", "mb_by_mb"
+            ),
+            *_exempt(
+                "Answers for one target: the edges at it, as its PAG holds them.", "mmb_by_mmb"
+            ),
         ),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
@@ -1412,7 +1431,7 @@ _CONCEPTS = (
         fragment="a column label (a string) or a 0-based position (an integer)",
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
-            *("icp", "mb_by_mb"),
+            *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
         others_exempt="Answers for every variable at once.",
     ),
@@ -1471,8 +1490,9 @@ _CONCEPTS = (
         key="blanket",
         summary="The Markov blanket learner a method runs as one of its steps, by the name of its "
         "public function, or iamb_forward, IAMB's grow phase without its shrink (Wang et al. "
-        "2014). A method offers the learners its proof allows, so its choices may be fewer than "
-        "every learner's.",
+        "2014), or total_conditioning, a test of each variable given all the others (Pellet and "
+        "Elisseeff 2008). A method offers the learners its proof allows, so its choices may be "
+        "fewer than every learner's.",
         param=_template(
             "blanket",
             "str",
@@ -1483,7 +1503,7 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=("mb_by_mb",),
+        suitable=("mb_by_mb", "mmb_by_mmb"),
         others_exempt="Runs no Markov blanket learner as a step.",
         deviations=(
             Deviation(
@@ -1494,6 +1514,18 @@ _CONCEPTS = (
                 reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
                 "to keep a variable added in error rather than lose a member; any blanket "
                 "learner, or a superset of the blanket, satisfies its proof.",
+            ),
+            Deviation(
+                method="mmb_by_mmb",
+                name="blanket",
+                default="total_conditioning",
+                choices=MMB_BLANKETS,
+                reason="Xie et al. 2024 run MMB-by-MMB with total conditioning (Pellet and "
+                "Elisseeff 2008). Its proof needs the blanket of the maximal ancestral graph, "
+                "which total conditioning and the grow-shrink learners find, since m-separation "
+                "keeps the properties their correctness rests on; IAMB's grow phase alone returns "
+                "a superset, and HITON-MB assembles the blanket from a DAG's parents, children, "
+                "and spouses.",
             ),
         ),
     ),
@@ -1506,7 +1538,7 @@ _CONCEPTS = (
         "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
-            *("icp", "mb_by_mb"),
+            *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
         others_exempt="Answers for every variable at once.",
     ),
@@ -1518,6 +1550,7 @@ _CONCEPTS = (
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "mb_by_mb",
+            "mmb_by_mmb",
             "y_structures",
         ),
         others_exempt="Does not report its test count.",
@@ -1527,7 +1560,7 @@ _CONCEPTS = (
         summary="A method that learns the Markov blankets of several variables in turn lists them "
         "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
         "of blankets it needed is the list's length.",
-        suitable=("mb_by_mb",),
+        suitable=("mb_by_mb", "mmb_by_mmb"),
         others_exempt="Learns no sequence of Markov blankets.",
     ),
     Concept(
@@ -1581,6 +1614,11 @@ _CONCEPTS = (
                 "Each local structure decides a triple by the separating set of its endpoints, "
                 "as MB-by-MB states (Wang et al. 2014); no vote over several sets.",
                 "mb_by_mb",
+            ),
+            *_exempt(
+                "Each local structure decides a triple by the separating set of its endpoints, "
+                "as MMB-by-MMB states (Xie et al. 2024); no vote over several sets.",
+                "mmb_by_mmb",
             ),
         ),
         others_exempt="No separating-set orientation.",

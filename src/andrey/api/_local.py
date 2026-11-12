@@ -19,13 +19,15 @@ from andrey.core.knowledge import as_node, column_position
 #: orients the target's edges lists the edge of each adjacent column under one of the others.
 TARGET_SETS: dict[str, str] = {
     "markov_blanket": "the target's Markov blanket: its parents, its children, and its "
-    "children's other parents",
+    "children's other parents; with hidden variables, also the variables joined to it or to a "
+    "child by a path of hidden common causes, and their parents",
     "parents_and_children": "adjacent to the target, by a learner of parents and children",
     "parents": "a direct cause of the target: x -> target",
     "children": "a direct effect of the target: target -> x",
     "undirected": "adjacent to the target with the direction undecided: x - target in a CPDAG",
     "bidirected": "x <-> target in a PAG: neither is an ancestor of the other",
-    "undetermined": "adjacent to the target with a circle mark at the target's end in a PAG",
+    "undetermined": "adjacent to the target with a circle mark at either end in a PAG: x o-o "
+    "target, x o-> target, or target o-> x",
 }
 
 

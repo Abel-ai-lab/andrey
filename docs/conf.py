@@ -502,6 +502,7 @@ PROSE_NAMES = {
     "hiton_mb": "HITON-MB",
     "mmmb": "MMMB",
     "mb_by_mb": "MB-by-MB",
+    "mmb_by_mmb": "MMB-by-MMB",
     "y_structures": "Y-structures",
     "ges": "GES",
     "gies": "GIES",

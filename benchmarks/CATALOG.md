@@ -33,7 +33,7 @@ whose Reproduce table lists the driver.
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI, each also with `edge_removal="triangles"`; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | 0.15.0 |
 | [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
-| [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | FCI as context; no Andrey solution of the lane's own yet | the authors' MMB-by-MMB code; pcalg (RFCI) | |
+| [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | MMB-by-MMB (total conditioning, IAMB); FCI as context | the authors' MMB-by-MMB code; pcalg (RFCI) | |
 | [Y-structures](comparisons/y-structures.md) | `y_structures_cpu.py` | Y-structures, extended Y-structures | the authors' Y-structure code (sbcd) | |
 | [Treatment-outcome methods](comparisons/adjustment.md) | `adjustment_cpu.py` | the methods that answer for a treatment and an outcome, as they ship (`covariate_rules`, `ldecc`, `ldp`, `ld3`, `snap`, `local_optimal_adjustment`, `locpc_cde`); PC read at the pair | the authors' code for LDECC, LDP, LD3, SNAP, and LOAD | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | 0.14.0 |

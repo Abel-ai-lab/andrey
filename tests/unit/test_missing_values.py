@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 import andrey
+from andrey.api._adapt import TESTWISE_SERIES_METHODS
 from andrey.cli import main
 from andrey.core import ci, warning_policy
 from andrey.core.ci import (
@@ -503,10 +504,13 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
         assert "drop the rows that hold one" in str(error.value)
     else:
         assert "drop the rows that hold one" in str(error.value)
-        assert (
-            "pc, fci, cdnod, fci_jci, iamb, inter_iamb, gs, fast_iamb, mmpc, hiton_pc, hiton_mb, "
-            "mmmb, mb_by_mb, or y_structures" in str(error.value)
-        )
+        listed = [
+            n
+            for n in SUPPORTED
+            if REGISTRY[n].family != "pairwise" and n not in TESTWISE_SERIES_METHODS
+        ]
+        names = f"{', '.join(listed[:-1])}, or {listed[-1]}"
+        assert f"{names}, or for a time series" in str(error.value)
         assert 'missing="em"' not in str(error.value)
 
 

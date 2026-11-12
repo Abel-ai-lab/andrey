@@ -46,6 +46,7 @@ import numpy as np
 
 from andrey_bench import latent_networks, networks, rsession, rundir
 from andrey_bench.adapters.andrey_fci import AndreyFCI
+from andrey_bench.adapters.andrey_mmb_by_mmb import AndreyMMBbyMMB
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.pcalg_rfci_local import PcalgRFCICounted
 from andrey_bench.adapters.xie_mmb_by_mmb import XieMMBbyMMB
@@ -60,8 +61,9 @@ from andrey_bench.runner import available_cores, check_interpreters, run_task, s
 
 #: Adapters of Andrey's own local methods (``mb_by_mb``, ``cmb``, ``mmb_by_mmb``). Each follows
 #: :class:`~andrey_bench.local_lane.LocalAdapter`: ``fit`` reads the target's column from
-#: ``params[TARGET_PARAM]`` and packs the marks at the target and its test count.
-ANDREY_ARMS: list = []
+#: ``params[TARGET_PARAM]`` and packs the marks at the target and its test count. ``mmb_by_mmb``
+#: runs with the paper's blanket learner, total conditioning, and with IAMB.
+ANDREY_ARMS: list = [AndreyMMBbyMMB(), AndreyMMBbyMMB("iamb")]
 
 #: The references and the context solutions, then the empty answer that floors the field.
 REFERENCES = [XieMMBbyMMB(), PcalgRFCICounted(), AndreyFCI()]

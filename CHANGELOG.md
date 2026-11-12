@@ -64,6 +64,16 @@ names its pull request.
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
   caps every test, as in the other learners, and sets no cap by default. ([#956])
+- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
+  effects of one target when unmeasured common causes may exist, the edges the target has in the
+  PAG with their marks, learned one Markov blanket at a time outward from the target until its
+  marks are decided or the paper's stop rules end the search. `metadata` lists the target's
+  `parents`, `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end),
+  its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
+  conditioning, a test of each variable given all the others, as in the paper's runs
+  (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. The benchmark lane of
+  MMB-by-MMB runs it beside the authors' code. ([#966])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2656,6 +2666,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
 [#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
