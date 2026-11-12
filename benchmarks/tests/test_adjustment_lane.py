@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from conftest import needs_r
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -401,6 +402,60 @@ def test_a_discrete_network_replays_its_tables_with_hidden_variables_last(tmp_pa
     assert not np.array_equal(data, model.rows(300, M.FRESH))
 
 
+@pytest.fixture
+def fitted_networks(tmp_path, monkeypatch):
+    """The R lane's reader on the real files: the cache is the environment's, or a download."""
+    import os
+
+    folder = Path(os.environ.get(networks.CACHE_ENV, "") or tmp_path / "networks")
+    folder.mkdir(parents=True, exist_ok=True)
+    # The reader keeps its JSON next to the download; a temporary copy leaves the cache as it was.
+    work = tmp_path / "work"
+    work.mkdir()
+    for name in gaussian_networks.NETWORKS:
+        if (folder / f"{name}.rds").is_file():
+            shutil.copy(folder / f"{name}.rds", work / f"{name}.rds")
+    monkeypatch.setenv(networks.CACHE_ENV, str(work))
+    return work
+
+
+@needs_r()
+def test_magic_niab_read_in_r_has_the_structure_and_the_effect_the_papers_state(fitted_networks):
+    try:
+        net = gaussian_networks.load_gaussian_network("magic-niab")
+    except OSError as error:
+        pytest.skip(f"the MAGIC-NIAB file is unavailable: {error}")
+    assert (net.d, int((net.weights != 0).sum())) == (44, 66)
+    x, y = (net.index(v) for v in network_models.PAIRS["magic-niab"])
+    # LDECC's own pickle of the network gives G266 -> HT a weight of -0.7827 and no other path
+    assert net.weights[x, y] == pytest.approx(-0.7827, abs=1e-3)
+    model = network_models.magic_niab(0)
+    pair = model.pairs[0]
+    cov = model.covariance()
+    assert model.true_effect(pair.treatment, pair.outcome, "total") == pytest.approx(
+        -0.7827 * np.sqrt(cov[pair.treatment, pair.treatment] / cov[pair.outcome, pair.outcome]),
+        abs=1e-3,
+    )
+    kept = networks.cache_dir() / "magic-niab.structure.json"
+    assert kept.is_file()
+    again = gaussian_networks.load_gaussian_network("magic-niab")  # from the JSON, no R
+    np.testing.assert_array_equal(again.weights, net.weights)
+
+
+@needs_r()
+def test_sangiovese_read_in_r_fixes_the_discrete_root_and_keeps_the_papers_pair(fitted_networks):
+    try:
+        net = gaussian_networks.load_gaussian_network("sangiovese")
+    except OSError as error:
+        pytest.skip(f"the SANGIOVESE file is unavailable: {error}")
+    assert (net.d, int((net.weights != 0).sum())) == (14, 51) and "Treatment" not in net.nodes
+    assert net.level.startswith("T")  # the most probable level of the 16
+    x, y = (net.index(v) for v in network_models.PAIRS["sangiovese"])
+    assert net.weights[x, y] != 0 and not net.weights[y].any()  # pH -> GrapeW, and GrapeW is a sink
+    model = network_models.sangiovese(0)
+    assert model.pairs[0].estimand == "direct" and model.p == 14
+
+
 # --- the adapters ----------------------------------------------------------------------------
 
 
@@ -507,6 +562,23 @@ def test_the_pc_arm_reads_the_optimal_set_where_the_class_identifies_the_effect(
     assert tests is None or tests > 0
     assert record["identifiable"] is True and record["adjustment_sets"] == [[2]]
     assert record["set_kind"] == "optimal" and record["nonzero"] is True
+
+
+def test_the_pc_arm_reads_a_direct_effect_off_the_edges_at_the_outcome():
+    rng = np.random.default_rng(1)
+    n = 20_000
+    x, z = rng.standard_normal(n), rng.standard_normal(n)
+    y = x + z + rng.standard_normal(n)  # a collider at y: every edge at y is oriented
+    w = rng.standard_normal(n)  # unrelated
+    arm = andrey_adjustment.AndreyPCAdjustment()
+    data = np.column_stack([x, y, z, w])
+    params = {**arm.params(), "treatment": 0, "outcome": 1, "estimand": "direct"}
+    (record,), _ = L.unpack_effects(arm.fit(data, params))
+    assert record["estimand"] == "direct" and record["identifiable"] is True
+    assert record["nonzero"] is True and record["adjustment_sets"] == [[2]]
+    assert record["set_kind"] == "parents_of_outcome"
+    (apart,), _ = L.unpack_effects(arm.fit(data, {**params, "treatment": 3}))
+    assert apart["nonzero"] is False and apart["adjustment_sets"] == []  # not adjacent
 
 
 # --- the driver ------------------------------------------------------------------------------

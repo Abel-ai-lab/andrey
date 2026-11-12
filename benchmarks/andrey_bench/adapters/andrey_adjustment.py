@@ -23,6 +23,7 @@ import numpy as np
 
 from andrey_bench.adapters.andrey_pc import _andrey_version
 from andrey_bench.adjustment_lane import (
+    ESTIMAND_PARAM,
     OPTIMAL_OR_LOCAL,
     OUTCOME_PARAM,
     TREATMENT_PARAM,
@@ -136,11 +137,14 @@ class AndreyAdjustment:
 class AndreyPCAdjustment:
     """PC's CPDAG read at the pair, as the global baseline of the group's papers.
 
-    Where the CPDAG identifies the total effect (:func:`andrey.core.adjustment.adjustment_set`
+    For a total effect, where the CPDAG identifies it (:func:`andrey.core.adjustment.adjustment_set`
     finds a set) the answer is the optimal adjustment set, and the effect is zero when there is
     none; where it does not, the answer is the local parent sets of the treatment with the outcome
-    left out. A CPDAG the adjustment core refuses (PC can return a graph that is no CPDAG of any
-    class) is an answer that decides nothing.
+    left out. For a direct effect, the effect is identifiable when no undirected edge meets the
+    outcome (Flanagan et al., 2020, Thm. 5.4), and the set is the outcome's parents but the
+    treatment; the effect is zero when the two are not adjacent. A CPDAG the adjustment core
+    refuses (PC can return a graph that is no CPDAG of any class) is an answer that decides
+    nothing.
     """
 
     name = "andrey.pc.adjustment"
@@ -150,7 +154,7 @@ class AndreyPCAdjustment:
     mode = "serial"
     algorithm = "pc"
     output_type = "effects"
-    estimand = "total"
+    estimand = "any"
     set_kind = OPTIMAL_OR_LOCAL
     identified_from = "cpdag"
     unordered = False
@@ -160,8 +164,11 @@ class AndreyPCAdjustment:
 
     def setup(self) -> None:
         """Import Andrey and the adjustment core before timing."""
+        import importlib
+
         import andrey  # noqa: F401
-        from andrey.core import adjustment  # noqa: F401
+
+        importlib.import_module("andrey.core.adjustment")
 
     def params(self) -> dict[str, Any]:
         """PC's own defaults, passed."""
@@ -176,41 +183,54 @@ class AndreyPCAdjustment:
         d = data.shape[1]
         settings = {**self.params(), **params}
         x, y = int(params[TREATMENT_PARAM]), int(params[OUTCOME_PARAM])
+        estimand = params.get(ESTIMAND_PARAM, "total")
         out = andrey.pc(
             data, alpha=float(settings["alpha"]), indep_test=str(settings["indep_test"])
         )
         record: dict[str, Any] = {
             "treatment": x,
             "outcome": y,
-            "estimand": "total",
+            "estimand": estimand,
             "nonzero": None,
             "identifiable": None,
             "adjustment_sets": [],
             "set_kind": None,
         }
-        graph = out.structure
         try:
-            adj.checked(graph, "the PC arm", ("cpdag",))
-            refused = False
+            marks = adj.checked(out.structure, "the PC arm", ("cpdag",))
         except ValueError:
-            refused = True  # not the CPDAG of a class: the answer decides nothing
-        if not refused:
-            if adj.adjustment_set(graph, x, y) is not None:
-                optimal = adj.optimal_set(graph, x, y)
-                record["identifiable"] = True
-                record["nonzero"] = optimal is not None
-                if optimal is not None:
-                    record.update(adjustment_sets=[sorted(optimal)], set_kind="optimal")
-            else:
-                sets = {
-                    tuple(sorted(v for v in s if v != y)) for s in adj.local_parent_sets(graph, x)
-                }
-                record.update(
-                    identifiable=False,
-                    adjustment_sets=[list(s) for s in sorted(sets)],
-                    set_kind="local_parents",
-                )
+            marks = None  # not the CPDAG of a class: the answer decides nothing
+        if marks is not None and estimand == "direct":
+            self._direct(record, adj, marks, x, y)
+        elif marks is not None:
+            self._total(record, adj, out.structure, x, y)
         return pack_effects([record], d, out.metadata.get("n_tests"))
+
+    @staticmethod
+    def _total(record: dict[str, Any], adj: Any, graph: Any, x: int, y: int) -> None:
+        if adj.adjustment_set(graph, x, y) is not None:
+            optimal = adj.optimal_set(graph, x, y)
+            record["identifiable"] = True
+            record["nonzero"] = optimal is not None
+            if optimal is not None:
+                record.update(adjustment_sets=[sorted(optimal)], set_kind="optimal")
+        else:
+            sets = {tuple(sorted(v for v in s if v != y)) for s in adj.local_parent_sets(graph, x)}
+            record.update(
+                identifiable=False,
+                adjustment_sets=[list(s) for s in sorted(sets)],
+                set_kind="local_parents",
+            )
+
+    @staticmethod
+    def _direct(record: dict[str, Any], adj: Any, marks: np.ndarray, x: int, y: int) -> None:
+        directed = adj.directed(marks)
+        record["identifiable"] = not bool(adj.undirected(marks)[y].any())
+        adjacent = bool(marks[x, y] or marks[y, x])
+        record["nonzero"] = False if not adjacent else (True if directed[x, y] else None)
+        if record["identifiable"] and record["nonzero"] is not False:
+            parents = [int(v) for v in np.flatnonzero(directed[:, y]) if v != x]
+            record.update(adjustment_sets=[parents], set_kind="parents_of_outcome")
 
     def to_structure(self, native: np.ndarray) -> Any:
         """The graph without edges; untimed."""

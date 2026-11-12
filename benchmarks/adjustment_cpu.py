@@ -111,12 +111,12 @@ def _read(out: Path) -> list[dict]:
 def kind_of(adapter: Any, estimand: str) -> dict[str, Any]:
     """What the oracle of ``adapter`` on a cell of ``estimand`` is built from.
 
-    The arms that answer either estimand (``"any"``) are judged by validity for a total effect and
-    against the outcome's parents for a direct one.
+    The arms that answer either estimand (``"any"``) keep their own kind of set for a total effect
+    and are judged against the outcome's parents for a direct one.
     """
     set_kind = adapter.set_kind
-    if adapter.estimand == "any":
-        set_kind = "valid" if estimand == "total" else "parents_of_outcome"
+    if adapter.estimand == "any" and estimand == "direct":
+        set_kind = "parents_of_outcome"
     return {
         "estimand": estimand,
         "set_kind": set_kind,
@@ -417,10 +417,15 @@ def _mean(values: list[float]) -> float:
     return statistics.mean(values) if values else float("nan")
 
 
+def gave_an_answer(record: dict) -> bool:
+    """Whether a fit's records give sets or say the effect is zero, rather than abstain."""
+    return any(a["adjustment_sets"] or a["nonzero"] is False for a in record["answer"])
+
+
 def summarize(records: list[dict]) -> list[dict[str, Any]]:
     """One row per cell and solution: fits, answer rate, how the answers fare, and the effect error.
 
-    ``answered`` is the share of fits that gave sets or said the effect is zero; ``adj`` counts the
+    ``answered`` is the share of fits that gave sets or said the effect is zero (:func:`gave_an_answer`); ``adj`` counts the
     adjustment answers (``correct``, ``wrong``, ``incomplete``) of the pairs whose effect is not
     zero; ``valid`` is the share of returned sets that satisfy the adjustment criterion and ``f1``
     the mean F1 of a returned set against the optimal set (total effects, no hidden variables).
@@ -459,7 +464,7 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
                     "solution": name,
                     "fits": len(mine),
                     "ok": len(ok),
-                    "answered": len(errors) / len(ok) if ok else float("nan"),
+                    "answered": (sum(map(gave_an_answer, ok)) / len(ok)) if ok else float("nan"),
                     "adj": {
                         k: sum(a[k] for a in adjustment) for k in ("correct", "wrong", "incomplete")
                     },

@@ -41,9 +41,9 @@ class Source:
     arcs: int
 
 
-#: The fitted networks the lane reads. SANGIOVESE has 15 nodes and 55 arcs in the repository; the
-#: discrete root ``Treatment`` and its 3 arcs (to ``SproutN``, ``BunchN``, ``SPAD06``) and its
-#: 1 more to ``Brix`` leave 14 nodes and 51 arcs.
+#: The fitted networks the lane reads. SANGIOVESE has 15 nodes and 55 arcs in the repository; its
+#: discrete root ``Treatment`` and the 4 arcs from it (to ``SproutN``, ``BunchN``, ``SPAD06``, and
+#: ``Brix``) leave 14 nodes and 51 arcs.
 NETWORKS: dict[str, Source] = {
     "magic-niab": Source(
         _BNLEARN.format(name="magic-niab"),
@@ -69,12 +69,20 @@ andrey_read_gaussian <- function(path, level) {
     if (length(discrete) > 1L) stop("more than one discrete node")
     if (length(discrete) == 1L && !nzchar(level)) level <- names(which.max(fit[[discrete]]$prob))
     keep <- setdiff(names(fit), discrete)
+    # The columns of a conditional Gaussian node's coefficients are the configurations of its
+    # discrete parent, named by their 0-based position among the levels.
+    column <- NA_character_
+    if (length(discrete) == 1L) {
+        column <- as.character(match(level, names(fit[[discrete]]$prob)) - 1L)
+        if (is.na(column)) stop("no level ", level)
+    }
     from <- character(); to <- character(); coef <- numeric()
     intercept <- numeric(); sd <- numeric()
     for (v in keep) {
         n <- fit[[v]]
         if (cls[[v]] == "bn.fit.cgnode") {
-            cf <- n$coefficients[, level]; s <- n$sd[[level]]
+            m <- n$coefficients
+            cf <- setNames(as.numeric(m[, column]), rownames(m)); s <- n$sd[[column]]
         } else {
             cf <- n$coefficients; s <- n$sd
         }
