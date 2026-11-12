@@ -79,5 +79,8 @@ benchmarks/.mmb/
 # The authors' sbcd R code that benchmarks/start_sbcd_r.sh fetches, read from disk and never
 # committed.
 benchmarks/.sbcd-r/
+# The authors' Causal Explorer toolbox that benchmarks/start_causal_explorer.sh fetches, run from
+# disk and never committed.
+benchmarks/.causal-explorer/
 # The published networks' files that the network lanes fetch, read from disk and never committed.
 benchmarks/.networks/

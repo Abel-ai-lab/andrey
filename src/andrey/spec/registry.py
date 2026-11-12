@@ -532,6 +532,22 @@ _OWN_DEPTH = {
             "variables that a larger conditioning set would remove.",
         ),
     ),
+    "hiton_mb": (
+        concept_param(
+            "max_depth",
+            default=3,
+            doc="The maximum conditioning-set size of every conditional-independence test, at "
+            "least 0: 0 runs only unconditional tests, and null sets no limit. Aliferis et al. "
+            "2010 leave the cap open and run HITON-MB with a cap of 3, the default. A smaller cap "
+            "runs fewer tests and can keep variables that a larger conditioning set would remove; "
+            "a spouse test conditions on the separating set and the common child, so a candidate "
+            "whose separating set holds max_depth variables does not join.",
+        ),
+    ),
+}
+#: What a set learner's target answer holds beyond its one set.
+_OWN_OUTPUT = {
+    "hiton_mb": "; metadata['parents_and_children'] lists the parents and children alone",
 }
 for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
@@ -624,6 +640,19 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ("Aliferis et al. 2010", "Margaritis 2003"),
         "experimental",
     ),
+    (
+        "hiton_mb",
+        "One variable's Markov blanket by semi-interleaved HITON-MB: HITON-PC's parents and "
+        "children of the target and of each of them, then each child's other parent admitted by "
+        "one conditional-independence test given the set that separated it from the target and "
+        "the common child. With target=null, every variable's sets joined into a CPDAG by the "
+        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Aliferis et al. 2010", "Margaritis 2003"),
+        "experimental",
+    ),
 ):
     _add(
         MethodSpec(
@@ -634,7 +663,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             output=OutputSpec(
                 structure_type="graph",
                 graph_kind=_kind,
-                doc=_LOCAL_OUTPUT_DOC.format(key=_key),
+                doc=_LOCAL_OUTPUT_DOC.format(key=_key) + _OWN_OUTPUT.get(_name, ""),
             ),
             accel="numpy",
             status=_status,
@@ -3115,6 +3144,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hiton_pc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
+    "hiton_mb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
+    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
@@ -3203,6 +3235,7 @@ _PATH_METHODS = (
     "fast_iamb",
     "mmpc",
     "hiton_pc",
+    "hiton_mb",
 )
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
@@ -3398,6 +3431,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     "hiton_pc": ("target", "parents_and_children"),
+    "hiton_mb": ("target", "markov_blanket", "parents_and_children"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

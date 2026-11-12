@@ -46,6 +46,7 @@ TESTWISE_METHODS = (
     "fast_iamb",
     "mmpc",
     "hiton_pc",
+    "hiton_mb",
     "y_structures",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")

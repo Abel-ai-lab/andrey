@@ -114,7 +114,12 @@ def test_fewer_than_four_columns_claim_nothing():
 
 @pytest.mark.parametrize(
     ("variables", "error"),
-    [("x5", TypeError), (["x5"], ValueError), (["x5", "x5"], ValueError), (["x9", "x5"], ValueError)],
+    [
+        ("x5", TypeError),
+        (["x5"], ValueError),
+        (["x5", "x5"], ValueError),
+        (["x9", "x5"], ValueError),
+    ],
 )
 def test_variables_are_checked(variables, error):
     with pytest.raises(error):
