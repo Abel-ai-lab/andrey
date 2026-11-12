@@ -1,11 +1,14 @@
 #!/usr/bin/env python
-"""Benchmark the Markov blanket and parents-and-children learners on CPU: Andrey against bnlearn.
+"""Benchmark the Markov blanket and parents-and-children learners on CPU: Andrey against bnlearn
+and the authors' Causal Explorer.
 
 Runs each learner of :data:`andrey_bench.adapters.andrey_blanket.LEARNERS` that the installed
 Andrey has, beside the bnlearn function that runs its algorithm
-(:data:`andrey_bench.adapters.bnlearn_blanket.COUNTERPART`), bnlearn's ``pc.stable`` read for each
-kind of set, and the empty answer. Every solution gets the same data, the same test, the same
-``alpha``, and the same limit on the conditioning set (``--max-depth``), all recorded in every row.
+(:data:`andrey_bench.adapters.bnlearn_blanket.COUNTERPART`), the Causal Explorer function that does
+(:data:`andrey_bench.adapters.causal_explorer_blanket.COUNTERPART`, in target mode, when MATLAB and
+the toolbox are there), bnlearn's ``pc.stable`` read for each kind of set, and the empty answer.
+Every solution gets the same data, the same test, the same ``alpha``, and the same limit on the
+conditioning set (``--max-depth``), all recorded in every row.
 Two kinds of data, as :data:`CELLS` writes them:
 
 - ``net:<name>:<n>``: ``n`` rows sampled from a published network's own tables, discrete, with
@@ -37,7 +40,10 @@ by its adjacencies (:func:`andrey_bench.blanket_lane.pair_scores`) or, for the C
 ``<out>/records.jsonl`` with the answer, so ``--rescore`` recomputes the scores without fitting;
 ``<out>/provenance.json`` records the build and the machine.
 
-Load R with bnlearn 5.2.1 as the README's R lane describes before running bnlearn's solutions.
+Load R with bnlearn 5.2.1 as the README's R lane describes before running bnlearn's solutions, and
+for Causal Explorer's, put ``matlab`` on the ``PATH`` and run ``benchmarks/start_causal_explorer.sh``
+(see :mod:`andrey_bench.adapters.causal_explorer_blanket`); without them the lane leaves that arm
+out.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/blanket_cpu.py --out outputs/blanket-cpu
 """
@@ -58,10 +64,11 @@ import numpy as np
 
 from andrey import GraphStructure
 from andrey_bench import datasets, rsession, rundir, scoring
-from andrey_bench.adapters import andrey_blanket, bnlearn_blanket
+from andrey_bench.adapters import andrey_blanket, bnlearn_blanket, causal_explorer_blanket
 from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_blanket import BnlearnBlanket
+from andrey_bench.adapters.causal_explorer_blanket import CausalExplorerBlanket
 from andrey_bench.blanket_lane import (
     NO_COUNT,
     STRUCTURES,
@@ -166,14 +173,21 @@ def targets_of(d: int, spec: str, seed: int) -> list[int]:
     return sorted(int(t) for t in np.random.default_rng(seed).choice(d, int(spec), replace=False))
 
 
-def field(cell: Cell, settings: Settings, structure: str | None) -> list:
-    """The solutions of a cell: Andrey's learners and the bnlearn function of each, bnlearn's
-    ``pc.stable`` for each kind of set, and the empty answer last.
+def field(
+    cell: Cell, settings: Settings, structure: str | None, causal_explorer: bool | None = None
+) -> list:
+    """The solutions of a cell: Andrey's learners, the bnlearn function and, in target mode, the
+    Causal Explorer function of each, bnlearn's ``pc.stable`` for each kind of set, and the empty
+    answer last.
 
     A whole-graph run (`structure` named) takes only the learners that offer that graph.
+    `causal_explorer` says whether to run Causal Explorer's functions; ``None`` runs them when
+    MATLAB and the toolbox are there (:func:`causal_explorer_blanket.available`).
     """
     test = cell.indep_test(settings.discrete_test)
     shared = {"indep_test": test, "alpha": settings.alpha, "max_depth": settings.max_depth}
+    if causal_explorer is None:
+        causal_explorer = causal_explorer_blanket.available()
     solutions: list = []
     kinds: set[str] = set()
     for learner in andrey_blanket.available():
@@ -191,6 +205,14 @@ def field(cell: Cell, settings: Settings, structure: str | None) -> list:
                     function, structure=structure, sparse_rule=settings.sparse_rule, **shared
                 )
             )
+        function = causal_explorer_blanket.COUNTERPART.get(learner)
+        if (
+            causal_explorer
+            and structure is None
+            and function
+            and test in causal_explorer_blanket.TESTS[function]
+        ):
+            solutions.append(CausalExplorerBlanket(function, **shared))
     if structure is None:
         for kind in sorted(kinds):
             solutions.append(
@@ -217,6 +239,14 @@ def reference_name(name: str, kind: str | None) -> str | None:
         return None
     function = bnlearn_blanket.COUNTERPART.get(name.removeprefix("andrey."))
     return None if function is None else "bnlearn." + function.replace(".", "-")
+
+
+def authors_name(name: str) -> str | None:
+    """The Causal Explorer solution that runs the algorithm of the Andrey solution `name`, if any."""
+    if not name.startswith("andrey."):
+        return None
+    function = causal_explorer_blanket.COUNTERPART.get(name.removeprefix("andrey."))
+    return None if function is None else CausalExplorerBlanket(function, indep_test="gsq").name
 
 
 def _log(msg: str = "") -> None:
@@ -462,6 +492,11 @@ def main(argv: list[str] | None = None) -> int:
     if needs_r:
         r_environment = rsession.check_environment("bnlearn")
         bnlearn_blanket.check_version()
+    needs_matlab = any(
+        a.package == "causal-explorer" for solutions in fields.values() for a in solutions
+    )
+    if not needs_matlab:
+        _log("causal-explorer: matlab or the toolbox is absent; its arm is left out")
 
     out.mkdir(parents=True, exist_ok=True)
     meta_path = out / "run_meta.json"
@@ -481,6 +516,7 @@ def main(argv: list[str] | None = None) -> int:
         "max_depth": args.max_depth,
         "targets": args.targets,
         "r environment": r_environment,
+        "causal explorer": causal_explorer_blanket.environment() if needs_matlab else {},
         "cells": [c.label for c in cells],
         "seeds": args.seeds,
         "first_seed": args.first_seed,
@@ -589,9 +625,10 @@ def _summarize(records: list[dict]) -> None:
 
     Target mode: pooled precision and recall over the datasets' targets, the mean F1 and distance
     over the targets where they are defined, ``exact`` the share of targets whose set is the true
-    one, and ``same`` the targets where the solution's set is the one its bnlearn counterpart
-    found. Graph mode: pooled precision and recall of the adjacencies, the mean ``shd`` against
-    the empty graph's, and ``same`` the datasets with the counterpart's graph.
+    one, ``same`` the targets where the solution's set is the one its bnlearn counterpart found,
+    and ``authors`` the targets where it is the one its Causal Explorer counterpart found. Graph
+    mode: pooled precision and recall of the adjacencies, the mean ``shd`` against the empty
+    graph's, and ``same`` the datasets with the counterpart's graph.
     """
     if not records:
         return
@@ -599,7 +636,7 @@ def _summarize(records: list[dict]) -> None:
     _log("")
     _log(
         f"{'solution':24s} {'set':>9s} {'ok/all':>7s} {'wall_s':>8s} {'prec':>6s} {'recall':>6s} "
-        f"{'f1':>6s} {'dist':>6s} {'exact':>6s} {'tests':>8s} {'same':>9s}"
+        f"{'f1':>6s} {'dist':>6s} {'exact':>6s} {'tests':>8s} {'same':>9s} {'authors':>9s}"
     )
     groups = sorted({(r["cell"], r["mode"], r["kind"], r["structure"]) for r in records}, key=str)
     for cell, mode, kind, structure in groups:
@@ -616,21 +653,27 @@ def _summarize(records: list[dict]) -> None:
                 _log(f"{name:24s} {structure or kind:>9s} {0:3d}/{len(mine):<3d}")
                 continue
             wall = statistics.median(r["wall_s"] for r in fit)
-            reference = reference_name(name, kind)
-            theirs = {
-                (r["seed"]): r
-                for r in ok
-                if r["solution"] == reference
-                and (r["cell"], r["mode"], r["kind"], r["structure"])
-                == (cell, mode, kind, structure)
-            }
+
+            def fits_of(reference: str | None) -> dict[int, dict]:
+                return {
+                    r["seed"]: r
+                    for r in ok
+                    if r["solution"] == reference
+                    and (r["cell"], r["mode"], r["kind"], r["structure"])
+                    == (cell, mode, kind, structure)
+                }
+
+            theirs = fits_of(reference_name(name, kind))
             if mode == "target":
-                same = total = 0
-                for r in fit:
-                    other = theirs.get(r["seed"])
-                    if other is not None:
-                        total += len(r["sets"])
-                        same += sum(r["sets"][t] == other["sets"][t] for t in r["sets"])
+                agree = []
+                for reference in (theirs, fits_of(authors_name(name))):
+                    same = total = 0
+                    for r in fit:
+                        other = reference.get(r["seed"])
+                        if other is not None:
+                            total += len(r["sets"])
+                            same += sum(r["sets"][t] == other["sets"][t] for t in r["sets"])
+                    agree.append(f"{same}/{total}" if total else "-")
                 tests = [c for r in fit for c in r["n_tests"].values() if c is not None]
                 _log(
                     f"{name:24s} {structure or kind:>9s} {len(fit):3d}/{len(mine):<3d} {wall:8.3g} "
@@ -638,7 +681,7 @@ def _summarize(records: list[dict]) -> None:
                     f"{_mean(fit, 'f1'):6.3f} {_mean(fit, 'distance'):6.3f} "
                     f"{_pool(fit, 'exact'):6.3f} "
                     f"{(statistics.mean(tests) if tests else float('nan')):8.4g} "
-                    f"{(f'{same}/{total}' if total else '-'):>9s}"
+                    f"{agree[0]:>9s} {agree[1]:>9s}"
                 )
             else:
                 same = total = 0
