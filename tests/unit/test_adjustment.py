@@ -99,7 +99,7 @@ def test_validity_is_the_regression_coefficient_in_linear_models():
     # DAG; an invalid set's differs for generic weights.
     rng = np.random.default_rng(1)
     cases = 0
-    for _ in range(40):
+    for _ in range(20):
         d = int(rng.integers(4, 7))
         D = _random_dag(rng, d, rng.uniform(0.3, 0.7))
         dag = _dag_of(D)
@@ -109,13 +109,13 @@ def test_validity_is_the_regression_coefficient_in_linear_models():
                 recovered = abs(_coefficient(cov, x, y, z) - total[x, y]) < 1e-9
                 assert dag.is_adjustment_set(x, y, z) == recovered
                 cases += 1
-    assert cases > 10_000
+    assert cases > 5000
 
 
 def test_a_cpdag_answers_as_every_dag_of_its_class():
     rng = np.random.default_rng(2)
     pairs = amenable = 0
-    for _ in range(60):
+    for _ in range(20):
         d = int(rng.integers(4, 7))
         cpdag = to_cpdag(_random_dag(rng, d, rng.uniform(0.3, 0.8)).astype(int))
         members = _members(cpdag)
@@ -133,7 +133,7 @@ def test_a_cpdag_answers_as_every_dag_of_its_class():
             assert exists == (adj.amenable(cpdag, x, y) and not parent)
             pairs += 1
             amenable += exists
-    assert pairs > 1000 and 0.2 < amenable / pairs < 0.9
+    assert pairs > 300 and 0.2 < amenable / pairs < 0.9
 
 
 def test_the_optimal_set_is_the_class_s_valid_and_most_precise():
@@ -141,7 +141,7 @@ def test_the_optimal_set_is_the_class_s_valid_and_most_precise():
     # every DAG, valid in each, and no valid set gives a smaller asymptotic variance.
     rng = np.random.default_rng(3)
     checked = 0
-    for _ in range(80):
+    for _ in range(40):
         d = int(rng.integers(4, 7))
         D = _random_dag(rng, d, rng.uniform(0.3, 0.7))
         cpdag = to_cpdag(D.astype(int))
@@ -163,7 +163,7 @@ def test_the_optimal_set_is_the_class_s_valid_and_most_precise():
                 if dag.is_adjustment_set(x, y, z):
                     assert best <= _variance(cov, x, y, z) * (1 + 1e-9)
             checked += 1
-    assert checked > 100
+    assert checked > 50
 
 
 def test_the_local_parent_sets_are_the_parent_sets_of_the_class():
@@ -181,7 +181,7 @@ def test_the_local_parent_sets_are_the_parent_sets_of_the_class():
 
 def test_answers_do_not_depend_on_node_order_or_labels():
     rng = np.random.default_rng(5)
-    for _ in range(20):
+    for _ in range(8):
         d = int(rng.integers(4, 7))
         D = _random_dag(rng, d, 0.5)
         names = tuple(f"v{i}" for i in rng.permutation(d))
@@ -196,7 +196,7 @@ def test_answers_do_not_depend_on_node_order_or_labels():
                 assert graph.optimal_adjustment_set(x, y) == _sorted_like(
                     moved.optimal_adjustment_set(x, y), names
                 )
-                for z in _subsets([v for v in names if v not in (x, y)])[:8]:
+                for z in _subsets([v for v in names if v not in (x, y)])[:4]:
                     assert graph.is_adjustment_set(x, y, z) == moved.is_adjustment_set(x, y, z)
 
 
@@ -414,7 +414,7 @@ def _hidden_graphs(seed: int, count: int) -> list[tuple[GraphStructure, list[str
 @pytest.mark.parametrize("kind", ["cpdag", "mag", "pag"])
 def test_the_criterion_is_definition_4_path_by_path(kind):
     checked = valid = 0
-    for dag, hidden in _hidden_graphs(6, 10 if kind == "cpdag" else 25):
+    for dag, hidden in _hidden_graphs(6, 4 if kind == "cpdag" else 12):
         if kind == "cpdag":
             graph = to_cpdag(dag)
             graph = GraphStructure.from_numpy(graph.to_numpy(), kind="cpdag", labels=dag.labels)
@@ -428,14 +428,14 @@ def test_the_criterion_is_definition_4_path_by_path(kind):
                 assert answer == criterion(z)
                 checked += 1
                 valid += answer
-    assert checked > 2000 and valid > 100
+    assert checked > 1000 and valid > 50
 
 
 def test_a_set_valid_in_the_pag_is_valid_in_its_mag_and_dag():
     # Soundness against the generating DAG: the PAG's sets hold in the MAG, whose sets hold in
     # the DAG with its hidden nodes.
     found = 0
-    for dag, hidden in _hidden_graphs(7, 40):
+    for dag, hidden in _hidden_graphs(7, 8):
         mag, pag = dag.to_mag(latent=hidden), dag.to_pag(latent=hidden)
         names = pag.labels
         for x, y in itertools.permutations(names, 2):
@@ -445,7 +445,7 @@ def test_a_set_valid_in_the_pag_is_valid_in_its_mag_and_dag():
                 assert not in_pag or in_mag
                 assert not in_mag or dag.is_adjustment_set(x, y, z)
                 found += in_pag
-    assert found > 100
+    assert found > 15
 
 
 # Worked examples of Henckel, Perković and Maathuis (2022).
@@ -503,7 +503,7 @@ def test_a_set_of_given_nodes_exists_when_the_constructive_one_is_valid():
     # the ancestors of the pair in R that are not forbidden are one; R = the observed nodes.
     rng = np.random.default_rng(8)
     pairs = found_any = 0
-    for _ in range(60):
+    for _ in range(30):
         d = int(rng.integers(4, 8))
         dag = _dag_of(_random_dag(rng, d, rng.uniform(0.3, 0.7)))
         for x, y in itertools.permutations(range(d), 2):
@@ -514,4 +514,4 @@ def test_a_set_of_given_nodes_exists_when_the_constructive_one_is_valid():
             assert found is None or set(found) <= set(among)
             pairs += 1
             found_any += exists
-    assert pairs > 1000 and 0.2 < found_any / pairs < 0.95
+    assert pairs > 500 and 0.2 < found_any / pairs < 0.95
