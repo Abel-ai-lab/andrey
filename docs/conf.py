@@ -528,11 +528,13 @@ PROSE_NAMES = {
     "direct_lingam": "DirectLiNGAM",
     "ica_lingam": "ICA-LiNGAM",
     "local_isa_ling": "Local ISA-LiNG",
+    "lhts": "LHTS",
     "multi_group_direct_lingam": "Multi-group DirectLiNGAM",
     "cam": "CAM",
     "resit": "RESIT",
     "score_matching": "SCORE",
     "nogam": "NoGAM",
+    "nhts": "NHTS",
     "varma_lingam": "VARMA-LiNGAM",
     "longitudinal_lingam": "Longitudinal LiNGAM",
     "pcmci": "PCMCI",
@@ -560,12 +562,15 @@ def _takes(spec, name: str, choice: str) -> bool:
 # ``{{ <key>_methods }}`` in prose names and ``{{ <key>_names }}`` in code names.
 METHOD_LISTS = {
     "indep_test": lambda s: any(p.name == "indep_test" for p in s.params),
+    "categorical_test": lambda s: _takes(s, "indep_test", "chisq"),
     "score_func": lambda s: any(p.name == "score_func" for p in s.params),
     "rank_score": lambda s: _takes(s, "score_func", "normal_scores"),
-    # The rank-based test with no score, and the rank-based score with no test.
+    # The rank-based test with no score, and the rank-based score with no test. A functional
+    # method sorts the variables by regressions on the values before its test runs.
     "rank_test_only": lambda s: (
         _takes(s, "indep_test", "normal_scores")
         and not any(p.name == "score_func" for p in s.params)
+        and s.family != "functional"
     ),
     "rank_score_only": lambda s: (
         _takes(s, "score_func", "normal_scores")

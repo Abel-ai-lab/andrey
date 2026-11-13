@@ -166,8 +166,8 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. {{ indep_test_methods }} test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and {{ score_func_methods }} score it with
+text, booleans, or a pandas `category`. {{ categorical_test_methods }} test independence on
+categorical data with `indep_test="chisq"` or `"gsq"`, and {{ score_func_methods }} score it with
 `score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
 the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or
 `"cond_gauss"`. By default they pick the test and the score from the column types you declare, with
