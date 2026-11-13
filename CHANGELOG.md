@@ -165,6 +165,13 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), experimental:
+  for two `variables` given in any order, finds whether one causes the other and the optimal
+  adjustment set for the total effect when it is identifiable, else the locally valid parent sets
+  of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
+  them. It learns only the blankets the answer needs. `metadata["effects"]` holds one record per
+  direction, the graph the edges at the two variables, and `metadata["blankets_learned"]` the
+  variables whose blanket it learned. ([#PR])
 
 ### Changed
 
