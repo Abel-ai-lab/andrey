@@ -2240,6 +2240,57 @@ _add(
 )
 _add(
     MethodSpec(
+        name="local_isa_ling",
+        family="functional",
+        summary="The weighted edges into one variable and into each of its children in a linear "
+        "non-Gaussian model whose graph may hold cycles, from the variable and its Markov blanket "
+        "alone: a sparse ICA and HSIC tests give its independent subspaces, and every model of the "
+        "equivalence class is read from them, stable models first.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="digraph",
+            weighted=True,
+            doc="the edges into target and into each of its children in the first model, with "
+            "their weights; metadata['equivalent_models'] lists every model the data allow, "
+            "stable ones first",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note=(
+            "The sparse ICA rounds differently under a new column order, which can move an entry "
+            "of the demixing matrix within rounding of w_threshold across it."
+        ),
+        params=(
+            REQUIRED_TARGET,
+            ParamSpec(
+                name="acyclic",
+                type="bool",
+                default=False,
+                doc="Read the edges by peeling sink columns of the demixing matrix (Dai et al. "
+                "2024, App. C), which assumes neither the target nor a child lies on a cycle, "
+                "instead of trying every admissible assignment (Algorithm 1); a matrix with no "
+                "sink column falls back to Algorithm 1.",
+            ),
+            concept_param(
+                "w_threshold",
+                default=0.05,
+                doc="Entries of the standardized demixing matrix at most this in magnitude read as "
+                "zero, and a block whose smallest singular value is at most this reads as "
+                "singular; at least 0. Dai et al. 2024's value.",
+            ),
+            concept_param(
+                "alpha",
+                doc="Significance level of the HSIC tests that group the ICA's components into "
+                "independent subspaces: a pair with a p-value at most alpha shares one.",
+            ),
+        ),
+        references=("Dai, Ng, Zheng, Gao & Zhang 2024", "Zhang & Chan 2006", "Lacerda et al. 2008"),
+    )
+)
+_add(
+    MethodSpec(
         name="multi_group_direct_lingam",
         family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
@@ -3758,6 +3809,9 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
     "camuv": ("latent_pairs", "cycle_edges"),
+    "local_isa_ling": (
+        *("target", "markov_blanket", "parents", "children", "equivalent_models", "subspaces"),
+    ),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

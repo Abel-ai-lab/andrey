@@ -24,10 +24,14 @@ from andrey.api._adapt import (
     column_labels,
     dag_from_adjacency,
     data_matrix,
+    label_of,
     shared_labels,
     structure_output,
 )
+from andrey.api._local import target_column, target_metadata
+from andrey.api._marks import directed_marks
 from andrey.api._method import method_spec
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -578,3 +582,166 @@ def multi_group_direct_lingam(
         lingam_output(order, B, constraints, labels, {"group_index": k})
         for k, B in enumerate(adjacency_matrices)
     ]
+
+
+def _local_weights(edges: Mapping[tuple[int, int], float], std: np.ndarray, d: int) -> np.ndarray:
+    """Return the ``(d, d)`` data-unit weights of edges weighed on standardized columns."""
+    weights = np.zeros((d, d))
+    for (k, j), w in edges.items():
+        weights[k, j] = w * std[j] / std[k]
+    return weights
+
+
+@method_spec("local_isa_ling")
+def local_isa_ling(
+    data: npt.ArrayLike,
+    *,
+    target: str | int | None = None,
+    acyclic: bool = False,
+    w_threshold: float = 0.05,
+    alpha: float = 0.05,
+) -> StructureOutput:
+    """Learn the weighted edges into one variable and into its children, with cycles allowed.
+
+    Local ISA-LiNG [1]_ reads a linear model with independent non-Gaussian noise whose graph may
+    hold cycles, from the target and its Markov blanket alone. It finds the blanket as the support
+    of the target's row of the precision matrix, separates the local variables into independent
+    subspaces with a sparse ICA [2]_ and HSIC tests, and reads every model of the equivalence class
+    that matches them: the direct causes of the target, its direct effects, and the direct causes
+    of each effect, with their weights.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    target : str or int
+        Required: the variable to answer for, a column label or a 0-based position.
+    acyclic : bool, default=False
+        Read the edges by peeling sink columns of the demixing matrix (the paper's Appendix C),
+        which assumes that neither the target nor a child lies on a cycle and needs no subspace
+        tests, instead of enumerating the admissible assignments (Algorithm 1). A fit whose
+        thresholded matrix has no sink column runs Algorithm 1.
+    w_threshold : float, default=0.05
+        Entries of the demixing matrix of the standardized columns at most this in magnitude read
+        as zero, and a block of it whose smallest singular value is at most this reads as singular;
+        at least 0. The paper's value.
+    alpha : float, default=0.05
+        Significance level of the HSIC tests that group the ICA's components into subspaces: a
+        pair whose p-value is at most ``alpha`` shares a subspace. In ``(0, 1)``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``digraph`` :class:`~andrey.core.GraphStructure` over every column holding the
+        edges of the first model alone: those into ``target`` and into each of its children, where
+        a 2-cycle is two directed edges. An absent edge between two other columns means nothing.
+        ``weighted_adjacency[i, j]`` is the weight of edge ``i -> j`` in the data's units.
+        ``metadata["algorithm"]`` is ``"local_isa_ling"``; ``metadata["target"]`` names the
+        target, ``metadata["markov_blanket"]`` its blanket, and ``metadata["parents"]`` and
+        ``metadata["children"]`` the columns with an edge into and out of it in the first model.
+        ``metadata["equivalent_models"]`` lists every model the data allow, the first being the
+        graph's, each as ``{"edges": [[source, target, weight], ...], "stable": bool}``, where
+        ``stable`` says whether the model's local coefficient matrix is convergent (spectral radius
+        below 1). Stable models come first, then the model with the weakest cycles. Without
+        ``acyclic``, ``metadata["subspaces"]`` lists the variables of each independent subspace of
+        the first model, each subspace a list.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is missing or
+        names a column ``data`` lacks, or if ``data`` holds a missing value.
+
+    Warns
+    -----
+    ExperimentalWarning
+        Always: the method is experimental.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** Local ISA-LiNG suits i.i.d. continuous observational data in which each
+    variable is a linear function of its direct causes plus independent non-Gaussian noise, where
+    the graph may hold cycles (no self-loops) and every variable is measured, when only the edges
+    at one variable matter [1]_. It identifies every model of the equivalence class at the target:
+    one answer when neither the target nor a child lies on a cycle, several otherwise, and with
+    disjoint cycles one stable answer [1]_. For the whole graph without cycles use
+    :func:`~andrey.direct_lingam`; for the edges at a target with Gaussian noise use
+    :func:`~andrey.mb_by_mb`.
+
+    **Units and column order.** The ICA and both thresholds read standardized columns, so the
+    answer does not depend on the columns' units; the weights are reported in them. The sparse ICA
+    starts from a regression, not at random, so a fit repeats exactly; under a new column order
+    its rounding differs, which can move an entry within rounding of ``w_threshold`` across it.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
+    unmix every local variable over the same rows, so a row with a missing value has no place in
+    them. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. Tested on the paper's simulation with up to 50 variables
+    and 2,000 rows. Algorithm 1 tries every assignment of the demixing matrix's rows to the local
+    variables that its zero pattern allows, a number that grows quickly with the blanket when the
+    matrix is dense. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Dai, H., Ng, I., Zheng, Y., Gao, Z., and Zhang, K. (2024). Local causal discovery with
+       linear non-Gaussian cyclic models. AISTATS, PMLR 238.
+    .. [2] Zhang, K., and Chan, L.-W. (2006). ICA with sparse connections. Intelligent Data
+       Engineering and Automated Learning (IDEAL 2006), LNCS 4224, 530-537.
+    .. [3] Lacerda, G., Spirtes, P., Ramsey, J., and Hoyer, P. O. (2008). Discovering cyclic causal
+       models by independent components analysis. UAI, 366-374.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import local_isa_ling
+    >>> rng = np.random.default_rng(0)
+    >>> e = rng.uniform(-1, 1, (1000, 3)) ** 3
+    >>> x = e[:, 0]
+    >>> y = 0.8 * x + e[:, 1]
+    >>> z = -0.7 * y + e[:, 2]
+    >>> out = local_isa_ling(np.column_stack([x, y, z]), target=1)
+    >>> out.metadata["parents"], out.metadata["children"]
+    ([0], [2])
+    """
+    from andrey.lingam.local import local_isa_ling as _native
+
+    X = data_matrix(data, method="local_isa_ling")
+    labels = column_labels(data)
+    d = X.shape[1]
+    t = target_column(target, labels, d, "local_isa_ling")
+    fit = _native(X, t, acyclic=acyclic, w_threshold=w_threshold, alpha=alpha)
+    std = X.std(axis=0, ddof=1)
+    name = label_of(labels)
+    first = fit.models[0] if fit.models else None
+    weights = _local_weights({} if first is None else first.edges, std, d)
+    sets = {
+        "markov_blanket": fit.blanket,
+        "parents": [k for k in range(d) if weights[k, t] != 0],
+        "children": [j for j in range(d) if weights[t, j] != 0],
+    }
+    metadata = target_metadata(t, sets, name)
+    metadata["equivalent_models"] = [
+        {
+            "edges": [
+                [name(k), name(j), float(w * std[j] / std[k])]
+                for (k, j), w in sorted(model.edges.items())
+            ],
+            "stable": model.stable,
+        }
+        for model in fit.models
+    ]
+    if first is not None and first.subspaces:
+        metadata["subspaces"] = [[name(j) for j in space] for space in first.subspaces]
+    structure = GraphStructure.from_numpy(directed_marks(weights.T), kind="digraph")
+    return structure_output(structure, labels=labels, weighted_adjacency=weights, metadata=metadata)

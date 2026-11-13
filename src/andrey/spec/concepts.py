@@ -162,7 +162,10 @@ TESTED = (
     *("ldp", "ld3"),
 )
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3")
+NO_KNOWLEDGE = (
+    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3"),
+    "local_isa_ling",
+)
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -211,6 +214,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "local_isa_ling",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -358,6 +362,9 @@ _CONCEPTS = (
         fragment="conditional-independence test",
         suitable=TESTED,
         exempt=(
+            *_exempt(
+                "Its HSIC tests of the ICA's components are part of its own model.local_isa_ling",
+            ),
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
                 *RESIDUAL,
@@ -587,8 +594,19 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="weight magnitude",
-        suitable=(*CONTINUOUS, "calm", "dynotears"),
+        suitable=(*CONTINUOUS, "calm", "dynotears", "local_isa_ling"),
         others_exempt="No weighted continuous fit to threshold.",
+        deviations=(
+            Deviation(
+                method="local_isa_ling",
+                name="w_threshold",
+                default=0.05,
+                reason="0.05 is the threshold of the method's published experiments (Dai et "
+                "al. 2024, App. E.1), applied to the demixing matrix of the standardized "
+                "columns.",
+                fragment="in magnitude read as zero",
+            ),
+        ),
     ),
     Concept(
         key="standardize",
@@ -648,6 +666,9 @@ _CONCEPTS = (
         fragment="conditioning-set size",
         suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
+            *_exempt(
+                "No conditional-independence tests over growing conditioning sets.local_isa_ling",
+            ),
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
                 "max_p_global.",
@@ -776,6 +797,9 @@ _CONCEPTS = (
         suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
         exempt=(
             *_exempt(
+                "Reads the parents from the nonzero entries of the demixing matrix.local_isa_ling",
+            ),
+            *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
                 "pc",
                 "fci",
@@ -895,6 +919,9 @@ _CONCEPTS = (
             "ld3",
         ),
         exempt=(
+            *_exempt(
+                "Deterministic: the sparse ICA starts from a regression.local_isa_ling",
+            ),
             *_exempt(
                 "Deterministic.",
                 *(m for m in PURE_SCORE if m not in STARTS),
@@ -1083,6 +1110,11 @@ _CONCEPTS = (
         fragment="background knowledge",
         suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
+            *_exempt(
+                "The paper gives no rule for background knowledge: the edges are the rows of "
+                "the demixing matrix that the admissible assignments read."
+                "local_isa_ling",
+            ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
                 "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
@@ -1122,7 +1154,7 @@ _CONCEPTS = (
                 *(
                     m
                     for m in NO_KNOWLEDGE
-                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3")
+                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling")
                 ),
             ),
             *_exempt(
@@ -1132,6 +1164,7 @@ _CONCEPTS = (
                 "y_structures",
                 "ldp",
                 "ld3",
+                "local_isa_ling",
             ),
         ),
     ),
@@ -1221,6 +1254,10 @@ _CONCEPTS = (
             *EM_METHODS,
         ),
         exempt=(
+            *_exempt(
+                "The independent components unmix every local variable over the same rows."
+                "local_isa_ling",
+            ),
             *_exempt(
                 "Its score phase reads every column.",
                 *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
@@ -1358,6 +1395,11 @@ _CONCEPTS = (
             "ut_igsp",
         ),
         exempt=(
+            *_exempt(
+                "Its model reads the noise of continuous variables, which an environment "
+                "label does not have."
+                "local_isa_ling",
+            ),
             *_exempt(
                 "cdnod is PC with env, the environment index tested as a context variable "
                 "(Huang et al. 2020).",
@@ -1538,7 +1580,7 @@ _CONCEPTS = (
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "pcmb",
-            *("icp", "mb_by_mb", "mmb_by_mmb"),
+            *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
         ),
         exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
         others_exempt="Answers for every variable at once.",
