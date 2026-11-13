@@ -321,7 +321,7 @@ def summary_rows(rows: list[dict], measure: str, fresh: str) -> list[dict]:
             "comparator_s": r["other_s"],
             "result": r[f"{measure}_result"],
         }
-        if r["fresh"]:
+        if r["fresh"] and r["first"][measure]["verdict"] == "worse":
             row["replication"] = {"seeds": fresh, **_summary_side(r["fresh"], measure)}
         out.append(row)
     return out
