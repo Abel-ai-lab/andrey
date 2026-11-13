@@ -366,7 +366,7 @@ UNIT_CASES = {
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
-            "rsmax2",
+            *("cmb", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc"),
         ),
@@ -1003,6 +1003,7 @@ CI_CASES = {
     "mmmb": [{}, {"target": 0}],
     "pcmb": [{}, {"target": 0}],
     "mb_by_mb": [{"target": 0}],
+    "cmb": [{"target": 0}, {"target": 0, "blanket": "mmmb"}],
     "mmb_by_mmb": [{"target": 0}, {"target": 0, "blanket": "iamb"}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],

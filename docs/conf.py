@@ -503,6 +503,7 @@ PROSE_NAMES = {
     "mmmb": "MMMB",
     "pcmb": "PCMB",
     "mb_by_mb": "MB-by-MB",
+    "cmb": "CMB",
     "mmb_by_mmb": "MMB-by-MMB",
     "y_structures": "Y-structures",
     "ldp": "LDP",
