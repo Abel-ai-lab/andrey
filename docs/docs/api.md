@@ -101,23 +101,22 @@ single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`,
-`hiton_mb`, `mmmb`, `mb_by_mb`, `mmb_by_mmb`, `y_structures`, `pcmci`, `pcmciplus`, and `lpcmci`
-accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file:
-each
-conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where both columns
-are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read.
-Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
-default, picks the method's default handling, `"testwise"`; `metadata["missing"]` records the one a
-fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of
-each missingness indicator and tests again the edges they could have kept. `ges`, `xges`, `hc`,
-`tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose fits read the data
-only through their covariance, refuse missing values under `None` and take `missing="em"`:
-structural EM runs the search on the expected covariance of the data 10 times, refitting a
-linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that graph before
-the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds, the
-observed-data log-likelihood after each, and whether each changed the graph; a fit whose last round
-changed it logs a warning. A row that observes no value is dropped first. It takes
+`hiton_mb`, `mmmb`, `mb_by_mb`, `mmb_by_mmb`, `y_structures`, `ldp`, `ld3`, `pcmci`, `pcmciplus`,
+and `lpcmci` accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of
+a CSV file: each conditional-independence test reads only the rows where all of its variables are
+observed (test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the
+rows where both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the
+median rows a test read. Their argument `missing` names the handling: `"testwise"` is test-wise
+deletion, and `None`, the default, picks the method's default handling, `"testwise"`;
+`metadata["missing"]` records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC
+(Tu et al., 2019) finds the parents of each missingness indicator and tests again the edges they
+could have kept. `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`,
+and `calm`, whose fits read the data only through their covariance, refuse missing values under
+`None` and take `missing="em"`: structural EM runs the search on the expected covariance of the data
+10 times, refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps
+on that graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the
+rounds, the observed-data log-likelihood after each, and whether each changed the graph; a fit whose
+last round changed it logs a warning. A row that observes no value is dropped first. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
 `hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
@@ -139,11 +138,10 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `mb_by_mb`, `mmb_by_mmb`, `mmhc`, `rsmax2`,
-`igsp`,
-`ut_igsp`, `y_structures`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices:
-`"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for
-categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests
-`"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
+`igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `pcmci`, `pcmciplus`, and `lpcmci` take the same
+`indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data,
+`"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and
+the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
 dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
@@ -334,16 +332,16 @@ tests then orient can put more arrowheads at a node.
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `mb_by_mb`, `mmb_by_mmb`, `mmhc`, `rsmax2`,
-`y_structures`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes
-their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
-unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
-whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
-independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
-with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
-1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`y_structures`, `ldp`, `ld3`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`,
+`ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1
+that fixes their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when
+it is unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and
+`grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on every fit, the
+methods that test independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or
+`"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also
+with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes
+nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on
+`ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -686,6 +684,8 @@ in a process.
    mb_by_mb
    mmb_by_mmb
    y_structures
+   ldp
+   ld3
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -733,6 +733,19 @@ selected by a mechanism the variables affect, with hidden common causes allowed 
 `metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
 to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
 patterns. It is experimental until its comparison with the authors' code is published.
+
+LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
+`outcome`: it labels each other column by its causal relation to the pair, from tests whose
+conditioning sets are the labels found before, and it returns the confounders as a valid adjustment
+set for the total effect when its Z5 criterion passes, and no set otherwise. `metadata["effects"]`
+holds the answer, `metadata["partition"]` the labels, and the graph has no edges. It is experimental
+until its comparison with the authors' code is published.
+
+LD3 (Maasch et al. 2025) answers for one `treatment` and `outcome` that has no descendants among the
+columns: it finds the parents of the outcome and whether the treatment is one of them (the
+structural direct criterion), with the other parents as the adjustment set for the direct effect, in
+`metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
+labels. It is experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

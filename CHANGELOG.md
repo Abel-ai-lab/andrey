@@ -119,6 +119,20 @@ names its pull request.
   networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
   set estimates, on a fresh sample, against the true effect; a method that gives no set is never
   scored as the empty set. ([#964])
+- `andrey.ldp`, local discovery by partitioning (Maasch et al. 2024), experimental: a valid
+  adjustment set for the total effect of one `treatment` on one `outcome`, in a number of tests
+  quadratic in the number of columns. It labels every other column by its causal relation to the
+  pair from tests whose conditioning sets are the labels found before, and returns the confounders
+  as the adjustment set when its Z5 criterion passes, and no set otherwise. The answer is one record
+  in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the graph has no edges.
+  The treatment-outcome benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.ld3`, LD3 (Maasch et al. 2025), experimental: the parents of an outcome that has no
+  descendants among the columns, and whether the treatment is one of them (the structural direct
+  criterion), in a number of tests linear in the number of columns. The parents other than the
+  treatment are the adjustment set for the direct effect, and the answer is one record in
+  `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
+  into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
+  benchmark lane runs it beside the authors' code. ([#970])
 
 ### Changed
 
@@ -2666,6 +2680,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#970]: https://github.com/Abel-ai-lab/Andrey/pull/970
 [#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
