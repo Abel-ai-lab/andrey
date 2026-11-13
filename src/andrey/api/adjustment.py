@@ -621,24 +621,24 @@ def ldecc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
-        edges at the treatment: ``v -> treatment`` for a parent, ``treatment -> v`` for a child,
-        and ``v - treatment`` for a neighbor left undirected. An absent edge away from the
-        treatment means nothing. ``metadata["effects"]`` holds one record
-        (:mod:`andrey.core.effects`) for the pair, by column label or 0-based position:
-        ``estimand`` is ``"total"`` and ``set_kind`` ``"local_parents"``; ``adjustment_sets``
-        lists the locally valid parent sets, the parents with each subset of the undirected
-        neighbors that holds no pair found to be a non-collider at the treatment, the outcome left
-        out of a set that holds it. With one set, ``identifiable`` is ``True``; with several,
-        ``None``. When the outcome is a parent of the treatment, the effect is zero in every graph
-        the answer allows and no set is valid: ``nonzero`` and ``identifiable`` are ``False`` and
-        ``adjustment_sets`` is ``[]``. When the marks conflict, so that no parent set is locally
-        valid, ``adjustment_sets`` is ``[]`` and ``identifiable`` ``None``: the method gives no
-        answer. ``nonzero`` is ``None`` otherwise. ``metadata["algorithm"]``
-        is ``"ldecc"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
-        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
-        evaluated; a query asked again reads its kept answer and is not a new test.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under.
+        edges at the treatment: ``v -> treatment`` for a parent, ``treatment -> v`` for a child, and
+        ``v - treatment`` for a neighbor left undirected. An absent edge away from the treatment
+        means nothing. ``metadata["effects"]`` holds one record (:mod:`andrey.core.effects`) for the
+        pair, by column label or 0-based position: ``estimand`` is ``"total"`` and ``set_kind``
+        ``"local_parents"``; ``adjustment_sets`` lists the locally valid parent sets, the parents
+        with each subset of the undirected neighbors that holds no pair found to be a non-collider
+        at the treatment, the outcome left out of a set that holds it. With one set,
+        ``identifiable`` is ``True``; with several, ``None``. When the outcome is a parent of the
+        treatment, the effect is zero in every graph the answer allows and no set is valid:
+        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``. When the
+        marks conflict, so that no parent set is locally valid, ``adjustment_sets`` is ``[]`` and
+        ``identifiable`` ``None``: the method gives no answer. ``nonzero`` is ``None`` otherwise.
+        ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query asked again reads its kept
+        answer and is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
