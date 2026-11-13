@@ -310,12 +310,15 @@ def test_params_are_complete_json_and_the_adapter_pickles():
 
 
 def test_every_learner_with_a_reference_names_a_function_of_the_table():
-    """Each learner has a reference, bnlearn's function or the authors' Causal Explorer function,
-    which learns the same kind of set."""
+    """A learner has a reference, bnlearn's function or the authors' Causal Explorer function,
+    which learns the same kind of set, exactly when its row says one exists."""
     assert set(bnlearn_blanket.COUNTERPART.values()) <= set(bnlearn_blanket.FUNCTIONS)
     authors = causal_explorer_blanket.COUNTERPART
     assert set(authors.values()) <= set(causal_explorer_blanket.FUNCTIONS)
-    assert set(LEARNERS) <= set(bnlearn_blanket.COUNTERPART) | set(authors)
+    referenced = set(bnlearn_blanket.COUNTERPART) | set(authors)
+    assert referenced <= set(LEARNERS)
+    for learner, row in LEARNERS.items():
+        assert row.reference == (learner in referenced), learner
     for learner, function in bnlearn_blanket.COUNTERPART.items():
         kind = bnlearn_blanket.FUNCTIONS[function].kind
         if learner in LEARNERS:
@@ -403,11 +406,13 @@ def test_a_harness_network_cell_draws_from_the_network_s_own_tables(monkeypatch)
     monkeypatch.setattr(blanket_cpu, "_harness_network", lambda name: network)
     cell = blanket_cpu.Cell.parse("net:asia:300")
     X, truth, digest = cell.draw(1)
-    np.testing.assert_array_equal(X, network.sample(300, 1))
-    either = network.nodes.index("either")
-    blanket = {"tub", "lung", "bronc", "xray", "dysp"}
-    assert lane.true_set(truth, either, "mb") == sorted(network.nodes.index(v) for v in blanket)
+    order = blanket_cpu.harness_order(network.d, 1).tolist()
+    np.testing.assert_array_equal(X, network.sample(300, 1)[:, order])
+    column = {v: order.index(network.nodes.index(v)) for v in network.nodes}
+    blanket = sorted(column[v] for v in ("tub", "lung", "bronc", "xray", "dysp"))
+    assert lane.true_set(truth, column["either"], "mb") == blanket
     assert cell.draw(1)[2] == digest != cell.draw(2)[2]
+    assert order != list(range(network.d))
 
 
 def test_a_gaussian_cell_is_a_function_of_its_seed():

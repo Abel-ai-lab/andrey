@@ -19,8 +19,7 @@ Two kinds of data, as :data:`CELLS` writes them:
   ``degree`` expected edges per variable (2 by default), standardized, with Fisher's z (bnlearn's
   ``zf``).
 
-The columns come in an order drawn from the seed (a harness network's in file order). ``--mode``
-picks what a fit answers:
+The columns come in an order drawn from the seed. ``--mode`` picks what a fit answers:
 
 - ``target`` (the default): the set of each target, ``--targets`` of them (``all``, or a number
   drawn from the seed), as a Markov blanket for a learner of blankets and as parents and children
@@ -160,21 +159,30 @@ class Cell:
         """The rows of `seed`, the true DAG's endpoint marks, and the dataset's digest.
 
         A harness network's rows come from :meth:`andrey_bench.networks.Network.sample`, its
-        columns in file order; every other cell's from :func:`datasets.generate_one`.
+        columns in the order :func:`harness_order` draws; every other cell's from
+        :func:`datasets.generate_one`.
         """
         if self.kind == "network" and self.name in networks.HARNESS_NETWORKS:
             network = _harness_network(self.name)
-            X = network.sample(self.n, seed)
-            truth = GraphStructure.from_numpy(network.adjacency, kind="dag").to_numpy()
+            order = harness_order(network.d, seed)
+            X = network.sample(self.n, seed)[:, order]
+            marks = GraphStructure.from_numpy(network.adjacency, kind="dag").to_numpy()
+            truth = np.asarray(marks, dtype=np.int8)[np.ix_(order, order)]
             call = {"network": self.name, "n": self.n, "seed": seed, "sampler": "Network.sample"}
             digest = hashlib.sha1(json.dumps(call, sort_keys=True).encode()).hexdigest()[:12]
-            return X, np.asarray(truth, dtype=np.int8), digest
+            return np.ascontiguousarray(X), np.ascontiguousarray(truth), digest
         key = self.key(seed)
         X, truth, _, _ = datasets.generate_one(key)
         return X, truth, key.digest
 
     def indep_test(self, discrete_test: str) -> str:
         return discrete_test if self.kind == "network" else CONTINUOUS_TEST
+
+
+def harness_order(d: int, seed: int) -> np.ndarray:
+    """The file positions of a harness network's ``d`` columns in a cell of `seed`, drawn apart
+    from the rows' draw."""
+    return np.random.default_rng((seed, d)).permutation(d)
 
 
 @functools.cache
