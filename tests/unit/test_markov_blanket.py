@@ -95,8 +95,13 @@ def test_iamb_with_fisherz_is_calms_moral_graph_bit_for_bit(d, n, density, seed,
     assert got.dtype == want.dtype and got.tobytes() == want.tobytes()
 
 
-#: The settings that make a method's facade call the engine's defaults: no conditioning-set cap.
-_UNCAPPED = {"hiton_pc": {"max_depth": None}, "hiton_mb": {"max_depth": None}}
+#: The settings that make a method's facade call the engine as these tests do: no
+#: conditioning-set cap, and the level 0.05.
+_UNCAPPED = {
+    "hiton_pc": {"max_depth": None},
+    "hiton_mb": {"max_depth": None},
+    "pcmb": {"alpha": 0.05},
+}
 
 
 def _oracle(seed: int, d: int = 12, density: float = 3.0) -> DSeparation:
@@ -576,7 +581,7 @@ def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
 def _fresh(method, test, target, d, alpha, ranks):
     """``target``'s run by ``method`` made anew: the set and the separating sets."""
     sepsets: dict[int, tuple[int, ...]] = {}
-    if method in ("gs", "fast_iamb", "hiton_pc"):
+    if method in ("gs", "fast_iamb", "hiton_pc", "get_pcd"):
         assert d == len(ranks)
         return LocalSearch(test, ranks, alpha).run(method, target)
     if method == "mmpc":
@@ -609,7 +614,7 @@ def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
     search = LocalSearch(test, ranks, 0.05)
     order = np.random.default_rng(0).permutation(15).tolist()
     want = {}
-    for method in ("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"):
+    for method in ("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "get_pcd"):
         for t in order:
             want[method, t] = search.local(method, t)
             assert search.run(method, t) == _fresh(method, test, t, 15, 0.05, ranks), (method, t)
@@ -620,7 +625,7 @@ def test_a_memoized_run_is_the_run_made_afresh_and_tests_nothing_again(kind):
                 assert want[method, t][0] == symmetric, t
             else:
                 assert want[method, t][1] == members, t
-    for method in ("hiton_mb", "mmmb"):
+    for method in ("hiton_mb", "mmmb", "pcmb"):
         for t in order:
             want[method, t] = search.local(method, t)
             assert want[method, t] == LocalSearch(test, ranks, 0.05).local(method, t), (method, t)
@@ -637,7 +642,9 @@ def _check_sepsets(oracle: DSeparation, t: int, learned: list[int], sepsets) -> 
 
 
 @pytest.mark.parametrize("seed", range(4))
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
+@pytest.mark.parametrize(
+    "method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "get_pcd"]
+)
 def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
     oracle = _oracle(seed)
     search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
@@ -652,7 +659,9 @@ def test_each_recorded_separating_set_separates_under_an_oracle(method, seed):
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc"])
+@pytest.mark.parametrize(
+    "method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "get_pcd"]
+)
 def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
     """On data, the test given a recorded set has a p-value above alpha."""
     x, test = _search_data(kind)
@@ -724,7 +733,133 @@ def test_mmmb_runs_the_symmetry_check_of_mmpc():
     assert oracle(t, s, sepsets[s]) == 1.0 and sepsets[s] == search.run("mmpc", s)[1][t]
 
 
-_ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"]
+@pytest.mark.parametrize("seed", range(4))
+def test_pcmb_finds_the_true_blanket_under_an_oracle(seed):
+    dag = data.sample_scm(graph="erdos_renyi", d=12, n=2, seed=seed, density=3.0).graph
+    oracle = DSeparation(dag)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for t in range(oracle.d):
+        pc, mb, sepsets = search.local("pcmb", t)
+        assert pc is not None and mb is not None
+        assert pc == search.parents_children("get_pcd", t), t
+        assert set(pc) == oracle.parents_children(t), t
+        assert set(mb) == oracle.markov_blanket(t) and mb[: len(pc)] == pc, t
+        _check_sepsets(oracle, t, pc, sepsets)
+    np.testing.assert_array_equal(search.structure("pcmb", "moral") != 0, oracle.moral_graph())
+    np.testing.assert_array_equal(search.structure("pcmb", "skeleton") != 0, oracle.skeleton())
+    truth = dag2cpdag(dag.to_numpy())
+    np.testing.assert_array_equal(search.structure("pcmb", "cpdag"), truth)
+    search.test = _NoTests()
+    assert search.local("pcmb", 0)[1] is not None
+
+
+class _PTable:
+    """A test of target 0 that answers each listed (variable, set) with its p-value and finds the
+    rest dependent (a p-value of 0)."""
+
+    def __init__(self, pvalues: dict[tuple[int, tuple[int, ...]], float]) -> None:
+        self.pvalues = pvalues
+
+    def __call__(self, x, y, cond=()):
+        return self.pvalues.get((y if x == 0 else x, tuple(sorted(cond))), 0.0)
+
+
+def test_get_pcd_removes_every_member_the_newcomer_lets_a_subset_separate_at_once():
+    """Pena et al. (2007), Table 5, lines 12-16: after 3 joins, 1 is separated given {2, 3} and 2
+    given {1, 3}, each set judged against the members before any leaves, so both leave in one
+    batch; a member-by-member backward step would drop 1 and then find nothing that separates 2.
+    The newcomer 3 is not tested again in its own pass, and no query is asked twice."""
+    pvalues = {(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (2, (1,)): 0.01, (3, (1,)): 0.02}
+    pvalues |= {(1, (2,)): 0.001, (3, (2,)): 0.01, (3, (1, 2)): 0.03}
+    pvalues |= {(1, (3,)): 0.001, (1, (2, 3)): 0.9, (2, (3,)): 0.001, (2, (1, 3)): 0.8}
+    logged = _Logged(_PTable(pvalues))
+    search = LocalSearch(logged, [0, 1, 2, 3], 0.05)
+    assert search.run("get_pcd", 0) == ([3], {1: (2, 3), 2: (1, 3)})
+    assert [(x, cond) for _, x, cond in logged.log] == [
+        *((1, ()), (2, ()), (3, ())),
+        *((2, (1,)), (3, (1,))),
+        *((1, (2,)), (3, (2,)), (3, (1, 2))),
+        *((1, (3,)), (1, (2, 3)), (2, (3,)), (2, (1, 3))),
+    ]
+
+
+def test_get_pcd_weighs_a_candidate_over_the_subsets_of_the_current_set():
+    """Table 5, lines 4-9: 4, separated given {1}, leaves for good, and 1 leaves once 2 joins.
+    3's weakest association given {1} (p = 0.04) then no longer counts: over the subsets of {2}
+    its largest p-value is 0.02, below 5's 0.03, so 3 joins before 5. Neither 4 nor 1 is asked
+    again."""
+    pvalues = {(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (4, ()): 0.004, (5, ()): 0.005}
+    pvalues |= {(2, (1,)): 0.01, (3, (1,)): 0.04, (4, (1,)): 0.9, (5, (1,)): 0.01}
+    pvalues |= {(1, (2,)): 0.7, (3, (2,)): 0.02, (5, (2,)): 0.03}
+    logged = _Logged(_PTable(pvalues))
+    search = LocalSearch(logged, list(range(6)), 0.05)
+    assert search.run("get_pcd", 0) == ([2, 3, 5], {4: (1,), 1: (2,)})
+    asked = [(x, cond) for _, x, cond in logged.log]
+    assert all(x != 4 for x, _ in asked[asked.index((4, (1,))) + 1 :])
+    assert all(x != 1 for x, _ in asked[asked.index((1, (2,))) + 1 :])
+    assert len(asked) == len(set(asked))
+
+
+def test_get_pcd_keeps_a_descendant_that_pcmb_drops_by_the_symmetry_check():
+    """Pena et al. (2007), DAG (a): on T -> Q <- P, P -> R, Q -> S <- R, T's blanket is {Q, P}.
+    No subset of {Q, S} separates the grandchild S from T, so GetPCD(T) keeps it (Theorem 5 allows
+    a descendant other than a child); S's own GetPCD does not hold T, so GetPC drops S, whose
+    separating set comes from S's run."""
+    t, q, p, r, s = range(5)
+    oracle = _dag([(t, q), (p, q), (p, r), (q, s), (r, s)], 5)
+    search = LocalSearch(oracle, list(range(5)), 0.5)
+    assert search.run("get_pcd", t) == ([q, s], {p: (), r: ()})
+    pc, mb, sepsets = search.local("pcmb", t)
+    assert pc == [q] and mb == [q, p]
+    assert oracle(t, s, sepsets[s]) == 1.0 and sepsets[s] == search.run("get_pcd", s)[1][t]
+
+
+def test_pcmb_pairs_a_candidate_only_with_its_neighbor():
+    """Pena et al. (2007), DAG (b) and Table 5, lines 3-8: on P -> Q -> T -> S <- R <- P, T's
+    blanket is {Q, S, R}. P, separated from T by {Q}, is dependent on T given {Q, S}, but it lies
+    only in Q's parents and children, and Q is in its separating set, so it is not tested again;
+    R, separated from T by {P}, joins through S."""
+    p, q, t, s, r = range(5)
+    oracle = _dag([(p, q), (q, t), (t, s), (r, s), (p, r)], 5)
+    logged = _Logged(oracle)
+    search = LocalSearch(logged, list(range(5)), 0.5)
+    pc = search.parents_children("get_pcd", t)
+    for y in pc:
+        search.parents_children("get_pcd", y)
+    before = len(logged.log)
+    got, mb, sepsets = search.local("pcmb", t)
+    assert got == pc and set(pc) == {q, s}
+    assert mb is not None and mb[:2] == pc and mb[2:] == [r]
+    assert sepsets[p] == (q,) and sepsets[r] == (p,)
+    assert oracle(t, p, (q, s)) == 0.0
+    assert logged.log[before:] == [(t, r, (p, s))]
+
+
+@pytest.mark.parametrize(
+    ("n", "want"), [(4, ([], {})), (19, ([1, 2, 3], {})), (20, ([1, 2], {3: (1, 2)}))]
+)
+def test_get_pcd_runs_a_test_only_with_five_rows_per_degree_of_freedom(n, want):
+    """3 -> 1 -> 0 and 3 -> 2 -> 0, every variable with two categories: a test of 0 given ``k``
+    variables has ``2**k`` degrees of freedom, so it runs with at least 5, 10, and 20 rows. Below
+    5 no test runs and no variable joins; below 20, {1, 2}, the only set that separates 3, is not
+    tested and 3 stays."""
+    oracle = DSepOracle(nx.DiGraph([(3, 1), (1, 0), (3, 2), (2, 0)]))
+    search = LocalSearch(oracle, [0, 1, 2, 3], 0.5, levels=np.full(4, 2), n=n)
+    assert search.run("get_pcd", 0) == want
+    assert (search.counts.issued == 0) == (n < 5)
+
+
+@pytest.mark.parametrize(("n", "want"), [(4, []), (9, [1]), (10, [1, 2])])
+def test_pcmb_runs_a_spouse_test_only_with_five_rows_per_degree_of_freedom(n, want):
+    """0 -> 1 <- 2, every variable with two categories: 2 is 0's spouse, separated from 0 by the
+    empty set. The spouse test of 0 and 2 given {1} has 2 degrees of freedom, so it runs with at
+    least 10 rows; below 10, 2 does not join. Below 5, no test runs and the blanket is empty."""
+    oracle = DSepOracle(nx.DiGraph([(0, 1), (2, 1)]))
+    search = LocalSearch(oracle, [0, 1, 2], 0.5, levels=np.full(3, 2), n=n)
+    assert search.local("pcmb", 0)[1] == want
+
+
+_ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"]
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
@@ -927,6 +1062,7 @@ def test_table_size_counts_cells_and_degrees_of_freedom():
         {"kind": "pc"},
         {"kind": "blanket", "search": blanket._mmpc, "pc": "mmpc"},
         {"kind": "pc", "search": blanket._mmpc, "cell_rows": 5},
+        {"kind": "pc", "search": blanket._mmpc, "df_rows": 5},
     ],
 )
 def test_a_learner_row_names_one_search_or_one_pc_learner(row):

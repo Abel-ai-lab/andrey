@@ -1,10 +1,10 @@
 """Local-structure facade adapters: one variable's Markov blanket or parents and children.
 
-``iamb``, ``inter_iamb``, ``gs``, ``fast_iamb``, ``mmpc``, ``hiton_pc``, ``hiton_mb``, and
-``mmmb`` share :mod:`andrey.constraint.blanket`. With ``target`` they return that variable's set,
-and ``hiton_mb`` and ``mmmb`` its parents and children as well; without, every variable's, joined
-by the AND rule into the graph ``structure`` names: the CPDAG, the skeleton, or, for the blankets,
-the moral graph.
+``iamb``, ``inter_iamb``, ``gs``, ``fast_iamb``, ``mmpc``, ``hiton_pc``, ``hiton_mb``, ``mmmb``,
+and ``pcmb`` share :mod:`andrey.constraint.blanket`. With ``target`` they return that variable's
+set, and ``hiton_mb``, ``mmmb``, and ``pcmb`` its parents and children as well; without, every
+variable's, joined by the AND rule into the graph ``structure`` names: the CPDAG, the skeleton, or,
+for the blankets, the moral graph.
 """
 
 from __future__ import annotations
@@ -2212,6 +2212,278 @@ def mmmb(
     """
     return fit_blanket(
         "mmmb",
+        data,
+        target=target,
+        structure=structure,
+        alpha=alpha,
+        indep_test=indep_test,
+        categorical=categorical,
+        seed=seed,
+        max_depth=max_depth,
+        knowledge=knowledge,
+    )
+
+
+@method_spec("pcmb")
+def pcmb(
+    data: npt.ArrayLike,
+    *,
+    target: str | int | None = None,
+    structure: str = "cpdag",
+    alpha: float = 0.01,
+    indep_test: str | None = None,
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a CPDAG, or one variable's Markov blanket, with PCMB.
+
+    A variable's Markov blanket is the smallest set of other variables given which it is
+    independent of all the rest: in a causal graph, its parents, its children, and its children's
+    other parents (its spouses). Parents-and-children based Markov boundary (PCMB) [1]_ finds the
+    parents and children of the target and of each of them with its own search, GetPCD followed by
+    a symmetry check, then admits each child's other parent by one conditional-independence test
+    given the set that separated it from the target and the common child. Without a target, every
+    variable's sets are learned and joined into the graph ``structure`` names, by default the
+    CPDAG of the Grow-Shrink structure learner [2]_ [3]_.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    target : str, int, or None, default=None
+        The variable whose set to learn: a column label (a string) or a 0-based position (an
+        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
+        the other's set.
+    structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
+        The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
+        the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
+        adjacencies with no directions, each variable joined to its parents and children.
+        ``"moral"``: the moral graph, each variable joined to every member of its Markov blanket,
+        a child's other parents included, for feature selection or as a superset of the skeleton;
+        an edge there does not say that the two variables are adjacent. With ``target``, the result
+        is the target's Markov blanket, whatever ``structure`` is.
+    alpha : float, default=0.01
+        Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
+        smaller sets. Pena et al. [1]_ run PCMB at 0.01, the default.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. A test of GetPCD
+        conditions on a subset of the current set, which may grow larger; a spouse's test
+        conditions on its separating set together with the common child, so a candidate whose
+        separating set already holds ``max_depth`` variables is not tested and does not join. A
+        collider test conditions on the middle node as well, so with ``0`` no spouse joins, no
+        triple is decided, and the CPDAG directs only the edges ``knowledge`` decides.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
+        the other's parents and children from the start, and no test removes it; a pair the
+        knowledge makes non-adjacent, forbidden both ways or outside ``allowed``, is never a
+        candidate, as a parent or child or as a spouse, and is left out of the result. Under
+        ``structure="cpdag"``, the result directs every edge the knowledge decides, by a tier or an
+        edge forbidden one way, before the colliders, which never reverse it, and Meek's rules
+        direct the edges that follow, giving the maximally oriented PDAG (MPDAG)
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The undirected outputs do not read tiers or edges
+        forbidden one way, and with them or a ``target``, ``required_paths`` and ``forbidden_paths``
+        raise ``NotImplementedError``. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep
+        the DAGs the graph stands for in which each listed path holds or does not, as
+        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
+        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``; when the
+        graph found has no consistent extension, and so stands for no DAG, a claim on a pair joined
+        by an undirected edge directs that edge, Meek's rules follow, ``metadata["edge_claims"]``
+        lists the claims applied this way, and the result is not guaranteed to stand for a DAG.
+
+    Returns
+    -------
+    StructureOutput
+        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
+        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
+        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
+        member of its Markov blanket; ``metadata["target"]`` names it,
+        ``metadata["markov_blanket"]`` lists the members, the parents and children first, then the
+        spouses, each in the order they joined, and ``metadata["parents_and_children"]`` lists the
+        parents and children alone, by column label or 0-based position. ``metadata["algorithm"]``
+        is ``"pcmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
+        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
+        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
+        evaluated; a query answered again from a kept answer is not a new test.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position, ``categorical`` is not a list of column names and positions, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` names a column
+        ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"`` orients the
+        edges the search kept into a directed cycle.
+    NotImplementedError
+        If ``knowledge`` holds a part the method does not honor, such as ``required_paths`` or
+        ``forbidden_paths`` with ``target`` or an undirected ``structure``; the message names the
+        methods that honor it.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** PCMB suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its paper runs it on
+    categorical data with a G-square test at the level 0.01 [1]_; the default Fisher-Z test assumes
+    continuous data with linear effects and Gaussian noise, and the other tests read categorical or
+    mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes; the paper names
+    Fisher's z for continuous data [1]_. It is designed for many variables and few rows, each
+    variable with few parents and children: its tests condition on subsets of a
+    parents-and-children set, never on the whole blanket, so the rows it needs depend on how
+    densely the graph is connected rather than on the size of the blanket [1]_. With ``target``, it
+    returns an undirected graph joining ``target`` to each member of its Markov blanket, and
+    ``metadata["parents_and_children"]`` tells the parents and children from the spouses; without,
+    the graph ``structure`` names: the CPDAG by default, or the undirected skeleton or moral graph.
+    :func:`~andrey.mmmb` and :func:`~andrey.hiton_mb` build the same blanket on another
+    parents-and-children search, and :func:`~andrey.iamb` learns it by growing and shrinking it.
+
+    **How it works.** GetPCD [1]_ grows a set of candidate parents and children of the target. A
+    candidate's separating set is, among the subsets of the current set, the one with the largest
+    p-value, and each pass runs three steps: every candidate its separating set separates from the
+    target (a p-value above ``alpha``) leaves for good; the candidate whose largest p-value is the
+    smallest joins; and every earlier member that a subset of the other members separates leaves
+    for good, all at once. The search stops when no candidate is left. The set it returns can hold
+    a descendant of the target other than a child, which no subset of the set separates from it,
+    so a member stays only when the target is in the member's own set (the symmetry check), which
+    gives the parents and children [1]_. A variable outside the target's parents and children that
+    lies in those of one of its members ``y`` is a candidate spouse, with the set that separated it
+    from the target: the target's own search found one, or, for a variable the symmetry check
+    removed, that variable's search. The candidate joins the blanket when the test finds it
+    dependent on the target (a p-value at or below ``alpha``) given that set together with ``y``,
+    which with exact tests happens exactly when ``y`` is a common child of the two [1]_. A
+    candidate is tested only with a ``y`` whose parents and children hold it [1]_, the ``y`` in the
+    order they joined, and it joins at the first one that admits it; a ``y`` already in the
+    separating set is not tested, as that test repeats the one that separated the two. Candidates
+    whose p-values agree to nine significant digits, as when they underflow to zero, are ordered by
+    the larger test statistic, then by the column ranks, where the paper breaks ties at random
+    [1]_. With exact tests, the result is the true Markov blanket [1]_.
+
+    On categorical data, a test runs only when ``data`` holds at least five rows per degree of
+    freedom of its contingency table, ``(r_x - 1) * (r_y - 1)`` times the product of the
+    conditioning variables' categories, the reliability rule of [1]_. In GetPCD, a conditioning set
+    that fails the rule is not tested and takes no part, and a candidate whose unconditional test
+    fails it never joins; a spouse test that fails it, or that would condition on more than
+    ``max_depth`` variables, is not run and admits nothing, so the candidate joins only through
+    another common child. The rule counts every row of ``data``, also where a test deletes rows
+    with missing values.
+
+    **From sets to a graph.** Without a target, a pair is kept in the skeleton
+    (``structure="skeleton"``) when each variable is in the other's parents and children, and in
+    the moral graph (``structure="moral"``) when each is in the other's Markov blanket. The CPDAG
+    decides each triple ``x - z - y`` of the skeleton with ``x`` and ``y`` not adjacent: ``z`` is a
+    collider, ``x -> z <- y``, when ``x`` and ``y`` test dependent given ``z`` together with every
+    subset of the smaller of their blankets without ``x``, ``y``, and ``z`` [2]_ [3]_, and a
+    non-collider when one such set separates them. The colliders are oriented as :func:`~andrey.pc`
+    orients them, the most clearly dependent first: by the smallest absolute partial correlation
+    over the collider's tests for ``"fisherz"`` and ``"student_t"``, and by the largest p-value,
+    smallest first, for the other tests. When two colliders that rank equal to nine decimals
+    dispute an edge, it stays undirected. Meek's rules [4]_ then orient the edges that follow, in
+    rounds, as for :func:`~andrey.pc`, so the result does not depend on the column order; under
+    ``andrey.config(tie_break="position")`` the colliders and the rules follow the column order
+    instead. With exact tests, the result is the true CPDAG [2]_.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
+    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
+    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
+    values missing completely at random. A spouse is found only through a child that the search
+    found, so an edge its tests miss also hides that child's other parents, and each spouse's
+    verdict rests on the one separating set GetPCD recorded for it. GetPCD tests every candidate
+    against every subset of the current set, so a set of ``m`` members takes up to ``2**m`` tests
+    per candidate; the search runs it for the target, for each of its parents and children, and,
+    for the symmetry check, for each of their members, so its cost grows with the sets two steps
+    from the target. The CPDAG tests every subset of the smaller blanket for each unshielded
+    triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Pena, J. M., Nilsson, R., Bjorkegren, J., and Tegner, J. (2007). Towards scalable and
+       data efficient learning of Markov boundaries. International Journal of Approximate
+       Reasoning 45(2), 211-232.
+    .. [2] Margaritis, D. (2003). Learning Bayesian network model structure from data. PhD thesis,
+       Carnegie Mellon University, CMU-CS-03-153.
+    .. [3] Margaritis, D., and Thrun, S. (2000). Bayesian network induction via local
+       neighborhoods. Advances in Neural Information Processing Systems 12, 505-511.
+    .. [4] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
+       UAI, 403-410.
+    .. [5] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [6] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import pcmb
+    >>> rng = np.random.default_rng(0)
+    >>> a, b = rng.standard_normal((2, 1000))
+    >>> c = a + b + 0.5 * rng.standard_normal(1000)
+    >>> out = pcmb(np.column_stack([a, b, c]), target=0)
+    >>> out.metadata["markov_blanket"], out.metadata["parents_and_children"]
+    ([2, 1], [2])
+    >>> pcmb(np.column_stack([a, b, c])).structure.oriented_edges()
+    [(0, 2, 'directed'), (1, 2, 'directed')]
+    """
+    return fit_blanket(
+        "pcmb",
         data,
         target=target,
         structure=structure,

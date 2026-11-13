@@ -34,6 +34,7 @@ The default cells are three networks and two Gaussian sizes, each at two sample 
 | `hiton_pc` | `learn.nbr(method = "si.hiton.pc")`, kept as for `mmpc` | `si.hiton.pc` |
 | `hiton_mb` | none | none |
 | `mmmb` | none | none |
+| `pcmb` | none | none |
 
 A learner runs beside the function in its row once it is named in `LEARNERS` and the installed
 Andrey has it. `hiton_mb`, `mmmb`, and `pcmb` have no bnlearn function; the lane's `mmpc` row

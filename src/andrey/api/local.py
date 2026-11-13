@@ -84,7 +84,8 @@ def mb_by_mb(
         variable added in error rather than lose a member, ``"total_conditioning"``, each variable
         the test finds dependent on it given all the other variables [5]_, or
         :func:`~andrey.iamb`, :func:`~andrey.inter_iamb`, :func:`~andrey.gs`,
-        :func:`~andrey.fast_iamb`, :func:`~andrey.hiton_mb`, or :func:`~andrey.mmmb` by name.
+        :func:`~andrey.fast_iamb`, :func:`~andrey.hiton_mb`, :func:`~andrey.mmmb`, or
+        :func:`~andrey.pcmb` by name.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. The paper runs
         0.01 and 0.05 [1]_.
