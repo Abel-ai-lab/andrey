@@ -2,11 +2,11 @@
 
 Under a d-separation oracle, total conditioning finds every target's Markov blanket in the maximal
 ancestral graph of random graphs with hidden common causes, as IAMB does; the paper's Example 4
-takes two blankets and gives the PAG's marks at its target; the answer at every target of random
-graphs holds the PAG's edges, each mark the PAG's or a circle the stop rule R3 left; and R3 leaves
-a circle on the graph where it stops early. On data the answer does not depend on the column order
-or the columns' units, knowledge sets marks, and the result holds the target's sets, the blankets
-learned, and the test count.
+gives the PAG's marks at its target; the answer at every target of random graphs is the PAG's; the
+stop guard decides the circle where the paper's R3 stops early, and the collider check drops the
+edge the PC step keeps on the graph where it does.
+On data the answer does not depend on the column order or the columns' units, knowledge sets
+marks, and the result holds the target's sets, the blankets learned, and the test count.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import andrey
 from andrey import data
 from andrey.constraint import sequential as sequential_engine
 from andrey.constraint.blanket import LEARNERS, LocalSearch
-from andrey.core import ARROW, CIRCLE, TAIL, ci
+from andrey.core import ARROW, TAIL, ci
 from andrey.core.ci import counting_tests, register_indep_test
 from andrey.data.latent import DSepOracle, causal_digraph
 from andrey.metrics import target_oracle
@@ -119,42 +119,22 @@ def test_below_a_cap_on_the_rest_total_conditioning_runs_no_test_and_keeps_every
 # ---- the answer under the oracle -----------------------------------------------------------------
 
 
-def _coarsens(answer: np.ndarray, truth: np.ndarray, target: int) -> bool:
-    """Whether ``answer`` has the edges ``truth`` has at ``target``, each mark the truth's or a
-    circle."""
-    if not np.array_equal(answer[target] != 0, truth[target] != 0):
-        return False
-    for j in np.flatnonzero(truth[target]):
-        for mine, theirs in (
-            (answer[target, j], truth[target, j]),
-            (answer[j, target], truth[j, target]),
-        ):
-            if mine not in (theirs, CIRCLE):
-                return False
-    return True
-
-
 @pytest.mark.parametrize(
     ("seed", "blanket"),
     [(s, "total_conditioning") for s in range(14)] + [(s, "iamb") for s in range(4)],
 )
-def test_the_answer_has_the_pags_edges_and_its_marks_or_circles_at_every_target(
-    dsep, seed, blanket
-):
+def test_the_answer_is_the_pags_at_every_target(dsep, seed, blanket):
     d, hidden = 7 + seed % 9, seed % 5
     dag = _random_dag(seed, d, hidden, seed % 2 == 1)
-    exact = 0
     for target in range(d):
         out = _oracle_fit(dsep, dag, d, target, seed, blanket=blanket)
-        answer, truth = out.structure.to_numpy(), _truth(dag, d, target)
-        assert _coarsens(answer, truth, target), target
-        exact += np.array_equal(answer, truth)
+        answer = out.structure.to_numpy()
+        assert np.array_equal(answer, _truth(dag, d, target)), target
         meta = out.metadata
         assert meta["blankets_learned"][0] == target
         keys = ("parents", "children", "bidirected", "undetermined")
         listed = [j for key in keys for j in meta[key]]
         assert sorted(listed) == np.flatnonzero(answer[target]).tolist()
-    assert exact >= d - 2  # R3 leaves a circle at a few targets
 
 
 # Fig. 1 and Example 4 of Xie et al. (2024), the target V5. Columns: V2, V3, V4, V5, V7, V8, V9,
@@ -168,49 +148,50 @@ _XIE = [
 
 
 @pytest.mark.parametrize("blanket", ["total_conditioning", "iamb"])
-def test_example_4_takes_two_blankets_and_gives_the_pags_marks(dsep, blanket):
+def test_example_4_gives_the_pags_marks(dsep, blanket):
     dag = _dag([(_V[a], _V[b]) for a, b in _XIE], 12)
     out = _oracle_fit(dsep, dag, 10, _V[5], blanket=blanket)
     meta = out.metadata
     assert sorted(meta["markov_blanket"]) == [_V[v] for v in (3, 4, 7, 8, 10, 12)]
-    # The paper's waitlist after V5 is V4, V8, V10, and V4's blanket decides V4 -> V5 (R1); here
-    # the ranks order the waitlist, so V8 or V10 may come before V4.
+    # The paper's walk stops after V4's blanket decides V4 -> V5 (R1); the stop guard reads the
+    # rules only once more blankets are learned than V5 has neighbors (V4, V8, V10).
     learned = meta["blankets_learned"]
-    assert learned[0] == _V[5] and learned[-1] == _V[4]
-    assert set(learned) <= {_V[5], _V[4], _V[8], _V[10]}
+    assert learned[0] == _V[5] and {_V[4], _V[8], _V[10]} <= set(learned)
     assert (meta["parents"], meta["children"]) == ([_V[4]], [_V[10]])
     assert (meta["bidirected"], meta["undetermined"]) == ([_V[8]], [])
     assert np.array_equal(out.structure.to_numpy(), _truth(dag, 10, _V[5]))
 
 
 # The stop rule R3 on the graph 0 -> 3 <- 1 -> 4 <- 2 -> 3, 0 -> 5 <- 1, 5 -> 4: at the target 1,
-# every edge already ends in an arrowhead after its own blanket, so R3 stops there, while the PAG
-# decides the circle at 1 on 1 -> 4 through the discriminating path 0 *-> 5 <-* 1, 5 -> 4.
+# every edge already ends in an arrowhead after its own blanket, so the paper's R3 stops there,
+# while the PAG decides the circle at 1 on 1 -> 4 through the discriminating path
+# 0 *-> 5 <-* 1, 5 -> 4, which only the blankets of 4 or 5 bring in.
 _R3 = [(0, 3), (1, 3), (2, 3), (1, 4), (2, 4), (0, 5), (1, 5), (5, 4)]
 
 
-def test_r3_leaves_a_circle_the_pag_decides(dsep):
+def test_the_stop_guard_decides_the_circle_r3_leaves(dsep):
     dag = _dag(_R3, 6)
-    assert _truth(dag, 6, 1)[1, 4] == TAIL
-    early = _oracle_fit(dsep, dag, 6, 1)
-    assert early.metadata["blankets_learned"] == [1]
-    assert early.metadata["undetermined"] == [3, 4, 5]
-    assert early.structure.to_numpy()[1, 4] == CIRCLE
-    # At 4 the search goes on to 1's blanket, which brings in the discriminating path.
+    truth = _truth(dag, 6, 1)
+    assert truth[1, 4] == TAIL
+    # 1 has three neighbors after its own step, so the rules are read after four blankets.
+    at_1 = _oracle_fit(dsep, dag, 6, 1)
+    assert len(at_1.metadata["blankets_learned"]) >= 4
+    assert (at_1.metadata["children"], at_1.metadata["undetermined"]) == ([4], [3, 5])
+    assert np.array_equal(at_1.structure.to_numpy(), truth)
     at_4 = _oracle_fit(dsep, dag, 6, 4)
     assert (at_4.metadata["parents"], at_4.metadata["undetermined"]) == ([1, 5], [2])
     assert np.array_equal(at_4.structure.to_numpy(), _truth(dag, 6, 4))
 
 
-def test_the_pc_step_can_keep_an_edge_the_pag_lacks(dsep):
+def test_the_collider_check_drops_an_edge_the_pc_step_keeps(dsep):
     # In this graph only {4, 6, 9, 10, 12} and {4, 9, 10, 12, 13} separate 1 and 7, sets the PC
     # step over MB+(10) never tests (neither end keeps all of them as neighbors), so L_10 holds
-    # 1 - 7 and the v-structure 1 *-> 7 <-* 10, which joins the growing graph as one that contains
-    # 10. Testing every subset of MB+(10), as the proof of Theorem 2 supposes, removes the edge.
+    # 1 - 7 and the v-structure 1 *-> 7 <-* 10, a v-structure that contains 10. 7's own step tests
+    # the pair against every subset of MB(7) without 1 and separates it, so the check drops the
+    # v-structure, and the answer at 7 is the PAG's.
     dag = _random_dag(53, 15, 3, True)
     out = _oracle_fit(dsep, dag, 15, 7, 53)
-    assert 1 in np.flatnonzero(out.structure.to_numpy()[7])
-    assert 1 not in np.flatnonzero(_truth(dag, 15, 7)[7])
+    assert np.array_equal(out.structure.to_numpy(), _truth(dag, 15, 7))
     search = LocalSearch(DSepOracle(dag), list(range(15)), 0.05)
     blanket = search.local("iamb", 10)[1]
     assert (1, 7) in sequential_engine.learn_local(search, 10, blanket, "pc").adjacent
