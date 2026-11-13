@@ -1516,6 +1516,8 @@ def returns_text(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
         return "Temporal graph"
     if spec.output.graph_kind == "undirected":
         return "Undirected graph"
+    if spec.output.graph_kind == "digraph":
+        return "Directed graph"
     return spec.output.graph_kind.upper()
 
 

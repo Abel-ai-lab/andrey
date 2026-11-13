@@ -155,6 +155,13 @@ names its pull request.
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), experimental: the weighted edges into
+  a target and into each of its children in a linear model with non-Gaussian noise whose graph may
+  hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket
+  is the support of a Lasso regression; a sparse ICA (Zhang and Chan 2006) and HSIC tests give the
+  independent subspaces, and every admissible assignment of them gives a model of the equivalence
+  class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
+  peels sink columns instead, for a target and children on no cycle. ([#PR])
 
 ### Changed
 

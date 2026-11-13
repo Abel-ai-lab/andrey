@@ -61,11 +61,9 @@ class LocalFit:
 
 
 def standardized(X: np.ndarray) -> np.ndarray:
-    """Center each column and scale it to unit sample standard deviation; a constant column
-    becomes zero."""
+    """Center each column and scale it to unit sample standard deviation."""
     Z = X - X.mean(axis=0)
-    std = Z.std(axis=0, ddof=1)
-    return Z / np.where(std > 0, std, 1.0)
+    return Z / Z.std(axis=0, ddof=1)
 
 
 def markov_blanket(Z: np.ndarray, t: int) -> list[int]:
@@ -241,7 +239,7 @@ def local_isa_ling(
     """
     Z = standardized(np.asarray(X, dtype=np.float64))
     mb = markov_blanket(Z, t) if blanket is None else sorted(blanket)
-    if Z[:, t].std() == 0 or not mb:
+    if not mb:
         return LocalFit(mb, [LocalModel({}, True, 0.0, ((t,),))], None)
     local = sorted([t, *mb])
     lt = local.index(t)

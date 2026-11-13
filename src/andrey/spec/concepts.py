@@ -363,7 +363,8 @@ _CONCEPTS = (
         suitable=TESTED,
         exempt=(
             *_exempt(
-                "Its HSIC tests of the ICA's components are part of its own model.local_isa_ling",
+                "Its HSIC tests of the ICA's components are part of its own model.",
+                "local_isa_ling",
             ),
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
@@ -667,7 +668,8 @@ _CONCEPTS = (
         suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
-                "No conditional-independence tests over growing conditioning sets.local_isa_ling",
+                "No conditional-independence tests over growing conditioning sets.",
+                "local_isa_ling",
             ),
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
@@ -797,7 +799,8 @@ _CONCEPTS = (
         suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
         exempt=(
             *_exempt(
-                "Reads the parents from the nonzero entries of the demixing matrix.local_isa_ling",
+                "Reads the parents from the nonzero entries of the demixing matrix.",
+                "local_isa_ling",
             ),
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -920,7 +923,8 @@ _CONCEPTS = (
         ),
         exempt=(
             *_exempt(
-                "Deterministic: the sparse ICA starts from a regression.local_isa_ling",
+                "Deterministic: the sparse ICA starts from a regression.",
+                "local_isa_ling",
             ),
             *_exempt(
                 "Deterministic.",
@@ -1112,7 +1116,7 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "The paper gives no rule for background knowledge: the edges are the rows of "
-                "the demixing matrix that the admissible assignments read."
+                "the demixing matrix that the admissible assignments read.",
                 "local_isa_ling",
             ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
@@ -1255,7 +1259,7 @@ _CONCEPTS = (
         ),
         exempt=(
             *_exempt(
-                "The independent components unmix every local variable over the same rows."
+                "The independent components unmix every local variable over the same rows.",
                 "local_isa_ling",
             ),
             *_exempt(
@@ -1397,7 +1401,7 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment "
-                "label does not have."
+                "label does not have.",
                 "local_isa_ling",
             ),
             *_exempt(

@@ -32,6 +32,7 @@ from andrey.api._local import target_column, target_metadata
 from andrey.api._marks import directed_marks
 from andrey.api._method import method_spec
 from andrey.core import GraphStructure
+from andrey.core.backend import one_blas_thread
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -615,8 +616,9 @@ def local_isa_ling(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str or int
-        Required: the variable to answer for, a column label or a 0-based position.
+    target : str, int, or None, default=None
+        Required: the variable to answer for, a column label (a string) or a 0-based position (an
+        integer). ``None`` raises ``ValueError``.
     acyclic : bool, default=False
         Read the edges by peeling sink columns of the demixing matrix (the paper's Appendix C),
         which assumes that neither the target nor a child lies on a cycle and needs no subspace
@@ -678,8 +680,9 @@ def local_isa_ling(
 
     **Units and column order.** The ICA and both thresholds read standardized columns, so the
     answer does not depend on the columns' units; the weights are reported in them. The sparse ICA
-    starts from a regression, not at random, so a fit repeats exactly; under a new column order
-    its rounding differs, which can move an entry within rounding of ``w_threshold`` across it.
+    starts from a regression, not at random, and runs on one BLAS thread, so a fit repeats
+    exactly; under a new column order its rounding differs, which can move an entry within rounding
+    of ``w_threshold`` across it.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
     unmix every local variable over the same rows, so a row with a missing value has no place in
@@ -720,7 +723,8 @@ def local_isa_ling(
     labels = column_labels(data)
     d = X.shape[1]
     t = target_column(target, labels, d, "local_isa_ling")
-    fit = _native(X, t, acyclic=acyclic, w_threshold=w_threshold, alpha=alpha)
+    with one_blas_thread():
+        fit = _native(X, t, acyclic=acyclic, w_threshold=w_threshold, alpha=alpha)
     std = X.std(axis=0, ddof=1)
     name = label_of(labels)
     first = fit.models[0] if fit.models else None
