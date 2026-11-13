@@ -782,11 +782,10 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     earlier member is tested against the subsets of the other members, and every member some
     subset separates leaves for good: all of them at once, each judged against the members before
     any leaves. The newcomer is not tested then: its subsets are the ones it passed as a candidate.
-    So the set changes on every pass, and the search stops when no candidate is left. A test is
-    run once: each pass
-    tests only the subsets that hold the newest member, and the others are kept from earlier
-    passes, without those that hold a member that left. With no candidate left, no member joins
-    and none leaves, so the paper's rule, repeat "until PCD does not change", stops there too. With
+    So the set changes on every pass, and the search stops when no candidate is left; then no
+    member joins and none leaves, so the paper's rule, repeat "until PCD does not change", stops
+    there too. Each test runs once: a pass tests only the subsets that hold the newest member, and
+    keeps the others from earlier passes, less those that hold a member that left. With
     ``max_depth``, a test conditions on at most ``max_depth`` variables; the set itself may grow
     larger.
 

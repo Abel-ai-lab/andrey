@@ -13,6 +13,7 @@ HITON-PC's.
 from __future__ import annotations
 
 import functools
+import graphlib
 
 import networkx as nx
 import numpy as np
@@ -186,15 +187,16 @@ def test_each_structure_is_its_own_truth_under_an_oracle(method, structure, seed
 @pytest.mark.parametrize("seed", range(3))
 @pytest.mark.parametrize(("method", "structure"), CELLS)
 def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure, seed):
-    """On 20 variables with 2,000 rows, an undirected structure has at most a third as many wrong
-    pairs as its truth has pairs. A CPDAG pair is wrong when its edge or its marks differ, and one
-    wrong collider misdirects the edges Meek's rules orient from it, so the CPDAG has at most half
-    as many. HITON-MB, MMMB, and PCMB reach a spouse only through a child their
-    parents-and-children search found, so an edge it misses also drops the spouses behind it from
-    both blankets, and their moral graphs have at most half as many."""
+    """On 20 variables with 2,000 rows, at the level 0.05 for every learner, an undirected structure
+    has at most a third as many wrong pairs as its truth has pairs. A CPDAG pair is wrong when its
+    edge or its marks differ, and one wrong collider misdirects the edges Meek's rules orient from
+    it, so the CPDAG has at most half as many. HITON-MB, MMMB, and PCMB reach a spouse only through
+    a child their parents-and-children search found, so an edge it misses also drops the spouses
+    behind it from both blankets, and their moral graphs have at most half as many."""
     sample = _er_sample(20, seed)
     want = _true_structure(DSeparation(sample.graph), sample, structure)
-    got = _got_structure(getattr(andrey, method)(sample.data, structure=structure), structure)
+    fit = getattr(andrey, method)(sample.data, structure=structure, alpha=0.05)
+    got = _got_structure(fit, structure)
     wrong = (got != want) | (got.T != want.T)
     half = structure == "cpdag" or (method in SPOUSE_LEARNERS and structure == "moral")
     share = 1 / 2 if half else 1 / 3
@@ -528,14 +530,16 @@ def test_pcmb_skeleton_joins_each_variable_to_its_parents_and_children(kind):
 
 
 def _pena(edges: str, seed: int = 0, n: int = 5000) -> pd.DataFrame:
-    """Linear-Gaussian data on a network of Pena et al. (2007), the parents of each node before
-    it in ``edges``, ``"P>Q Q>T ..."``."""
+    """Linear-Gaussian data on a network of Pena et al. (2007) whose edges are ``"P>Q Q>T ..."``:
+    each node is 0.8 times the sum of its parents plus standard Gaussian noise. With weights of 1,
+    DAG (a) is unfaithful: P and Q are independent given S."""
     rng = np.random.default_rng(seed)
     columns: dict[str, np.ndarray] = {}
     pairs = [tuple(e.split(">")) for e in edges.split()]
-    for node in dict.fromkeys(v for pair in pairs for v in pair):
+    order = graphlib.TopologicalSorter({b: {a for a, c in pairs if c == b} for _, b in pairs})
+    for node in order.static_order():
         parents = [columns[a] for a, b in pairs if b == node]
-        columns[node] = sum(parents, rng.standard_normal(n))
+        columns[node] = 0.8 * sum(parents, np.zeros(n)) + rng.standard_normal(n)
     return pd.DataFrame(columns)
 
 

@@ -245,6 +245,13 @@ _CONCEPTS = (
                 reason="Xie et al. 2024 state no level; 0.01 is the level of their code.",
             ),
             Deviation(
+                method="pcmb",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published experiments (Pena et al. "
+                "2007, Section 4.1).",
+            ),
+            Deviation(
                 method="rcd",
                 name="alpha",
                 default=0.01,

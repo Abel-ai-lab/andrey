@@ -686,12 +686,12 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
         "pcmb",
         "One variable's Markov blanket by PCMB: the parents and children of the target and of each "
-        "of them by GetPCD, which removes false members after every addition, with the symmetry "
-        "check, then each child's other parent admitted by one conditional-independence test "
-        "given the set that separated it from the target and a common neighbor; on categorical "
-        "data a test runs only with five rows per degree of freedom. With target=null, every "
-        "variable's sets joined into a CPDAG by the Grow-Shrink structure learner, or into the "
-        "skeleton or the moral graph (structure).",
+        "of them by GetPCD, which after every addition removes each member a subset of the others "
+        "separates from the target, with the symmetry check, then each child's other parent "
+        "admitted by one conditional-independence test given the set that separated it from the "
+        "target and a common neighbor; on categorical data a test runs only with five rows per "
+        "degree of freedom. With target=null, every variable's sets joined into a CPDAG by the "
+        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
         "markov_blanket",
         _BLANKET_STRUCTURE,
         "cpdag",
