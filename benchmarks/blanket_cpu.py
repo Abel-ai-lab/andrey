@@ -13,12 +13,14 @@ Two kinds of data, as :data:`CELLS` writes them:
 
 - ``net:<name>:<n>``: ``n`` rows sampled from a published network's own tables, discrete, with
   Andrey's ``--indep-test`` (``gsq`` or ``chisq``) against bnlearn's ``mi`` or ``x2`` form
-  (``--discrete-test``, below);
+  (``--discrete-test``, below); the networks of ``andrey.data`` and the harness's own
+  (:data:`andrey_bench.networks.HARNESS_NETWORKS`, such as ``pigs``);
 - ``gauss:<d>:<n>[:<degree>]``: ``n`` rows of a linear-Gaussian graph on ``d`` variables with
   ``degree`` expected edges per variable (2 by default), standardized, with Fisher's z (bnlearn's
   ``zf``).
 
-The columns come in an order drawn from the seed. ``--mode`` picks what a fit answers:
+The columns come in an order drawn from the seed (a harness network's in file order). ``--mode``
+picks what a fit answers:
 
 - ``target`` (the default): the set of each target, ``--targets`` of them (``all``, or a number
   drawn from the seed), as a Markov blanket for a learner of blankets and as parents and children
@@ -51,6 +53,8 @@ out.
 from __future__ import annotations
 
 import argparse
+import functools
+import hashlib
 import json
 import socket
 import statistics
@@ -63,7 +67,7 @@ from typing import Any
 import numpy as np
 
 from andrey import GraphStructure
-from andrey_bench import datasets, rsession, rundir, scoring
+from andrey_bench import datasets, networks, rsession, rundir, scoring
 from andrey_bench.adapters import andrey_blanket, bnlearn_blanket, causal_explorer_blanket
 from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
@@ -152,8 +156,30 @@ class Cell:
             seed=seed,
         )
 
+    def draw(self, seed: int) -> tuple[np.ndarray, np.ndarray, str]:
+        """The rows of `seed`, the true DAG's endpoint marks, and the dataset's digest.
+
+        A harness network's rows come from :meth:`andrey_bench.networks.Network.sample`, its
+        columns in file order; every other cell's from :func:`datasets.generate_one`.
+        """
+        if self.kind == "network" and self.name in networks.HARNESS_NETWORKS:
+            network = _harness_network(self.name)
+            X = network.sample(self.n, seed)
+            truth = GraphStructure.from_numpy(network.adjacency, kind="dag").to_numpy()
+            call = {"network": self.name, "n": self.n, "seed": seed, "sampler": "Network.sample"}
+            digest = hashlib.sha1(json.dumps(call, sort_keys=True).encode()).hexdigest()[:12]
+            return X, np.asarray(truth, dtype=np.int8), digest
+        key = self.key(seed)
+        X, truth, _, _ = datasets.generate_one(key)
+        return X, truth, key.digest
+
     def indep_test(self, discrete_test: str) -> str:
         return discrete_test if self.kind == "network" else CONTINUOUS_TEST
+
+
+@functools.cache
+def _harness_network(name: str) -> networks.Network:
+    return networks.load_network(name)
 
 
 @dataclass(frozen=True)
@@ -329,9 +355,7 @@ def rescore(out: Path) -> list[dict]:
             continue
         cell = Cell.parse(record["cell"])
         if (record["cell"], record["seed"]) not in truths:
-            truths[record["cell"], record["seed"]] = datasets.generate_one(
-                cell.key(record["seed"])
-            )[1]
+            truths[record["cell"], record["seed"]] = cell.draw(record["seed"])[1]
         truth = truths[record["cell"], record["seed"]]
         if record["mode"] == "target":
             targets = [int(t) for t in record["sets"]]
@@ -543,8 +567,7 @@ def main(argv: list[str] | None = None) -> int:
     with (out / RECORDS).open("a") as sink:
         for cell in cells:
             for seed in range(args.first_seed, args.first_seed + args.seeds):
-                key = cell.key(seed)
-                X, truth, _, _ = datasets.generate_one(key)
+                X, truth, digest = cell.draw(seed)
                 targets = targets_of(X.shape[1], args.targets, seed)
                 walls: dict[str, list[float]] = {}
                 for structure in structures:
@@ -586,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
                             "d": int(X.shape[1]),
                             "n": cell.n,
                             "seed": seed,
-                            "dataset": key.digest,
+                            "dataset": digest,
                             "mode": args.mode,
                             "structure": structure,
                             "targets": targets if structure is None else None,

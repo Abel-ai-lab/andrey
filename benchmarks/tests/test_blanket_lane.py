@@ -393,6 +393,23 @@ def test_a_cell_is_a_network_or_a_gaussian_graph():
     assert blanket_cpu.Cell.parse(gaussian.label) == gaussian
 
 
+def test_a_harness_network_cell_draws_from_the_network_s_own_tables(monkeypatch):
+    import gzip
+
+    from andrey_bench import networks
+
+    network = networks.parse_network("asia", gzip.decompress(ASIA.read_bytes()).decode("utf-8"))
+    monkeypatch.setitem(networks.HARNESS_NETWORKS, "asia", None)
+    monkeypatch.setattr(blanket_cpu, "_harness_network", lambda name: network)
+    cell = blanket_cpu.Cell.parse("net:asia:300")
+    X, truth, digest = cell.draw(1)
+    np.testing.assert_array_equal(X, network.sample(300, 1))
+    either = network.nodes.index("either")
+    blanket = {"tub", "lung", "bronc", "xray", "dysp"}
+    assert lane.true_set(truth, either, "mb") == sorted(network.nodes.index(v) for v in blanket)
+    assert cell.draw(1)[2] == digest != cell.draw(2)[2]
+
+
 def test_a_gaussian_cell_is_a_function_of_its_seed():
     cell = blanket_cpu.Cell.parse("gauss:12:300")
     from andrey_bench import datasets
