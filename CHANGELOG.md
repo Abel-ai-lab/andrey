@@ -161,7 +161,7 @@ names its pull request.
   is the support of a Lasso regression; a sparse ICA (Zhang and Chan 2006) and HSIC tests give the
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
-  peels sink columns instead, for a target and children on no cycle. ([#PR])
+  peels sink columns instead, for a target and children on no cycle. ([#986])
 
 ### Changed
 
@@ -2716,6 +2716,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
