@@ -49,6 +49,9 @@ BLANKET_LEARNERS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if ro
 #: m-separation keeps (Pellet and Elisseeff 2008); the forward phase alone returns a superset and
 #: HITON-MB assembles the blanket from a DAG's parents, children, and spouses.
 MMB_BLANKETS: tuple[str, ...] = ("total_conditioning", "gs", "iamb", "inter_iamb", "fast_iamb")
+#: The learners ``cmb`` can name: the topology-based ones, which return a variable's parents and
+#: children apart from its spouses, as CMB's steps read them (Gao and Ji 2015).
+CMB_BLANKETS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if row.kind == "pc_spouses")
 
 #: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
 #: each.
@@ -126,7 +129,7 @@ CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
     *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
     "pcmb",
-    *("mb_by_mb", "mmb_by_mmb", "mmhc", "rsmax2"),
+    *("mb_by_mb", "cmb", "mmb_by_mmb", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -267,6 +270,13 @@ _CONCEPTS = (
                 default=0.005,
                 reason="0.005 is the level of the authors' code; Maasch et al. (2025) use 0.005, "
                 "0.01, and 0.05.",
+            ),
+            Deviation(
+                method="cmb",
+                name="alpha",
+                default=0.02,
+                reason="0.02 is the level of the method's published experiments (Gao and Ji 2015, "
+                "Section 4).",
             ),
             Deviation(
                 method="mmb_by_mmb",
@@ -831,6 +841,7 @@ _CONCEPTS = (
                 "mmmb",
                 "pcmb",
                 "mb_by_mb",
+                "cmb",
                 "mmb_by_mmb",
                 "ldecc",
                 "locpc_cde",
@@ -1274,6 +1285,7 @@ _CONCEPTS = (
             "ldecc",
             "locpc_cde",
             "mb_by_mb",
+            "cmb",
             "mmb_by_mmb",
             *PCMCI_FAMILY,
             "anm",
@@ -1467,6 +1479,7 @@ _CONCEPTS = (
                 *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
                 "pcmb",
                 "mb_by_mb",
+                "cmb",
                 "mmb_by_mmb",
             ),
             *_exempt(
@@ -1573,6 +1586,10 @@ _CONCEPTS = (
                 "Answers for one target: the edges at it, as its CPDAG holds them.", "mb_by_mb"
             ),
             *_exempt(
+                "Answers for one target: the edges at it, with the directions its tests decide.",
+                "cmb",
+            ),
+            *_exempt(
                 "Answers for one target: the edges at it, as its PAG holds them.", "mmb_by_mmb"
             ),
             *_exempt(
@@ -1621,7 +1638,7 @@ _CONCEPTS = (
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "pcmb",
-            *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
+            *("icp", "mb_by_mb", "cmb", "mmb_by_mmb", "local_isa_ling"),
         ),
         exempt=_exempt(
             "Answers for one treatment-outcome pair, not one variable.",
@@ -1700,7 +1717,7 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=("mb_by_mb", "mmb_by_mmb", "ldecc"),
+        suitable=("mb_by_mb", "cmb", "mmb_by_mmb", "ldecc"),
         others_exempt="Runs no Markov blanket learner as a step.",
         deviations=(
             Deviation(
@@ -1711,6 +1728,15 @@ _CONCEPTS = (
                 reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
                 "to keep a variable added in error rather than lose a member; any blanket "
                 "learner, or a superset of the blanket, satisfies its proof.",
+            ),
+            Deviation(
+                method="cmb",
+                name="blanket",
+                default="hiton_mb",
+                choices=CMB_BLANKETS,
+                reason="Gao and Ji 2015 run CMB with HITON-MB. Its steps read a variable's parents "
+                "and children apart from its spouses, which only the topology-based learners "
+                "return.",
             ),
             Deviation(
                 method="mmb_by_mmb",
@@ -1736,7 +1762,7 @@ _CONCEPTS = (
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "pcmb",
-            *("icp", "mb_by_mb", "mmb_by_mmb"),
+            *("icp", "mb_by_mb", "cmb", "mmb_by_mmb"),
         ),
         exempt=_exempt(
             "Answers for one treatment-outcome pair, not one variable.",
@@ -1756,6 +1782,7 @@ _CONCEPTS = (
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "pcmb",
             "mb_by_mb",
+            "cmb",
             "mmb_by_mmb",
             "y_structures",
             "ldp",
@@ -1770,7 +1797,7 @@ _CONCEPTS = (
         summary="A method that learns the Markov blankets of several variables in turn lists them "
         "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
         "of blankets it needed is the list's length.",
-        suitable=("mb_by_mb", "mmb_by_mmb"),
+        suitable=("mb_by_mb", "cmb", "mmb_by_mmb"),
         others_exempt="Learns no sequence of Markov blankets.",
     ),
     Concept(
@@ -1830,6 +1857,11 @@ _CONCEPTS = (
                 "Each local structure decides a triple by the separating set of its endpoints, "
                 "as MMB-by-MMB states (Xie et al. 2024); no vote over several sets.",
                 "mmb_by_mmb",
+            ),
+            *_exempt(
+                "Decides a direction from one pair's two tests, without and with the target in "
+                "the conditioning set, as CMB states (Gao and Ji 2015); no vote over several sets.",
+                "cmb",
             ),
             *_exempt(
                 "Each eager collider check reads the first separating set found, and check "
