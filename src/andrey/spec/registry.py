@@ -2242,9 +2242,9 @@ _add(
     MethodSpec(
         name="local_isa_ling",
         family="functional",
-        summary="The weighted edges into one variable and into each of its children in a linear "
-        "non-Gaussian model whose graph may hold cycles, from the variable and its Markov blanket "
-        "alone: a sparse ICA and HSIC tests give its independent subspaces, and every model of the "
+        summary="The weighted edges into one variable and its children, in a linear non-Gaussian "
+        "model whose graph may hold cycles: from the variable and its Markov blanket alone, a "
+        "sparse ICA and HSIC tests give the independent subspaces, and every model of the "
         "equivalence class is read from them, stable models first.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(

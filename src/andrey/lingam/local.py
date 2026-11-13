@@ -237,13 +237,13 @@ def local_isa_ling(
     ``blanket`` replaces the Lasso's blanket when given (a known blanket). Under ``acyclic``, a
     fit whose thresholded matrix has no sink falls back to Algorithm 1.
     """
-    Z = standardized(np.asarray(X, dtype=np.float64))
+    X = np.asarray(X, dtype=np.float64)
+    Z = standardized(X)
     mb = markov_blanket(Z, t) if blanket is None else sorted(blanket)
     if not mb:
         return LocalFit(mb, [LocalModel({}, True, 0.0, ((t,),))], None)
-    local = sorted([t, *mb])
-    lt = local.index(t)
-    ica = sparse_ica(Z[:, local])
+    local, lt = [t, *mb], 0  # the target first, as the authors' code orders the columns
+    ica = sparse_ica(X[:, local])
     W = np.where(np.abs(ica.W) > w_threshold, ica.W, 0.0)
     back = np.asarray(local)
     if acyclic:
@@ -258,7 +258,7 @@ def local_isa_ling(
             _names(md.edges, back),
             md.stable,
             md.cycle_strength,
-            tuple(tuple(int(back[c]) for c in cols) for cols in md.subspaces),
+            tuple(sorted(tuple(sorted(int(back[c]) for c in cols)) for cols in md.subspaces)),
         )
         for md in algorithm1(W, parts, lt, w_threshold)
     ]
