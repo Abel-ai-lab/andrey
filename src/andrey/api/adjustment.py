@@ -685,18 +685,10 @@ def snap(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and on
-    simulated linear-Gaussian data. The pruning after a low order rests on few tests: a dependence
-    found by chance between an unrelated variable and an ancestor of ``variables``, about
-    ``alpha`` of the independent pairs, orients edges into that ancestor and drops it, and with it
-    a member of the optimal set. On the random graphs of [1]_ with 20 variables and 5,000 rows,
-    the set it returned was the optimal one in about a third of the fits; with 100 or 200
-    variables and 1,000 rows, or 100 variables and 10,000 rows, the unconditional tests alone
-    dropped nearly every ancestor of a pair, so the sets missed the confounders. Among the
-    variables kept the search is PC's, so its tests grow with their neighborhoods. With 1,000 rows
-    a fit on 100 variables ran about 5,000 tests, nearly all of them unconditional, in under a
-    second. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** On the benchmark lane's treatment-outcome pairs (a treatment that is an
+    ancestor of the outcome, with an identifiable effect) with 100 to 200 variables, the sets it
+    returned did not beat adjusting for nothing, because its early independence tests prune true
+    ancestors at finite sample sizes. It has not been benchmarked in the setting of [1]_ yet.
 
     References
     ----------
