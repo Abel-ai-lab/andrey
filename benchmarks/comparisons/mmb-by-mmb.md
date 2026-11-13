@@ -25,8 +25,11 @@ The model is a published network, read as a linear-Gaussian structural model
   among the nodes that are not targets. The paper hides random nodes, so a hidden leaf simply
   leaves the data; `andrey.data`'s own latent datasets hide nodes with two or more children
   instead. `--hidden 0` hides none, and the truth is then the DAG's CPDAG.
-- **Targets.** The two nodes with the most neighbors in the network, ties in file order: the
-  paper's "nodes with more adjacent nodes", fixed per network. A target is never hidden.
+- **Targets.** The paper's own in its four networks, those of its Tables 7-10 (4, 4, 5, and 7
+  nodes; `PAPER_TARGETS`), and the two nodes with the most neighbors in any other network, ties in
+  file order; `--targets k` takes the `k` nodes with the most neighbors in any network. The paper
+  says it picks "nodes with more adjacent nodes", yet two of its WIN95PTS targets have one
+  neighbor. Targets are fixed per network, and a target is never hidden.
 - **Rows and seeds.** 1,000 and 5,000 rows, 20 datasets per network (the paper repeats 100 times).
   The model (weights, hidden nodes, column order) is a function of the network and the seed, and the
   rows are a function of the model and the sample size, so the two sample sizes of a seed are
@@ -86,8 +89,8 @@ $ANDREY_BENCH_PYTHON benchmarks/mmb_by_mmb_cpu.py --out outputs/mmb-smoke --smok
 $ANDREY_BENCH_PYTHON benchmarks/mmb_by_mmb_cpu.py --out outputs/mmb --cores 1
 ```
 
-The defaults are the paper's four networks and two sample sizes, 20 seeds from `--first-seed 0`, two
-targets per network, one timed fit with no warm-up fit, and `--cap-wall-s` of 1800. `--part` and
+The defaults are the paper's four networks and two sample sizes, 20 seeds from `--first-seed 0`, the
+paper's targets, one timed fit with no warm-up fit, and `--cap-wall-s` of 1800. `--part` and
 `--parts` split the datasets between jobs, `--solutions` selects solutions, `--resume` continues a
 run, and `--rescore` recomputes the scores from the stored marks without fitting. One JSON line per
 fit goes to `records.jsonl`: the solution, the dataset, the target, the time, the test count, the
