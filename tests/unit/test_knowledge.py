@@ -31,7 +31,7 @@ from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import BLANKET_STRUCTURES
-from tests.unit.methods import requires_target
+from tests.unit.methods import requires_pair, requires_target
 
 # The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
@@ -125,9 +125,12 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
     if name == "calm":
         pytest.importorskip("torch")
         kwargs = {**SHORT_CALM, **kwargs}
+    required = getattr(kwargs.get("knowledge"), "required", ())
     if requires_target(name):
-        required = getattr(kwargs.get("knowledge"), "required", ())
         kwargs = {"target": required[0][1] if required else TARGET, **kwargs}
+    if requires_pair(name):  # the pair of the required edge, else a parent of the target
+        pair = required[0][:2] if required else ("a", TARGET)
+        kwargs = {"treatment": pair[0], "outcome": pair[1], **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if name in ("cdnod", "fci_jci", "gnies"):

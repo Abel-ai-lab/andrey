@@ -145,12 +145,13 @@ def test_the_criterion_reads_undirected_and_double_bar_edges_leaving_the_set():
     assert non_orientable(single, [0, 1])
 
 
-def test_units_and_shifts_do_not_change_the_answer():
+def test_units_shifts_and_reruns_do_not_change_the_answer():
     data = frame()
     scaled = data * np.array([3.0, 0.01, 7.0, 2.0, 1e3, 0.5]) + 11.0
     first = locpc_cde(data, treatment="x", outcome="y").metadata["effects"]
     second = locpc_cde(scaled, treatment="x", outcome="y").metadata["effects"]
-    assert first == second
+    again = locpc_cde(data, treatment="x", outcome="y").metadata["effects"]
+    assert first == second == again
 
 
 def test_missing_values_are_deleted_test_by_test():

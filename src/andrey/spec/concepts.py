@@ -159,7 +159,7 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3"),
+    *("ldp", "ld3", "locpc_cde"),
 )
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = (
@@ -214,6 +214,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "locpc_cde",
             "local_isa_ling",
         ),
         exempt=(
@@ -667,7 +668,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "locpc_cde", "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
@@ -922,6 +923,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "locpc_cde",
         ),
         exempt=(
             *_exempt(
@@ -1207,6 +1209,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "locpc_cde",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1251,6 +1254,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "locpc_cde",
             "mb_by_mb",
             "mmb_by_mmb",
             *PCMCI_FAMILY,
@@ -1588,7 +1592,9 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "locpc_cde"
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1605,7 +1611,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1621,7 +1627,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1697,7 +1703,9 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "locpc_cde"
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1713,6 +1721,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "locpc_cde",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1729,7 +1738,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3"),
+        suitable=("y_structures", "ldp", "ld3", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

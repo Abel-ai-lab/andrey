@@ -39,7 +39,14 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
-from tests.unit.methods import REQUIRED, SHORT, domains, environments, requires_target
+from tests.unit.methods import (
+    REQUIRED,
+    SHORT,
+    domains,
+    environments,
+    requires_pair,
+    requires_target,
+)
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -368,7 +375,7 @@ UNIT_CASES = {
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
             "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "locpc_cde"),
         ),
         "gauss_5v",
     ),
@@ -597,8 +604,12 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
     return table
 
 
-#: A target-centered method answers for the edges at its target, so the target is the edge's end.
-EDGE_TARGET = {m: {"target": "y"} for m in REGISTRY if requires_target(m)}
+#: A target-centered method answers for the edges at its target, so the target is the edge's end;
+#: a pair method learns the edges around its outcome, so the edge is its pair.
+EDGE_TARGET = {
+    **{m: {"target": "y"} for m in REGISTRY if requires_target(m)},
+    **{m: {"treatment": "x", "outcome": "y"} for m in REGISTRY if requires_pair(m)},
+}
 
 
 def required_edge_is_kept(method: str, kind: str) -> bool:

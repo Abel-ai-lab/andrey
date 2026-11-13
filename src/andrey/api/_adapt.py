@@ -54,6 +54,7 @@ TESTWISE_METHODS = (
     "y_structures",
     "ldp",
     "ld3",
+    "locpc_cde",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")

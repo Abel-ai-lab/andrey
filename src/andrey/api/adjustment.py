@@ -684,6 +684,10 @@ def locpc_cde(
     at the outcome: an inner variable's double-bar edge can be directed into it by a collider
     with another inner variable once the outer end joins the hop, and the answer is then "not
     orientable" for an identifiable effect. An unmeasured common cause breaks the claim.
+    With 5,000 rows a fit ran about 30 to 100 tests on the paper's random 10-node graphs and 200 to
+    1,000 on its 50-node graphs, each in under a second. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
