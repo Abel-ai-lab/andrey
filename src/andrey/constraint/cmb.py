@@ -102,16 +102,11 @@ class _Run:
 
     def independent(self, x: int, y: int, given: frozenset[int]) -> bool:
         """Whether the test finds ``x`` and ``y`` independent given ``given``: a p-value above
-        ``alpha``. A test over more than ``max_depth`` variables is not run and reads as
-        dependent, as no set has separated the pair."""
+        ``alpha``."""
         cond = tuple(sorted(given))
         key = (x, y, cond)
         if key not in self.answers:
-            depth = self.search.max_depth
-            if depth is not None and len(cond) > depth:
-                self.answers[key] = False
-            else:
-                self.answers[key] = bool(self.search.scan(x, [y], cond)[1][0] > self.search.alpha)
+            self.answers[key] = bool(self.search.scan(x, [y], cond)[1][0] > self.search.alpha)
         return self.answers[key]
 
     def causal_search(self, t: int, pc: list[int], z: frozenset[int], node: Identities) -> None:
@@ -119,10 +114,14 @@ class _Run:
         ``z`` and given ``z`` with ``t``, in place in ``node``."""
         if len(pc) == 1:
             node.put(pc[0], UNDECIDED)
+        depth = self.search.max_depth
         for x, y in itertools.combinations(pc, 2):
             given = z - {x, y, t}
-            apart = self.independent(x, y, given)
-            apart_given_t = self.independent(x, y, given | {t})
+            # A pair whose test with t would condition on more than max_depth variables runs no
+            # test and decides nothing.
+            capped = depth is not None and len(given) + 1 > depth
+            apart = not capped and self.independent(x, y, given)
+            apart_given_t = not capped and self.independent(x, y, given | {t})
             if apart and not apart_given_t:  # C2: x -> t <- y
                 node.put(x, PARENT)
                 node.put(y, PARENT)
@@ -167,8 +166,8 @@ class _Run:
             x, y = pair
             _, mb = self.local(x)
             self.causal_search(t, pc, frozenset(mb) - {t, y}, node)
-        # Meek's rule R3 (Algorithm 1, lines 12-14): a neighbor adjacent to two non-adjacent
-        # parents, and a non-collider between them, is a parent too.
+        # Meek's rule R3 (Algorithm 1, lines 12-14): a neighbor inconclusive with two parents is a
+        # parent when it lies in the set that separated them, where no descendant of t can lie.
         parents = [x for x in pc if node.codes[x] == PARENT]
         for x, y in itertools.combinations(parents, 2):
             sepset = node.separated.get((x, y))
@@ -224,14 +223,15 @@ def cmb(
     test has labeled yet is too. Step 1 takes ``Z`` empty; Step 2 retests every pair given the
     blanket of the inconclusive pair's member of lower rank, less the target and the other member
     (Lemma 2), pair by pair, until no member is inconclusive. A neighbor still inconclusive with
-    two parents is a parent when it lies in the set that separated them (Meek's rule R3 [2]_; a
-    neighbor outside that set is a collider between them and the rule does not apply); the rest
-    become undecided. Step 3 visits each undecided neighbor ``x`` in rank order and runs the same
+    two parents is a parent when it lies in the set that separated them (Meek's rule R3 [2]_): the
+    target is a collider between them, so no descendant of it lies in that set; the rest become
+    undecided. Step 3 visits each undecided neighbor ``x`` in rank order and runs the same
     steps there, never returning to a variable whose run is open: the target a child of ``x``
     makes ``x`` a parent and each partner of ``x`` a child, and the target a parent of ``x`` makes
     ``x`` a child. A lower code is never replaced by a higher one, and a direction ``decided``
     gives (``decided[u, v]``: ``u -> v``) is fixed before any test. Tests are asked once, the
-    lower-ranked member of the pair first.
+    lower-ranked member of the pair first; a pair whose test with the target would condition on
+    more than the search's ``max_depth`` variables runs neither test and decides nothing.
 
     References
     ----------

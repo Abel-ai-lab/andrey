@@ -667,8 +667,8 @@ def cmb(
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, the blanket
         learner's and CMB's own, at least ``0``; ``None``, the default, sets no limit, as the paper
-        sets none. A test of CMB's own over more variables is not run and reads as dependent, as no
-        set has separated the pair.
+        sets none. A pair whose test with the target would condition on more variables runs
+        neither of its two tests and decides nothing.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
@@ -745,13 +745,14 @@ def cmb(
     round takes ``Z`` empty. Each inconclusive pair is then retested given the blanket of its
     member of lower rank, less ``t`` and the other member, until no neighbor is inconclusive
     [1]_. A neighbor still inconclusive with two parents becomes a parent when it lies in the set
-    that separated them (Meek's rule R3 [2]_); outside that set it is a collider between them, and
-    the rule does not apply. The remaining inconclusive neighbors become undecided. Last, each
-    undecided neighbor ``x`` is visited in turn and the same steps run there, without returning to
-    a variable whose own steps are still open [1]_: ``t`` a child of ``x`` makes ``x`` a parent of
-    ``t`` and the other member of each pair that made one of the two a child a child; ``t`` a
-    parent of ``x`` makes ``x`` a child. A label once given is never replaced by a weaker one: a
-    parent or child stays so. A neighbor still undecided at the end keeps an undirected edge.
+    that separated them (Meek's rule R3 [2]_): ``t`` is a collider between the two parents, so no
+    descendant of ``t`` lies in that set. The remaining inconclusive neighbors become undecided.
+    Last, each undecided neighbor ``x`` is visited in turn and the same steps run there, without
+    returning to a variable whose own steps are still open [1]_: ``t`` a child of ``x`` makes
+    ``x`` a parent of ``t`` and the other member of each pair that made one of the two a child a
+    child; ``t`` a parent of ``x`` makes ``x`` a child. A label once given is never replaced by a
+    weaker one: a parent or child stays so. A neighbor still undecided at the end keeps an
+    undirected edge.
 
     Every choice between candidates of equal strength goes to the column whose rank, computed from
     the data, comes first, as for :func:`~andrey.iamb`, and pairs are tested in rank order, so the

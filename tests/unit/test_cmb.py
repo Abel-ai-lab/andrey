@@ -189,6 +189,14 @@ def test_the_result_names_the_target_sets_by_label():
     ]
 
 
+def test_a_pair_past_the_cap_decides_nothing():
+    # With max_depth=0 every test with the target conditions on one variable too many, so no pair
+    # decides a direction; uncapped, a and b are parents and e a child.
+    capped = andrey.cmb(_collider(), target="c", max_depth=0).metadata
+    assert capped["parents"] == capped["children"] == []
+    assert sorted(capped["undirected"]) == ["a", "b", "e"]
+
+
 def test_a_target_is_required():
     with pytest.raises(ValueError, match="cmb: pass target"):
         andrey.cmb(_collider())
