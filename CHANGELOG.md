@@ -52,7 +52,7 @@ names its pull request.
   a member stays only when the target is in that member's own set. It then admits each child's
   other parent when a test finds it dependent on the target given the set that separated the two
   and the common child. On categorical data a test runs only with at least five rows per degree of
-  freedom of its table. ([#969])
+  freedom of its table. ([#971])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
   experimental: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
@@ -2682,6 +2682,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
 [#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
