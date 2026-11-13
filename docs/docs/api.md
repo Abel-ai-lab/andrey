@@ -709,6 +709,7 @@ in a process.
    ldp
    ld3
    ldecc
+   local_isa_ling
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -756,6 +757,14 @@ selected by a mechanism the variables affect, with hidden common causes allowed 
 `metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
 to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
 patterns. It is experimental until its comparison with the authors' code is published.
+
+Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
+whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
+edges into the target and into each of its children as a `digraph`. A cycle through the target or
+a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
+them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
+when neither the target nor a child lies on a cycle. It is experimental until its comparison with
+the authors' code is published.
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
 `outcome`: it labels each other column by its causal relation to the pair, from tests whose

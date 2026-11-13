@@ -527,6 +527,7 @@ PROSE_NAMES = {
     "ut_igsp": "UT-IGSP",
     "direct_lingam": "DirectLiNGAM",
     "ica_lingam": "ICA-LiNGAM",
+    "local_isa_ling": "Local ISA-LiNG",
     "multi_group_direct_lingam": "Multi-group DirectLiNGAM",
     "cam": "CAM",
     "resit": "RESIT",

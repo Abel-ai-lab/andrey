@@ -131,6 +131,28 @@ def test_an_abstention_has_no_effect_error_and_a_zero_answer_estimates_zero():
     assert len(got["estimates"]) == 2 and got["worst"] >= got["error"] >= 0
 
 
+def test_a_record_that_says_the_effect_is_zero_estimates_zero_whatever_sets_it_lists():
+    rng = np.random.default_rng(2)
+    x = rng.standard_normal(2_000)
+    y = 0.8 * x + rng.standard_normal(2_000)
+    fresh = np.column_stack([x, y, rng.standard_normal(2_000)])
+    base = {
+        "treatment": 0,
+        "outcome": 1,
+        "estimand": "total",
+        "identifiable": False,
+        "set_kind": "local_parents",
+        "adjustment_sets": [[], [2]],
+    }
+    says_zero = {**base, "nonzero": False}
+    got = L.effect_estimates(says_zero, fresh, 0.0)
+    assert got["estimates"] == [0.0] and got["error"] == 0.0 and got["worst"] == 0.0
+    assert L.effect_estimates(says_zero, fresh, 0.3)["error"] == pytest.approx(0.3)
+    for nonzero in (None, True):  # the same sets estimate by themselves where it does not say zero
+        got = L.effect_estimates({**base, "nonzero": nonzero}, fresh, 0.0)
+        assert len(got["estimates"]) == 2 and min(got["estimates"]) > 0.5
+
+
 # --- the planted models ----------------------------------------------------------------------
 
 
@@ -827,6 +849,136 @@ def test_an_unordered_solution_is_scored_in_both_directions(tmp_path, monkeypatc
     assert r["scores"]["answer"]["nonzero"]["abstained"] == 0
     assert r["scores"]["answer"]["nonzero"]["queries"] == 2  # both directions are queries
     assert set(r["scores"]["error"].values()) == {None}  # abstentions have no error
+
+
+def _estimate(error):
+    return None if error is None else {"error": error, "worst": error, "estimates": [error]}
+
+
+def _stored_fit(solution, answer, errors, *, seed=0, treatment=3, outcome=7):
+    """A fit as the driver stores it: its answer records and the effect error of each."""
+    return {
+        "cell": "toy@100",
+        "seed": seed,
+        "pair": 0,
+        "treatment": treatment,
+        "outcome": outcome,
+        "solution": solution,
+        "status": "ok",
+        "wall_s": 0.1,
+        "answer": answer,
+        "scores": {
+            "answer": {"adjustment": {"correct": 0, "wrong": 0, "incomplete": 0}},
+            "sets": [],
+            "error": {
+                f"{a['treatment']}>{a['outcome']}": _estimate(
+                    errors[(a["treatment"], a["outcome"])]
+                )
+                for a in answer  # in the order of the records, as the driver stores them
+            },
+        },
+    }
+
+
+def _answer(treatment, outcome, *, sets=(), nonzero=None):
+    return {
+        "treatment": treatment,
+        "outcome": outcome,
+        "estimand": "total",
+        "nonzero": nonzero,
+        "identifiable": None,
+        "adjustment_sets": [list(s) for s in sets],
+        "set_kind": "local_parents" if sets else None,
+    }
+
+
+@pytest.mark.parametrize("asked_first", [True, False])
+def test_the_summary_reads_the_record_of_the_pair_asked_not_the_last_of_the_fit(asked_first):
+    empty = _stored_fit("baseline.adjust-none", [_answer(3, 7, sets=[[]])], {(3, 7): 0.5})
+    asked = _answer(3, 7, sets=[[]])
+    reverse = _answer(7, 3, sets=[[1]], nonzero=False)
+    records = [asked, reverse] if asked_first else [reverse, asked]
+    both = _stored_fit("stand-in.both", records, {(3, 7): 0.1, (7, 3): 0.9})
+    row = next(
+        r for r in adjustment_cpu.summarize([empty, both]) if r["solution"] == "stand-in.both"
+    )
+    assert row["error"] == pytest.approx(0.1) and row["empty"] == pytest.approx(0.5)
+    assert adjustment_cpu.asked_error(both)["error"] == pytest.approx(0.1)
+
+
+def test_a_fit_whose_asked_record_abstains_has_no_error_and_is_not_answered():
+    empty = _stored_fit("baseline.adjust-none", [_answer(3, 7, sets=[[]])], {(3, 7): 0.5})
+    reverse_only = _stored_fit(
+        "stand-in.both",
+        [_answer(3, 7), _answer(7, 3, sets=[[1]], nonzero=False)],
+        {(3, 7): None, (7, 3): 0.9},
+    )
+    says_zero = _stored_fit(
+        "stand-in.both",
+        [_answer(3, 7, nonzero=False), _answer(7, 3)],
+        {(3, 7): 0.4, (7, 3): None},
+        seed=1,
+    )
+    rows = adjustment_cpu.summarize([empty, {**empty, "seed": 1}, reverse_only, says_zero])
+    row = next(r for r in rows if r["solution"] == "stand-in.both")
+    assert row["answered"] == pytest.approx(0.5)  # the fit with a zero answer for the pair asked
+    assert row["error"] == pytest.approx(0.4)  # the other fit has no error, not its reverse's
+    assert not adjustment_cpu.gave_an_answer(reverse_only)
+    assert adjustment_cpu.gave_an_answer(says_zero)
+    assert adjustment_cpu.asked_error(reverse_only) is None
+
+
+@pytest.mark.parametrize("asked_first", [True, False])
+def test_a_reference_answering_both_directions_is_scored_on_the_pair_asked(
+    asked_first, tmp_path, monkeypatch
+):
+    cell = M.parse_cell("random-graph@300,nodes=30")
+    by_seed = {seed: cell.model(seed) for seed in range(4)}
+    models = {m.rows(cell.n, M.DATA).tobytes(): m for m in by_seed.values()}
+
+    class Both(StandIn):
+        name = "stand-in.reference"
+        unordered = True
+        set_kind = "optimal+local_parents"
+        identified_from = "cpdag"
+
+        def fit(self, data, params):
+            pair = models[data.tobytes()].pairs[0]
+            asked = _answer(pair.treatment, pair.outcome, sets=[[]])
+            other = next(v for v in range(data.shape[1]) if v not in (pair.treatment, pair.outcome))
+            reverse = _answer(pair.outcome, pair.treatment, sets=[[other]], nonzero=False)
+            records = [asked, reverse] if asked_first else [reverse, asked]
+            return L.pack_effects(records, data.shape[1], 1)
+
+    monkeypatch.setattr(
+        adjustment_cpu,
+        "run_task",
+        lambda adapter, data, params, **kw: [
+            {"status": "ok", "adj": adapter.fit(data, params), "wall_s": 0.1, "cpu_s": 0.1}
+        ],
+    )
+    monkeypatch.setattr(adjustment_cpu, "check_interpreters", lambda field: {})
+    monkeypatch.setattr(adjustment_cpu, "andrey_arms", lambda: [])
+    monkeypatch.setattr(adjustment_cpu, "FIXED_ARMS", [baseline_adjustment.AdjustForNothing()])
+    monkeypatch.setattr(adjustment_cpu, "REFERENCES", [Both()])
+    out = tmp_path / "run"
+    adjustment_cpu.main(["--out", str(out), "--cells", cell.key, "--seeds", "4"])
+    fits = [r for r in _records(out) if r["solution"] == "stand-in.reference"]
+    assert len(fits) == 4 and all(len(r["answer"]) == 2 for r in fits)
+    expected = []
+    for r in fits:
+        model = by_seed[r["seed"]]
+        pair = (r["treatment"], r["outcome"])
+        asked = next(a for a in r["answer"] if (a["treatment"], a["outcome"]) == pair)
+        fresh, truth = model.rows(cell.n, M.FRESH), model.effects()[pair]
+        expected.append(L.effect_estimates(asked, fresh, truth)["error"])
+        # the reverse record says zero: its estimate is 0 whatever set it lists
+        assert r["scores"]["error"][f"{pair[1]}>{pair[0]}"]["estimates"] == [0.0]
+    assert max(expected) > 0
+    rows = adjustment_cpu.summarize(_records(out))
+    (row,) = [x for x in rows if x["solution"] == "stand-in.reference"]
+    assert row["error"] == pytest.approx(np.mean(expected))
+    assert [adjustment_cpu.asked_error(r)["error"] for r in fits] == pytest.approx(expected)
 
 
 def test_a_finished_run_is_not_overwritten_and_resumes_without_new_fits(lane):
