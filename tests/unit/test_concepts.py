@@ -33,6 +33,8 @@ from andrey.spec.concepts import (
     CI_SEARCHES,
     CONCEPTS,
     PCMCI_FAMILY,
+    STARTS,
+    TESTED,
     Concept,
 )
 from tests.recovery.helpers import datagen
@@ -365,7 +367,7 @@ UNIT_CASES = {
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "mb_by_mb", "mmb_by_mmb", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3"),
         ),
         "gauss_5v",
     ),
@@ -767,7 +769,7 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 RANDOMIZED = {
     **{
         m: {"indep_test": "rcot"}
-        for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "y_structures")
+        for m in (*CI_SEARCHES, *PCMCI_FAMILY, *(m for m in TESTED if m not in STARTS))
     },
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }

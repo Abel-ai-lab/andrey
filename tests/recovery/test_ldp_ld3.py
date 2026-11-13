@@ -301,7 +301,8 @@ def scores(method, models, seeds, n):
 
 def test_ldp_on_figure_3_data_beats_the_floor():
     lane = lane_models()
-    got = scores(ldp, lambda s: [lane.ldp(s)], range(5), 5000)["adjustment"]
+    got = scores(lambda *a, **k: ldp(*a, **k), lambda s: [lane.ldp(s)], range(5), 5000)
+    got = got["adjustment"]
     assert got["coverage"] >= 0.6
     assert got["net_rate"] > got["floor_rate"]
     assert got["risk"] == 0
@@ -309,7 +310,12 @@ def test_ldp_on_figure_3_data_beats_the_floor():
 
 def test_ld3_on_figure_d1_data_beats_the_floor():
     lane = lane_models()
-    figure = scores(ld3, lambda s: [lane.ld3_dag(s, effect=e) for e in (1.25, 0.0)], range(4), 5000)
+    figure = scores(
+        lambda *a, **k: ld3(*a, **k),
+        lambda s: [lane.ld3_dag(s, effect=e) for e in (1.25, 0.0)],
+        range(4),
+        5000,
+    )
     assert figure["adjustment"]["net_rate"] > figure["adjustment"]["floor_rate"]
     # The criterion with and without the direct effect, on the graph of the authors' code, which
     # lacks the arc Z4a -> Z4b (see test_ld3_criterion_fails_when_...).

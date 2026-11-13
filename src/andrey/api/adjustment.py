@@ -211,7 +211,9 @@ def ldp(
     the data there is no instrument to check, so the method gives no set even when the empty set
     is valid; it also gives none for some effects that a set identifies, such as a zero effect
     [4]_. The test of Step 5 conditions on all the variables Step 4 kept, so it needs more rows as
-    they grow.
+    they grow. With 5,000 rows a fit ran about 40 tests on the 10-node graph of [1]_ and about 120
+    on its 18-node graph, each in under a second. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -411,7 +413,10 @@ def ld3(
     when it is not. A descendant of the outcome among the columns, or a hidden parent of it,
     breaks the claim.
     The parent tests condition on most of the other variables, so they need more rows as the
-    number of variables grows.
+    number of variables grows. With 5,000 rows a fit ran about 65 tests on the 18-node graph of
+    [1]_ and about 190 on random 50-node graphs, each in under a second. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
