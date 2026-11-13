@@ -57,6 +57,7 @@ def pc(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     missing: str = "testwise",
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
@@ -84,10 +85,11 @@ def pc(
     larger conditioning-size passes (:func:`adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) and of MVPC's permutations; ``None`` uses
-    ``ANDREY_SEED``. ``missing="mvpc"`` corrects the skeleton of data with ``NaN`` before the
-    orientation (:func:`correct_skeleton`); every other value, and data without ``NaN``, keep the
-    test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with ``constraints``, as a
-    ``GraphStructure`` of kind ``"cpdag"``.
+    ``ANDREY_SEED``. ``degrees_of_freedom`` reaches a categorical ``indep_test``
+    (:class:`~andrey.core.ci.ChiSquare`). ``missing="mvpc"`` corrects the skeleton of data with
+    ``NaN`` before the orientation (:func:`correct_skeleton`); every other value, and data without
+    ``NaN``, keep the test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with
+    ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`adjacency_search`), each unshielded triple
@@ -104,7 +106,9 @@ def pc(
     check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
     allowed, keep, apart = knowledge_masks(constraints)
-    deletion = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    deletion = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     skeleton, sepsets, pvalues = adjacency_search(
         deletion,
         X.shape[1],
@@ -138,7 +142,9 @@ def pc(
     ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
         # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
-        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+        test = make_indep_test(
+            indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+        )
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )

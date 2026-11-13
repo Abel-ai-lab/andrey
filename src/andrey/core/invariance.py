@@ -109,17 +109,18 @@ def make_invariance_test(
     indep_test: str,
     categorical: npt.ArrayLike | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> InvarianceTest:
     """Build the invariance test ``name`` over the rows of ``X`` and their ``groups``.
 
     ``X`` is the checked ``(n_samples, n_variables)`` data and ``groups[i]`` the group of row ``i``,
     ``0..G-1``, or ``-1`` for a row the test does not read. ``indep_test`` is the fit's
     conditional-independence test, ``categorical`` its mask of the categorical columns (for the
-    mixed-data tests), and ``seed`` reaches its random draws, as for
-    :func:`~andrey.core.ci.make_indep_test`. A factory reads what its test needs and ignores the
-    rest. Raises ``ValueError`` when ``name`` is not in :data:`INVARIANCE_TESTS`, when a
-    two-group test is given other groups than ``0`` and ``1``, and when a ``K``-group test is
-    given fewer than two groups.
+    mixed-data tests), ``seed`` reaches its random draws, and ``degrees_of_freedom`` a categorical
+    test, as for :func:`~andrey.core.ci.make_indep_test`. A factory reads what its test needs and
+    ignores the rest. Raises ``ValueError`` when ``name`` is not in :data:`INVARIANCE_TESTS`, when a
+    two-group test is given other groups than ``0`` and ``1``, and when a ``K``-group test is given
+    fewer than two groups.
     """
     try:
         factory = INVARIANCE_TESTS[name]
@@ -133,6 +134,7 @@ def make_invariance_test(
         indep_test=indep_test,
         categorical=categorical,
         seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
     )
 
 
@@ -238,6 +240,7 @@ class IndicatorInvariance:
         indep_test: str,
         categorical: npt.ArrayLike | None = None,
         seed: int | None = None,
+        degrees_of_freedom: str = "mean",
     ) -> None:
         _two_groups(groups, "indicator")
         read = groups >= 0
@@ -246,7 +249,9 @@ class IndicatorInvariance:
         if indep_test in MIXED_INDEP_TESTS:
             given = np.zeros(X.shape[1], dtype=bool) if categorical is None else categorical
             mask = np.append(np.asarray(given, dtype=bool), True)
-        self._test = make_indep_test(indep_test, data, categorical=mask, seed=seed)
+        self._test = make_indep_test(
+            indep_test, data, categorical=mask, seed=seed, degrees_of_freedom=degrees_of_freedom
+        )
         self._indicator = X.shape[1]
 
     def __call__(self, y: int, condition_set: Iterable[int] = ()) -> float:

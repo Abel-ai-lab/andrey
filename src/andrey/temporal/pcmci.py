@@ -165,13 +165,15 @@ def design_test(
     *,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> LinkTest:
     """The ``indep_test`` test over the lagged design of ``data``.
 
     A partial-correlation test (:data:`PARTIAL_CORRELATION_TESTS`) comes as a :class:`DesignTest`.
     Any other name is built by :func:`~andrey.core.ci.make_indep_test` over the design, with
     ``categorical``, the mask of the categorical columns of ``data``, repeated for every lag, and
-    ``seed``, which the randomized tests take. A registered test that reports no statistics, one
+    ``seed``, which the randomized tests take, and ``degrees_of_freedom``, which the categorical
+    tests take. A registered test that reports no statistics, one
     without ``statistic_pvalues``, is asked one query at a time
     (:class:`~andrey.core.ci.PValueTest`) and ranks the candidates by p-value, smallest first.
     Raises :class:`NotImplementedError` when ``indep_test`` is not registered and, for a
@@ -187,7 +189,14 @@ def design_test(
     """
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
-    return column_test(indep_test, design, data.shape[1], categorical=mask, seed=seed)
+    return column_test(
+        indep_test,
+        design,
+        data.shape[1],
+        categorical=mask,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+    )
 
 
 def column_test(
@@ -198,6 +207,7 @@ def column_test(
     categorical: np.ndarray | None = None,
     n_lagged: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> LinkTest:
     """The ``indep_test`` test over the columns of ``design``, as :func:`design_test` builds it.
 
@@ -206,7 +216,13 @@ def column_test(
     counts the columns of the lagged design when more follow it; the error ignores those.
     """
     if indep_test not in PARTIAL_CORRELATION_TESTS:
-        built = make_indep_test(indep_test, design, categorical=categorical, seed=seed)
+        built = make_indep_test(
+            indep_test,
+            design,
+            categorical=categorical,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        )
         if not callable(getattr(built, "statistic_pvalues", None)):
             built = PValueTest(built)
         return cast("LinkTest", built)
@@ -389,6 +405,7 @@ def pcmci(
     max_depth: int | None = None,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -399,13 +416,21 @@ def pcmci(
     With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
     forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
     a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
-    categorical columns for a mixed-data test, and ``seed`` reach :func:`design_test`, which raises
+    categorical columns for a mixed-data test, ``seed``, and ``degrees_of_freedom`` reach
+    :func:`design_test`, which raises
     on an ``indep_test`` it cannot build.
     """
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
-    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    test = design_test(
+        indep_test,
+        data,
+        tau_max,
+        categorical=categorical,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+    )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         parents = tuple(

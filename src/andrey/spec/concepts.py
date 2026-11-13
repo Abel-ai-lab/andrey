@@ -25,7 +25,12 @@ from andrey import api
 from andrey.api._local import TARGET_SETS
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.blanket import LEARNERS
-from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci import (
+    CONTINUOUS_INDEP_TESTS,
+    DEGREES_OF_FREEDOM,
+    SHIPPED_INDEP_TESTS,
+    STOCHASTIC_INDEP_TESTS,
+)
 from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
@@ -388,6 +393,38 @@ _CONCEPTS = (
                 choices=CONTINUOUS_INDEP_TESTS,
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
                 "tests of continuous data.",
+            ),
+        ),
+    ),
+    Concept(
+        key="degrees_of_freedom",
+        summary="The degrees of freedom of the categorical tests, chisq and gsq: mean = the mean "
+        "of the statistic when y is shuffled within each configuration of the conditioning set; "
+        "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
+        "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
+        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
+        param=_template(
+            "degrees_of_freedom",
+            "str",
+            "mean",
+            "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
+            "statistic when y is shuffled within each configuration of the conditioning set; "
+            "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "Only chisq and gsq read it: passing it with another test raises ValueError.",
+            choices=DEGREES_OF_FREEDOM,
+        ),
+        fragment="degrees of freedom",
+        suitable=tuple(m for m in TESTED if m != "jpcmciplus"),
+        others_exempt="Takes no categorical conditional-independence test.",
+        deviations=(
+            Deviation(
+                method="pcmb",
+                name="degrees_of_freedom",
+                default="nonempty",
+                choices=DEGREES_OF_FREEDOM,
+                reason="Its paper runs G-square as Spirtes, Glymour and Scheines do (Pena et al. "
+                "2007, Section 3), whose degrees of freedom drop the cells with no expected count.",
             ),
         ),
     ),

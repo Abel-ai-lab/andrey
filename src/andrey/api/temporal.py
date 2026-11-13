@@ -441,6 +441,7 @@ def pcmci(
     alpha: float = 0.05,
     fdr_method: str = "fdr_bh",
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -499,6 +500,13 @@ def pcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -723,6 +731,7 @@ def pcmci(
             alpha_level=alpha,
             fdr_method=fdr_method,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             constraints=constraints,
             max_depth=max_depth,
             categorical=mask,
@@ -741,6 +750,7 @@ def pcmciplus(
     fdr_method: str = "fdr_bh",
     collider_rule: str = "majority",
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -806,6 +816,13 @@ def pcmciplus(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1044,6 +1061,7 @@ def pcmciplus(
             fdr_method=fdr_method,
             collider_rule=collider_rule,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             constraints=constraints,
             max_depth=max_depth,
             max_p_global=max_p_global,
@@ -1353,6 +1371,7 @@ def lpcmci(
     alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -1401,6 +1420,13 @@ def lpcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1643,6 +1669,7 @@ def lpcmci(
             pc_alpha=alpha,
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             max_p_global=max_p_global,
             constraints=constraints,
             categorical=mask,

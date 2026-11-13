@@ -47,6 +47,7 @@ _INDEP_TEST = concept_param(
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
     "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
 )
+_DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
@@ -181,6 +182,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -232,6 +234,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -276,6 +279,7 @@ _add(
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -351,6 +355,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -417,6 +422,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -546,6 +552,15 @@ _OWN_DEPTH = {
     ),
 }
 #: A set learner's own alpha, where its default is not the concept's.
+_OWN_DEGREES_OF_FREEDOM = {
+    "pcmb": concept_param(
+        "degrees_of_freedom",
+        default="nonempty",
+        doc=_DEGREES_OF_FREEDOM.doc
+        + " PCMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines do "
+        "(Pena et al. 2007).",
+    ),
+}
 _OWN_ALPHA = {
     "pcmb": concept_param(
         "alpha",
@@ -719,6 +734,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
                 _structure,
                 _OWN_ALPHA.get(_name, _ALPHA),
                 _INDEP_TEST,
+                _OWN_DEGREES_OF_FREEDOM.get(_name, _DEGREES_OF_FREEDOM),
                 _CATEGORICAL,
                 _TEST_SEED,
                 *_OWN_DEPTH.get(_name, ()),
@@ -764,6 +780,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param("max_depth"),
@@ -825,6 +842,7 @@ _add(
                 "al. 2024 state none; 0.01 is the level of their code.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param("max_depth"),
@@ -894,6 +912,7 @@ _add(
                 "other an independence. The default is the level of Versteeg, Zhang & Mooij 2022.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
         ),
@@ -942,6 +961,7 @@ _add(
             _OUTCOME,
             concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.01, 0.005, or 0.001."),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
         ),
@@ -975,6 +995,7 @@ _add(
             _OUTCOME,
             concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.005, 0.01, and 0.05."),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
         ),
@@ -1712,6 +1733,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1761,6 +1783,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1956,6 +1979,7 @@ for _name, _summary, _own, _refs in (
                 _EQUIVALENT_SAMPLE_SIZE,
                 *_own,
                 _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
@@ -2035,6 +2059,7 @@ _add(
                 nullable=True,
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2127,6 +2152,7 @@ _add(
                 nullable=True,
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2566,6 +2592,7 @@ _add(
                 "adjusted p-value is at most alpha.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2634,6 +2661,7 @@ _add(
                 "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2805,6 +2833,7 @@ _add(
                 "to the next as conditions.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(

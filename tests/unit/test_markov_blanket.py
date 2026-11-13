@@ -49,6 +49,7 @@ from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.data.latent import DSepOracle
 from andrey.search.calm import moral_graph
+from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
 
@@ -908,10 +909,12 @@ _ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb",
 @pytest.mark.parametrize("method", _ALL)
 def test_the_local_entry_gives_the_sets_the_method_returns(method, kind):
     """The parents and children and the Markov blanket, each the method learns, are the sets its
-    target fit reports; a set it does not learn is ``None`` and absent from the metadata."""
+    target fit reports; a set it does not learn is ``None`` and absent from the metadata. The search
+    takes the method's default degrees of freedom."""
     x, _ = _search_data(kind)
     indep_test = "fisherz" if kind == "fisherz" else "chisq"
-    search = local_search(x, alpha=0.05, indep_test=indep_test)
+    rule = next(p.default for p in REGISTRY[method].params if p.name == "degrees_of_freedom")
+    search = local_search(x, alpha=0.05, indep_test=indep_test, degrees_of_freedom=rule)
     fit = partial(getattr(andrey, method), **_UNCAPPED.get(method, {}))
     for t in range(15):
         pc, mb, _ = search.local(method, t)
