@@ -98,7 +98,7 @@ names its pull request.
   the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
   off the step confirm it from their own blankets, and the stop rules are read only once more
   blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
-  beside the authors' code. ([#966], [#980], [#PR])
+  beside the authors' code. ([#966], [#980], [#994])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2727,6 +2727,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
