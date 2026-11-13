@@ -14,8 +14,9 @@ The answers are scored by :func:`andrey.metrics.effect_scores` against the oracl
 is the lane's own: least squares of the outcome on the treatment and the returned set, on a fresh
 sample of the model, against the model's true effect, both in standardized units (the intervention
 distance of Schubert et al., 2025, Def. 9.1: the mean over the returned sets of the absolute
-difference). An answer that gives no set and does not say the effect is zero abstains and has no
-error; it is never scored as the empty set.
+difference). A record that says the effect is zero estimates 0, whatever sets it lists; an answer
+that gives no set and does not say the effect is zero abstains and has no error; it is never scored
+as the empty set.
 
 The module imports NumPy only, so an adapter in a reference's own environment can use it; the
 scoring functions import :mod:`andrey` when called.
@@ -220,17 +221,19 @@ def effect_estimates(
 ) -> dict[str, Any] | None:
     """The effect estimates of one record on a fresh sample, and their distance to the truth.
 
-    One estimate per returned set (:func:`ols_effect`); a record with no set that says the effect
-    is zero estimates 0. ``error`` is the mean absolute difference from ``true_effect`` over the
-    estimates, ``worst`` the largest. ``None`` for a record that gives no set and does not say
-    the effect is zero: an abstention has no estimate.
+    A record that says the effect is zero estimates 0 whatever sets it carries (an unordered
+    method's reverse direction of a compelled edge, for one, lists the local parent sets of its
+    treatment). Otherwise one estimate per returned set (:func:`ols_effect`). ``error`` is the
+    mean absolute difference from ``true_effect`` over the estimates, ``worst`` the largest.
+    ``None`` for a record that gives no set and does not say the effect is zero: an abstention has
+    no estimate.
     """
     x, y = int(record["treatment"]), int(record["outcome"])
     sets = record["adjustment_sets"]
-    if sets:
-        estimates = [ols_effect(fresh, x, y, s) for s in sets]
-    elif record["nonzero"] is False:
+    if record["nonzero"] is False:
         estimates = [0.0]
+    elif sets:
+        estimates = [ols_effect(fresh, x, y, s) for s in sets]
     else:
         return None
     gaps = [abs(e - true_effect) for e in estimates]
@@ -314,8 +317,13 @@ def score_answer(
                 out["sets"].append({"pair": [x, y], "set": members, **{k: s[k] for k in keep}})
         truth = effects.get((x, y))
         if fresh is not None and truth is not None:
-            out["error"][f"{x}>{y}"] = effect_estimates(record, fresh, truth)
+            out["error"][error_key(x, y)] = effect_estimates(record, fresh, truth)
     return plain(out)
+
+
+def error_key(treatment: int, outcome: int) -> str:
+    """The key of the record for ``treatment`` and ``outcome`` in the ``"error"`` scores."""
+    return f"{treatment}>{outcome}"
 
 
 def plain(value: Any) -> Any:

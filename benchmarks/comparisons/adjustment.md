@@ -89,11 +89,13 @@ The answers are scored by `andrey.metrics`, and the lane adds nothing to their d
   on a fresh sample of the model, against the true effect; both in standardized units, the estimate
   with the fresh sample's standard deviations and the truth with the model's. The error of a record
   is the mean over its sets of the absolute difference (the intervention distance of Schubert et al.,
-  2025, Definition 9.1), and a record that says the effect is zero estimates 0. A record with no set
-  that does not say the effect is zero abstains and has no error: it is never scored as the empty
-  set. The summary reports the answer rate, and compares the error with `baseline.adjust-none` on
-  the fits the solution answered, paired per dataset. The records keep every estimate, so the worst
-  set's error, and the Hausdorff distance LDECC's paper reports, can be recomputed.
+  2025, Definition 9.1), and a record that says the effect is zero estimates 0, whatever sets it
+  lists. A record with no set that does not say the effect is zero abstains and has no error: it is
+  never scored as the empty set. The summary reports the answer rate, and compares the error with
+  `baseline.adjust-none` on the fits the solution answered, paired per dataset. A method that does
+  not know the order answers both directions; the summary reads the record for the treatment and
+  the outcome asked, and the answer scores cover both. The records keep every estimate, so the
+  worst set's error, and the Hausdorff distance LDECC's paper reports, can be recomputed.
 - **Cost.** `n_tests` where the method reports it, and the wall time.
 
 A fit that passes `--cap-wall-s` is a `timeout` with no answer and fails its cell, never an empty
