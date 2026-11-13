@@ -41,9 +41,12 @@ gives each candidate's weakest association over many sets (a max-min step); and
 :meth:`LocalSearch.separating` gives the sets of one size that separate a pair.
 :class:`SearchCounts` adds up the queries they ask and the time they take. Candidates are compared
 by the strength of their dependence on the target: the absolute partial correlation for a test that
-reports one (``statistic_pvalue``), else the p-value. Strengths that agree to ``KEY_DP`` decimals go
-to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, which
-:func:`strongest` reads only for candidates that tie, so the sets do not depend on the column order.
+reports one (``statistic_pvalue``), else the p-value. Strengths that agree go to the candidate with
+the lower rank, from :func:`~andrey.core.ties.tie_ranks`, which :func:`strongest` and
+:func:`ordered` read only for candidates that tie, so the sets do not depend on the column order.
+Every grow step of IAMB, Inter-IAMB, Grow-Shrink, and Fast-IAMB orders its candidates with
+:meth:`LocalSearch.by_strength`, which compares a partial correlation to ``KEY_DP`` decimals and a
+p-value to ``KEY_DP`` significant digits.
 """
 
 from __future__ import annotations
@@ -217,9 +220,9 @@ def _grow_shrink(
     shrink: bool = True,
 ) -> list[int]:
     """:func:`markov_blanket` on the engine: each grow step is one :meth:`LocalSearch.scan` of the
-    candidates given the blanket, and :meth:`LocalSearch.strongest` picks the candidate whose
-    strength, rounded to ``KEY_DP`` decimals, is the largest. Without ``shrink``, IAMB's grow phase
-    alone: no member is tested again, so the set may hold variables outside the blanket."""
+    candidates given the blanket, and :meth:`LocalSearch.by_strength` puts first the dependent
+    candidate with the strongest dependence. Without ``shrink``, IAMB's grow phase alone: no member
+    is tested again, so the set may hold variables outside the blanket."""
     alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
     required = _required(constraints, target, search.ranks)
     blanket: list[int] = list(required)
@@ -233,9 +236,8 @@ def _grow_shrink(
             sepsets.update((candidates[i], given) for i in np.flatnonzero(pvalues > alpha).tolist())
         if not dependent:
             break
-        strength = strengths[dependent].tolist()
-        keys = {candidates[i]: -round(s, KEY_DP) for i, s in zip(dependent, strength, strict=True)}
-        blanket.append(search.strongest(keys))
+        xs = [candidates[i] for i in dependent]
+        blanket.append(search.by_strength(xs, strengths[dependent])[0])
         if interleaved:
             _shrink(search, target, blanket, required, sepsets)
             state = frozenset(blanket)

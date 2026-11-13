@@ -229,6 +229,55 @@ def test_the_strength_order_keeps_tiny_p_values_apart():
     assert search.by_strength(xs, strengths) == ordered(keys, search.ranks)
 
 
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+def test_a_grow_step_admits_the_smallest_p_value_even_far_below_the_key_precision(interleaved):
+    """IAMB and Inter-IAMB order the dependent candidates of a grow step by their p-values to
+    ``KEY_DP`` significant digits, so p-values below ``10**-KEY_DP`` keep the order of their
+    sizes; the rank decides only among equal p-values, exactly zero ones included."""
+    ranks = [0, 5, 4, 3, 2, 1]
+    tiny = _PValues({1: 1e-12, 2: 1e-70, 3: 1e-41, 4: 1e-70, 5: 0.5})
+    assert markov_blanket(tiny, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 2, 3, 1]
+    zero = _PValues({1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.5})
+    assert markov_blanket(zero, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 3, 2, 1]
+
+
+def _chisq_iamb(test, target, d, alpha, ranks, decimals):
+    """IAMB written out for a p-value test: grow by the smallest p-value among candidates at or
+    below ``alpha``, compared to ``KEY_DP`` significant digits (``decimals`` False) or decimals,
+    ties by rank, then shrink once in joining order."""
+    blanket = []
+    while True:
+        best_key, best_x = None, None
+        for x in range(d):
+            if x == target or x in blanket:
+                continue
+            p = test(target, x, blanket)
+            key = (round(p, KEY_DP) if decimals else float(f"{p:.{KEY_DP}g}"), ranks[x])
+            if p <= alpha and (best_key is None or key < best_key):
+                best_key, best_x = key, x
+        if best_x is None:
+            break
+        blanket.append(best_x)
+    for x in list(blanket):
+        rest = [z for z in blanket if z != x]
+        if test(target, x, rest) > alpha:
+            blanket.remove(x)
+    return blanket
+
+
+def test_iamb_on_discrete_data_orders_by_p_value_to_significant_digits():
+    """The engine's blankets equal the written-out IAMB's, which a key of decimals would not give
+    for every target."""
+    x, test = _search_data("chisq")
+    ranks = tie_ranks(x).tolist()
+    by_decimals = 0
+    for target in range(15):
+        want = _chisq_iamb(test, target, 15, 0.05, ranks, decimals=False)
+        assert markov_blanket(test, target, 15, 0.05, ranks) == want, target
+        by_decimals += _chisq_iamb(test, target, 15, 0.05, ranks, decimals=True) != want
+    assert by_decimals
+
+
 def test_the_order_reads_ranks_only_when_keys_tie():
     keys = {3: 0.5, 1: 0.25, 7: 0.25, 2: 0.25, 5: 0.75}
     ranks = _Recorded([0, 9, 4, 8, 1, 2, 7, 3])
