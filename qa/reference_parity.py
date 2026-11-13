@@ -22,8 +22,11 @@ summary's ``parity_rule`` sets how its rows are judged:
   field overrides its entry's.
 - ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent),
   ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
-  targets), or ``"direct_errors"`` (the directed edges against the edges between observed
-  variables that no unobserved causal or backdoor path joins). A row's means are
+  targets), ``"direct_errors"`` (the directed edges against the edges between observed
+  variables that no unobserved causal or backdoor path joins), ``"set_distance"`` (a set learned
+  at every target, such as a Markov blanket: the mean over the targets of the distance of the
+  set's precision and recall from (1, 1)), or ``"set_f1_loss"`` (1 minus the mean over the
+  targets of the set's F1, so that fewer is better as for the others). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
   then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
   and a row's key names the ``metric``.
@@ -108,6 +111,8 @@ METRICS: dict[str, str] = {
     "shd": "SHD",
     "target_error": "target error",
     "direct_errors": "direct-edge errors",
+    "set_distance": "set distance",
+    "set_f1_loss": "set F1 loss",
 }
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset(

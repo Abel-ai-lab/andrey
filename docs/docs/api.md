@@ -193,14 +193,15 @@ knowledge (Shimizu et al. 2011, Section 3.4).
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
-supported method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`,
+supported method that honors them except nine. `required_paths` is experimental in `tabu`, `mmhc`,
 and `rsmax2`, where a reference package given the required edges those paths imply made fewer
 errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
-alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. In an experimental
-method, such as `gs`, `fast_iamb`, or `hiton_pc`, both are experimental. An experimental part warns
-with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
+alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
+experimental in `gs`, `fast_iamb`, `hiton_pc`, and `pcmb`, which that measurement did not cover,
+and in an experimental method, such as `hiton_mb` or `mmmb`. An experimental part warns with
+{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
 claim says less than an edge and so directs less: when you know the edge itself, state it as
@@ -452,7 +453,10 @@ variable.
    fci_jci
    iamb
    inter_iamb
+   gs
+   fast_iamb
    mmpc
+   hiton_pc
    pcmb
    icp
    ges
@@ -570,14 +574,36 @@ proposed cause, and decides either by an HSIC test of the scaled residual agains
 which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
 against the authors' code.
 
-IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they join a pair when each is in the other's set and return the graph
-`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
-IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
-conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+IAMB, Inter-IAMB, GS, and Fast-IAMB learn a variable's Markov blanket, and MMPC and HITON-PC its
+parents and children, given as `target`; without one, they join a pair when each is in the other's
+set and return the graph `structure` names: the CPDAG of the Grow-Shrink structure learner, the
+undirected skeleton, or, for the blanket learners, the moral graph. MMHC learns a skeleton with
+MMPC's conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
 RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
+
+GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does,
+by growing the blanket with conditional-independence tests and then shrinking it, and takes the
+same arguments. It visits the other variables in one fixed order, the most dependent first, and
+adds each at once when a test finds it dependent given the blanket so far, in passes until none
+joins, where `iamb` adds the most dependent variable at each step. Without a `target` it joins
+the blankets into the same CPDAG, skeleton, or moral graph. The
+[0.18.0](benchmarks/0.18.0.md#gs) release card measures it against bnlearn's `gs`.
+
+Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round
+tests every variable outside the blanket, adds all those that test dependent at once, the most
+dependent first, while the data hold more than five rows per cell of the next test's table on
+categorical data, and then shrinks the blanket. It takes the arguments of `iamb`. The
+[0.18.0](benchmarks/0.18.0.md#fast-iamb) release card measures it against bnlearn's `fast.iamb`.
+
+HITON-PC (Aliferis et al. 2010) learns a variable's parents and children as `mmpc` does and takes
+the same arguments, with `max_depth` 3 by default. It orders the candidates once by their
+unconditional association with the target and lets them join one at a time, testing only the
+newcomer against the subsets of the members before it; once all have joined, it tests every member
+again, and a symmetry check keeps a member only when the target is in that member's own set. Without
+a `target` it joins the sets into the same skeleton or CPDAG. The
+[0.18.0](benchmarks/0.18.0.md#hiton-pc) release card measures it against bnlearn's `si.hiton.pc`.
 
 FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
 orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
@@ -700,9 +726,6 @@ in a process.
    :nosignatures:
 
    dagma
-   gs
-   fast_iamb
-   hiton_pc
    hiton_mb
    mmmb
    mb_by_mb
@@ -731,28 +754,6 @@ direct an edge at the target, and returns the edges the target has in the CPDAG 
 directions. `metadata["parents"]`, `metadata["children"]`, and `metadata["undirected"]` list the
 columns joined to the target, and `metadata["blankets_learned"]` the variables whose blanket it
 learned, in order. No reference implementation exists to compare it with.
-
-GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does,
-by growing the blanket with conditional-independence tests and then shrinking it, and takes the
-same arguments. It visits the other variables in one fixed order, the most dependent first, and
-adds each at once when a test finds it dependent given the blanket so far, in passes until none
-joins, where `iamb` adds the most dependent variable at each step. Without a `target` it joins
-the blankets into the same CPDAG, skeleton, or moral graph. It is experimental until its
-comparison with bnlearn's `gs` is published.
-
-Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round
-tests every variable outside the blanket, adds all those that test dependent at once, the most
-dependent first, while the data hold more than five rows per cell of the next test's table on
-categorical data, and then shrinks the blanket. It takes the arguments of `iamb` and is experimental
-until its comparison with bnlearn's `fast.iamb` is published.
-
-HITON-PC (Aliferis et al. 2010) learns a variable's parents and children as `mmpc` does and takes
-the same arguments, with `max_depth` 3 by default. It orders the candidates once by their
-unconditional association with the target and lets them join one at a time, testing only the
-newcomer against the subsets of the members before it; once all have joined, it tests every member
-again, and a symmetry check keeps a member only when the target is in that member's own set. Without
-a `target` it joins the sets into the same skeleton or CPDAG. It is experimental until its
-comparison with bnlearn's `si.hiton.pc` is published.
 
 Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
 ancestor of another from a pattern of four variables, and the claims hold when the rows were
