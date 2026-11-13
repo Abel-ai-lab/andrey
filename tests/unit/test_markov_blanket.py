@@ -859,6 +859,48 @@ def test_pcmb_runs_a_spouse_test_only_with_five_rows_per_degree_of_freedom(n, wa
     assert search.local("pcmb", 0)[1] == want
 
 
+def test_reliable_depth_stops_where_the_fewest_categories_fail_the_rule():
+    """0 and 1 have 2 and 3 categories, so a test of them has 2 degrees of freedom; the other
+    variables, 2, 3, and 4 of them, have 2, 4, and 3 categories. Their sets of the fewest
+    categories have 4, 12, and 48 times that many degrees of freedom: with 5 rows each, 20, 60,
+    and 240 rows."""
+    levels = [2, 3, 2, 4, 3, 2]
+    search = LocalSearch(DSepOracle(nx.DiGraph([(0, 1)])), [0, 1], 0.5, levels=levels, n=20)
+    for n, depth in [(19, 0), (20, 1), (59, 1), (60, 2), (239, 2), (240, 3)]:
+        search.n = n
+        assert search.reliable_depth(0, 1, [3, 2, 4], df_rows=5) == depth
+    search.n = 60
+    assert search.reliable_depth(0, 1, [2, 3, 4], (5,), df_rows=5) == 1
+    search.n = 39
+    assert search.reliable_depth(0, 1, [2, 3, 4], (5,), df_rows=5) == 0
+    search.levels = np.array([2, 3, 2, 0, 3, 2])
+    assert search.reliable_depth(0, 1, [2, 3, 4], df_rows=5) == 3
+    search.levels = None
+    assert search.reliable_depth(0, 1, [2, 3, 4], df_rows=5) == 3
+
+
+@pytest.mark.parametrize("n", [30, 100, 200, 600])
+def test_get_pcd_lists_only_the_subset_sizes_the_rule_can_pass(n, monkeypatch):
+    """Six parents of 0 with three categories each, and an ancestor chain behind the first: the
+    members outgrow the sizes the rows allow (none at 30 rows, 1 at 100, 2 at 200, 3 at 600), and
+    the set and the count of tests are those of a search that lists every subset of the members
+    and lets the rule drop the large ones."""
+    edges = [(p, 0) for p in range(1, 7)] + [(7, 1), (8, 7)]
+
+    def fit():
+        search = LocalSearch(
+            DSepOracle(nx.DiGraph(edges)), list(range(9)), 0.5, levels=np.full(9, 3), n=n
+        )
+        return search.run("get_pcd", 0), search.counts.issued
+
+    bounded = fit()
+    monkeypatch.setattr(
+        LocalSearch, "reliable_depth", lambda self, x, y, among, forced=(), *, df_rows: len(among)
+    )
+    assert bounded == fit()
+    assert bounded[0][0] == ([1, 2, 3, 4, 5, 6] if n >= 100 else list(range(1, 9)))
+
+
 _ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"]
 
 

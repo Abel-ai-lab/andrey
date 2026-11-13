@@ -62,6 +62,18 @@ def pack_answer(
     return packed
 
 
+def widen_answer(native: np.ndarray, keep: np.ndarray, d: int) -> np.ndarray:
+    """The packed answer of a fit on the columns `keep` of `d`, on all `d`: a column left out joins
+    no set and has no test count, and the whole fit's count is kept."""
+    answer, counts, total = unpack_answer(native)
+    keep = np.asarray(keep, dtype=np.intp)
+    full = np.zeros((d, d), dtype=np.int64)
+    full[np.ix_(keep, keep)] = answer
+    full_counts = np.full(d, NO_COUNT, dtype=np.int64)
+    full_counts[keep] = counts
+    return pack_answer(full, full_counts, total)
+
+
 def unpack_answer(native: np.ndarray) -> tuple[np.ndarray, np.ndarray, int | None]:
     """Return ``(answer, counts, total)`` of what ``fit`` returned.
 

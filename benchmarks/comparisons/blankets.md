@@ -5,15 +5,17 @@ and children (`mmpc`) with bnlearn's, and HITON-PC, HITON-MB, and MMMB with the 
 Explorer, on the set each learns at a target and on the graph the sets give. A learner joins the
 lane by being named in `LEARNERS` of `andrey_bench/adapters/andrey_blanket.py`, and its reference by
 being named in `COUNTERPART` of `andrey_bench/adapters/bnlearn_blanket.py` or
-`andrey_bench/adapters/causal_explorer_blanket.py`; the driver runs every learner the installed
-Andrey has.
+`andrey_bench/adapters/causal_explorer_blanket.py`. A learner that no reference implementation
+runs says so in its row (`reference=False`) and is judged on its paper's published results and the
+true sets. The driver runs every learner the installed Andrey has.
 
 ## Data
 
 A cell is one data setting, written as the driver's `--cells` take it:
 
 - `net:<name>:<n>`: `n` rows sampled from a published network's own tables, discrete
-  (`andrey.data`'s networks, such as `child`, `insurance`, and `alarm`);
+  (`andrey.data`'s networks, such as `child`, `insurance`, and `alarm`, and the harness's
+  `mildew`, `win95pts`, `hailfinder`, and `pigs`);
 - `gauss:<d>:<n>[:<degree>]`: `n` rows of a linear-Gaussian graph on `d` variables with `degree`
   expected edges per variable (2 by default), standardized.
 

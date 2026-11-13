@@ -13,7 +13,8 @@ Two kinds of data, as :data:`CELLS` writes them:
 
 - ``net:<name>:<n>``: ``n`` rows sampled from a published network's own tables, discrete, with
   Andrey's ``--indep-test`` (``gsq`` or ``chisq``) against bnlearn's ``mi`` or ``x2`` form
-  (``--discrete-test``, below);
+  (``--discrete-test``, below); the networks of ``andrey.data`` and the harness's own
+  (:data:`andrey_bench.networks.HARNESS_NETWORKS`, such as ``pigs``);
 - ``gauss:<d>:<n>[:<degree>]``: ``n`` rows of a linear-Gaussian graph on ``d`` variables with
   ``degree`` expected edges per variable (2 by default), standardized, with Fisher's z (bnlearn's
   ``zf``).
@@ -51,6 +52,8 @@ out.
 from __future__ import annotations
 
 import argparse
+import functools
+import hashlib
 import json
 import socket
 import statistics
@@ -63,7 +66,7 @@ from typing import Any
 import numpy as np
 
 from andrey import GraphStructure
-from andrey_bench import datasets, rsession, rundir, scoring
+from andrey_bench import datasets, networks, rsession, rundir, scoring
 from andrey_bench.adapters import andrey_blanket, bnlearn_blanket, causal_explorer_blanket
 from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
@@ -80,7 +83,9 @@ from andrey_bench.blanket_lane import (
     true_graph,
     true_set,
     unpack_answer,
+    widen_answer,
 )
+from andrey_bench.contracts import structure_from_adjacency
 from andrey_bench.runner import available_cores, run_task, split_cores
 
 RECORDS = "records.jsonl"
@@ -152,8 +157,39 @@ class Cell:
             seed=seed,
         )
 
+    def draw(self, seed: int) -> tuple[np.ndarray, np.ndarray, str]:
+        """The rows of `seed`, the true DAG's endpoint marks, and the dataset's digest.
+
+        A harness network's rows come from :meth:`andrey_bench.networks.Network.sample`, its
+        columns in the order :func:`harness_order` draws; every other cell's from
+        :func:`datasets.generate_one`.
+        """
+        if self.kind == "network" and self.name in networks.HARNESS_NETWORKS:
+            network = _harness_network(self.name)
+            order = harness_order(network.d, seed)
+            X = network.sample(self.n, seed)[:, order]
+            marks = structure_from_adjacency(network.adjacency, kind="dag").to_numpy()
+            truth = np.asarray(marks, dtype=np.int8)[np.ix_(order, order)]
+            call = {"network": self.name, "n": self.n, "seed": seed, "sampler": "Network.sample"}
+            digest = hashlib.sha1(json.dumps(call, sort_keys=True).encode()).hexdigest()[:12]
+            return np.ascontiguousarray(X), np.ascontiguousarray(truth), digest
+        key = self.key(seed)
+        X, truth, _, _ = datasets.generate_one(key)
+        return X, truth, key.digest
+
     def indep_test(self, discrete_test: str) -> str:
         return discrete_test if self.kind == "network" else CONTINUOUS_TEST
+
+
+def harness_order(d: int, seed: int) -> np.ndarray:
+    """The file positions of a harness network's ``d`` columns in a cell of `seed`, drawn apart
+    from the rows' draw."""
+    return np.random.default_rng((seed, d)).permutation(d)
+
+
+@functools.cache
+def _harness_network(name: str) -> networks.Network:
+    return networks.load_network(name)
 
 
 @dataclass(frozen=True)
@@ -329,9 +365,7 @@ def rescore(out: Path) -> list[dict]:
             continue
         cell = Cell.parse(record["cell"])
         if (record["cell"], record["seed"]) not in truths:
-            truths[record["cell"], record["seed"]] = datasets.generate_one(
-                cell.key(record["seed"])
-            )[1]
+            truths[record["cell"], record["seed"]] = cell.draw(record["seed"])[1]
         truth = truths[record["cell"], record["seed"]]
         if record["mode"] == "target":
             targets = [int(t) for t in record["sets"]]
@@ -413,6 +447,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="largest conditioning set for both sides: none (default) or at least 1",
     )
+    p.add_argument(
+        "--drop-constant",
+        action="store_true",
+        help="target mode: fit on the columns that hold more than one value; a column with one "
+        "value joins no set and answers the empty set at its target, scored against the whole "
+        "network (a small sample of a skewed network has such columns, which Andrey refuses)",
+    )
     p.add_argument("--seeds", type=int, default=20, help="datasets per cell (default: 20)")
     p.add_argument("--first-seed", type=int, default=0, help="the first seed (default: 0)")
     p.add_argument("--part", type=int, default=0, help="run every --parts-th cell from this one")
@@ -459,6 +500,8 @@ def main(argv: list[str] | None = None) -> int:
         cells = [Cell.parse(text) for text in args.cells][args.part :: args.parts]
         if args.targets != "all" and int(args.targets) < 1:
             raise ValueError("--targets is 'all' or a positive number")
+        if args.drop_constant and args.mode != "target":
+            raise ValueError("--drop-constant answers per target: it takes --mode target")
     except ValueError as error:
         p.error(str(error))
 
@@ -543,9 +586,14 @@ def main(argv: list[str] | None = None) -> int:
     with (out / RECORDS).open("a") as sink:
         for cell in cells:
             for seed in range(args.first_seed, args.first_seed + args.seeds):
-                key = cell.key(seed)
-                X, truth, _, _ = datasets.generate_one(key)
-                targets = targets_of(X.shape[1], args.targets, seed)
+                X, truth, digest = cell.draw(seed)
+                d = X.shape[1]
+                targets = targets_of(d, args.targets, seed)
+                keep = np.arange(d)
+                if args.drop_constant:
+                    keep = np.flatnonzero((X != X[0]).any(axis=0))
+                position = {int(c): i for i, c in enumerate(keep)}
+                fit_targets = [position[t] for t in targets if t in position]
                 walls: dict[str, list[float]] = {}
                 for structure in structures:
                     solutions = fields[cell.label, structure]
@@ -566,11 +614,11 @@ def main(argv: list[str] | None = None) -> int:
                             continue
                         params = adapter.params()
                         if structure is None:
-                            params = {**params, TARGETS_PARAM: targets}
+                            params = {**params, TARGETS_PARAM: fit_targets}
                         threads, n_jobs = split_cores(args.cores, adapter.mode)
                         measures = run_task(
                             adapter,
-                            X,
+                            np.ascontiguousarray(X[:, keep]) if keep.size < d else X,
                             params,
                             cap_wall_s=args.cap_wall_s,
                             cap_mem_mb=args.cap_mem_mb,
@@ -586,7 +634,7 @@ def main(argv: list[str] | None = None) -> int:
                             "d": int(X.shape[1]),
                             "n": cell.n,
                             "seed": seed,
-                            "dataset": key.digest,
+                            "dataset": digest,
                             "mode": args.mode,
                             "structure": structure,
                             "targets": targets if structure is None else None,
@@ -599,6 +647,7 @@ def main(argv: list[str] | None = None) -> int:
                             "alpha": settings.alpha,
                             "max_depth": settings.max_depth,
                             "params": params,
+                            "constant_columns": sorted(set(range(d)) - set(position)),
                             "machine_id": args.machine_id,
                         }
                         for repeat, m in enumerate(measures):
@@ -606,6 +655,8 @@ def main(argv: list[str] | None = None) -> int:
                                 label = (cell.label, seed, adapter.name, args.mode, kind)
                                 if (*label, structure, repeat) in done:
                                     continue
+                                if keep.size < d and m.get("adj") is not None:
+                                    m = {**m, "adj": widen_answer(m["adj"], keep, d)}
                                 record = make_record({**base, "kind": kind, "repeat": repeat}, m)
                                 score(record, adapter, m, truth)
                                 if record["status"] == "ok":
