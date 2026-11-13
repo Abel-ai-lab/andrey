@@ -173,3 +173,22 @@ def test_missing_values_are_deleted_test_by_test():
     out = ldecc(df, treatment="x", outcome="y")
     assert out.metadata["missing"] == "testwise"
     assert out.metadata["rows_tested"]["min"] < len(df)
+
+
+def test_conflicting_marks_give_no_answer():
+    """Two parents marked as a non-collider at the treatment leave no locally valid parent set:
+    the record has no set and does not decide."""
+    from andrey.api.adjustment import _ldecc_record
+
+    result = engine.Result(
+        blanket=(1, 2, 3),
+        neighbors=(1, 2, 3),
+        parents=frozenset({1, 2}),
+        children=frozenset({3}),
+        unoriented=frozenset(),
+        non_colliders=frozenset({frozenset({1, 2})}),
+        parent_sets=(),
+    )
+    record = _ldecc_record(result, 0, 3, int)
+    assert record["adjustment_sets"] == [] and record["set_kind"] is None
+    assert record["identifiable"] is None and record["nonzero"] is None

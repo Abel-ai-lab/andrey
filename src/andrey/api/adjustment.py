@@ -631,7 +631,9 @@ def ldecc(
         out of a set that holds it. With one set, ``identifiable`` is ``True``; with several,
         ``None``. When the outcome is a parent of the treatment, the effect is zero in every graph
         the answer allows and no set is valid: ``nonzero`` and ``identifiable`` are ``False`` and
-        ``adjustment_sets`` is ``[]``. ``nonzero`` is ``None`` otherwise. ``metadata["algorithm"]``
+        ``adjustment_sets`` is ``[]``. When the marks conflict, so that no parent set is locally
+        valid, ``adjustment_sets`` is ``[]`` and ``identifiable`` ``None``: the method gives no
+        answer. ``nonzero`` is ``None`` otherwise. ``metadata["algorithm"]``
         is ``"ldecc"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
         categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
         seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit

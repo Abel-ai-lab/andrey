@@ -210,6 +210,22 @@ def test_parent_sets_hold_the_class_sets_on_random_graphs(family, check):
     assert counts["equal"] >= 0.9 * sum(counts.values())
 
 
+def test_a_superset_of_the_blanket_gives_the_same_answer():
+    """IAMB's grow phase alone returns a superset of the blanket; under exact tests the members
+    that are not in the blanket are separated from the treatment and the answer is unchanged."""
+    for edges, d, x in er_graphs(range(100, 140)):
+        nodes = list(range(d))
+        base = oracle_answer(edges, nodes, x)
+        wider = oracle_answer(edges, nodes, x, blanket="iamb_forward")
+        assert set(wider.blanket) >= set(base.blanket)
+        assert (wider.neighbors, wider.parents, wider.children) == (
+            base.neighbors,
+            base.parents,
+            base.children,
+        )
+        assert wider.parent_sets == base.parent_sets
+
+
 def test_the_tests_stop_once_every_neighbor_is_directed():
     """In Figure 1(a) every neighbor is directed at size 1, after the collider check on A and B
     and the non-collider W - X - M: no pair away from X is tested given two other variables."""
