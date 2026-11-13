@@ -119,6 +119,9 @@ In the PAG fragment, one edge has two arrowheads. In the directed graph, `X -> Y
 are separate directed edges. The endpoint matrix alone cannot distinguish them; retain `kind`
 when saving or converting a graph.
 
+`local_isa_ling` returns a `digraph`: the edges into one variable and into each of its children in
+a linear model whose graph may hold cycles, where a 2-cycle at the variable is two directed edges.
+
 ## Undirected graphs: adjacency without direction
 
 `kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
@@ -175,6 +178,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb` |
 | `undirected` | `mmpc`, `hiton_pc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
+| `digraph` | `local_isa_ling` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
