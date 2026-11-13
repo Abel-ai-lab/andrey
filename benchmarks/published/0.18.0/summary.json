@@ -3,10 +3,10 @@
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-12",
  "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 0 fits compared)",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets)",
  "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row",
  "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network",
- "error_metric": "PCMB: distance, precision, and recall as above, with the means over the datasets; andrey_s is the median wall time of a fit for every target",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target",
  "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number)",
  "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9",
  "regimes": {
@@ -17,7 +17,7 @@
   "NumPy (Andrey)": "2.5.4"
  },
  "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative",
- "complete": false,
+ "complete": true,
  "pending_fits": 0,
  "incomplete": [],
  "methods": [
@@ -31,12 +31,12 @@
    "output": "Markov blanket at every target",
    "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative",
    "cores": 1,
-   "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 0 fits compared)",
+   "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets)",
    "regime": "network_tables",
    "claim": "in",
    "metric": "distance",
    "error_metric": "distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size",
-   "complete": false,
+   "complete": true,
    "rows": [
     {
      "network": "alarm",
@@ -462,40 +462,46 @@
      "network": "pigs",
      "d": 441,
      "n": 500,
-     "seeds": 4,
-     "andrey_distance_mean": 0.0223,
-     "andrey_distance_sd": 0.0052,
+     "seeds": 10,
+     "andrey_distance_mean": 0.0197,
+     "andrey_distance_sd": 0.0044,
      "paper_distance_mean": 0.02,
      "paper_distance_sd": 0.0,
-     "andrey_precision_mean": 0.9798,
+     "andrey_precision_mean": 0.9816,
      "paper_precision_mean": 0.98,
      "paper_precision_sd": 0.0,
-     "andrey_recall_mean": 0.9978,
+     "andrey_recall_mean": 0.9986,
      "paper_recall_mean": 1.0,
      "paper_recall_sd": 0.0,
      "andrey_empty_answers_mean": 0.0,
-     "andrey_distance_one_mean": 0.0223,
-     "andrey_errors_mean": 0.0873,
+     "andrey_distance_one_mean": 0.0197,
+     "andrey_errors_mean": 0.0776,
      "empty_errors_mean": 3.6553,
      "floor": {
       "applies": true,
-      "pass": false,
+      "pass": true,
       "andrey_minus_empty": {
-       "paired": 4,
-       "mean": -3.568,
+       "paired": 10,
+       "mean": -3.5778,
        "bootstrap_95": [
-        -3.5856,
-        -3.5573
+        -3.5862,
+        -3.5687
        ],
        "per_dataset": [
         -3.5601,
         -3.5556,
         -3.5941,
-        -3.5624
+        -3.5624,
+        -3.5714,
+        -3.5941,
+        -3.576,
+        -3.5828,
+        -3.5873,
+        -3.5941
        ]
       }
      },
-     "andrey_s": 954.1
+     "andrey_s": 1022.3
     }
    ]
   }

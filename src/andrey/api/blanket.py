@@ -2524,7 +2524,7 @@ def pcmb(
     most 0.01 above the paper's [1]_, and on Alarm at 100, 200, and 500 rows its mean recall was
     0.06, 0.04, and 0.04 below the paper's at a precision within 0.01 of it. Its errors, the members
     missed plus those added, were below the empty answer's in every setting, and a fit for every
-    variable took a median of 2.6 to 7.6 s on Alarm and 3 to 16 minutes on Pigs on one core. The
+    variable took a median of 2.6 to 7.6 s on Alarm and 3 to 17 minutes on Pigs on one core. The
     `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#pcmb>`_ has the table
     beside the paper's. Tested with exact d-separation on 15 variables, on simulated linear-Gaussian
     data with 20 variables and 2,000 rows, and on categorical data with 10 variables and 3,000 rows;

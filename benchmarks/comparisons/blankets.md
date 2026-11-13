@@ -139,8 +139,8 @@ datasets the lane draws: 20 per Alarm cell (seeds 0-19) and 10 per Pigs cell (se
 run G-square at `--alpha 0.01` with no limit on the conditioning set (`--max-depth none`). On
 categorical data `pcmb` counts degrees of freedom as Spirtes, Glymour, and Scheines (1993) do, its
 default `degrees_of_freedom="nonempty"`, where the other learners default to `"mean"`.
-`--drop-constant` fits the columns that hold more than one value, because a test needs two: an
-Alarm sample at 100 rows has a few columns of one value, whose targets answer the empty set and
+`--drop-constant` fits only the columns that hold more than one value, as Andrey refuses a column
+of one value: an Alarm sample at 100 rows has a few, and their targets answer the empty set and
 count against the full network.
 
 A dataset's value is the mean over its targets of the lane's per-target scores, in two readings of
@@ -167,7 +167,7 @@ floor, and the time of a fit for every node on one core:
 | Alarm | 5,000 | 20 | 1.0 | 0.111 | 0.58 | 3.51 | -2.94 [-2.96, -2.91] | 7.6 s |
 | Pigs | 100 | 10 | 3.5 | 0.305 | 1.39 | 3.66 | -2.27 [-2.30, -2.24] | 3 min |
 | Pigs | 200 | 10 | 0.4 | 0.074 | 0.35 | 3.66 | -3.31 [-3.32, -3.29] | 9 min |
-| Pigs | 500 | 4 | 0.0 | 0.022 | 0.09 | 3.66 | -3.57 [-3.59, -3.56] | 16 min |
+| Pigs | 500 | 10 | 0.0 | 0.020 | 0.08 | 3.66 | -3.58 [-3.59, -3.57] | 17 min |
 
 On Alarm, the datasets of seeds 0-9 and of seeds 10-19 give mean distances that differ by at most
 0.03 in each cell.

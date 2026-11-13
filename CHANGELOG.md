@@ -55,7 +55,7 @@ names its pull request.
   freedom of its table, and the categorical tests take `degrees_of_freedom="nonempty"` by default,
   the degrees of freedom of the G-square test its paper runs. The 0.18.0 release card sets its
   results on samples of the Alarm and Pigs networks beside the published results of its paper.
-  ([#971], [#981], [#NNN])
+  ([#971], [#981], [#982])
 - `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
   `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
   statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
@@ -2709,7 +2709,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
+[#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
