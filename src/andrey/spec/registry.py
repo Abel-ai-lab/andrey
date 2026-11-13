@@ -711,7 +711,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Pena, Nilsson, Bjorkegren & Tegner 2007", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
 ):
     _add(

@@ -175,6 +175,7 @@ FITS: dict[str, Fit] = {
     "IAMB": Fit(functools.partial(andrey.iamb, alpha=ALPHA), alpha=ALPHA),
     "InterIAMB": Fit(functools.partial(andrey.inter_iamb, alpha=ALPHA), alpha=ALPHA),
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
+    "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -287,6 +288,7 @@ LARGER: dict[str, str] = {
             "IAMB",
             "InterIAMB",
             "MMPC",
+            "PCMB",
             "MMHC",
             "RSMAX2",
             "BOSS",

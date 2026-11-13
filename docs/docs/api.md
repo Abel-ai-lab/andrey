@@ -453,6 +453,7 @@ variable.
    iamb
    inter_iamb
    mmpc
+   pcmb
    icp
    ges
    gies
@@ -519,6 +520,15 @@ defines the path, and takes no `knowledge`, `max_parents`, `missing`, or `env`. 
 partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists the path. The
 [0.17.0](benchmarks/0.17.0.md#ages) release card measures it on the paper's 10-variable
 simulation against pcalg.
+
+PCMB, parents-and-children based Markov boundary (Pena et al. 2007), {py:func}`~andrey.pcmb`,
+learns a variable's Markov blanket from the parents and children of the target and of each of them,
+found by GetPCD and a symmetry check, and then admits each child's other parent with one
+conditional-independence test. Without a `target` it joins the blankets into a CPDAG, a skeleton,
+or a moral graph, as `iamb` does. On categorical data it counts degrees of freedom as Spirtes,
+Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation
+exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
+networks beside those of its paper.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -695,7 +705,6 @@ in a process.
    hiton_pc
    hiton_mb
    mmmb
-   pcmb
    mb_by_mb
    mmb_by_mmb
    y_structures
