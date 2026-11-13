@@ -822,6 +822,7 @@ _CONCEPTS = (
                 "pcmb",
                 "mb_by_mb",
                 "mmb_by_mmb",
+                "locpc_cde",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -1450,6 +1451,11 @@ _CONCEPTS = (
                 "pcmb",
                 "mb_by_mb",
                 "mmb_by_mmb",
+            ),
+            *_exempt(
+                "A local search around one outcome, with no place for a context variable; cdnod is "
+                "the test-based search that takes env.",
+                "locpc_cde",
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
