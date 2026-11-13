@@ -270,6 +270,13 @@ _CONCEPTS = (
                 "0.01, and 0.05.",
             ),
             Deviation(
+                method="local_optimal_adjustment",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of every test in the method's published experiments "
+                "(Schubert, Claassen and Magliacane 2026, Section 5).",
+            ),
+            Deviation(
                 method="mmb_by_mmb",
                 name="alpha",
                 default=0.01,
