@@ -89,19 +89,22 @@ names its pull request.
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
   caps every test, as in the other learners, and sets no cap by default. ([#956])
 - `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
-  effects of one target when unmeasured common causes may exist, the edges the target has in the
-  PAG with their marks, learned one Markov blanket at a time outward from the target until its
-  marks are decided or the paper's stop rules end the search. `metadata` lists the target's
-  `parents`, `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end),
-  its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
+  effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
+  with their marks, learned one Markov blanket at a time outward from the target until its marks are
+  decided or the paper's stop rules end the search. `metadata` lists the target's `parents`,
+  `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end), its
+  `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
   conditioning, a test of each variable given all the others, as in the paper's runs
   (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
-  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. Where its authors'
-  code goes beyond the paper, the method follows it, with two safeguards that make the answer
-  correct where the paper's steps as written can be wrong: a v-structure joins the answer only
-  when the variables off the step confirm it from their own blankets, and the stop rules are read
-  only once more blankets have been learned than the target has neighbors. The benchmark lane of
-  MMB-by-MMB runs it beside the authors' code. ([#966], [#980])
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings, and total conditioning
+  tests each blanket at `alpha / (10 * floor(d / 10))` over `d >= 10` columns, as their code does.
+  With a partial-correlation test on complete data, total conditioning answers the tests of every
+  blanket a fit learns from one inverse of the correlation matrix. Where its authors' code goes
+  beyond the paper, the method follows it, with two safeguards that make the answer correct where
+  the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
+  off the step confirm it from their own blankets, and the stop rules are read only once more
+  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
+  beside the authors' code. ([#966], [#980], [#994])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -168,6 +171,13 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+  directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
+  blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
+  eager collider checks that direct the treatment's parents. The step that finds the neighbors
+  tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
+  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
+  lane runs it beside the authors' code. ([#991])
 
 ### Changed
 
@@ -2731,8 +2741,10 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
+[#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

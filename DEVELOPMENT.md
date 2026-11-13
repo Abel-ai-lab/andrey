@@ -192,7 +192,9 @@ defines it, the existing implementations, and the setting the paper claims.
    `claim_scores` score such answers.
    Its search runs on the blanket engine (`src/andrey/constraint/blanket.py`): it asks its tests
    through `LocalSearch.scan` (many candidates against one conditioning set, in one call where the
-   test can), `LocalSearch.weakest` (each candidate's weakest association over many sets), and
+   test can), `LocalSearch.scan_given_rest` (each candidate given all the other variables, from one
+   inverse of the correlation matrix where the test can), `LocalSearch.weakest` (each candidate's
+   weakest association over many sets), and
    `LocalSearch.separating` (the sets of one size that separate a pair), and picks between
    candidates with `LocalSearch.strongest`, which reads the tie-break ranks only when keys tie. It
    never reads a test's internals, such as its correlation matrix, and never indexes the ranks, so

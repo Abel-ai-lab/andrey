@@ -11,8 +11,9 @@ the p-value and then the statistic, and skips a test with fewer than five rows p
 follows its paper's trace, admits a spouse only with five rows per cell of its test's table, and
 skips a spouse test past ``max_depth``. A memoized
 run is the run made afresh, and the local search gives the sets the methods return, whatever the
-column order. A scan of many candidates gives each the bits of its own query, the ranks are read
-only when keys tie, and the counts follow their definitions.
+column order. A scan of many candidates gives each the bits of its own query, a scan given the rest
+gives each candidate its own scan's answer, the ranks are read only when keys tie, and the counts
+follow their definitions.
 """
 
 from __future__ import annotations
@@ -43,7 +44,13 @@ from andrey.constraint.blanket import (
     strongest,
     table_size,
 )
-from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
+from andrey.core.ci import (
+    ChiSquare,
+    FisherZ,
+    SingularCorrelationError,
+    counting_tests,
+    make_indep_test,
+)
 from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -988,6 +995,59 @@ def test_a_scan_is_its_candidates_asked_one_at_a_time_bit_for_bit(kind):
         assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
         backward = search.scan(target, xs[::-1], cond)
         assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
+
+
+def _given_rest(target: int, v: int, d: int) -> list[int]:
+    return [z for z in range(d) if z not in (target, v)]
+
+
+@pytest.mark.parametrize("kind", list(_BATCHED))
+def test_a_scan_given_the_rest_is_each_candidate_scanned_given_the_rest(kind):
+    """Each candidate's strength and p-value given all the other variables are those of its own
+    scan: for a partial-correlation test on complete data, from one inverse, to rounding (the
+    strength to 1e-12, a p-value above 1e-6 to nine significant digits, every p-value on the same
+    side of alpha); for any other test bit for bit. The queries counted and traced are the same."""
+    x = _scan_data(kind)
+    test = make_indep_test(kind.removesuffix("-missing"), x)
+    shared = kind in ("fisherz", "student_t", "normal_scores")
+    assert hasattr(test, "statistic_pvalues_given_rest") == shared
+    ranks = tie_ranks(x).tolist()
+    search, alone = (LocalSearch(test, ranks, 0.05, trace=True) for _ in range(2))
+    for target in (0, 4, 11):
+        xs = [v for v in range(12) if v != target]
+        with counting_tests() as tests:
+            strengths, pvalues = search.scan_given_rest(target, xs)
+        with counting_tests() as one_by_one:
+            each = [alone.scan(target, [v], _given_rest(target, v, 12)) for v in xs]
+        want_s, want_p = (np.concatenate(column) for column in zip(*each, strict=True))
+        if shared:
+            np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+            above = want_p > 1e-6
+            np.testing.assert_allclose(pvalues[above], want_p[above], rtol=1e-9, atol=0.0)
+            assert ((pvalues <= 0.05) == (want_p <= 0.05)).all()
+        else:
+            assert strengths.tobytes() == want_s.tobytes() and pvalues.tobytes() == want_p.tobytes()
+        assert tests.n == one_by_one.n == len(xs)
+    assert search.counts.issued == alone.counts.issued
+    assert search.counts.queries == alone.counts.queries
+
+
+def test_a_scan_given_the_rest_raises_where_each_scan_raises():
+    """A column that is the sum of two others makes the correlation matrix singular, and too few
+    rows leave no degrees of freedom; either way the scan given the rest raises the error of the
+    first candidate's scan."""
+    x = _scan_data("fisherz")
+    summed = np.column_stack([x, x[:, 3] + x[:, 5]])
+    for bad, error in ((summed, SingularCorrelationError), (x[:12], ValueError)):
+        d = bad.shape[1]
+        search = local_search(bad, alpha=0.05, indep_test="fisherz")
+        with pytest.raises(error) as given_rest:
+            search.scan_given_rest(0, list(range(1, d)))
+        with pytest.raises(error) as scan:
+            search.scan(0, [1], _given_rest(0, 1, d))
+        assert type(given_rest.value) is type(scan.value)
+        assert str(given_rest.value) == str(scan.value)
+        assert getattr(given_rest.value, "groups", ()) == getattr(scan.value, "groups", ())
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
