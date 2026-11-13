@@ -22,7 +22,7 @@ import pytest
 
 from andrey import GraphStructure
 from andrey_bench.adapters import tetrad_pag
-from andrey_bench.adapters.andrey_adjustment import AndreyPCAdjustment
+from andrey_bench.adapters.andrey_adjustment import AndreyAdjustment, AndreyPCAdjustment
 from andrey_bench.adapters.andrey_blanket import LEARNERS as BLANKET_LEARNERS
 from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
@@ -138,6 +138,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AdjustForNothing(),
     AdjustForEverything(),
     AndreyPCAdjustment(),
+    AndreyAdjustment("ldp"),
+    AndreyAdjustment("ld3"),
 ]
 
 
@@ -186,6 +188,8 @@ DEFERRED_MODULES = {
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
     "andrey.pc.adjustment": "andrey.core.adjustment",
+    "andrey.ldp": "andrey.constraint.partition",
+    "andrey.ld3": "andrey.constraint.partition",
     **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
     "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
     "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",

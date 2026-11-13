@@ -51,6 +51,8 @@ TESTWISE_METHODS = (
     "mb_by_mb",
     "mmb_by_mmb",
     "y_structures",
+    "ldp",
+    "ld3",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")

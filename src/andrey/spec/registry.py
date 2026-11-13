@@ -880,6 +880,83 @@ _add(
     )
 )
 
+# --- treatment-outcome pairs ----------------------------------------------------------------------
+
+_TREATMENT = concept_param("treatment")
+_OUTCOME = concept_param("outcome")
+_PAIR_ALPHA_DOC = (
+    "Significance level of every test: a p-value above alpha is an independence, any other a "
+    "dependence. The default is the level of the authors' code; the papers' experiments use "
+)
+
+_add(
+    MethodSpec(
+        name="ldp",
+        family="constraint",
+        summary="Local discovery by partitioning: sorts every other variable by its causal "
+        "relation to a treatment and an outcome (confounder, instrument, cause of the outcome, "
+        "descendant of the treatment, ...) from tests whose conditioning sets are the variables "
+        "already sorted, and returns the confounders as a valid adjustment set for the total "
+        "effect when an instrument checks them; hidden variables allowed. Returns no edges; the "
+        "answer is in metadata['effects'], the labels in metadata['partition'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            hidden_causes=True,
+            doc="no edges; metadata['effects'] holds the pair's record: a valid adjustment set "
+            "for the total effect when the Z5 criterion passes, no answer otherwise",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The number of tests can change with the column order: a search stops at the "
+        "first variable that decides it.",
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.01, 0.005, or 0.001."),
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Maasch, Pan, Gupta, Kuleshov, Gan & Wang 2024",),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="ld3",
+        family="constraint",
+        summary="Local discovery for direct discrimination: finds the parents of an outcome that "
+        "has no observed descendants, and whether a treatment is one of them (the structural "
+        "direct criterion), from a number of tests linear in the number of variables; the parents "
+        "are a valid adjustment set for the weighted controlled direct effect. Returns the edges "
+        "into the outcome; the answer is in metadata['effects'], the labels in "
+        "metadata['partition'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="edges into the outcome from each parent found; metadata['effects'] holds the "
+            "pair's record: whether the treatment is a parent, and the other parents as the set "
+            "for the direct effect",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.005, 0.01, and 0.05."),
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Maasch, Gan, Chen, Orfanoudaki, Akpinar & Wang 2025",),
+    )
+)
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(
@@ -3592,6 +3669,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
+    **dict.fromkeys(("ldp", "ld3"), ("partition",)),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

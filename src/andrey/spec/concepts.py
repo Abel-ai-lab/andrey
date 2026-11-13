@@ -151,9 +151,12 @@ RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures")
+TESTED = (
+    *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
+    *("ldp", "ld3"),
+)
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures")
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -200,6 +203,8 @@ _CONCEPTS = (
             "igsp",
             "ut_igsp",
             "y_structures",
+            "ldp",
+            "ld3",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -236,6 +241,20 @@ _CONCEPTS = (
                 default=0.01,
                 reason="0.01 is the level of the method's published simulations (Versteeg, Zhang "
                 "and Mooij 2022, Appendix C.2).",
+            ),
+            Deviation(
+                method="ldp",
+                name="alpha",
+                default=0.005,
+                reason="0.005 is the level of the authors' code; Maasch et al. (2024) use 0.01, "
+                "0.005, or 0.001 by setting.",
+            ),
+            Deviation(
+                method="ld3",
+                name="alpha",
+                default=0.005,
+                reason="0.005 is the level of the authors' code; Maasch et al. (2025) use 0.005, "
+                "0.01, and 0.05.",
             ),
             Deviation(
                 method="mmb_by_mmb",
@@ -622,6 +641,12 @@ _CONCEPTS = (
                 "Every test is marginal or conditions on one variable, the pattern's middle one.",
                 "y_structures",
             ),
+            *_exempt(
+                "Each test conditions on a set the algorithm fixes from the labels found before; "
+                "no cap is defined.",
+                "ldp",
+                "ld3",
+            ),
         ),
         deviations=(
             Deviation(
@@ -735,6 +760,7 @@ _CONCEPTS = (
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
             *_exempt("Claims ancestors from fixed test patterns; no parent sets.", "y_structures"),
+            *_exempt("Labels variables from fixed test patterns; no parent sets.", "ldp", "ld3"),
             *_exempt(
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
@@ -819,6 +845,8 @@ _CONCEPTS = (
             "calm",
             "ica_lingam",
             "y_structures",
+            "ldp",
+            "ld3",
         ),
         exempt=(
             *_exempt(
@@ -1028,6 +1056,12 @@ _CONCEPTS = (
                 "which no knowledge of edges enters.",
                 "y_structures",
             ),
+            *_exempt(
+                "Fixed test patterns: each label reads the tests its algorithm names, which no "
+                "knowledge of edges enters.",
+                "ldp",
+                "ld3",
+            ),
         ),
     ),
     Concept(
@@ -1039,9 +1073,20 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "y_structures")),
+                *(
+                    m
+                    for m in NO_KNOWLEDGE
+                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3")
+                ),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "y_structures"),
+            *_exempt(
+                "Takes no knowledge (the knowledge concept).",
+                "icp",
+                "ages",
+                "y_structures",
+                "ldp",
+                "ld3",
+            ),
         ),
     ),
     Concept(
@@ -1075,6 +1120,8 @@ _CONCEPTS = (
             "igsp",
             "ut_igsp",
             "y_structures",
+            "ldp",
+            "ld3",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1116,6 +1163,8 @@ _CONCEPTS = (
             "hiton_mb",
             "mmmb",
             "y_structures",
+            "ldp",
+            "ld3",
             "mb_by_mb",
             "mmb_by_mmb",
             *PCMCI_FAMILY,
@@ -1313,6 +1362,12 @@ _CONCEPTS = (
                 "y_structures",
             ),
             *_exempt(
+                "Its labels are among the columns of data, and a context variable is one more "
+                "column.",
+                "ldp",
+                "ld3",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1433,6 +1488,7 @@ _CONCEPTS = (
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
+        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1449,7 +1505,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=(),
+        suitable=("ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1465,7 +1521,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=(),
+        suitable=("ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1540,6 +1596,7 @@ _CONCEPTS = (
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
+        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1552,6 +1609,8 @@ _CONCEPTS = (
             "mb_by_mb",
             "mmb_by_mmb",
             "y_structures",
+            "ldp",
+            "ld3",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1568,7 +1627,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures",),
+        suitable=("y_structures", "ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

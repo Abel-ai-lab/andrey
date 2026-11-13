@@ -166,10 +166,10 @@ def test_ldp_finds_the_confounder_as_the_valid_set_when_an_instrument_exists(tmp
 
 
 @needs_maasch
-def test_ldp_calls_the_effect_not_identifiable_without_an_instrument(tmp_path):
+def test_ldp_gives_no_answer_without_an_instrument(tmp_path):
     """The code's Z5 criterion needs an instrument: with the confounder alone it gives no set."""
     record, _ = _run(tmp_path, "ldp", _partition()[:, :3])
-    assert record["identifiable"] is False and record["adjustment_sets"] == []
+    assert record["identifiable"] is None and record["adjustment_sets"] == []
     assert record["set_kind"] is None and record["nonzero"] is None
 
 
