@@ -946,7 +946,14 @@ def local_optimal_adjustment(
     new v-structure forms [4]_. The variable whose rank, computed from the data, comes first is
     searched first, ties between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the
     neighbors of Step 2 go in rank order, so the answer does not depend on the column order unless
-    two columns are identical.
+    two columns are identical. An edge that two v-structures direct both ways, which exact tests
+    never give, is left undirected, so each end reads the other as an undirected neighbor.
+
+    **Zero effects.** A zero effect between two adjacent variables, the treatment a child of the
+    outcome, is not identifiable here: the edge into the treatment is a back-door path that no set
+    blocks, so the record lists the treatment's parent sets. This is the definition
+    :func:`~andrey.metrics.effect_oracle` scores on the true graph; [1]_ counts every zero effect
+    as identified.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
