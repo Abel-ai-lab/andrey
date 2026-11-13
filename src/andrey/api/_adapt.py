@@ -50,6 +50,7 @@ TESTWISE_METHODS = (
     "mmmb",
     "pcmb",
     "mb_by_mb",
+    "cmb",
     "mmb_by_mmb",
     "y_structures",
     "ldp",
