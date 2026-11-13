@@ -983,7 +983,10 @@ def locpc_cde(
     **When it stops.**), a non-identifiable effect is searched until a hop adds no variable: with
     exact tests the mean hop of a search rose from 1.41 to 1.79 on random graphs of 6 to 15
     variables and from 1.46 to 2.16 on graphs of 20 to 30. An unmeasured common cause breaks the
-    claim.
+    claim. With 5,000 rows a fit ran about 40 to 250 tests on the paper's random 10-node graphs, and
+    on its 50-node graphs about 200 to 2,000 for an identifiable effect and 300 to 5,000 for one
+    that is not, each in under a second. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
