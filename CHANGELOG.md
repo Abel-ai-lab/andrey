@@ -168,7 +168,7 @@ names its pull request.
   eager collider checks that direct the treatment's parents. The step that finds the neighbors
   tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
   treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
-  lane runs it beside the authors' code. ([#NNN])
+  lane runs it beside the authors' code. ([#991])
 
 ### Changed
 
@@ -2733,7 +2733,7 @@ First alpha release.
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
-[#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
+[#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
