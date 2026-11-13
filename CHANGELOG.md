@@ -16,10 +16,10 @@ names its pull request.
   one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
   arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
   first, and adds each at once when a test finds it dependent given the blanket so far, in passes
-  until none joins, then shrinks the blanket in passes until none leaves. It is supported: against
-  bnlearn's `gs` on four published networks and linear-Gaussian graphs, every variable a target, its
-  sets were better in 13 of 20 settings and worse in 1. On hepar2 they have more errors than the
-  empty set, as those of `iamb` do. ([#931], [#993])
+  until none joins, then shrinks the blanket, starting again from the first member after each
+  removal. It is supported: against bnlearn's `gs` on four published networks and linear-Gaussian
+  graphs, every variable a target, its sets were better in 13 of 20 settings and worse in none. On
+  hepar2 they have more errors than the empty set, as those of `iamb` do. ([#931], [#993])
 - `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005), with
   the arguments and metadata of `iamb`. Each round tests every variable outside the blanket and adds
   those that test dependent together, the most dependent first, while a categorical test's table

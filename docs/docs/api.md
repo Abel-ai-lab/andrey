@@ -581,12 +581,13 @@ RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMP
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
 
-GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does,
-by growing the blanket with conditional-independence tests and then shrinking it, and takes the
-same arguments. It visits the other variables in one fixed order, the most dependent first, and
-adds each at once when a test finds it dependent given the blanket so far, in passes until none
-joins, where `iamb` adds the most dependent variable at each step. Without a `target` it joins
-the blankets into the same CPDAG, skeleton, or moral graph. The
+GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does, by
+growing the blanket with conditional-independence tests and then shrinking it, and takes the same
+arguments. It visits the other variables in one fixed order, the most dependent first, and adds each
+at once when a test finds it dependent given the blanket so far, in passes until none joins, where
+`iamb` adds the most dependent variable at each step. It then removes each member a test finds
+independent given the others, starting again from the first member after each removal. Without a
+`target` it joins the blankets into the same CPDAG, skeleton, or moral graph. The
 [0.18.0](benchmarks/0.18.0.md#gs) release card measures it against bnlearn's `gs`.
 
 Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round

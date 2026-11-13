@@ -244,17 +244,6 @@
     },
     {
       "summary": "0.18.0",
-      "method": "GS",
-      "comparator": "bnlearn 5.2.1 gs",
-      "row": {"regime": "gaussian", "metric": "set_distance", "mean_degree": 4.0, "d": 50, "n": 5000},
-      "andrey_errors": 0.1699,
-      "comparator_errors": 0.1588,
-      "cause": "trade-off",
-      "reason": "The difference is the shrink phase, which the paper states as removing a member while one tests independent of the target given the others, without saying which goes first. After a removal Andrey's search goes on to the next member in its order and repeats passes until none is removed; bnlearn's gs starts again from the first member after each removal. A trace running one Fisher z test under ports of both searches reproduces both packages' records on every target. With bnlearn's restart in Andrey's search the difference is +0.0004 [-0.0099, +0.0109] on seeds 0-19 and -0.0023 [-0.0124, +0.0093] on seeds 20-39; the visit order alone changes nothing (+0.0149, +0.0111), nor does bnlearn's grow. Over the 40 datasets the two rules end differently at 264 targets, and every member they keep differently is outside the true blanket: 451 kept by Andrey's rule only, 169 by the restart only. In the other seven Gaussian cells the restart moves the difference by at most 0.0066 and in no cell makes Andrey's distance significantly larger; the discrete cells were not traced for it. Both are readings of the paper's rule.",
-      "citation": "Margaritis, D. and Thrun, S. (1999). Bayesian network induction via local neighborhoods. NIPS 12, Fig. 2, step 3, and Margaritis, D. (2003), PhD thesis CMU-CS-03-153, Fig. 3.2 step 3 and p. 31: while there exists Y in S independent of X given S - {Y}, remove Y. bnlearn 5.2.1 (GPL): R/grow-shrink.R, gs.markov.blanket, the shrinking phase restarts after each removal."
-    },
-    {
-      "summary": "0.18.0",
       "method": "Fast-IAMB",
       "comparator": "bnlearn 5.2.1 fast.iamb",
       "row": {"regime": "discrete", "metric": "set_distance", "d": 37, "n": 1000},
