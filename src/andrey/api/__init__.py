@@ -13,7 +13,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 """
 
 from .adjustment import ld3, ldp
-from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmmb, mmpc
+from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmmb, mmpc, pcmb
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc, y_structures
 from .continuous import dagma, notears
 from .fcm import cam, camuv, nogam, resit, score_matching
@@ -53,6 +53,7 @@ __all__ = [
     "hiton_mb",
     "hiton_pc",
     "mmmb",
+    "pcmb",
     "mb_by_mb",
     "mmb_by_mmb",
     # treatment-outcome pairs: an adjustment set or a direct cause

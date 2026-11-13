@@ -365,7 +365,8 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
-            *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "mb_by_mb", "mmb_by_mmb", "mmhc", "rsmax2"),
+            *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
+            "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3"),
         ),
@@ -999,6 +1000,7 @@ CI_CASES = {
     "hiton_pc": [{}, {"target": 0}],
     "hiton_mb": [{}, {"target": 0}],
     "mmmb": [{}, {"target": 0}],
+    "pcmb": [{}, {"target": 0}],
     "mb_by_mb": [{"target": 0}],
     "mmb_by_mmb": [{"target": 0}, {"target": 0, "blanket": "iamb"}],
     "mmhc": [{}],

@@ -124,10 +124,10 @@ when saving or converting a graph.
 `kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
 graph's edges also join spouses, two parents of one child that need not be adjacent. `mmpc` and
 `hiton_pc` return the skeleton of their parents-and-children sets by default, an undirected graph,
-and a CPDAG with `structure="cpdag"`. `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, and
-`mmmb` return a CPDAG by default; with `structure="skeleton"` they return its adjacencies as an
+and a CPDAG with `structure="cpdag"`. `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`,
+and `pcmb` return a CPDAG by default; with `structure="skeleton"` they return its adjacencies as an
 undirected graph, and with `structure="moral"` the moral graph of their Markov blankets. With a
-`target`, the eight return that variable's set as undirected edges. An undirected graph has no CPDAG
+`target`, the nine return that variable's set as undirected edges. An undirected graph has no CPDAG
 or DAG, so `andrey.metrics.score` scores it on its skeleton alone: `shd` counts the pairs adjacent
 in one graph and not in the other, and no arrowhead metric is reported.
 
@@ -172,7 +172,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures`, `ldp`, `ld3` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `mb_by_mb` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb` |
 | `undirected` | `mmpc`, `hiton_pc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |

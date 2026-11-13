@@ -545,10 +545,20 @@ _OWN_DEPTH = {
         ),
     ),
 }
+#: A set learner's own alpha, where its default is not the concept's.
+_OWN_ALPHA = {
+    "pcmb": concept_param(
+        "alpha",
+        default=0.01,
+        doc="Significance level of the conditional-independence test, in (0, 1). Smaller values "
+        "give smaller sets. Pena et al. 2007 run PCMB at 0.01, the default.",
+    ),
+}
 #: What a set learner's target answer holds beyond its one set.
 _OWN_OUTPUT = {
     "hiton_mb": "; metadata['parents_and_children'] lists the parents and children alone",
     "mmmb": "; metadata['parents_and_children'] lists the parents and children alone",
+    "pcmb": "; metadata['parents_and_children'] lists the parents and children alone",
 }
 for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
@@ -673,6 +683,21 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ),
         "experimental",
     ),
+    (
+        "pcmb",
+        "One variable's Markov blanket by PCMB: the parents and children of the target and of each "
+        "of them by GetPCD, which after every addition removes each member a subset of the others "
+        "separates from the target, with the symmetry check, then each child's other parent "
+        "admitted by one conditional-independence test given the set that separated it from the "
+        "target and a common neighbor; on categorical data a test runs only with five rows per "
+        "degree of freedom. With target=null, every variable's sets joined into a CPDAG by the "
+        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
+        "markov_blanket",
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Pena, Nilsson, Bjorkegren & Tegner 2007", "Margaritis 2003"),
+        "experimental",
+    ),
 ):
     _add(
         MethodSpec(
@@ -692,7 +717,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             params=(
                 _TARGET,
                 _structure,
-                _ALPHA,
+                _OWN_ALPHA.get(_name, _ALPHA),
                 _INDEP_TEST,
                 _CATEGORICAL,
                 _TEST_SEED,
@@ -3367,6 +3392,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "mmmb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
     "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
+    "pcmb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
+    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
     "mb_by_mb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent never shares an edge. Every edge a tier or an edge "
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
@@ -3468,6 +3496,7 @@ _PATH_METHODS = (
     "hiton_pc",
     "hiton_mb",
     "mmmb",
+    "pcmb",
 )
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
@@ -3665,6 +3694,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "hiton_pc": ("target", "parents_and_children"),
     "hiton_mb": ("target", "markov_blanket", "parents_and_children"),
     "mmmb": ("target", "markov_blanket", "parents_and_children"),
+    "pcmb": ("target", "markov_blanket", "parents_and_children"),
     "mb_by_mb": ("target", "parents", "children", "undirected"),
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
