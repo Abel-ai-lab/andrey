@@ -83,6 +83,7 @@ from andrey_bench.blanket_lane import (
     true_graph,
     true_set,
     unpack_answer,
+    widen_answer,
 )
 from andrey_bench.contracts import structure_from_adjacency
 from andrey_bench.runner import available_cores, run_task, split_cores
@@ -446,6 +447,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="largest conditioning set for both sides: none (default) or at least 1",
     )
+    p.add_argument(
+        "--drop-constant",
+        action="store_true",
+        help="target mode: fit on the columns that hold more than one value; a column with one "
+        "value joins no set and answers the empty set at its target, scored against the whole "
+        "network (a small sample of a skewed network has such columns, which Andrey refuses)",
+    )
     p.add_argument("--seeds", type=int, default=20, help="datasets per cell (default: 20)")
     p.add_argument("--first-seed", type=int, default=0, help="the first seed (default: 0)")
     p.add_argument("--part", type=int, default=0, help="run every --parts-th cell from this one")
@@ -492,6 +500,8 @@ def main(argv: list[str] | None = None) -> int:
         cells = [Cell.parse(text) for text in args.cells][args.part :: args.parts]
         if args.targets != "all" and int(args.targets) < 1:
             raise ValueError("--targets is 'all' or a positive number")
+        if args.drop_constant and args.mode != "target":
+            raise ValueError("--drop-constant answers per target: it takes --mode target")
     except ValueError as error:
         p.error(str(error))
 
@@ -577,7 +587,13 @@ def main(argv: list[str] | None = None) -> int:
         for cell in cells:
             for seed in range(args.first_seed, args.first_seed + args.seeds):
                 X, truth, digest = cell.draw(seed)
-                targets = targets_of(X.shape[1], args.targets, seed)
+                d = X.shape[1]
+                targets = targets_of(d, args.targets, seed)
+                keep = np.arange(d)
+                if args.drop_constant:
+                    keep = np.flatnonzero((X != X[0]).any(axis=0))
+                position = {int(c): i for i, c in enumerate(keep)}
+                fit_targets = [position[t] for t in targets if t in position]
                 walls: dict[str, list[float]] = {}
                 for structure in structures:
                     solutions = fields[cell.label, structure]
@@ -598,11 +614,11 @@ def main(argv: list[str] | None = None) -> int:
                             continue
                         params = adapter.params()
                         if structure is None:
-                            params = {**params, TARGETS_PARAM: targets}
+                            params = {**params, TARGETS_PARAM: fit_targets}
                         threads, n_jobs = split_cores(args.cores, adapter.mode)
                         measures = run_task(
                             adapter,
-                            X,
+                            np.ascontiguousarray(X[:, keep]) if keep.size < d else X,
                             params,
                             cap_wall_s=args.cap_wall_s,
                             cap_mem_mb=args.cap_mem_mb,
@@ -631,6 +647,7 @@ def main(argv: list[str] | None = None) -> int:
                             "alpha": settings.alpha,
                             "max_depth": settings.max_depth,
                             "params": params,
+                            "constant_columns": sorted(set(range(d)) - set(position)),
                             "machine_id": args.machine_id,
                         }
                         for repeat, m in enumerate(measures):
@@ -638,6 +655,8 @@ def main(argv: list[str] | None = None) -> int:
                                 label = (cell.label, seed, adapter.name, args.mode, kind)
                                 if (*label, structure, repeat) in done:
                                     continue
+                                if keep.size < d and m.get("adj") is not None:
+                                    m = {**m, "adj": widen_answer(m["adj"], keep, d)}
                                 record = make_record({**base, "kind": kind, "repeat": repeat}, m)
                                 score(record, adapter, m, truth)
                                 if record["status"] == "ok":

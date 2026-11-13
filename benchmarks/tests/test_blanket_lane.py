@@ -509,6 +509,40 @@ def test_the_driver_records_sets_scores_and_counts_and_rescores_them(asia_cache,
     assert after == before
 
 
+def test_a_constant_column_joins_no_set_and_answers_the_empty_set(
+    asia_cache, tmp_path, monkeypatch
+):
+    draw = blanket_cpu.Cell.draw
+
+    def one_constant(cell, seed):
+        X, truth, digest = draw(cell, seed)
+        X = X.copy()
+        X[:, 3] = X[0, 3]
+        return X, truth, digest
+
+    monkeypatch.setattr(blanket_cpu.Cell, "draw", one_constant)
+    flags = ["--smoke", "--solutions", "andrey.iamb,baseline.empty"]
+    assert blanket_cpu.main(["--out", str(tmp_path / "refused"), *flags]) == 0
+    assert {r["status"] for r in _records(tmp_path / "refused")} >= {"error"}
+    assert blanket_cpu.main(["--out", str(tmp_path / "run"), *flags, "--drop-constant"]) == 0
+    iamb = next(r for r in _records(tmp_path / "run") if r["solution"] == "andrey.iamb")
+    assert iamb["status"] == "ok" and iamb["constant_columns"] == [3]
+    assert iamb["targets"] == list(range(8)) and len(iamb["params"]["targets"]) == 7
+    assert iamb["sets"]["3"] == [] and all(3 not in s for s in iamb["sets"].values())
+    assert iamb["per_target"]["3"]["true"] > 0 and iamb["n_tests"]["3"] is None
+    with pytest.raises(SystemExit):
+        blanket_cpu.main(
+            ["--out", str(tmp_path / "g"), *flags, "--drop-constant", "--mode", "graph"]
+        )
+
+
+def test_a_widened_answer_keeps_the_fit_s_sets_and_counts_on_its_columns():
+    native = lane.pack_answer(np.array([[0, 1], [1, 0]]), np.array([5, 7]), 12)
+    answer, counts, total = lane.unpack_answer(lane.widen_answer(native, np.array([0, 2]), 3))
+    np.testing.assert_array_equal(answer, [[0, 0, 1], [0, 0, 0], [1, 0, 0]])
+    assert counts.tolist() == [5, lane.NO_COUNT, 7] and total == 12
+
+
 def test_the_driver_scores_whole_graphs_and_resumes(asia_cache, tmp_path):
     out = tmp_path / "run"
     flags = [
