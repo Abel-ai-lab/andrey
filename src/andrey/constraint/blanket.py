@@ -36,8 +36,10 @@ endpoints given the middle node and each subset of the smaller blanket
 completes the result by Meek's rules.
 
 A learner asks its tests through its :class:`LocalSearch`. :meth:`LocalSearch.scan` tests many
-candidates against one conditioning set, in one call where the test can; :meth:`LocalSearch.weakest`
-gives each candidate's weakest association over many sets (a max-min step); and
+candidates against one conditioning set, in one call where the test can;
+:meth:`LocalSearch.scan_given_rest` tests each candidate given all the other variables, from one
+inverse of the correlation matrix where the test can; :meth:`LocalSearch.weakest` gives each
+candidate's weakest association over many sets (a max-min step); and
 :meth:`LocalSearch.separating` gives the sets of one size that separate a pair.
 :class:`SearchCounts` adds up the queries they ask and the time they take. Candidates are compared
 by the strength of their dependence on the target: the absolute partial correlation for a test that
@@ -119,6 +121,29 @@ def _scan(
     else:
         p = np.array([test(target, x, cond) for x in xs], dtype=np.float64)
     return -p, p
+
+
+def _scan_given_rest(
+    test: CITest, target: int, xs: Sequence[int], d: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """:meth:`LocalSearch.scan_given_rest` on ``test`` over ``d`` variables: the strengths and
+    p-values of ``target`` against each of ``xs`` given all the other variables.
+
+    A test with ``statistic_pvalues_given_rest`` (a partial-correlation test on complete data)
+    answers every candidate from one inverse of its correlation matrix, which it keeps, and its
+    strength is the absolute partial correlation; any other test answers each candidate as
+    :func:`_scan` does alone.
+    """
+    given_rest = getattr(test, "statistic_pvalues_given_rest", None)
+    if given_rest is not None and len(xs) > 0:
+        r, p = given_rest(target, xs)
+        return np.abs(np.asarray(r, dtype=np.float64)), np.asarray(p, dtype=np.float64)
+    strengths, pvalues = np.empty(len(xs)), np.empty(len(xs))
+    for k, x in enumerate(xs):
+        rest = [z for z in range(d) if z not in (target, x)]
+        strength, pvalue = _scan(test, target, [x], rest)
+        strengths[k], pvalues[k] = strength[0], pvalue[0]
+    return strengths, pvalues
 
 
 def strongest(keys: Mapping[int, Any], ranks: Sequence[int]) -> int:
@@ -1152,14 +1177,13 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
         blanket = required + sorted(others, key=lambda x: search.ranks[x])
     else:
         dependent, strengths = [], []
-        for x in others:
-            rest = [z for z in range(search.d) if z not in (target, x)]
-            strength, pvalue = search.scan(target, [x], rest)
-            if pvalue[0] <= search.total_alpha:
+        scanned = search.scan_given_rest(target, others)
+        for x, strength, pvalue in zip(others, *scanned, strict=True):
+            if pvalue <= search.total_alpha:
                 dependent.append(x)
-                strengths.append(strength[0])
+                strengths.append(strength)
             else:
-                sepsets[x] = tuple(rest)
+                sepsets[x] = tuple(z for z in range(search.d) if z not in (target, x))
         blanket = required + search.by_strength(dependent, np.asarray(strengths))
     if search.constraints is None:
         return blanket
@@ -1194,12 +1218,13 @@ class SearchCounts:
     spouse steps.
 
     ``issued`` counts the queries the learners asked through :meth:`LocalSearch.scan`,
-    :meth:`LocalSearch.weakest`, and :meth:`LocalSearch.separating`, one per candidate and
-    conditioning set, each time it is asked, whether the test computes its answer or reads it from
-    an answer it keeps. ``computed`` counts the tests computed during the runs and spouse steps as
-    :func:`~andrey.core.ci.counting_tests` counts them, the unit of ``metadata["n_tests"]``: a query
-    answered from a kept answer, as the chi-square tests keep their marginal answers, counts
-    nothing, and one a batch computes past the point where the search stops reading counts.
+    :meth:`LocalSearch.scan_given_rest`, :meth:`LocalSearch.weakest`, and
+    :meth:`LocalSearch.separating`, one per candidate and conditioning set, each time it is asked,
+    whether the test computes its answer or reads it from an answer it keeps. ``computed`` counts
+    the tests computed during the runs and spouse steps as :func:`~andrey.core.ci.counting_tests`
+    counts them, the unit of ``metadata["n_tests"]``: a query answered from a kept answer, as the
+    chi-square tests keep their marginal answers, counts nothing, and one a batch computes past the
+    point where the search stops reading counts.
     ``queries`` holds the distinct queries among the issued ones, each the lower and the higher
     variable and the sorted conditioning set, when the search keeps them (``trace=True``), and is
     ``None`` otherwise; ``distinct`` is their number. ``test_seconds`` is the time spent in those
@@ -1234,11 +1259,11 @@ class LocalSearch:
     read them without a test. A test with BLAS calls gives the same bits on every host inside
     :meth:`pinned`.
 
-    A learner asks its tests through :meth:`scan`, :meth:`weakest`, and :meth:`separating`, and
-    picks between candidates with :meth:`strongest`, which reads ``ranks`` only when two
-    candidates tie; it reads neither the test's internals nor ``ranks`` itself. ``counts``
-    (:class:`SearchCounts`) adds up the queries and the time; with ``trace``, it also keeps the
-    distinct queries, which costs memory in proportion to their number.
+    A learner asks its tests through :meth:`scan`, :meth:`scan_given_rest`, :meth:`weakest`, and
+    :meth:`separating`, and picks between candidates with :meth:`strongest`, which reads ``ranks``
+    only when two candidates tie; it reads neither the test's internals nor ``ranks`` itself.
+    ``counts`` (:class:`SearchCounts`) adds up the queries and the time; with ``trace``, it also
+    keeps the distinct queries, which costs memory in proportion to their number.
     """
 
     def __init__(
@@ -1286,6 +1311,33 @@ class LocalSearch:
         start = perf_counter()
         strengths, pvalues = _scan(self.test, target, xs, cond)
         self._asked(start, target, xs, 1, lambda: [cond])
+        return strengths, pvalues
+
+    def scan_given_rest(self, target: int, xs: Sequence[int]) -> tuple[np.ndarray, np.ndarray]:
+        """The strength and the p-value of ``target`` against each candidate in ``xs`` given all
+        the other variables, the queries of total conditioning: two float arrays in the order of
+        ``xs``, each entry :meth:`scan`'s of that candidate alone given the rest.
+
+        A partial-correlation test on complete data answers them from one inverse of its
+        correlation matrix, computed once for the life of the test, so the entries equal
+        :meth:`scan`'s up to rounding; any other test answers one :meth:`scan` query at a time.
+        Each candidate counts as one query, as :meth:`scan` counts it. ``xs`` excludes
+        ``target``.
+        """
+        start = perf_counter()
+        strengths, pvalues = _scan_given_rest(self.test, target, xs, self.d)
+        counts = self.counts
+        counts.test_seconds += perf_counter() - start
+        counts.issued += len(xs)
+        if counts.queries is not None:
+            counts.queries.update(
+                (
+                    min(target, x),
+                    max(target, x),
+                    tuple(z for z in range(self.d) if z not in (target, x)),
+                )
+                for x in xs
+            )
         return strengths, pvalues
 
     def weakest(
