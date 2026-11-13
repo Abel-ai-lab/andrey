@@ -84,6 +84,7 @@ from andrey_bench.blanket_lane import (
     true_set,
     unpack_answer,
 )
+from andrey_bench.contracts import structure_from_adjacency
 from andrey_bench.runner import available_cores, run_task, split_cores
 
 RECORDS = "records.jsonl"
@@ -166,7 +167,7 @@ class Cell:
             network = _harness_network(self.name)
             order = harness_order(network.d, seed)
             X = network.sample(self.n, seed)[:, order]
-            marks = GraphStructure.from_numpy(network.adjacency, kind="dag").to_numpy()
+            marks = structure_from_adjacency(network.adjacency, kind="dag").to_numpy()
             truth = np.asarray(marks, dtype=np.int8)[np.ix_(order, order)]
             call = {"network": self.name, "n": self.n, "seed": seed, "sampler": "Network.sample"}
             digest = hashlib.sha1(json.dumps(call, sort_keys=True).encode()).hexdigest()[:12]
