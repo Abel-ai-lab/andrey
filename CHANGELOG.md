@@ -161,6 +161,13 @@ names its pull request.
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), experimental: the weighted edges into
+  a target and into each of its children in a linear model with non-Gaussian noise whose graph may
+  hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket
+  is the support of a Lasso regression; a sparse ICA (Zhang and Chan 2006) and HSIC tests give the
+  independent subspaces, and every admissible assignment of them gives a model of the equivalence
+  class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
+  peels sink columns instead, for a target and children on no cycle. ([#986])
 
 ### Changed
 
@@ -178,6 +185,14 @@ names its pull request.
   `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
   pooled F1 is never lower. ([#969])
+
+### Fixed
+
+- The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
+  answers both directions of a pair, the summary reads the record for the treatment and the outcome
+  asked, not the last record of the fit, and a record that says the effect is zero estimates 0
+  instead of adjusting for the sets it lists. `--rescore` recomputes the errors of a stored run.
+  ([#988])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2716,6 +2731,8 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
+[#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
+[#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

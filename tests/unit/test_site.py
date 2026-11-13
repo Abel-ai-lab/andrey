@@ -956,6 +956,8 @@ def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
     # (a MAG). A skeleton is not a causal graph: a supported method may return one by default, as
     # MMPC does, and the tile names the four kinds of causal graph without it.
     supported = {s.output.graph_kind for s in list_specs() if s.status == "supported"}
+    if any(s.status == "supported" and s.output.structure_type == "temporal" for s in list_specs()):
+        supported.add("digraph")  # a TemporalStructure's summary graph is a cyclic graph
     experimental = {s.output.graph_kind for s in list_specs() if s.status == "experimental"}
     kinds = build.graph_kinds()
     assert supported - {None} <= build.GRAPH_KINDS.keys() | build.SKELETON_KINDS

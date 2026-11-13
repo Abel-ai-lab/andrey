@@ -373,6 +373,7 @@ UNIT_CASES = {
         "gauss_5v",
     ),
     "direct_lingam": "lingam_5v_uniform",
+    "local_isa_ling": "lingam_5v_uniform",
     "multi_group_direct_lingam": "mgdl_2groups",
     "varma_lingam": "varma_3v",
     "longitudinal_lingam": "panel_4v",
