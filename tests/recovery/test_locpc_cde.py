@@ -1,17 +1,16 @@
 """Recovery tests for ``locpc_cde``: Loranchet and Assaad (2026) under exact d-separation, and
 answers on linear-Gaussian data drawn by the benchmark lane's sampler, scored against the truth.
 
-With exact tests (:class:`~andrey.data.latent.DSepOracle`), every answer the record decides
-equals the answer the true CPDAG gives (``andrey.metrics.effect_oracle``), and the set of an
-identifiable effect is the outcome's parents, a valid set for the controlled direct effect
-(Theorem 14), with one exception the tests name: the non-orientability criterion (Theorem 13)
-stops on some graphs whose CPDAG directs every edge at the outcome.
+With exact tests (:class:`~andrey.data.latent.DSepOracle`), every verdict equals the one the true
+CPDAG gives (``andrey.metrics.effect_oracle``), and the set of an identifiable effect is the
+outcome's parents, a valid set for the controlled direct effect.
 """
 
 from __future__ import annotations
 
 import importlib
 import sys
+from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
@@ -57,82 +56,79 @@ def random_dag(rng: np.random.Generator, d: int, p: float) -> np.ndarray:
     return A
 
 
-def collider_at_inner_end(dag: np.ndarray, answer) -> bool:
-    """Whether a member's double-bar edge to an outer variable ``a`` ends in a collider ``b -> v
-    <- a`` of the true DAG with ``b`` an inner neighbor of the member not adjacent to ``a``: the
-    pattern that orients the edge into the member at the next hop."""
-    graph, inside = answer.graph, set(answer.graph.neighborhood)
-    adjacent = (dag + dag.T) > 0
-    for v, a in graph.double_bar:
-        if v not in answer.members or not dag[a, v]:
-            continue
-        for b in graph.neighbors(v):
-            if b in inside and b != a and dag[b, v] and not adjacent[a, b]:
-                return True
-    return False
+def draw(seed: int, low: int, high: int) -> tuple[np.ndarray, nx.DiGraph, list[int]]:
+    """A random DAG with ``low`` to ``high`` variables, two or three expected parents per
+    variable, and a random rank order of its variables."""
+    rng = np.random.default_rng(seed)
+    d = int(rng.integers(low, high + 1))
+    A = random_dag(rng, d, min(float(rng.choice([2.0, 3.0])) / (d - 1), 0.9))
+    dag = nx.DiGraph()
+    dag.add_nodes_from(range(d))
+    dag.add_edges_from(zip(*np.nonzero(A), strict=True))
+    return A, dag, rng.permutation(d).tolist()
+
+
+def assert_the_cpdags_verdict(A: np.ndarray, answer, x: int, y: int) -> None:
+    """The answer for ``x`` and ``y`` is the true CPDAG's: a zero stop only for a true zero
+    (``x`` not adjacent to ``y``, or its child), otherwise "oriented" exactly when the CPDAG
+    directs every edge at ``y``, with ``y``'s true parents; a zero stop that directs every edge
+    at ``y`` gives them too."""
+    truth = effect_oracle(A, x, y, estimand="direct")
+    parents = np.flatnonzero(A[:, y]).tolist()
+    if answer.reason == "not adjacent":
+        assert not A[x, y] and not A[y, x]
+    elif answer.reason == "treatment is a child":
+        assert A[y, x]
+    else:
+        assert (answer.reason == "oriented") == truth["identifiable"], answer.reason
+    if not answer.graph.non_arrow(y):
+        assert truth["identifiable"] and answer.graph.parents(y) == parents
 
 
 # --- exact tests --------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("pairs", ["parents", "all"])
-def test_every_decided_answer_is_the_true_cpdags_but_the_criterions_named_stops(pairs):
-    """On random DAGs with exact tests, an "oriented" answer gives exactly the outcome's parents
-    and the oracle calls the effect identifiable; a zero stop is a true zero; a "not orientable"
-    answer is right, or its criterion met a double-bar edge that a collider at its inner end
-    directs at the next hop (the counterexample to Theorem 13); every non-identifiable effect is
-    found."""
-    seen = {"oriented": 0, "not orientable": 0, "zero": 0, "criterion": 0}
-    for seed in range(40 if pairs == "parents" else 15):
-        rng = np.random.default_rng(seed)
-        d = int(rng.integers(5, 12))
-        A = random_dag(rng, d, min(float(rng.choice([2.0, 3.0])) / (d - 1), 0.9))
-        dag = nx.DiGraph()
-        dag.add_nodes_from(range(d))
-        dag.add_edges_from(zip(*np.nonzero(A), strict=True))
-        ranks = rng.permutation(d).tolist()
-        if pairs == "parents":
-            asked = [(int(x), int(y)) for x, y in zip(*np.nonzero(A), strict=True)]
-        else:
-            asked = [(x, y) for x in range(d) for y in range(d) if x != y]
-        for x, y in asked:
+@pytest.mark.parametrize("first", range(0, 300, 30))
+def test_every_verdict_on_a_parent_pair_is_the_true_cpdags(first):
+    """On 300 random DAGs of 6 to 15 variables, for every pair ``x -> y`` of the DAG, as the
+    paper samples its pairs, the verdict and the set are the true CPDAG's."""
+    for seed in range(first, first + 30):
+        A, dag, ranks = draw(seed, 6, 15)
+        for x, y in zip(*np.nonzero(A), strict=True):
+            answer = engine(oracle_search(dag, list(range(len(A))), ranks), int(x), int(y))
+            assert_the_cpdags_verdict(A, answer, int(x), int(y))
+
+
+def test_every_verdict_on_any_pair_is_the_true_cpdags():
+    """On random DAGs of 5 to 11 variables, for every ordered pair, the verdict is the true
+    CPDAG's, and both verdicts and both zero stops occur."""
+    seen = Counter()
+    for seed in range(15):
+        A, dag, ranks = draw(seed, 5, 11)
+        d = len(A)
+        for x, y in ((x, y) for x in range(d) for y in range(d) if x != y):
             answer = engine(oracle_search(dag, list(range(d)), ranks), x, y)
-            truth = effect_oracle(A, x, y, estimand="direct")
-            parents = np.flatnonzero(A[:, y]).tolist()
-            if answer.reason == "oriented":
-                assert truth["identifiable"]
-                assert answer.graph.parents(y) == parents
-                seen["oriented"] += 1
-            elif answer.reason == "not orientable" and not truth["identifiable"]:
-                seen["not orientable"] += 1
-            elif answer.reason == "not orientable":
-                assert collider_at_inner_end(A, answer), (seed, x, y)
-                seen["criterion"] += 1
-            else:
-                assert not A[x, y]
-                seen["zero"] += 1
-                if not answer.graph.non_arrow(y):
-                    assert answer.graph.parents(y) == parents
-    assert min(seen["oriented"], seen["not orientable"]) > 20
-    assert seen["criterion"] < seen["oriented"] / 10
+            assert_the_cpdags_verdict(A, answer, x, y)
+            seen[answer.reason] += 1
+    assert min(seen.values()) > 20 and len(seen) == 4, seen
 
 
-def test_the_criterion_stops_on_an_identifiable_effect_when_a_collider_lies_past_the_hop():
-    """Theorem 13 says a met criterion shows the effect is not identifiable. Here ``y -> x <- w``
-    makes ``y -> x`` compelled (``x`` is the outcome's child, a zero effect, and the outcome's only
-    edge is directed), but at hop 1 ``w`` is outside, ``x``'s edge to it is double-bar (``v`` is
-    separated from ``x`` by the empty set), the criterion holds for ``{y, x}``, and the answer is
-    "not orientable"."""
+def test_a_double_bar_edge_that_a_collider_past_the_hop_directs_is_learned_to_that_hop():
+    """In ``y -> x <- w``, with ``v`` apart, the outcome's edge to ``x`` is undirected at hop 1
+    and ``x``'s edge to ``w``, still outside, is double-bar (``v`` is separated from ``x`` by the
+    empty set). At hop 2 the collider at ``x`` directs ``y -> x``, as the CPDAG does, and the
+    answer is a zero effect."""
     dag = nx.DiGraph([("y", "x"), ("w", "x")])
     dag.add_node("v")
     names = ["v", "w", "x", "y"]
-    answer = engine(oracle_search(dag, names), names.index("x"), names.index("y"))
-    assert answer.reason == "not orientable" and answer.hop == 1
-    assert (names.index("x"), names.index("w")) in answer.graph.double_bar
+    v, w, x, y = range(4)
+    hop1 = locpc(oracle_search(dag, names), y, 1, Memory())
+    assert (x, w) in hop1.double_bar and hop1.non_arrow(y) == [x]
+    answer = engine(oracle_search(dag, names), x, y)
+    assert answer.reason == "treatment is a child" and answer.hop == 2
+    assert answer.graph.parents(x) == [w, y]
     cpdag = to_cpdag(nx.to_numpy_array(dag, nodelist=names, dtype=np.int8)).to_numpy()
-    assert cpdag[names.index("y"), names.index("x")] == 1  # y -> x in the CPDAG
-    larger = locpc(oracle_search(dag, names), names.index("y"), 2, Memory())
-    assert larger.parents(names.index("x")) == [names.index("w"), names.index("y")]
+    assert cpdag[y, x] == 1  # y -> x in the CPDAG
 
 
 def test_figure_1_orients_every_edge_at_the_outcome_and_returns_its_parents():

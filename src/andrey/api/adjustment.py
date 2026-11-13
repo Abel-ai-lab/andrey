@@ -519,8 +519,9 @@ def locpc_cde(
     LocPC-CDE learns the graph around the outcome one hop at a time with PC's tests, run only at
     the variables near the outcome, until every edge at the outcome is oriented, so that its
     parents are known and are a valid adjustment set for the controlled direct effect, or until a
-    criterion shows that no larger hop orients them [1]_. It stops at once when the treatment is
-    not adjacent to the outcome or is its child: the direct effect is then zero.
+    larger hop adds no variable, so that an edge at the outcome left unoriented stays so [1]_. It
+    stops at once when the treatment is not adjacent to the outcome or is its child: the direct
+    effect is then zero.
 
     Parameters
     ----------
@@ -639,16 +640,16 @@ def locpc_cde(
     -----
     **When to use.** LocPC-CDE suits i.i.d. observational data with no unmeasured common causes,
     when you want to know whether the controlled direct effect of one variable on another can be
-    estimated, the effect with every other parent of the outcome held fixed, and which variables
-    to adjust for, without learning the whole graph. Its claim [1]_: when every independence the
-    tests near the outcome read follows from the graph (local faithfulness) and the tests are
-    exact, the effect is identifiable exactly when the CPDAG directs every edge at the outcome,
-    and then the outcome's parents are a valid adjustment set (Theorem 14); it learns no more
-    hops than needed to tell (Theorem 15). The default Fisher-Z test assumes continuous data with
-    linear effects and Gaussian noise; the other tests read categorical or mixed data or detect
-    nonlinear effects, as :func:`~andrey.pc` describes. Regressing the outcome on the treatment
-    and the set estimates the effect in a linear model. For the whole CPDAG, use
-    :func:`~andrey.pc`.
+    estimated, the effect with every other parent of the outcome held fixed, and which variables to
+    adjust for, without learning the whole graph. Its claim [1]_: when every independence the tests
+    near the outcome read follows from the graph (local faithfulness) and the tests are exact, the
+    effect is identifiable exactly when the CPDAG directs every edge at the outcome, and then the
+    outcome's parents are a valid adjustment set; an edge at the outcome that the graph learned
+    around it directs is directed so in the CPDAG, so an identifiable effect is often found without
+    learning the whole graph. The default Fisher-Z test assumes continuous data with linear effects
+    and Gaussian noise; the other tests read categorical or mixed data or detect nonlinear effects,
+    as :func:`~andrey.pc` describes. Regressing the outcome on the treatment and the set estimates
+    the effect in a linear model. For the whole CPDAG, use :func:`~andrey.pc`.
 
     **How it works.** LocPC [1]_ (Algorithm 1) learns the graph around the outcome at hop ``h``.
     It joins the outcome to every other variable and runs PC's levels over it: at size ``s``,
@@ -662,12 +663,21 @@ def locpc_cde(
     one is double-bar when no outer variable needs the outer end to be separated from the inner
     one. LocPC-CDE (Algorithm 2) runs LocPC at hop 0, 1, 2, ..., keeping every separating set
     and test result for the next hop, while the treatment is adjacent to the outcome and not its
-    child and some edge at the outcome is undirected or double-bar. After each hop it collects
-    the variables that undirected and double-bar edges join to the outcome within the hop, and
-    stops when none of them has an undirected edge leaving the collection and each has at most
-    one double-bar edge leaving it (the non-orientability criterion, Theorem 13), or when the hop
-    adds no variable. Variables, neighbors, and conditioning sets are visited in the order of
+    child and some edge at the outcome is undirected or double-bar, and stops when the hop adds
+    no variable. Variables, neighbors, and conditioning sets are visited in the order of
     :func:`~andrey.core.ties.tie_ranks`, so the answer does not depend on the column order.
+
+    **When it stops.** Algorithm 2 of [1]_ also stops after a hop when the variables that undirected
+    and double-bar edges join to the outcome within the hop have no undirected edge leaving them and
+    at most one double-bar edge each leaving them (the non-orientability criterion), which its
+    Theorem 13 states makes the effect not identifiable. Andrey leaves this stop out and grows the
+    hop until every edge at the outcome is oriented or the hop adds no variable, the strategy that
+    Section 6 of [1]_ describes before the criterion. With exact tests, on the pairs ``x -> y`` of
+    300 random graphs of 6 to 15 variables, the stop ended 23 of 3,091 searches for an identifiable
+    direct effect while an edge at the outcome was undirected: a double-bar edge from a variable
+    near the outcome to one farther out was directed into the nearer one, by a collider with another
+    variable near the outcome, once the hop reached the farther one. Without it, every verdict on
+    those graphs is the CPDAG's.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
@@ -678,16 +688,12 @@ def locpc_cde(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and
-    the paper's figures, and on simulated linear-Gaussian data. With exact tests, the
-    non-orientability criterion sometimes stops while a larger hop would still orient every edge
-    at the outcome: an inner variable's double-bar edge can be directed into it by a collider
-    with another inner variable once the outer end joins the hop, and the answer is then "not
-    orientable" for an identifiable effect. An unmeasured common cause breaks the claim.
-    With 5,000 rows a fit ran about 30 to 100 tests on the paper's random 10-node graphs and 200 to
-    1,000 on its 50-node graphs, each in under a second. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and the
+    paper's figures, and on simulated linear-Gaussian data. Without the paper's early stop (see
+    **When it stops.**), a non-identifiable effect is searched until a hop adds no variable: with
+    exact tests the mean hop of a search rose from 1.41 to 1.79 on random graphs of 6 to 15
+    variables and from 1.46 to 2.16 on graphs of 20 to 30. An unmeasured common cause breaks the
+    claim.
 
     References
     ----------

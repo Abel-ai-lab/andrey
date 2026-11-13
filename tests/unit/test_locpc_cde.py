@@ -9,7 +9,7 @@ import pytest
 
 from andrey import Knowledge, locpc_cde
 from andrey.constraint.blanket import LocalSearch
-from andrey.constraint.locpc import Memory, locpc, non_orientable
+from andrey.constraint.locpc import Memory, locpc
 from andrey.constraint.locpc import locpc_cde as engine
 from andrey.core.ci import counting_tests
 from andrey.core.effects import check_effects
@@ -126,23 +126,6 @@ def test_tiers_direct_the_edges_they_decide():
     out = locpc_cde(data, treatment="x", outcome="y", knowledge=knowledge)
     record = out.metadata["effects"][0]
     assert record["reason"] == "oriented" and record["adjustment_sets"] == [["b"]]
-
-
-def test_the_criterion_reads_undirected_and_double_bar_edges_leaving_the_set():
-    """Definition 12 on a hand-built graph: an undirected edge leaving the set fails it, one
-    double-bar edge per member passes, two fail."""
-    from andrey.constraint.locpc import LocalEssentialGraph
-
-    marks = np.zeros((4, 4), dtype=np.int8)
-    for i, j in ((0, 1), (1, 2), (1, 3)):
-        marks[i, j] = marks[j, i] = 1
-    one = LocalEssentialGraph(marks, frozenset({(1, 2)}), (0, 1), (0, 1), 1)
-    assert not non_orientable(one, [0, 1])
-    both = LocalEssentialGraph(marks, frozenset({(1, 2), (1, 3)}), (0, 1), (0, 1), 1)
-    assert not non_orientable(both, [0, 1])
-    marks[1, 3] = marks[3, 1] = 0
-    single = LocalEssentialGraph(marks, frozenset({(1, 2)}), (0, 1), (0, 1), 1)
-    assert non_orientable(single, [0, 1])
 
 
 def test_units_shifts_and_reruns_do_not_change_the_answer():

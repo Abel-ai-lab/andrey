@@ -779,14 +779,14 @@ structural direct criterion), with the other parents as the adjustment set for t
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
 
-LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the
-graph around the outcome one hop at a time with PC's tests, run only near the outcome, until every
-edge at the outcome is oriented, so that the outcome's parents are a valid adjustment set for the
-controlled direct effect, or until a criterion shows that no larger hop orients them. It stops at
-once when the treatment is not adjacent to the outcome or is its child. `metadata["effects"]` holds
-the answer with the paper's reason, the graph is the local essential graph it learned, and
-`metadata["hop"]`, `metadata["visited"]`, and `metadata["double_bar"]` describe the search. It is
-experimental until its comparison with the authors' code is published.
+LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the graph
+around the outcome one hop at a time with PC's tests, run only near the outcome, until every edge at
+the outcome is oriented, so that the outcome's parents are a valid adjustment set for the controlled
+direct effect, or until a larger hop adds no variable. It stops at once when the treatment is not
+adjacent to the outcome or is its child. `metadata["effects"]` holds the answer with the paper's
+reason, the graph is the local essential graph it learned, and `metadata["hop"]`,
+`metadata["visited"]`, and `metadata["double_bar"]` describe the search. It is experimental until
+its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

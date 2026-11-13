@@ -234,24 +234,6 @@ def locpc(
     return LocalEssentialGraph(marks, frozenset(double_bar), tuple(inside), tuple(visited), hop)
 
 
-def non_orientable(graph: LocalEssentialGraph, members: list[int]) -> bool:
-    """Whether ``members`` meets the non-orientability criterion (Definition 12 of [1]_): no
-    member has an undirected edge to a variable outside ``members``, and each has at most one
-    double-bar edge to one."""
-    within = set(members)
-    for v in members:
-        bars = 0
-        for u in graph.non_arrow(v):
-            if u in within:
-                continue
-            if (v, u) not in graph.double_bar:
-                return False
-            bars += 1
-            if bars > 1:
-                return False
-    return True
-
-
 @dataclass(frozen=True)
 class CDEAnswer:
     """What :func:`locpc_cde` found.
@@ -259,14 +241,13 @@ class CDEAnswer:
     ``graph`` is the last local essential graph learned, at hop ``hop``; ``reason`` is one of
     :data:`REASONS`: the treatment is not adjacent to the outcome or is its child (the controlled
     direct effect is zero), every edge at the outcome is oriented (its parents are known), or
-    some edge at the outcome stays unoriented, found by the non-orientability criterion or after
-    every variable was visited. ``members`` is the set the criterion read last.
+    some edge at the outcome stays unoriented once a larger hop adds no variable or every
+    variable was visited.
     """
 
     graph: LocalEssentialGraph
     hop: int
     reason: str
-    members: tuple[int, ...]
 
     @property
     def identifiable(self) -> bool:
@@ -276,20 +257,20 @@ class CDEAnswer:
 
 def locpc_cde(search: LocalSearch, treatment: int, outcome: int) -> CDEAnswer:
     """Decide whether the controlled direct effect of ``treatment`` on ``outcome`` is identifiable
-    with LocPC-CDE (Algorithm 2 of [1]_).
+    with LocPC-CDE (Algorithm 2 of [1]_, without its non-orientability stop).
 
     It learns the local essential graph of ``outcome`` at hop 0, 1, 2, ... (:func:`locpc`, the
     separating sets and p-values of each run kept for the next) while the treatment is adjacent
     to the outcome and not its child, some edge at the outcome is undirected or double-bar, and
-    some variable is unvisited. After each run from hop 1 on, it adds to a set that starts at the
-    outcome the variables within the hop that an undirected or double-bar edge joins to a member,
-    and stops when that set meets the non-orientability criterion (:func:`non_orientable`),
-    which shows that no larger hop orients the outcome's undirected edges, or when the hop adds no
-    variable to the neighborhood: every variable the outcome connects to is visited, and a larger
-    hop reruns the same tests (a variable the tests separate from all of them is never visited,
-    so the paper's other stop, every variable visited, need not come). The effect is
-    identifiable unless the treatment is adjacent to the outcome, not its child, and some edge at
-    the outcome is unoriented.
+    some variable is unvisited, and stops when the hop adds no variable to the neighborhood:
+    every variable the outcome connects to is visited, and a larger hop reruns the same tests (a
+    variable the tests separate from all of them is never visited, so the paper's other stop,
+    every variable visited, need not come). Algorithm 2 also stops when a set of variables around
+    the outcome meets the non-orientability criterion (Definition 12 of [1]_); this function
+    leaves that stop out, as the strategy of Section 6 of [1]_ that precedes the criterion does,
+    so a hop that would still direct an edge at the outcome is always learned. The effect is
+    identifiable unless the treatment is adjacent to the outcome, not its child, and some edge
+    at the outcome is unoriented.
 
     References
     ----------
@@ -300,7 +281,6 @@ def locpc_cde(search: LocalSearch, treatment: int, outcome: int) -> CDEAnswer:
     memory = Memory()
     x, y = treatment, outcome
     graph = locpc(search, y, 0, memory)
-    members = [y]
 
     def undecided(g: LocalEssentialGraph) -> bool:
         return g.marks[x, y] != NULL and y not in g.parents(x) and bool(g.non_arrow(y))
@@ -309,14 +289,7 @@ def locpc_cde(search: LocalSearch, treatment: int, outcome: int) -> CDEAnswer:
     while undecided(graph) and len(graph.visited) < search.d:
         previous = graph.neighborhood
         graph = locpc(search, y, hop, memory)
-        inside = set(graph.neighborhood)
-        k = 0
-        while k < len(members):
-            for u in graph.non_arrow(members[k]):
-                if u in inside and u not in members:
-                    members.append(u)
-            k += 1
-        if non_orientable(graph, members) or graph.neighborhood == previous:
+        if graph.neighborhood == previous:
             break
         hop += 1
     if graph.marks[x, y] == NULL:
@@ -327,4 +300,4 @@ def locpc_cde(search: LocalSearch, treatment: int, outcome: int) -> CDEAnswer:
         reason = "oriented"
     else:
         reason = "not orientable"
-    return CDEAnswer(graph, graph.hop, reason, tuple(members))
+    return CDEAnswer(graph, graph.hop, reason)
