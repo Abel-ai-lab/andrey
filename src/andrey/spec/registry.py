@@ -1023,6 +1023,7 @@ _add(
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        tie_break=True,
         params=(
             concept_param(
                 "variables",

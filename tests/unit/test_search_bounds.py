@@ -72,11 +72,16 @@ def ci_search_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
             return self._test(x, y, condition_set)
 
     monkeypatch.setitem(ci._CI_REGISTRY, "recorded", Recorded)
+    data = inputs(method)
+    settings = dict(REQUIRED.get(method, {}))
+    if "variables" in settings:
+        # A method that answers for given variables drops the columns that cannot be their
+        # ancestors; with every column given, none is dropped, so the search goes as deep as the
+        # data make it.
+        settings["variables"] = list(range(data[0].shape[1]))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        getattr(andrey, method)(
-            *inputs(method), indep_test="recorded", max_depth=cap, **REQUIRED.get(method, {})
-        )
+        getattr(andrey, method)(*data, indep_test="recorded", max_depth=cap, **settings)
     return sizes
 
 

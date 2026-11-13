@@ -613,7 +613,8 @@ def snap(
         ``metadata["algorithm"]`` is ``"snap"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated.
+        number of conditional-independence tests the fit evaluated. ``metadata["tie_break"]`` is
+        the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -661,9 +662,12 @@ def snap(
     leave an edge with arrowheads at both ends, so neither end can be an ancestor of the other.
     After each size, a variable with no possibly directed path to one of ``variables`` is dropped.
     When no pair is left to test, Meek's rules [3]_ complete the orientation and the variables are
-    pruned once more; an edge left with two arrowheads is then made undirected. The search visits
-    the variables, their neighbors, and the conditioning sets in an order computed from the data,
-    so the answer and the number of tests do not depend on the column order, and it tests each
+    pruned once more. There the v-structures are oriented as :func:`~andrey.pc` orients them:
+    where two disagree on an edge, the one whose pair the tests separated more clearly is kept, and
+    an edge two tie on is made undirected; with exact tests none disagree. The search visits the
+    variables, their neighbors, and the conditioning sets in an order computed from the data, so
+    the answer and the number of tests do not depend on the column order; under
+    ``andrey.config(tie_break="position")`` they follow the column order instead. It tests each
     query once. The effects are read from the CPDAG that extends the graph: the same skeleton and
     v-structures, each edge oriented as its class requires. The optimal set is that of [4]_, and
     the parent sets are those of local IDA [5]_; a set holds neither variable of the pair, so the
