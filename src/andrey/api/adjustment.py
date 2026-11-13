@@ -36,8 +36,9 @@ def _fit(method: str, data, treatment, outcome, alpha, indep_test, categorical, 
     Returns its result, the fit's columns, labels, and namer, and the shared metadata.
     """
     from andrey.api._local import pair_columns
-    from andrey.constraint import partition
     from andrey.constraint.blanket import local_search
+    from andrey.constraint.partition import ld3 as ld3_engine
+    from andrey.constraint.partition import ldp as ldp_engine
     from andrey.core.ci import counting_tests
 
     X, mask, labels, _ = fit_inputs(
@@ -51,7 +52,7 @@ def _fit(method: str, data, treatment, outcome, alpha, indep_test, categorical, 
             X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed, ranked=False
         )
         with search.pinned():
-            result = getattr(partition, method)(search, x, y, others)
+            result = (ldp_engine if method == "ldp" else ld3_engine)(search, x, y, others)
     name = label_of(labels)
     metadata = {
         "partition": {k: [name(j) for j in v] for k, v in result.partition.items()},
