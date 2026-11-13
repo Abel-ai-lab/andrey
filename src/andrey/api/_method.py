@@ -24,7 +24,12 @@ import numpy as np
 from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
-from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    SHIPPED_INDEP_TESTS,
+    STOCHASTIC_INDEP_TESTS,
+    available_indep_tests,
+)
 from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
@@ -76,7 +81,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
     declared column types, and the facade gets the pick and the columns it reads
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
-    a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
+    a score that does not use it raises ``ValueError`` (:func:`check_penalties`), and so does one
+    that passes ``degrees_of_freedom`` with a test that does not read it
+    (:func:`check_degrees_of_freedom`).
     After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
     ``forbidden_paths`` (:func:`restrict_paths`), a PAG or a DAG is checked against them
     (:func:`meet_paths`), and a claim the result does not meet is dropped with a warning
@@ -119,6 +126,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 warn_experimental(name)
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
+            check_degrees_of_freedom(spec, bound.arguments, chosen.get("indep_test"))
             out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
                 out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
@@ -526,6 +534,21 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | No
                 f"{spec.name}: {name} weighs {weighed} of score_func={used[0]!r}, which "
                 f"score_func={score!r} does not use; drop {name}, or pass score_func={used[0]!r}"
             )
+
+
+def check_degrees_of_freedom(spec: MethodSpec, arguments: dict[str, Any], test: str | None) -> None:
+    """Raise ``ValueError`` when the call passes ``degrees_of_freedom`` with a test that ignores it.
+
+    Only the categorical tests (:data:`~andrey.core.ci.DISCRETE_INDEP_TESTS`) read it; ``test`` is
+    the one the fit uses (:func:`chosen_settings`). A default is never checked, so a method whose
+    default is ``"nonempty"`` runs with any test.
+    """
+    if "degrees_of_freedom" in arguments and test not in DISCRETE_INDEP_TESTS:
+        raise ValueError(
+            f"{spec.name}: degrees_of_freedom sets the degrees of freedom of indep_test='chisq' "
+            f"and 'gsq', which indep_test={test!r} does not use; drop degrees_of_freedom, or pass "
+            "indep_test='gsq'"
+        )
 
 
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:

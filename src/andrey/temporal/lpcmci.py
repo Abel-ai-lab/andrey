@@ -1374,17 +1374,26 @@ def lpcmci(
     max_p_global: int | None = None,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> LPCMCIResult:
     """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` test.
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach :func:`run`.
     ``max_p_global`` caps the size of the searched subsets ``S`` in both removal phases and in the
     majority vote; the default conditions ``S_def`` come on top. ``None`` sets no cap.
-    ``categorical`` and ``seed`` reach :func:`~andrey.temporal.pcmci.design_test`, which raises on
+    ``categorical``, ``seed``, and ``degrees_of_freedom`` reach
+    :func:`~andrey.temporal.pcmci.design_test`, which raises on
     an ``indep_test`` it cannot build.
     """
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    test = design_test(
+        indep_test,
+        data,
+        tau_max,
+        categorical=categorical,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+    )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():
         return run(

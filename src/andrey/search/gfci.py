@@ -78,6 +78,7 @@ def gfci(
     max_parents: int | None = None,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "order_free",
@@ -113,11 +114,13 @@ def gfci(
     ``"majority"`` decides the triples the pattern shields by the vote of
     :func:`~andrey.constraint._skeleton.vote_triples` after the possible-d-sep step. ``seed`` fixes
     the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
-    ``None`` uses ``ANDREY_SEED``. ``context``, the column of an environment index, is a source of
-    the GES phase (:func:`~andrey.search.ges.ges`), whose passes then run in this process, and the
-    test phase gives its edges the marks of Joint Causal Inference (:func:`fci_from_pattern`, with
-    ``confounded_index``). The private ``_ambiguous`` sink receives the triples no orientation rule
-    reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    ``None`` uses ``ANDREY_SEED``; ``degrees_of_freedom`` reaches a categorical ``indep_test``
+    (:class:`~andrey.core.ci.ChiSquare`). ``context``, the column of an environment index, is a
+    source of the GES phase (:func:`~andrey.search.ges.ges`), whose passes then run in this process,
+    and the test phase gives its edges the marks of Joint Causal Inference
+    (:func:`fci_from_pattern`, with ``confounded_index``). The private ``_ambiguous`` sink receives
+    the triples no orientation rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with
+    ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
@@ -142,6 +145,7 @@ def gfci(
         cpdag_structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=possible_dsep,
@@ -168,6 +172,7 @@ def boss_fci(
     n_starts: int = 1,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     edge_removal: str = "all",
@@ -210,6 +215,7 @@ def boss_fci(
         pattern,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=None,
@@ -237,6 +243,7 @@ def grasp_fci(
     n_starts: int = 1,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     edge_removal: str = "all",
@@ -277,6 +284,7 @@ def grasp_fci(
         pattern,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         collider_rule=collider_rule,
         categorical=categorical,
         possible_dsep=None,
@@ -298,6 +306,7 @@ def fci_from_pattern(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     collider_rule: str,
     categorical: np.ndarray | None,
     possible_dsep: str | None,
@@ -345,7 +354,9 @@ def fci_from_pattern(
         untested = outside_triangles(pattern != NULL)
         keep = untested if keep is None else keep | untested
 
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     support = pattern != NULL
     confounded = None if constraints is None else constraints.confounded
     if confounded is not None:
@@ -383,6 +394,7 @@ def fci_from_pattern(
             sepsets,
             possible_dsep=possible_dsep,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             categorical=categorical,
             seed=seed,
             max_depth=max_depth,

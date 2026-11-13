@@ -30,7 +30,9 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
-def _fit(method: str, data, treatment, outcome, alpha, indep_test, categorical, seed):
+def _fit(
+    method: str, data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
+):
     """Run the engine ``method`` of :mod:`andrey.constraint.partition` on the pair.
 
     Returns its result, the fit's columns, labels, and namer, and the shared metadata.
@@ -49,7 +51,13 @@ def _fit(method: str, data, treatment, outcome, alpha, indep_test, categorical, 
     others = [j for j in range(d) if j not in (x, y)]
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
-            X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed, ranked=False
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+            ranked=False,
         )
         with search.pinned():
             result = (ldp_engine if method == "ldp" else ld3_engine)(search, x, y, others)
@@ -71,6 +79,7 @@ def ldp(
     outcome: str | int | None = None,
     alpha: float = 0.005,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -107,6 +116,13 @@ def ldp(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -251,7 +267,7 @@ def ldp(
 
     assert indep_test is not None  # method_spec picks it from the column types
     result, (x, y, d, labels, name), metadata = _fit(
-        "ldp", data, treatment, outcome, alpha, indep_test, categorical, seed
+        "ldp", data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
     )
     record = effect_record(
         x,
@@ -276,6 +292,7 @@ def ld3(
     outcome: str | int | None = None,
     alpha: float = 0.005,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -312,6 +329,13 @@ def ld3(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -452,7 +476,7 @@ def ld3(
 
     assert indep_test is not None  # method_spec picks it from the column types
     result, (x, y, d, labels, name), metadata = _fit(
-        "ld3", data, treatment, outcome, alpha, indep_test, categorical, seed
+        "ld3", data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
     )
     record = effect_record(
         x,

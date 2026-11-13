@@ -472,6 +472,7 @@ def pcmciplus(
     max_p_global: int | None = None,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> PCMCIPlusResult:
     """Run the four PCMCI+ phases on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -481,7 +482,8 @@ def pcmciplus(
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
-    conditions phases 2 and 3 take beyond the lagged parents. ``categorical`` and ``seed`` reach
+    conditions phases 2 and 3 take beyond the lagged parents. ``categorical``, ``seed``, and
+    ``degrees_of_freedom`` reach
     :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
     Raises :class:`ValueError` when ``collider_rule`` is not one of
     :data:`~andrey.constraint._skeleton.COLLIDER_RULES`.
@@ -489,7 +491,14 @@ def pcmciplus(
     check_collider_rule(collider_rule)
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    test = design_test(
+        indep_test,
+        data,
+        tau_max,
+        categorical=categorical,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+    )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         return run_phases(

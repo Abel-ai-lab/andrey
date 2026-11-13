@@ -37,6 +37,7 @@ def fit_hybrid(
     maximize: str,
     alpha: float,
     indep_test: str | None,
+    degrees_of_freedom: str,
     score_func: str | None,
     penalty_discount: float,
     ebic_gamma: float,
@@ -67,6 +68,7 @@ def fit_hybrid(
             maximize=maximize,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
@@ -93,6 +95,7 @@ def mmhc(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -127,6 +130,13 @@ def mmhc(
         column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -308,6 +318,7 @@ def mmhc(
         maximize="hc",
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
@@ -331,6 +342,7 @@ def rsmax2(
     maximize: str = "hc",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -375,6 +387,13 @@ def rsmax2(
         as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
@@ -590,6 +609,7 @@ def rsmax2(
         maximize=maximize,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,

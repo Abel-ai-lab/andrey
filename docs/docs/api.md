@@ -151,6 +151,18 @@ as tigramite does: the partial correlation, the chi-square statistic, the likeli
 conditional mutual information estimate, or GPDC's distance correlation. A test you register that
 reports only p-values is ordered by its p-value, smallest first.
 
+% concept: degrees_of_freedom
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
+`fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `mmb_by_mmb`, `mmhc`,
+`rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `pcmci`, `pcmciplus`, and `lpcmci` take
+`degrees_of_freedom`, the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`:
+`"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
+of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
+values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
+Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
+paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
+raises a `ValueError`.
+
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `mmb_by_mmb`, `ges`,

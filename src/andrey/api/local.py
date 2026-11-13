@@ -55,6 +55,7 @@ def mb_by_mb(
     blanket: str = "iamb_forward",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -97,6 +98,13 @@ def mb_by_mb(
         paper's runs use the likelihood-ratio test on categorical data, ``"gsq"`` [1]_.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -276,6 +284,7 @@ def mb_by_mb(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             categorical=mask,
             seed=seed,
             max_depth=max_depth,
@@ -321,6 +330,7 @@ def mmb_by_mmb(
     blanket: str = "total_conditioning",
     alpha: float = 0.01,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -363,6 +373,13 @@ def mmb_by_mmb(
         paper's runs use the Fisher-Z test on linear-Gaussian data, ``"fisherz"`` [1]_.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -556,6 +573,7 @@ def mmb_by_mmb(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             categorical=mask,
             seed=seed,
             max_depth=max_depth,
