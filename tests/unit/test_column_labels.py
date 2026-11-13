@@ -126,11 +126,12 @@ def test_columns_named_alike_as_text_raise_before_the_fit(spec):
 
 
 def labeled_settings(name: str) -> dict:
-    """The fit settings of ``name`` with a required target named by its label, so that it follows
-    its column."""
+    """The fit settings of ``name`` with a required target, treatment, or outcome named by its
+    label, so that it follows its column."""
     settings = fit_settings(name)
-    if isinstance(settings.get("target"), int):
-        settings["target"] = COLUMNS[settings["target"]]
+    for key in ("target", "treatment", "outcome"):
+        if isinstance(settings.get(key), int):
+            settings[key] = COLUMNS[settings[key]]
     return settings
 
 

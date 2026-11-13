@@ -15,8 +15,9 @@ and notebooks do:
   The code returns the partition of the other variables; its Z5 criterion is the attribute
   ``vas_exists``, set when some instrument candidate is independent of the outcome given the
   confounders and the treatment. The record is identifiable with the set ``Z1`` as a valid set when
-  the criterion holds, and not identifiable with no set when it does not. The code never returns
-  the empty set as a valid set: with no confounder found it reports "not identifiable".
+  the criterion holds, and gives no answer when it does not (``identifiable`` ``None``, no set), as
+  ``andrey.ldp`` does: a failed criterion does not show that no valid set exists. The code never
+  returns the empty set as a valid set: with no confounder found it reports "not identifiable".
 - :class:`MaaschLD3`: ``LD3(data=df, independence_test=...).get_sdc_cde_adjustment(exposure,
   outcome, alpha)``. The code returns the structural direct criterion (1 when the treatment and the
   outcome are dependent given the confounder-or-mediator parents of the outcome) and ``ADE``, the
@@ -166,7 +167,7 @@ class MaaschLDP(_Maasch):
             "outcome": outcome,
             "estimand": self.estimand,
             "nonzero": None,
-            "identifiable": valid,
+            "identifiable": True if valid else None,
             "adjustment_sets": [sorted({_position(v) for v in result["Z1"]})] if valid else [],
             "set_kind": self.set_kind if valid else None,
         }

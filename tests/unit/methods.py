@@ -27,9 +27,20 @@ def requires_target(method: str) -> bool:
     )
 
 
+def requires_pair(method: str) -> bool:
+    """Whether ``method`` answers for one treatment-outcome pair: its ``treatment`` entry opens
+    "Required:"."""
+    return any(
+        p.concept == "treatment" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
 #: The arguments a method needs beyond its inputs: a target, by position, for each method that
-#: requires one.
-REQUIRED = {method: {"target": 2} for method in REGISTRY if requires_target(method)}
+#: requires one, and a treatment and an outcome for each method that answers for a pair.
+REQUIRED = {
+    **{method: {"target": 2} for method in REGISTRY if requires_target(method)},
+    **{method: {"treatment": 1, "outcome": 2} for method in REGISTRY if requires_pair(method)},
+}
 
 
 def fit_settings(method: str) -> dict:
