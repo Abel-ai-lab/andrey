@@ -162,11 +162,11 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3"),
+    *("ldp", "ld3", "ldecc"),
 )
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = (
-    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3"),
+    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
     "local_isa_ling",
 )
 #: The methods whose main loop a cap can stop early.
@@ -217,6 +217,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_isa_ling",
         ),
         exempt=(
@@ -280,7 +281,9 @@ _CONCEPTS = (
                 method="mmb_by_mmb",
                 name="alpha",
                 default=0.01,
-                reason="Xie et al. 2024 state no level; 0.01 is the level of their code.",
+                reason="Xie et al. 2024 state no level; 0.01 is the level of their code, whose "
+                "total-conditioning blanket learner tests at alpha / (10 floor(d / 10)) over d "
+                "columns, alpha itself below 10 columns, as mmb_by_mmb does.",
             ),
             Deviation(
                 method="pcmb",
@@ -675,7 +678,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv", "ldecc"),
         exempt=(
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
@@ -830,6 +833,7 @@ _CONCEPTS = (
                 "mb_by_mb",
                 "cmb",
                 "mmb_by_mmb",
+                "ldecc",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -931,6 +935,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
         ),
         exempt=(
             *_exempt(
@@ -1155,6 +1160,7 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
             ),
+            *_exempt("Its paper gives no rule for background knowledge.", "ldecc"),
         ),
     ),
     Concept(
@@ -1169,7 +1175,8 @@ _CONCEPTS = (
                 *(
                     m
                     for m in NO_KNOWLEDGE
-                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling")
+                    if m
+                    not in ("icp", "ages", "y_structures", "ldp", "ld3", "ldecc", "local_isa_ling")
                 ),
             ),
             *_exempt(
@@ -1179,6 +1186,7 @@ _CONCEPTS = (
                 "y_structures",
                 "ldp",
                 "ld3",
+                "ldecc",
                 "local_isa_ling",
             ),
         ),
@@ -1216,6 +1224,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1260,6 +1269,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "mb_by_mb",
             "cmb",
             "mmb_by_mmb",
@@ -1475,6 +1485,11 @@ _CONCEPTS = (
                 "ld3",
             ),
             *_exempt(
+                "A local search around one treatment, with no place for a context variable; cdnod "
+                "is the test-based search that takes env.",
+                "ldecc",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1558,6 +1573,9 @@ _CONCEPTS = (
             *_exempt(
                 "Answers for one target: the edges at it, as its PAG holds them.", "mmb_by_mmb"
             ),
+            *_exempt(
+                "Answers for one treatment: the edges at it, as its CPDAG holds them.", "ldecc"
+            ),
         ),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
@@ -1603,7 +1621,9 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "cmb", "mmb_by_mmb", "local_isa_ling"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1620,7 +1640,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "ldecc"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1636,7 +1656,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "ldecc"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1674,7 +1694,7 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=("mb_by_mb", "cmb", "mmb_by_mmb"),
+        suitable=("mb_by_mb", "cmb", "mmb_by_mmb", "ldecc"),
         others_exempt="Runs no Markov blanket learner as a step.",
         deviations=(
             Deviation(
@@ -1721,7 +1741,9 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "cmb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1738,6 +1760,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1754,7 +1777,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3"),
+        suitable=("y_structures", "ldp", "ld3", "ldecc"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1811,6 +1834,11 @@ _CONCEPTS = (
                 "Decides a direction from one pair's two tests, without and with the target in "
                 "the conditioning set, as CMB states (Gao and Ji 2015); no vote over several sets.",
                 "cmb",
+            ),
+            *_exempt(
+                "Each eager collider check reads the first separating set found, and check "
+                "picks how it directs parents; no vote over several sets.",
+                "ldecc",
             ),
         ),
         others_exempt="No separating-set orientation.",

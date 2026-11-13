@@ -508,6 +508,7 @@ PROSE_NAMES = {
     "y_structures": "Y-structures",
     "ldp": "LDP",
     "ld3": "LD3",
+    "ldecc": "LDECC",
     "ges": "GES",
     "gies": "GIES",
     "gnies": "GnIES",

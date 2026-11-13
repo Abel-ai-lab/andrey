@@ -221,6 +221,9 @@ class PartialCorrelationTest:
 
     # The data's groups of copies, set by the first singular inversion.
     _copies: tuple[tuple[int, ...], ...]
+    # The inverse of the whole correlation matrix, None when it is singular, set by the first
+    # statistic_pvalues_given_rest call.
+    _inverse: np.ndarray | None
 
     def __init__(self, data: np.ndarray) -> None:
         arr = stats.checked_matrix(data, "run a partial-correlation test")
@@ -429,6 +432,40 @@ class PartialCorrelationTest:
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         p = np.asarray(self._pvalue(r, df))
         count_tests(len(lo))
+        return r, p
+
+    def statistic_pvalues_given_rest(
+        self, x: int, ys: Sequence[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given every other column.
+
+        Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given all the columns but
+        those two, up to rounding: its partial correlation is ``-P[x, y] / sqrt(P[x, x] P[y, y])``
+        with ``P`` the inverse of the whole correlation matrix, which the first call computes and
+        the test keeps, so every later ``x`` reads the same inverse. Each query counts as one test.
+        When that matrix is singular, each query takes :meth:`statistic_pvalue`, which raises
+        where it raises.
+        """
+        ys = [int(y) for y in ys]
+        d = np.atleast_2d(self._corr).shape[0]
+        df = self._degrees_of_freedom(d - 2)
+        if not hasattr(self, "_inverse"):
+            try:
+                self._inverse = _invert_nonsingular(np.atleast_2d(self._corr)[None])[0]
+            except (ValueError, np.linalg.LinAlgError):
+                self._inverse = None
+        inv = self._inverse
+        if inv is None:
+            answers = [
+                self.statistic_pvalue(x, y, [z for z in range(d) if z not in (x, y)]) for y in ys
+            ]
+            r, p = np.array(answers, dtype=np.float64).reshape(-1, 2).T
+            return r, p
+        lo, hi = np.minimum(x, ys), np.maximum(x, ys)
+        r = -inv[lo, hi] / np.sqrt(np.abs(inv[lo, lo] * inv[hi, hi]))
+        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+        p = np.asarray(self._pvalue(r, df), dtype=np.float64)
+        count_tests(len(ys))
         return r, p
 
     def residual_statistic_pvalues(
