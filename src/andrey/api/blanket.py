@@ -795,9 +795,6 @@ def gs(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -866,19 +863,29 @@ def gs(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables and on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows; missing values on up to 20
-    variables with up to a fifth of the values missing completely at random. At a fixed ``alpha``,
-    the grow phase tests every variable outside the blanket, so the false members grow with the
-    number of variables: of the many variables independent of the target, those whose p-values fall
-    below ``alpha`` by chance join, each pass tests the ones left out again, and the shrink phase,
-    which retests the members given nearly the same set with the same test, keeps most of them. It
-    conditions on the whole current blanket, so each test needs more rows as the blanket grows, and
-    a variable the grow phase adds in error enlarges every later conditioning set. The skeleton and
-    the CPDAG test every subset of the smaller blanket for each pair of the moral graph and each
-    unshielded triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
-    tests. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of four
+    published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 1,000, 5,000,
+    and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
+    1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#gs>`_ shows; the benchmark scores the set at
+    each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
+    members, than the empty set in every measured setting except hepar2, where they have more at
+    every size, 5.6, 5.1, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
+    hepar2, with 70 variables, 2.8 to 3.4 members per target are extra, close to ``alpha`` times the
+    variables outside the blanket, while 1.3 to 2.8 of its 4.5 members are missed. The median fit
+    for every target took 1.3 to 26 s on the networks and 0.35 to 4.1 s on the Gaussian graphs.
+    Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
+    run them on up to 20 variables with up to a fifth of the values missing completely at random. At
+    a fixed ``alpha``, the grow phase tests every variable outside the blanket, so the false members
+    grow with the number of variables: of the many variables independent of the target, those whose
+    p-values fall below ``alpha`` by chance join, each pass tests the ones left out again, and the
+    shrink phase, which retests the members given nearly the same set with the same test, keeps most
+    of them. It conditions on the whole current blanket, so each test needs more rows as the blanket
+    grows, and a variable the grow phase adds in error enlarges every later conditioning set. The
+    skeleton and the CPDAG test every subset of the smaller blanket for each pair of the moral graph
+    and each unshielded triple, so a triple whose smaller blanket holds ``m`` variables takes up to
+    ``2**m`` tests. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1060,9 +1067,6 @@ def fast_iamb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -1133,20 +1137,33 @@ def fast_iamb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on simulated categorical
-    data with 10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth
-    of the values missing completely at random. At a fixed ``alpha``, every round tests every
-    variable outside the blanket, so the false members grow with the number of variables: of the
-    many variables independent of the target, those whose p-values fall below ``alpha`` by chance
-    join, and the shrink, which retests them given nearly the same set with the same test, keeps
-    most of them. Without the rule, on continuous data, the first round adds every variable that
-    depends on the target at all, ancestors and descendants included, and the shrink must remove
-    them given all the others. It conditions on the whole current blanket, so each test needs more
-    rows as the blanket grows. The skeleton and the CPDAG test every subset of the smaller blanket
-    for each pair of the moral graph and each unshielded triple, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of four
+    published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 1,000, 5,000,
+    and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
+    1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#fast-iamb>`_ shows; the benchmark scores the
+    set at each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
+    members, than the empty set in every measured setting except hepar2, where they have more at
+    every size, 5.4, 4.9, and 4.7 per target against 4.5, and the Gaussian graphs with 100
+    variables, where they have as many. There, 2.5 to 3.2 members per target on hepar2 and 3.8 on
+    the Gaussian graphs are extra, close to ``alpha`` times the variables outside the blanket,
+    against blankets of 4.5 and 3.9 members. It ran 42% to 73% of the tests of :func:`~andrey.iamb`
+    but was less accurate in every setting except hepar2, where the two tied: its mean F1 was 0.054
+    to 0.106 lower on the other networks and 0.010 to 0.052 lower on the Gaussian graphs. The median
+    fit for every target took 0.78 to 16 s on the networks and 0.35 to 3.5 s on the Gaussian graphs.
+    Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
+    run them on up to 20 variables with up to a fifth of the values missing completely at random. At
+    a fixed ``alpha``, every round tests every variable outside the blanket, so the false members
+    grow with the number of variables: of the many variables independent of the target, those whose
+    p-values fall below ``alpha`` by chance join, and the shrink, which retests them given nearly
+    the same set with the same test, keeps most of them. Without the rule, on continuous data, the
+    first round adds every variable that depends on the target at all, ancestors and descendants
+    included, and the shrink must remove them given all the others. It conditions on the whole
+    current blanket, so each test needs more rows as the blanket grows. The skeleton and the CPDAG
+    test every subset of the smaller blanket for each pair of the moral graph and each unshielded
+    triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1349,7 +1366,9 @@ def mmpc(
     some subset of the other members separates. A member stays only when the target is in that
     member's own set as well, the symmetry check of [1]_, which removes a descendant of the
     target that no subset of the target's set separates from it. With exact tests, the result is
-    the true set of parents and children [1]_.
+    the true set of parents and children [1]_. The search runs every test: the experiments of [1]_
+    run a test only with at least five rows per parameter on average, and taking a table that fails
+    that rule as independent lowered the mean F1 in 16 of 16 measured settings.
 
     Two candidates whose largest p-values agree to nine decimals are compared by their smallest
     strength, and candidates whose strengths also agree go to the column whose rank, computed from
@@ -1605,9 +1624,6 @@ def hiton_pc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -1654,7 +1670,9 @@ def hiton_pc(
     authors set to five. A candidate whose unconditional test fails the rule is taken as
     independent of the target, and a conditioning set that fails it is not tested, so it drops
     nothing. The rule counts every row of ``data``, also where a test deletes rows with missing
-    values.
+    values. The search applies the rule of [1]_: on four published networks, running every test
+    instead was less accurate in 9 of 12 measured settings, every one with 5,000 rows among them,
+    and more accurate in one with 200 rows.
 
     **From sets to a graph.** Without a target, a pair is kept when each variable is in the other's
     set, which gives the skeleton (``structure="skeleton"``). The CPDAG decides each triple
@@ -1681,19 +1699,27 @@ def hiton_pc(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
-    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
-    values missing completely at random. A newcomer is tested only against the members before it,
-    so a member that a later one separates stays until the last candidate has joined and enlarges
-    the conditioning sets until then. Under the default ``max_depth=3``, a variable that only a
-    larger conditioning set separates from the target stays [1]_. Each candidate takes up to one
-    test per subset of the current set, so the cost grows with the size of the set, up to
-    ``max_depth`` members at a time, and the symmetry check runs the search once more for each
-    member. The CPDAG tests every subset of the smaller blanket for each unshielded triple, so a
-    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of four
+    published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 200, 500, and
+    5,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at 1,000
+    and 5,000 rows with ``"fisherz"``. The numbers here are for the default ``max_depth=3``; the
+    comparison on the `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#hiton-pc>`_ runs ``max_depth=None``. The
+    benchmark scores the set at each target, not the graphs the sets give. In every setting the sets
+    have fewer errors, missing plus extra members, than the empty set: on hepar2, 3.4, 3.0, and 1.8
+    per target against 3.5 at 200, 500, and 5,000 rows. The median fit for every target took 1.4 to
+    16 s on the networks and 0.43 to 4.3 s on the Gaussian graphs. Tested with exact d-separation on
+    15 variables. Missing values are not benchmarked; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random. A newcomer is tested only against the
+    members before it, so a member that a later one separates stays until the last candidate has
+    joined and enlarges the conditioning sets until then. Under the default ``max_depth=3``, a
+    variable that only a larger conditioning set separates from the target stays [1]_. Each
+    candidate takes up to one test per subset of the current set, so the cost grows with the size of
+    the set, up to ``max_depth`` members at a time, and the symmetry check runs the search once more
+    for each member. The CPDAG tests every subset of the smaller blanket for each unshielded triple,
+    so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

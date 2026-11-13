@@ -12,23 +12,29 @@ names its pull request.
 
 ### Added
 
-- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000), experimental:
-  the blanket of one target, or every variable's blanket joined into the CPDAG, skeleton, or moral
-  graph, with the arguments and metadata of `iamb`. It visits the other variables in one order,
-  the most dependent first, and adds each at once when a test finds it dependent given the blanket
-  so far, in passes until none joins, then shrinks the blanket in passes until none leaves.
-  ([#931])
-- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005),
-  experimental, with the arguments and metadata of `iamb`. Each round tests every variable outside
-  the blanket and adds those that test dependent together, the most dependent first, while a
-  categorical test's table holds more than five rows per cell, then shrinks the blanket once.
-  ([#935])
+- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
+  one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
+  arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
+  first, and adds each at once when a test finds it dependent given the blanket so far, in passes
+  until none joins, then shrinks the blanket in passes until none leaves. It is supported: against
+  bnlearn's `gs` on four published networks and linear-Gaussian graphs, every variable a target, its
+  sets were better in 13 of 20 settings and worse in 1. On hepar2 they have more errors than the
+  empty set, as those of `iamb` do. ([#931], [#993])
+- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005), with
+  the arguments and metadata of `iamb`. Each round tests every variable outside the blanket and adds
+  those that test dependent together, the most dependent first, while a categorical test's table
+  holds more than five rows per cell, then shrinks the blanket once. It is supported: against
+  bnlearn's `fast.iamb` on the same data, its sets were better in 10 of 20 settings and worse in 3,
+  and on hepar2 they have more errors than the empty set. It runs 42% to 73% of the tests of `iamb`
+  and is less accurate than `iamb` outside hepar2. ([#935], [#993])
 - `andrey.hiton_pc`, the semi-interleaved HITON-PC learner of parents and children (Aliferis et al.
-  2010), experimental, with the arguments and metadata of `mmpc` and `max_depth=3` by default. It
-  orders the candidates once by their unconditional test, tests each newcomer against the subsets
-  of the members before it, tests every member again once all have joined, and keeps a member only
-  when the target is in that member's own set. On categorical data a test runs only with at least
-  five rows per cell of its table. ([#950])
+  2010), with the arguments and metadata of `mmpc` and `max_depth=3` by default. It orders the
+  candidates once by their unconditional test, tests each newcomer against the subsets of the
+  members before it, tests every member again once all have joined, and keeps a member only when the
+  target is in that member's own set. On categorical data a test runs only with at least five rows
+  per cell of its table. It is supported: against bnlearn's `si.hiton.pc` on the same networks and
+  graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
+  empty set in every setting. ([#950], [#993])
 - `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
   experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
   target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
@@ -2741,6 +2747,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986

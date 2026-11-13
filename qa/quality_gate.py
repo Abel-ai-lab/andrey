@@ -920,12 +920,12 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     return [learned[k] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
-#: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
-#: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
-#: fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
-#: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
-#: call the public functions with the published settings: the domain index of four equal blocks of
-#: rows, and three groups of columns.
+#: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
+#: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
+#: fits its IAMB restrict phase. A fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and
+#: GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through
+#: their benchmark adapters, which call the public functions with the published settings: the domain
+#: index of four equal blocks of rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -934,6 +934,8 @@ SUPPORTED: dict[str, Method] = {
     "FCI-JCI": Method(fci_jci_fit, "index_pag", INDEX_PAG_DATA),
     "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
+    "GS": Method(lambda x: andrey.gs(x), "cpdag", CPDAG_DATA),
+    "FastIAMB": Method(lambda x: andrey.fast_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(gies_fit, "essential", INTERVENTION_DATA),
     "GnIES": Method(gnies_fit, "essential", NOISE_INTERVENTION_DATA),
@@ -944,6 +946,7 @@ SUPPORTED: dict[str, Method] = {
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
+    "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),

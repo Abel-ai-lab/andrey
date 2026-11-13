@@ -90,9 +90,10 @@ quick_start
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, MMPC,
-and PCMB, which join each variable's local structure into a graph; CD-NOD and FCI-JCI on data from
-several domains; and ICP's parents of one variable from several environments.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, GS,
+Fast-IAMB, MMPC, HITON-PC, and PCMB, which join each variable's local structure into a graph;
+CD-NOD and FCI-JCI on data from several domains; and ICP's parents of one variable from several
+environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
