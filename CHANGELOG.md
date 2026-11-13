@@ -81,8 +81,12 @@ names its pull request.
   its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
   conditioning, a test of each variable given all the others, as in the paper's runs
   (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
-  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. The benchmark lane of
-  MMB-by-MMB runs it beside the authors' code. ([#966])
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. Where its authors'
+  code goes beyond the paper, the method follows it, with two safeguards that make the answer
+  correct where the paper's steps as written can be wrong: a v-structure joins the answer only
+  when the variables off the step confirm it from their own blankets, and the stop rules are read
+  only once more blankets have been learned than the target has neighbors. The benchmark lane of
+  MMB-by-MMB runs it beside the authors' code. ([#966], [#980])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2699,6 +2703,7 @@ First alpha release.
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
 [#970]: https://github.com/Abel-ai-lab/Andrey/pull/970
+[#980]: https://github.com/Abel-ai-lab/Andrey/pull/980
 [#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
