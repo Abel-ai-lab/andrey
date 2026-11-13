@@ -4,10 +4,10 @@ Under a d-separation oracle every edge and every direction the answer gives at a
 graphs is the true CPDAG's, with each of the three blanket learners; the paper's two examples come
 out as the CPDAG at every target, and its case study learns the blankets it names, in its order.
 The rule for a neighbor of two parents fires only when that neighbor is not a collider between
-them. Edges the CPDAG directs by a test the steps never run, or by acyclicity, stay undirected.
-On data the answer
-does not depend on the column order or the columns' units, and the result holds the target's sets,
-the blankets learned, and the test count.
+them, and a visited neighbor's directions carry over triangles by acyclicity. Edges the CPDAG
+directs by a test the steps never run stay undirected. On data the answer does not depend on the
+column order or the columns' units, and the result holds the target's sets, the blankets learned,
+and the test count.
 """
 
 from __future__ import annotations
@@ -146,17 +146,27 @@ def test_a_neighbor_between_two_parents_is_made_a_parent():
         assert _codes(dag, 3, list(ranks)).codes == {0: PARENT, 1: PARENT, 2: PARENT}
 
 
-def test_edges_the_cpdag_directs_can_stay_undirected():
+def test_acyclicity_directs_an_edge_once_the_edges_around_it_are_directed():
     # k -> j <- i, j -> t, i -> t. The CPDAG directs j -> t (k _||_ t given i and j) and then
-    # i -> t (acyclicity, Meek's rule R2). The steps have no acyclicity rule, so i - t stays
-    # undecided in every rank order; in the column order they also never test k and t given i and
-    # j, so j - t stays undecided too. The edges are still the CPDAG's.
+    # i -> t (acyclicity, Meek's rule R2). Wherever the tests direct j -> t, i -> t follows, in
+    # every rank order, and nothing the answer directs is wrong.
     dag = _dag(["kj", "ij", "jt", "it"], "kijt")
-    assert _codes(dag, 3, [0, 1, 2, 3]).codes == {1: UNDECIDED, 2: UNDECIDED}
-    for ranks in itertools.permutations(range(4)):
-        assert _codes(dag, 3, list(ranks)).codes[1] == UNDECIDED
     truth = _truth(dag, 3)
     assert truth[3, 1] == truth[3, 2] == 2 and truth[1, 3] == truth[2, 3] == 1
+    directed = 0
+    for ranks in itertools.permutations(range(4)):
+        codes = _codes(dag, 3, list(ranks)).codes
+        assert codes[2] != PARENT or codes[1] == PARENT, ranks
+        assert all(code in (PARENT, UNDECIDED) for code in codes.values()), ranks
+        directed += codes[1] == PARENT
+    assert directed
+
+
+def test_edges_the_cpdag_directs_can_stay_undirected():
+    # Same graph, in the column order: the steps never test k and t given i and j, so j - t is
+    # never decided and R2 has no direction to carry to i - t. Both edges are still the CPDAG's.
+    dag = _dag(["kj", "ij", "jt", "it"], "kijt")
+    assert _codes(dag, 3, [0, 1, 2, 3]).codes == {1: UNDECIDED, 2: UNDECIDED}
 
 
 # ---- the result on data --------------------------------------------------------------------------

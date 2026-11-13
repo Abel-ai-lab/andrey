@@ -165,12 +165,13 @@ names its pull request.
 - `andrey.cmb`, CMB (Gao and Ji 2015), experimental: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
-  labels each neighbor from how its dependence on the others changes once the target is
-  conditioned on, retests an inconclusive pair given one member's blanket, and visits undecided
-  neighbors in turn. `alpha` defaults to 0.02, the level of the paper's runs. `metadata` lists the
-  target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the `blankets_learned`,
-  and `n_tests`. With exact tests every edge and direction it returns is the CPDAG's, and some
-  edges the CPDAG directs stay undirected. ([#995])
+  labels each neighbor from how its dependence on the others changes once the target is conditioned
+  on, retests an inconclusive pair given one member's blanket, and visits undecided neighbors in
+  turn, whose directions also direct the target's edges that close a triangle with them, by
+  acyclicity (Meek's rule R2). `alpha` defaults to 0.02, the level of the paper's runs. `metadata`
+  lists the target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the
+  `blankets_learned`, and `n_tests`. With exact tests every edge and direction it returns is the
+  CPDAG's, and some edges the CPDAG directs stay undirected. ([#995])
 
 ### Changed
 

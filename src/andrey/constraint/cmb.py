@@ -3,8 +3,9 @@
 Gao and Ji's Causal Markov Blanket discovery (Algorithms 1 and 2) reads the direction of a
 target's edges from how the dependence between two of its parents and children changes when the
 target joins the conditioning set, retests an inconclusive pair given one member's Markov blanket,
-and visits each undecided neighbor in turn to learn the target's identity there. :func:`cmb` runs
-it over a :class:`~andrey.constraint.blanket.LocalSearch`.
+and visits each undecided neighbor in turn to learn the target's identity there. A visited
+neighbor's identities also direct, by acyclicity (Meek's rule R2), the target's edges that close a
+triangle with it. :func:`cmb` runs it over a :class:`~andrey.constraint.blanket.LocalSearch`.
 
 References
 ----------
@@ -66,6 +67,25 @@ class Identities:
     def inconclusive_with(self, x: int, y: int) -> bool:
         """Whether ``(x, y)``, in either order, is in ``inconclusive``."""
         return (x, y) in self.inconclusive or (y, x) in self.inconclusive
+
+    def acyclic(self, x: int, there: dict[int, int]) -> None:
+        """Meek's rule R2 over each triangle the variable ``t`` forms with ``x`` and a member ``w``.
+
+        ``there`` holds the identities at ``x``: ``there[w]`` is :data:`CHILD` for ``x -> w`` and
+        :data:`PARENT` for ``w -> x``. A path ``t -> x -> w`` makes ``w`` a child of ``t`` and
+        ``w -> x -> t`` makes it a parent; where ``w``'s own code is known, ``t -> w -> x`` makes
+        ``x`` a child and ``x -> w -> t`` a parent. Only these codes act, through :meth:`put`.
+        """
+        for w in self.codes:
+            code = there.get(w, 0)
+            if w == x or code not in (PARENT, CHILD):
+                continue
+            if self.codes[x] == code:
+                self.put(w, code)
+            if self.codes[w] == CHILD and code == PARENT:
+                self.put(x, CHILD)
+            if self.codes[w] == PARENT and code == CHILD:
+                self.put(x, PARENT)
 
 
 @dataclass(frozen=True)
@@ -183,13 +203,15 @@ class _Run:
         for x in pc:
             if node.codes[x] != UNDECIDED or x in self.visiting:
                 continue
-            there = self.identify(x).codes.get(t, 0)
+            at_x = self.identify(x).codes
+            there = at_x.get(t, 0)
             if there == CHILD:
                 node.put(x, PARENT)
                 for y in node.partners(x):
                     node.put(y, CHILD)
             elif there == PARENT:
                 node.put(x, CHILD)
+            node.acyclic(x, at_x)
             if not node.holds(UNDECIDED):
                 break
         self.done[t] = node
@@ -228,7 +250,10 @@ def cmb(
     undecided. Step 3 visits each undecided neighbor ``x`` in rank order and runs the same
     steps there, never returning to a variable whose run is open: the target a child of ``x``
     makes ``x`` a parent and each partner of ``x`` a child, and the target a parent of ``x`` makes
-    ``x`` a child. A lower code is never replaced by a higher one, and a direction ``decided``
+    ``x`` a child. Each visited ``x`` also directs, by acyclicity (Meek's rule R2 [2]_), the
+    target's edges that close a triangle with it: a path ``target -> x -> w`` makes ``w`` a child,
+    ``w -> x -> target`` makes ``w`` a parent, and a direction already given to ``w`` directs
+    ``x`` the same way. A lower code is never replaced by a higher one, and a direction ``decided``
     gives (``decided[u, v]``: ``u -> v``) is fixed before any test. Tests are asked once, the
     lower-ranked member of the pair first; a pair whose test with the target would condition on
     more than the search's ``max_depth`` variables runs neither test and decides nothing.

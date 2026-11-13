@@ -750,9 +750,14 @@ def cmb(
     Last, each undecided neighbor ``x`` is visited in turn and the same steps run there, without
     returning to a variable whose own steps are still open [1]_: ``t`` a child of ``x`` makes
     ``x`` a parent of ``t`` and the other member of each pair that made one of the two a child a
-    child; ``t`` a parent of ``x`` makes ``x`` a child. A label once given is never replaced by a
-    weaker one: a parent or child stays so. A neighbor still undecided at the end keeps an
-    undirected edge.
+    child; ``t`` a parent of ``x`` makes ``x`` a child. The paper's steps have no acyclicity rule;
+    Andrey adds Meek's rule R2 [2]_ to the visit, so that an edge the CPDAG directs only because
+    the opposite direction would close a cycle is directed too. A visited ``x`` directs each edge
+    of ``t`` that closes a triangle with it: ``t -> x -> w`` makes ``w`` a child of ``t``,
+    ``w -> x -> t`` makes ``w`` a parent, and a direction already found for ``w`` directs ``x``
+    the same way. The rule reads only directions the steps found, so it adds no test and no edge.
+    A label once given is never replaced by a weaker one: a parent or child stays so. A neighbor
+    still undecided at the end keeps an undirected edge.
 
     Every choice between candidates of equal strength goes to the column whose rank, computed from
     the data, comes first, as for :func:`~andrey.iamb`, and pairs are tested in rank order, so the
