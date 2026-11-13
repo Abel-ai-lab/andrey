@@ -49,6 +49,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -92,6 +93,13 @@ def pc(
         values. See **Categorical data.** and **Mixed data.** in Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -526,6 +534,7 @@ def pc(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_order=resolve_collider_order(collider_order),
             collider_rule=collider_rule,
             categorical=mask,
@@ -591,6 +600,7 @@ def fci(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -633,6 +643,13 @@ def fci(
         DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -905,6 +922,7 @@ def fci(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -998,6 +1016,7 @@ def gfci(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1077,6 +1096,13 @@ def gfci(
         DataFrame's ``category``, ``bool``, or text type, never by its values.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1378,6 +1404,7 @@ def gfci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -1401,6 +1428,7 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1453,6 +1481,13 @@ def cdnod(
         DataFrame's ``category``, ``bool``, or text type, never by its values.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1763,6 +1798,7 @@ def cdnod(
             c,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_order=resolve_collider_order(collider_order),
             collider_rule=collider_rule,
             categorical=mask,
@@ -1794,6 +1830,7 @@ def fci_jci(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -1847,6 +1884,13 @@ def fci_jci(
         categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
         never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
         from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -2101,6 +2145,7 @@ def fci_jci(
             c,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -2445,6 +2490,7 @@ def y_structures(
     extended: bool = False,
     alpha: float = 0.01,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -2484,6 +2530,13 @@ def y_structures(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -2637,7 +2690,13 @@ def y_structures(
     )
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
-            X, alpha=alpha, indep_test=indep_test, categorical=mask, seed=seed, ranked=False
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+            ranked=False,
         )
         with search.pinned():
             claims = _y_structures(search, columns, extended=extended)

@@ -51,14 +51,23 @@ names its pull request.
   variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
   ([#965])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
-  experimental, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
+  supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
   parents-and-children search, GetPCD, adds the candidate most dependent on the target and then
   removes every member that a subset of the others separates from it, until no candidate is left;
   a member stays only when the target is in that member's own set. It then admits each child's
   other parent when a test finds it dependent on the target given the set that separated the two
   and the common child. On categorical data a test runs only with at least five rows per degree of
-  freedom of its table. ([#971])
+  freedom of its table, and the categorical tests take `degrees_of_freedom="nonempty"` by default,
+  the degrees of freedom of the G-square test its paper runs. The 0.18.0 release card sets its
+  results on samples of the Alarm and Pigs networks beside the published results of its paper.
+  ([#971], [#981], [#982])
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
+  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  Passing it with another test raises `ValueError`. ([#981])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
   experimental: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
@@ -87,8 +96,12 @@ names its pull request.
   its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
   conditioning, a test of each variable given all the others, as in the paper's runs
   (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
-  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. The benchmark lane of
-  MMB-by-MMB runs it beside the authors' code. ([#966])
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. Where its authors'
+  code goes beyond the paper, the method follows it, with two safeguards that make the answer
+  correct where the paper's steps as written can be wrong: a v-structure joins the answer only
+  when the variables off the step confirm it from their own blankets, and the stop rules are read
+  only once more blankets have been learned than the target has neighbors. The benchmark lane of
+  MMB-by-MMB runs it beside the authors' code. ([#966], [#980])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -134,6 +147,20 @@ names its pull request.
   networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
   set estimates, on a fresh sample, against the true effect; a method that gives no set is never
   scored as the empty set. ([#964])
+- `andrey.ldp`, local discovery by partitioning (Maasch et al. 2024), experimental: a valid
+  adjustment set for the total effect of one `treatment` on one `outcome`, in a number of tests
+  quadratic in the number of columns. It labels every other column by its causal relation to the
+  pair from tests whose conditioning sets are the labels found before, and returns the confounders
+  as the adjustment set when its Z5 criterion passes, and no set otherwise. The answer is one record
+  in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the graph has no edges.
+  The treatment-outcome benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.ld3`, LD3 (Maasch et al. 2025), experimental: the parents of an outcome that has no
+  descendants among the columns, and whether the treatment is one of them (the structural direct
+  criterion), in a number of tests linear in the number of columns. The parents other than the
+  treatment are the adjustment set for the direct effect, and the answer is one record in
+  `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
+  into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
+  benchmark lane runs it beside the authors' code. ([#970])
 
 ### Changed
 
@@ -2689,8 +2716,12 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
+[#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
+[#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
+[#970]: https://github.com/Abel-ai-lab/Andrey/pull/970
+[#980]: https://github.com/Abel-ai-lab/Andrey/pull/980
 [#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
 [#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
 [#964]: https://github.com/Abel-ai-lab/Andrey/pull/964

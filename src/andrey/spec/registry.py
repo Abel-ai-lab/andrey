@@ -47,6 +47,7 @@ _INDEP_TEST = concept_param(
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
     "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
 )
+_DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
@@ -181,6 +182,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -232,6 +234,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -276,6 +279,7 @@ _add(
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -351,6 +355,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -417,6 +422,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -546,6 +552,15 @@ _OWN_DEPTH = {
     ),
 }
 #: A set learner's own alpha, where its default is not the concept's.
+_OWN_DEGREES_OF_FREEDOM = {
+    "pcmb": concept_param(
+        "degrees_of_freedom",
+        default="nonempty",
+        doc=_DEGREES_OF_FREEDOM.doc
+        + " PCMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines do "
+        "(Pena et al. 2007).",
+    ),
+}
 _OWN_ALPHA = {
     "pcmb": concept_param(
         "alpha",
@@ -696,7 +711,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Pena, Nilsson, Bjorkegren & Tegner 2007", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
 ):
     _add(
@@ -719,6 +734,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
                 _structure,
                 _OWN_ALPHA.get(_name, _ALPHA),
                 _INDEP_TEST,
+                _OWN_DEGREES_OF_FREEDOM.get(_name, _DEGREES_OF_FREEDOM),
                 _CATEGORICAL,
                 _TEST_SEED,
                 *_OWN_DEPTH.get(_name, ()),
@@ -764,6 +780,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param("max_depth"),
@@ -825,6 +842,7 @@ _add(
                 "al. 2024 state none; 0.01 is the level of their code.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param("max_depth"),
@@ -894,6 +912,7 @@ _add(
                 "other an independence. The default is the level of Versteeg, Zhang & Mooij 2022.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
         ),
@@ -902,6 +921,85 @@ _add(
             "Mani, Spirtes & Cooper 2006",
             "Mooij & Cremers 2015",
         ),
+    )
+)
+
+# --- treatment-outcome pairs ----------------------------------------------------------------------
+
+_TREATMENT = concept_param("treatment")
+_OUTCOME = concept_param("outcome")
+_PAIR_ALPHA_DOC = (
+    "Significance level of every test: a p-value above alpha is an independence, any other a "
+    "dependence. The default is the level of the authors' code; the papers' experiments use "
+)
+
+_add(
+    MethodSpec(
+        name="ldp",
+        family="constraint",
+        summary="Local discovery by partitioning: sorts every other variable by its causal "
+        "relation to a treatment and an outcome (confounder, instrument, cause of the outcome, "
+        "descendant of the treatment, ...) from tests whose conditioning sets are the variables "
+        "already sorted, and returns the confounders as a valid adjustment set for the total "
+        "effect when an instrument checks them; hidden variables allowed. Returns no edges; the "
+        "answer is in metadata['effects'], the labels in metadata['partition'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            hidden_causes=True,
+            doc="no edges; metadata['effects'] holds the pair's record: a valid adjustment set "
+            "for the total effect when the Z5 criterion passes, no answer otherwise",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The number of tests can change with the column order: a search stops at the "
+        "first variable that decides it.",
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.01, 0.005, or 0.001."),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Maasch, Pan, Gupta, Kuleshov, Gan & Wang 2024",),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="ld3",
+        family="constraint",
+        summary="Local discovery for direct discrimination: finds the parents of an outcome that "
+        "has no observed descendants, and whether a treatment is one of them (the structural "
+        "direct criterion), from a number of tests linear in the number of variables; the parents "
+        "are a valid adjustment set for the weighted controlled direct effect. Returns the edges "
+        "into the outcome; the answer is in metadata['effects'], the labels in "
+        "metadata['partition'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="edges into the outcome from each parent found; metadata['effects'] holds the "
+            "pair's record: whether the treatment is a parent, and the other parents as the set "
+            "for the direct effect",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.005, 0.01, and 0.05."),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Maasch, Gan, Chen, Orfanoudaki, Akpinar & Wang 2025",),
     )
 )
 
@@ -1635,6 +1733,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1684,6 +1783,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1879,6 +1979,7 @@ for _name, _summary, _own, _refs in (
                 _EQUIVALENT_SAMPLE_SIZE,
                 *_own,
                 _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
@@ -1958,6 +2059,7 @@ _add(
                 nullable=True,
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2050,6 +2152,7 @@ _add(
                 nullable=True,
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2489,6 +2592,7 @@ _add(
                 "adjusted p-value is at most alpha.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2557,6 +2661,7 @@ _add(
                 "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2728,6 +2833,7 @@ _add(
                 "to the next as conditions.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -3622,6 +3728,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
+    **dict.fromkeys(("ldp", "ld3"), ("partition",)),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

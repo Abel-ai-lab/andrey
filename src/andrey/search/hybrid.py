@@ -33,6 +33,7 @@ def candidate_graph(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -47,7 +48,8 @@ def candidate_graph(
     keeps PC's skeleton (:func:`~andrey.constraint.pc.adjacency_search`). Each runs the
     ``indep_test`` test at level ``alpha``; ``categorical`` marks the categorical columns for a
     mixed-data test; ``seed`` fixes the draws of a stochastic test (``None`` uses
-    ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning set.
+    ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a categorical test; ``max_depth`` caps every
+    test's conditioning set.
 
     ``constraints`` reach ``"mmpc"`` and ``"pc"`` as they do when the learner runs on its own: the
     pair of a required edge is kept without a test and conditions the tests of the other pairs
@@ -62,7 +64,13 @@ def candidate_graph(
     if restrict == "pc":
         allowed, keep, _ = knowledge_masks(constraints)
         skeleton, _, _ = adjacency_search(
-            make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+            make_indep_test(
+                indep_test,
+                X,
+                categorical=categorical,
+                seed=seed,
+                degrees_of_freedom=degrees_of_freedom,
+            ),
             X.shape[1],
             alpha,
             support=allowed,
@@ -78,6 +86,7 @@ def candidate_graph(
         "skeleton",
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -109,6 +118,7 @@ def rsmax2(
     maximize: str = "hc",
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    degrees_of_freedom: str = "mean",
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -137,6 +147,7 @@ def rsmax2(
         restrict,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

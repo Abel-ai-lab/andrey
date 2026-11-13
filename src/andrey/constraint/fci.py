@@ -60,6 +60,7 @@ def fci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
@@ -90,16 +91,19 @@ def fci(
     (:func:`~andrey.constraint.pc.adjacency_search`) and the larger possible-d-sep searches
     (:func:`possible_dsep_step`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes the draws
     of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses
-    ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and
-    all). The private ``_ambiguous`` sink receives the triples no orientation rule reads as a
-    collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    ``ANDREY_SEED``. ``degrees_of_freedom`` reaches a categorical ``indep_test``
+    (:class:`~andrey.core.ci.ChiSquare`). Returns the PAG as a ``GraphStructure`` of kind ``"pag"``
+    (circle marks and all). The private ``_ambiguous`` sink receives the triples no orientation rule
+    reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
 
     check_collider_rule(collider_rule)
     validate_possible_dsep(possible_dsep)
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     allowed, keep, apart = knowledge_masks(constraints)
     skeleton, sepsets, _ = adjacency_search(
         test,
@@ -123,6 +127,7 @@ def fci(
         sepsets,
         possible_dsep=possible_dsep,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -599,6 +604,7 @@ def possible_dsep_step(
     *,
     possible_dsep: str,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None,
     seed: int | None,
     max_depth: int | None,
@@ -629,7 +635,9 @@ def possible_dsep_step(
             marks, test, alpha, sepsets, keep=keep, max_depth=max_depth, workers=workers
         )
     else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
+        by_rank, ranked_test = _test_in_rank_order(
+            X, indep_test, categorical, seed, degrees_of_freedom
+        )
         _remove_by_possible_dsep(
             marks,
             ranked_test,
@@ -707,10 +715,15 @@ def _remove_by_possible_dsep(
 
 
 def _test_in_rank_order(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None = None
+    X: np.ndarray,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> tuple[np.ndarray, CITest]:
     """The column order that sorts ``X`` by :func:`~andrey.core.ties.tie_ranks`, and the
-    ``indep_test`` test, seeded by ``seed``, over ``X``'s columns in that order.
+    ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X``'s columns in
+    that order.
 
     The columns the test reads as categories rank as categories
     (:func:`~andrey.core.ties.tie_mask`), so relabeling a column's categories keeps the order. Each
@@ -719,7 +732,11 @@ def _test_in_rank_order(
     by_rank = np.argsort(tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])))
     mask = None if categorical is None else np.asarray(categorical)[by_rank]
     return by_rank, make_indep_test(
-        indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask, seed=seed
+        indep_test,
+        np.ascontiguousarray(X[:, by_rank]),
+        categorical=mask,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
     )
 
 

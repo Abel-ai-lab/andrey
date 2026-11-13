@@ -825,11 +825,14 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     def measure(xs: list[int], newest: int | None) -> None:
         """Test each of ``xs`` given each subset of the other members that holds ``newest`` (every
         subset when ``newest`` is ``None``), of at most ``max_depth`` variables, that passes the
-        rule; candidates with the same subsets are tested together, one subset at a time."""
+        rule, listing only the sizes whose smallest table passes it; candidates with the same
+        subsets are tested together, one subset at a time."""
         groups: dict[tuple[tuple[int, ...], ...], list[int]] = {}
         for x in xs:
             rest = sorted(z for z in members if z not in (x, newest))
             top = len(rest) if max_depth is None else max_depth - (newest is not None)
+            forced = () if newest is None else (newest,)
+            top = min(top, search.reliable_depth(target, x, rest, forced, df_rows=PCMB_DF_ROWS))
             conds = [
                 tuple(sorted((*s, newest) if newest is not None else s))
                 for size in range(min(top, len(rest)) + 1)
@@ -1060,12 +1063,18 @@ def blanket_cpdag(
 
 
 def _ranked_test(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
+    X: np.ndarray,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None,
+    degrees_of_freedom: str,
 ) -> tuple[CITest, list[int]]:
-    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
-    :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories ranked as
-    categories (:func:`~andrey.core.ties.tie_mask`)."""
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
+    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
+    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
 
 
@@ -1352,6 +1361,28 @@ class LocalSearch:
                     return False
         return True
 
+    def reliable_depth(
+        self, x: int, y: int, among: Sequence[int], forced: Sequence[int] = (), *, df_rows: int
+    ) -> int:
+        """The most variables of ``among`` that can join ``forced`` in a conditioning set of ``x``
+        and ``y`` and still pass the rule of :meth:`reliable` with ``df_rows``: the set of the
+        fewest categories grows until its table has too many degrees of freedom for the rows, and a
+        larger set only adds categories. ``len(among)`` when no bound follows, on a test that
+        reads a continuous column or a column of one category."""
+        if self.levels is None or any(self.levels[c] == 0 for c in (x, y, *forced, *among)):
+            return len(among)
+        size = (int(self.levels[x]) - 1) * (int(self.levels[y]) - 1)
+        size *= math.prod(int(self.levels[c]) for c in forced)
+        if size == 0:
+            return len(among)
+        depth = 0
+        for categories in sorted(int(self.levels[c]) for c in among):
+            size *= categories
+            if self.n < df_rows * size:
+                break
+            depth += 1
+        return depth
+
     def strongest(self, keys: Mapping[int, Any]) -> int:
         """The candidate with the smallest key, ties broken by ``ranks`` (:func:`strongest`)."""
         return strongest(keys, self.ranks)
@@ -1572,6 +1603,7 @@ def local_search(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1582,7 +1614,8 @@ def local_search(
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
     ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes the draws
-    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``alpha``, ``max_depth``, and
+    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a
+    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``max_depth``, and
     ``constraints`` are as :class:`LocalSearch` takes them, and ``trace`` keeps the distinct queries
     in its ``counts``. A column the test reads as categories (:func:`~andrey.core.ties.tie_mask`)
     has as many levels as distinct observed values. With ``ranked=False``, the ranks are the column
@@ -1590,9 +1623,11 @@ def local_search(
     through :meth:`~LocalSearch.scan` and never picks between tied candidates.
     """
     if ranked:
-        test, ranks = _ranked_test(X, indep_test, categorical, seed)
+        test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
     else:
-        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+        test = make_indep_test(
+            indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+        )
         ranks = list(range(X.shape[1]))
     mask = tie_mask(indep_test, categorical, X.shape[1])
     levels = None
@@ -1619,6 +1654,7 @@ def local_structure(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1640,6 +1676,7 @@ def local_structure(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -1656,6 +1693,7 @@ def local_set(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1670,6 +1708,7 @@ def local_set(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

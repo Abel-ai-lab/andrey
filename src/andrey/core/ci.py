@@ -614,6 +614,20 @@ def _null_means_batch(margins: Sequence[_Margins], g_square: bool) -> list[np.nd
     return [total[a:b] for a, b in zip(start[:-1], start[1:], strict=True)]
 
 
+def _nonempty_dofs(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray) -> np.ndarray:
+    """The degrees of freedom of each configuration's table with its empty rows and columns struck.
+
+    That is ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y``
+    present in the configuration, and ``0`` for a configuration with one value of either. A cell
+    of a row or a column with no rows has no expected count, and striking it with the margin it
+    would fit is the exact reduction of the degrees of freedom for such cells [Spirtes et al. 1993,
+    Section 5.5; Bishop, Fienberg and Holland 1975]. ``n_s`` is unused; it keeps the margins'
+    shape of :func:`_null_means`.
+    """
+    present_x, present_y, informative = _informative(n_sx, n_sy)
+    return np.where(informative, (present_x - 1) * (present_y - 1), 0).astype(np.float64)
+
+
 def _informative(n_sx: np.ndarray, n_sy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The values of ``x`` and of ``y`` present in each configuration, and whether both vary."""
     present_x = np.einsum("sx->s", (n_sx > 0).view(np.int8), dtype=np.int64)
@@ -840,6 +854,9 @@ class NormalScores(FisherZ):
         super().__init__(scores)
 
 
+#: The degrees-of-freedom rules of :class:`ChiSquare`: ``"mean"``, the null mean of the statistic,
+#: and ``"nonempty"``, each configuration's table with its empty rows and columns struck.
+DEGREES_OF_FREEDOM: tuple[str, ...] = ("mean", "nonempty")
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
 # that occur, so memory stays proportional to the rows whatever the cardinalities.
 _DENSE_CELLS = 1 << 20
@@ -894,7 +911,11 @@ class ChiSquare:
     support when the cell's expected count is below 10, and expanded about it through the fourth
     central moment above, which is within ``2e-3`` per cell. This is the semiparametric test of
     Tsamardinos and Borboudakis [4]_ with the mean worked out where they estimate it by shuffling.
-    With zero degrees of freedom the p-value is ``1``.
+    With ``degrees_of_freedom="nonempty"``, ``dof`` is instead ``(r_x - 1) * (r_y - 1)`` summed over
+    the configurations, each table's empty rows and columns struck: the degrees of freedom of
+    Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
+    of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
+    is the same under both. With zero degrees of freedom the p-value is ``1``.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -941,6 +962,15 @@ class ChiSquare:
         Finite values; each distinct value of a column is one category.
     g_square : bool, default=False
         Use the G-square (likelihood-ratio) statistic instead of Pearson's chi-square.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        The degrees of freedom the p-value uses: ``"mean"``, the mean of the statistic when ``y``
+        is shuffled within each configuration; ``"nonempty"``, ``(r_x - 1) * (r_y - 1)`` per
+        configuration over the values present.
+
+    Raises
+    ------
+    ValueError
+        If ``degrees_of_freedom`` is not one of :data:`DEGREES_OF_FREEDOM`.
 
     References
     ----------
@@ -955,9 +985,18 @@ class ChiSquare:
     .. [5] Koehler, K. J., and Larntz, K. (1980). An empirical investigation of goodness-of-fit
        statistics for sparse multinomials. Journal of the American Statistical Association
        75(370), 336-344.
+    .. [6] Bishop, Y. M. M., Fienberg, S. E., and Holland, P. W. (1975). Discrete Multivariate
+       Analysis: Theory and Practice. MIT Press.
     """
 
-    def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
+    def __init__(
+        self, data: np.ndarray, *, g_square: bool = False, degrees_of_freedom: str = "mean"
+    ) -> None:
+        if degrees_of_freedom not in DEGREES_OF_FREEDOM:
+            raise ValueError(
+                f"degrees_of_freedom must be one of {DEGREES_OF_FREEDOM}, "
+                f"got {degrees_of_freedom!r}"
+            )
         arr = stats.checked_matrix(data, "run a chi-square test", dtype=None)
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
@@ -966,6 +1005,7 @@ class ChiSquare:
         # stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
+        self._nonempty = degrees_of_freedom == "nonempty"
         # The marginal queries' statistics and p-values, by pair, and which pairs are known.
         self._marginals: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
 
@@ -1096,6 +1136,14 @@ class ChiSquare:
         self._refer(counted, statistics, p_values)
         return statistics, p_values
 
+    def _dofs(self, margins: Sequence[_Margins]) -> list[np.ndarray]:
+        """The degrees of freedom of each configuration's table, per entry of ``margins``: the null
+        means (:func:`_null_means_batch`) or the nonempty rows and columns
+        (:func:`_nonempty_dofs`)."""
+        if self._nonempty:
+            return [_nonempty_dofs(*entry) for entry in margins]
+        return _null_means_batch(margins, self._g_square)
+
     def _refer(
         self,
         counted: list[_Counted],
@@ -1104,7 +1152,7 @@ class ChiSquare:
     ) -> None:
         """Store the statistics and p-values of the counted blocks of :meth:`_given` at their
         ``part``, the degrees of freedom of all the blocks evaluated together."""
-        means = _null_means_batch([block[3] for block in counted], self._g_square)
+        means = self._dofs([block[3] for block in counted])
         for (part, bounds, statistic, _), per_table in zip(counted, means, strict=True):
             statistics[part], p_values[part] = (
                 statistic,
@@ -1157,7 +1205,7 @@ class ChiSquare:
             # Each configuration's expected counts sum to its observed ones, so Pearson's sum over
             # every cell, empty ones included, equals this sum over the occupied cells.
             statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
-        per_table = _null_means(n_sx, n_sy, n_s, self._g_square)
+        per_table = self._dofs([(n_sx, n_sy, n_s)])[0]
         dof = float(np.sum(per_table))
         count_tests()
         if dof == 0.0:
@@ -1360,14 +1408,14 @@ class ChiSquare:
         :meth:`__call__` visits them, so every p-value equals :meth:`__call__`'s.
         """
         statistic, margins = self._table_sums(tables, bounds)
-        per_table = _null_means(*margins, self._g_square)
+        per_table = self._dofs([margins])[0]
         p_values = self._table_pvalue(statistic, bounds, per_table)
         count_tests(len(bounds) - 1)
         return statistic, p_values
 
     def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
         """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
-        tables, from which :func:`_null_means` gives the degrees of freedom."""
+        tables, from which :meth:`_dofs` gives the degrees of freedom."""
         m, kx, ky = tables.shape
         n_sx = np.einsum("sxy->sx", tables)
         n_sy = np.einsum("sxy->sy", tables)
@@ -1877,6 +1925,7 @@ def make_indep_test(
     *,
     categorical: npt.ArrayLike | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     **options: Any,
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
@@ -1884,7 +1933,8 @@ def make_indep_test(
     ``options`` are keyword settings for the test's class, such as
     ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
     ``seed`` reaches the tests that draw random numbers (:data:`STOCHASTIC_INDEP_TESTS`), which
-    otherwise use ``ANDREY_SEED``; the other tests ignore it.
+    otherwise use ``ANDREY_SEED``; the other tests ignore it. ``degrees_of_freedom`` reaches the
+    categorical tests (:data:`DISCRETE_INDEP_TESTS`, :class:`ChiSquare`); the other tests ignore it.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
     :class:`NotImplementedError` when ``name`` is not registered, listing what is available. A
@@ -1904,6 +1954,8 @@ def make_indep_test(
         ) from None
     if seed is not None and name in STOCHASTIC_INDEP_TESTS:
         options["seed"] = seed
+    if name in DISCRETE_INDEP_TESTS:
+        options["degrees_of_freedom"] = degrees_of_freedom
     mixed = name in MIXED_INDEP_TESTS
     if not mixed and categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")

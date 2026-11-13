@@ -25,7 +25,6 @@ import blanket_cpu  # noqa: E402
 
 import andrey  # noqa: E402
 from andrey_bench import blanket_lane as lane  # noqa: E402
-from andrey_bench import datasets  # noqa: E402
 from andrey_bench.adapters import (  # noqa: E402
     andrey_blanket,
     bnlearn_blanket,
@@ -311,12 +310,15 @@ def test_params_are_complete_json_and_the_adapter_pickles():
 
 
 def test_every_learner_with_a_reference_names_a_function_of_the_table():
-    """Each learner has a reference, bnlearn's function or the authors' Causal Explorer function,
-    which learns the same kind of set."""
+    """A learner has a reference, bnlearn's function or the authors' Causal Explorer function,
+    which learns the same kind of set, exactly when its row says one exists."""
     assert set(bnlearn_blanket.COUNTERPART.values()) <= set(bnlearn_blanket.FUNCTIONS)
     authors = causal_explorer_blanket.COUNTERPART
     assert set(authors.values()) <= set(causal_explorer_blanket.FUNCTIONS)
-    assert set(LEARNERS) <= set(bnlearn_blanket.COUNTERPART) | set(authors)
+    referenced = set(bnlearn_blanket.COUNTERPART) | set(authors)
+    assert referenced <= set(LEARNERS)
+    for learner, row in LEARNERS.items():
+        assert row.reference == (learner in referenced), learner
     for learner, function in bnlearn_blanket.COUNTERPART.items():
         kind = bnlearn_blanket.FUNCTIONS[function].kind
         if learner in LEARNERS:
@@ -392,6 +394,25 @@ def test_a_cell_is_a_network_or_a_gaussian_graph():
     assert network.indep_test("chisq") == "chisq" and gaussian.indep_test("chisq") == "fisherz"
     assert all(blanket_cpu.Cell.parse(text).label.startswith(text) for text in blanket_cpu.CELLS)
     assert blanket_cpu.Cell.parse(gaussian.label) == gaussian
+
+
+def test_a_harness_network_cell_draws_from_the_network_s_own_tables(monkeypatch):
+    import gzip
+
+    from andrey_bench import networks
+
+    network = networks.parse_network("asia", gzip.decompress(ASIA.read_bytes()).decode("utf-8"))
+    monkeypatch.setitem(networks.HARNESS_NETWORKS, "asia", None)
+    monkeypatch.setattr(blanket_cpu, "_harness_network", lambda name: network)
+    cell = blanket_cpu.Cell.parse("net:asia:300")
+    X, truth, digest = cell.draw(1)
+    order = blanket_cpu.harness_order(network.d, 1).tolist()
+    np.testing.assert_array_equal(X, network.sample(300, 1)[:, order])
+    column = {v: order.index(network.nodes.index(v)) for v in network.nodes}
+    blanket = sorted(column[v] for v in ("tub", "lung", "bronc", "xray", "dysp"))
+    assert lane.true_set(truth, column["either"], "mb") == blanket
+    assert cell.draw(1)[2] == digest != cell.draw(2)[2]
+    assert order != list(range(network.d))
 
 
 def test_a_gaussian_cell_is_a_function_of_its_seed():
@@ -488,36 +509,38 @@ def test_the_driver_records_sets_scores_and_counts_and_rescores_them(asia_cache,
     assert after == before
 
 
-def test_constant_columns_leave_the_data_and_the_true_graph():
-    X = np.array([[0, 1, 2], [0, 0, 1], [0, 1, 0]])
-    truth = np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]])
-    kept, kept_truth, dropped = blanket_cpu.without_constant_columns(X, truth)
-    assert dropped == 1 and kept.tolist() == X[:, 1:].tolist()
-    assert kept_truth.tolist() == [[0, 1], [0, 0]]
-    assert blanket_cpu.without_constant_columns(X[:, 1:], truth[1:, 1:])[2] == 0
-
-
-def test_the_driver_drops_constant_columns_and_rescores_without_them(
+def test_a_constant_column_joins_no_set_and_answers_the_empty_set(
     asia_cache, tmp_path, monkeypatch
 ):
-    generate = datasets.generate_one
+    draw = blanket_cpu.Cell.draw
 
-    def with_a_constant_column(key):
-        X, truth, *rest = generate(key)
-        X = np.column_stack([np.zeros(len(X), dtype=X.dtype), X])
-        truth = np.pad(truth, ((1, 0), (1, 0)))
-        return (X, truth, *rest)
+    def one_constant(cell, seed):
+        X, truth, digest = draw(cell, seed)
+        X = X.copy()
+        X[:, 3] = X[0, 3]
+        return X, truth, digest
 
-    monkeypatch.setattr(datasets, "generate_one", with_a_constant_column)
-    out = tmp_path / "run"
-    flags = ["--out", str(out), "--smoke", "--drop-constant", "--solutions", "andrey.iamb"]
-    assert blanket_cpu.main(flags) == 0
-    (record,) = _records(out)
-    assert record["dropped"] == 1 and record["d"] == 8 and record["targets"] == list(range(8))
-    assert json.loads((out / "run_meta.json").read_text())["drop_constant"] is True
-    assert blanket_cpu.main(["--out", str(out), "--rescore"]) == 0
-    (again,) = _records(out)
-    assert again["per_target"] == record["per_target"]
+    monkeypatch.setattr(blanket_cpu.Cell, "draw", one_constant)
+    flags = ["--smoke", "--solutions", "andrey.iamb,baseline.empty"]
+    assert blanket_cpu.main(["--out", str(tmp_path / "refused"), *flags]) == 0
+    assert {r["status"] for r in _records(tmp_path / "refused")} >= {"error"}
+    assert blanket_cpu.main(["--out", str(tmp_path / "run"), *flags, "--drop-constant"]) == 0
+    iamb = next(r for r in _records(tmp_path / "run") if r["solution"] == "andrey.iamb")
+    assert iamb["status"] == "ok" and iamb["constant_columns"] == [3]
+    assert iamb["targets"] == list(range(8)) and len(iamb["params"]["targets"]) == 7
+    assert iamb["sets"]["3"] == [] and all(3 not in s for s in iamb["sets"].values())
+    assert iamb["per_target"]["3"]["true"] > 0 and iamb["n_tests"]["3"] is None
+    with pytest.raises(SystemExit):
+        blanket_cpu.main(
+            ["--out", str(tmp_path / "g"), *flags, "--drop-constant", "--mode", "graph"]
+        )
+
+
+def test_a_widened_answer_keeps_the_fit_s_sets_and_counts_on_its_columns():
+    native = lane.pack_answer(np.array([[0, 1], [1, 0]]), np.array([5, 7]), 12)
+    answer, counts, total = lane.unpack_answer(lane.widen_answer(native, np.array([0, 2]), 3))
+    np.testing.assert_array_equal(answer, [[0, 0, 1], [0, 0, 0], [1, 0, 0]])
+    assert counts.tolist() == [5, lane.NO_COUNT, 7] and total == 12
 
 
 def test_the_driver_scores_whole_graphs_and_resumes(asia_cache, tmp_path):

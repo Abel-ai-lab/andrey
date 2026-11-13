@@ -26,6 +26,7 @@ _GRAPH = (
             "FastIAMB",
             "MMPC",
             "HITONPC",
+            "PCMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",

@@ -15,7 +15,10 @@ A node ``y`` of ``MB(x)`` is adjacent to ``x`` exactly when no subset of ``MB(x)
 separates them ([1]_ Thm. 1, [2]_ Thm. 1, [3]_ Lemma A.2), so every pair at ``x`` is tested against
 the subsets of ``MB(x) \\ {y}``, never against ``x``'s shrinking adjacencies. The v-structures of
 ``L_x`` that contain ``x`` are true ones ([1]_ Thm. 2, [2]_ Thm. 2); its other edges may come from
-variables outside ``MB+(x)`` and stay out of the growing graph. A pair the growing graph leaves
+variables outside ``MB+(x)`` and stay out of the growing graph. With PC's search, a v-structure at
+``x`` can rest on an edge away from ``x`` that only a larger subset of the blanket separates;
+MMB-by-MMB checks each from the far variables' own blankets (:func:`confirm_colliders`), as its
+authors' code does. A pair the growing graph leaves
 apart is known to be non-adjacent only when a test separated it; the orientation rules read a
 non-adjacency only then.
 
@@ -40,7 +43,7 @@ References
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from itertools import combinations
 from typing import Literal
@@ -81,18 +84,32 @@ class Rules:
     step, each variable that no path of edges without an arrowhead joins to the target, and stops
     when the waitlist is empty ([1]_ Steps 6-7); ``"r1_r3"`` stops at the first of the rules
     R1-R3 ([2]_ Thm. 3, :func:`stop_rule`), and ``"r1_r2"`` at the first of R1 and R2.
+    ``colliders`` decides which v-structures at ``x`` join the growing graph: ``"local"`` every one
+    of ``L_x`` [1]_ [2]_; ``"own_blanket"`` those the variables off ``x`` confirm from their own
+    blankets (:func:`confirm_colliders`), as the code of MMB-by-MMB's authors checks them.
+    ``stop_after`` decides when the rules ``"r1_r3"`` and ``"r1_r2"`` are first read: ``"first"``
+    after every step [2]_; ``"degree"`` only once the search has taken more steps than the target
+    has neighbors after its own step, as the authors' code reads them. An empty waitlist ends the
+    search either way.
 
     R3 can stop the search before the target's marks are those of the PAG: it stops at an edge
     ``t o-> v`` whose circle a discriminating path through ``v`` decides, as on the DAG
     ``0 -> 3 <- 1 -> 4 <- 2 -> 3``, ``0 -> 5 <- 1``, ``5 -> 4``, where the PAG holds ``1 -> 4``
-    and R3 stops at ``1 o-> 4`` after the target ``1`` alone. R1 and R2 stop only when the marks
-    at the target are decided or no variable is left to learn.
+    and R3 stops at ``1 o-> 4`` after the target ``1`` alone; with ``stop_after="degree"`` the
+    search goes on to three more blankets, which bring in the path. R1 and R2 stop only when the
+    marks at the target are decided or no variable is left to learn. With the PC search, ``L_x``
+    can keep an edge ``b - c`` away from ``x`` that only a larger subset of the blanket
+    separates, and a v-structure ``x *-> b <-* c`` then brings in an edge the PAG lacks;
+    ``colliders="own_blanket"`` drops it, since ``b``'s own step tests the pair against every
+    subset of ``MB(b)``.
     """
 
     local: Literal["ic", "pc"] = "ic"
     expand: Literal["blanket", "adjacent"] = "blanket"
     orient: Literal["meek", "pag"] = "meek"
     stop: Literal["blocked", "r1_r3", "r1_r2"] = "blocked"
+    colliders: Literal["local", "own_blanket"] = "local"
+    stop_after: Literal["first", "degree"] = "first"
 
     def __post_init__(self) -> None:
         for name, value, choices in (
@@ -100,17 +117,28 @@ class Rules:
             ("expand", self.expand, ("blanket", "adjacent")),
             ("orient", self.orient, ("meek", "pag")),
             ("stop", self.stop, ("blocked", "r1_r3", "r1_r2")),
+            ("colliders", self.colliders, ("local", "own_blanket")),
+            ("stop_after", self.stop_after, ("first", "degree")),
         ):
             if value not in choices:
                 raise ValueError(f"{name} must be one of {choices}, got {value!r}")
+        if self.stop_after == "degree" and self.stop == "blocked":
+            raise ValueError("stop_after='degree' needs stop='r1_r3' or 'r1_r2'")
 
 
 #: MB-by-MB as Wang et al. state it [1]_.
 MB_BY_MB = Rules()
 #: MB-by-MB as LOAD runs it ([3]_ Alg. 11): PC's search in place of IC's.
 LOAD = Rules(local="pc")
-#: MMB-by-MMB [2]_.
-MMB_BY_MMB = Rules(local="pc", expand="adjacent", orient="pag", stop="r1_r3")
+#: MMB-by-MMB [2]_, with the collider check and the stop guard of its authors' code.
+MMB_BY_MMB = Rules(
+    local="pc",
+    expand="adjacent",
+    orient="pag",
+    stop="r1_r3",
+    colliders="own_blanket",
+    stop_after="degree",
+)
 
 
 @dataclass(frozen=True)
@@ -136,12 +164,14 @@ class LocalGraph:
 class Cache:
     """What one run of :func:`sequential` leaves for the next over the same
     :class:`~andrey.constraint.blanket.LocalSearch`, as LOAD runs the search for several targets
-    ([3]_ Alg. 11): each variable's blanket in joining order, each local structure, and a separating
-    set for each pair a test separated, keyed by the pair, the first one found."""
+    ([3]_ Alg. 11): each variable's blanket in joining order, each local structure, a separating
+    set for each pair a test separated, keyed by the pair, the first one found, and the own local
+    structures the collider check learned, with their separating sets (:func:`own_step`)."""
 
     blankets: dict[int, list[int]] = field(default_factory=dict)
     local: dict[int, LocalGraph] = field(default_factory=dict)
     sepsets: dict[Pair, tuple[int, ...]] = field(default_factory=dict)
+    own: dict[int, tuple[LocalGraph, dict[Pair, tuple[int, ...]]]] = field(default_factory=dict)
 
     def separate(self, u: int, v: int, sepset: Iterable[int]) -> None:
         """Record ``sepset`` for ``(u, v)`` unless the pair has one."""
@@ -235,7 +265,8 @@ class Result:
 
     ``network`` is the graph the search grew; its edges at the target are the answer. ``done``
     lists the variables whose blanket and local structure the search used, in order; ``learned``
-    those whose blanket this run learned, the rest coming from the ``cache``. ``stopped`` names
+    those whose blanket this run learned, in order, the collider check's included, the rest coming
+    from the ``cache``. ``stopped`` names
     the rule that ended it: ``"empty"`` (an empty waitlist), ``"determined"`` (R1: every mark at
     the target decided), or ``"blocked"`` (R3); the ``"blocked"`` rules of :class:`Rules` always
     end with an empty waitlist. ``n_tests`` counts the tests the run computed
@@ -272,8 +303,11 @@ def sequential(
     structure, else the substructure of a done variable's ``L_y`` when ``MB+(x)`` lies inside
     ``MB+(y)`` (the first such ``y`` done), else the growing graph's substructure when every member
     of ``MB(x)`` is done, else learned from the data (:func:`learn_local`) ([1]_ Step 3, [2]_
-    Alg. 1, [3]_ Alg. 11). Then :func:`merge`, :func:`orient`, the waitlist (:func:`extend`), and
-    the stop rule. With the CPDAG rules, an edge whose two ends got arrowheads, from v-structures
+    Alg. 1, [3]_ Alg. 11). With ``colliders="own_blanket"``, :func:`confirm_colliders` keeps the
+    v-structures at ``x`` that the variables off ``x`` confirm. Then :func:`merge`, :func:`orient`,
+    the waitlist (:func:`extend`), and the stop rule, read from the first step or, with
+    ``stop_after="degree"``, once more steps are done than the target has neighbors after its own
+    step. With the CPDAG rules, an edge whose two ends got arrowheads, from v-structures
     that disagree, is left undirected at the end. With the CPDAG rules and ``search`` constraints
     that direct edges (tiers, edges forbidden one way), each step directs those edges after the
     merge, over any arrowhead a v-structure put on them (:func:`direct`), and Meek's rule R4 joins
@@ -298,20 +332,21 @@ def sequential(
         known = search.constraints
     waitlist, done, learned = [target], [], []
     stopped = "empty"
+    degree = 0
+
+    def own(v: int) -> tuple[LocalGraph, dict[Pair, tuple[int, ...]]]:
+        return own_step(search, v, blanket, rules.local, cache, learned, depth=local_depth)
+
     with counting_tests() as tests, search.pinned():
         while waitlist:
             x = waitlist.pop(0)
-            if x not in cache.blankets:
-                _, mb, sepsets = search.local(blanket, x)
-                cache.blankets[x] = list(mb or [])
-                for y, sepset in sepsets.items():
-                    cache.separate(x, y, sepset)
-                learned.append(x)
-            mb = cache.blankets[x]
+            mb = learn_blanket(search, blanket, x, cache, learned)
             if rules.expand == "blanket":
                 extend(waitlist, mb, done)
             done.append(x)
             local = _local_structure(search, x, mb, rules.local, cache, network, done, local_depth)
+            if rules.colliders == "own_blanket":
+                local = confirm_colliders(local, x, search, own)
             merge(network, local, x)
             if decided is not None:
                 direct(network, decided)
@@ -321,10 +356,12 @@ def sequential(
             if rules.expand == "adjacent":
                 adjacent = set(network.neighbors(x))
                 extend(waitlist, [y for y in mb if y in adjacent], done)
+            if len(done) == 1:
+                degree = len(network.neighbors(target))
             if rules.stop == "blocked":
                 reach = open_reach(network, target)
                 waitlist[:] = [w for w in waitlist if w in reach]
-            else:
+            elif rules.stop_after == "first" or len(done) > degree:
                 rule = stop_rule(network, target, waitlist, r3=rules.stop == "r1_r3")
                 if rule is not None:
                     stopped = rule
@@ -332,6 +369,20 @@ def sequential(
     if rules.orient == "meek" and network.nodes:
         network.marks[...] = undirect_conflicts(network.marks)
     return Result(network, done, learned, stopped, tests.n, cache)
+
+
+def learn_blanket(
+    search: LocalSearch, blanket: str, x: int, cache: Cache, learned: list[int]
+) -> list[int]:
+    """``x``'s blanket from ``cache``, else learned by the learner ``blanket`` and kept in ``cache``
+    with the separating set of each variable it leaves out; ``x`` then joins ``learned``."""
+    if x not in cache.blankets:
+        _, mb, sepsets = search.local(blanket, x)
+        cache.blankets[x] = list(mb or [])
+        for y, sepset in sepsets.items():
+            cache.separate(x, y, sepset)
+        learned.append(x)
+    return cache.blankets[x]
 
 
 def extend(waitlist: list[int], members: Iterable[int], done: Iterable[int]) -> None:
@@ -466,6 +517,66 @@ def _sides(
         (first, other, sorted(neighbors[first] - {other})),
         (other, first, sorted(neighbors[other] - {first})),
     ]
+
+
+def own_step(
+    search: LocalSearch,
+    v: int,
+    blanket: str,
+    how: str,
+    cache: Cache,
+    learned: list[int],
+    *,
+    depth: int | None = None,
+) -> tuple[LocalGraph, dict[Pair, tuple[int, ...]]]:
+    """``v``'s own local structure, learned from the data over ``MB+(v)`` (:func:`learn_local`),
+    and the separating sets it found, kept in ``cache.own`` for :func:`confirm_colliders`.
+
+    ``v``'s blanket comes from ``cache`` or is learned on demand (:func:`learn_blanket`), as a
+    step's blanket is. The local structure and its sets stay out of ``cache.local`` and
+    ``cache.sepsets``, so a later step at ``v`` learns or reads its ``L_v`` as it would without
+    the check.
+    """
+    if v not in cache.own:
+        mb = learn_blanket(search, blanket, v, cache, learned)
+        found = Cache()
+        local = learn_local(search, v, mb, how, found, depth=depth)
+        cache.own[v] = (local, found.sepsets)
+    return cache.own[v]
+
+
+def confirm_colliders(
+    local: LocalGraph,
+    x: int,
+    search: LocalSearch,
+    own: Callable[[int], tuple[LocalGraph, Mapping[Pair, tuple[int, ...]]]],
+) -> LocalGraph:
+    """``local`` with only the colliders at ``x`` that the variables off ``x`` confirm from their
+    own blankets, as the code of MMB-by-MMB's authors checks its v-structures; ``own(v)`` gives
+    ``v``'s own local structure and its separating sets (:func:`own_step`).
+
+    A collider with ``x`` at an end, ``x *-> b <-* c``, is kept when ``b`` and ``c`` are adjacent
+    in ``b``'s own local structure, where the pair is tested against every subset of ``MB(b)``
+    without ``c``. A collider ``a *-> x <-* c`` is kept when ``a`` and ``c`` are separated by a
+    set without ``x`` in the own local structure of ``a`` or, failing that, of ``c``, the one of
+    lower rank asked first. With exact tests and uncapped sets, a true unshielded collider always
+    passes, so the check removes only false ones. The colliders are checked in the order of the
+    ranks of their members other than ``x``, so the blankets learned on demand join ``cache`` in
+    an order free of the column order.
+    """
+    rank = {v: k for k, v in enumerate(search.ordered(dict.fromkeys(local.nodes, 0)))}
+    kept = {t for t in local.colliders if x not in t}
+    at_x = [t for t in local.colliders if x in t]
+    for a, b, c in sorted(at_x, key=lambda t: sorted(rank[v] for v in t if v != x)):
+        if b == x:
+            ends = sorted((a, c), key=rank.__getitem__)
+            sets = (own(u)[1].get((a, c)) for u in ends)
+            confirmed = any(s is not None and x not in s for s in sets)
+        else:
+            confirmed = _pair(b, c if a == x else a) in own(b)[0].adjacent
+        if confirmed:
+            kept.add((a, b, c))
+    return replace(local, colliders=frozenset(kept))
 
 
 def merge(network: Network, local: LocalGraph, x: int) -> None:

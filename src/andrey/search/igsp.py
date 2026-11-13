@@ -477,6 +477,7 @@ def _prepared(
     by_code: Mapping[int, frozenset[int] | None],
     *,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     invariance_test: str,
     invariance_alpha: float,
     categorical: np.ndarray | None,
@@ -500,11 +501,21 @@ def _prepared(
     settings = [c for c in sorted(by_code) if by_code[c] != frozenset()]
     try:
         ci = make_indep_test(
-            indep_test, sorted_x[observational], categorical=sorted_mask, seed=seed
+            indep_test,
+            sorted_x[observational],
+            categorical=sorted_mask,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
         )
     except ValueError:
         # The error names positions in the sorted data; the same test on ``X`` names its columns.
-        make_indep_test(indep_test, X[observational], categorical=categorical, seed=seed)
+        make_indep_test(
+            indep_test,
+            X[observational],
+            categorical=categorical,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        )
         raise
     tests: dict[int, InvarianceTest] = {}
 
@@ -516,6 +527,7 @@ def _prepared(
                 sorted_x,
                 groups,
                 indep_test=indep_test,
+                degrees_of_freedom=degrees_of_freedom,
                 categorical=sorted_mask,
                 seed=seed,
             )
@@ -556,6 +568,7 @@ def igsp(
     alpha: float,
     invariance_alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     invariance_test: str,
     categorical: np.ndarray | None,
     n_starts: int,
@@ -582,6 +595,7 @@ def igsp(
         codes,
         targets_by_code,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         invariance_test=invariance_test,
         invariance_alpha=invariance_alpha,
         categorical=categorical,
@@ -607,6 +621,7 @@ def ut_igsp(
     alpha: float,
     invariance_alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     invariance_test: str,
     categorical: np.ndarray | None,
     n_starts: int,
@@ -633,6 +648,7 @@ def ut_igsp(
         codes,
         known_by_code,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         invariance_test=invariance_test,
         invariance_alpha=invariance_alpha,
         categorical=categorical,

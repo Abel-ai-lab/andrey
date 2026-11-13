@@ -46,7 +46,7 @@ whose Reproduce table lists the driver.
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
-| [Markov blankets, and parents and children](comparisons/blankets.md) | `blanket_cpu.py` | IAMB, Inter-IAMB, MMPC, and the family's other learners as they ship; the sets at a target and the graphs they give | bnlearn (GS, IAMB, Fast-IAMB, Inter-IAMB, MMPC, SI-HITON-PC; PC-stable read at a target); the authors' Causal Explorer (HITON-PC, HITON-MB, MMMB), MATLAB | |
+| [Markov blankets, and parents and children](comparisons/blankets.md) | `blanket_cpu.py`, `pcmb_summary.py` | IAMB, Inter-IAMB, MMPC, PCMB, and the family's other learners as they ship; the sets at a target and the graphs they give | bnlearn (GS, IAMB, Fast-IAMB, Inter-IAMB, MMPC, SI-HITON-PC; PC-stable read at a target); the authors' Causal Explorer (HITON-PC, HITON-MB, MMMB), MATLAB; for PCMB, which has no implementation, the published results of its paper | 0.18.0 |
 | [GS, Fast-IAMB, and HITON-PC](comparisons/gs-fast-iamb-hiton-pc.md) | `blanket_cpu.py`, `blanket_summary.py` | GS, Fast-IAMB, HITON-PC; IAMB, Inter-IAMB, MMPC, HITON-PC at `max_depth=3` and without its rows-per-cell rule as context | bnlearn (GS, Fast-IAMB, SI-HITON-PC), with `mi-adf` and plain `mi` | 0.18.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
@@ -120,7 +120,9 @@ all three. The NOTEARS and DAGMA lane's rows are in
 authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental. The
 AGES lane's rows are in [`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
 [comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg. The 0.18.0
-summary draws GS's, Fast-IAMB's, and HITON-PC's rows from
+summary holds PCMB's rows beside the published results of its paper, which the [comparison
+page](comparisons/blankets.md#pcmb-against-its-paper) presents with the other readings of an empty
+answer and the floors. It draws GS's, Fast-IAMB's, and HITON-PC's rows from
 [`published/0.18.0/gs-fast-iamb-hiton-pc.json`](published/0.18.0/gs-fast-iamb-hiton-pc.json), the
 three methods with bnlearn, which their [comparison page](comparisons/gs-fast-iamb-hiton-pc.md)
 presents, with the fresh seeds, the floors, and the context comparisons.

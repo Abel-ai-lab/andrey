@@ -187,6 +187,19 @@ SHARED = {
         "handling used. See **Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming,
     ),
+    # A method whose default follows its paper words its own entry.
+    "degrees_of_freedom": Shared(
+        "Parameters",
+        "degrees_of_freedom",
+        "entry",
+        'Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the '
+        "mean of the statistic when ``y`` is shuffled within each configuration of the conditioning "
+        'set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x`` '
+        "and ``y`` present in it, the table's empty rows and columns struck. The two differ only on "
+        'sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises '
+        "``ValueError``.",
+        lambda m: m in CONCEPTS["degrees_of_freedom"].conforming,
+    ),
     # "em" is supported where a reference implementation exists and the comparison with it passed.
     "missing_em": Shared(
         "Parameters",

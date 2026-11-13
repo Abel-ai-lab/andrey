@@ -120,6 +120,62 @@ def test_a_pair_with_no_degrees_of_freedom_has_p_value_one():
         assert ChiSquare(x, g_square=g_square)(0, 3, (2,)) == 1.0
 
 
+def _sparse_strata() -> np.ndarray:
+    """``x`` and ``y`` with three values each, given two binary columns, in three of the four
+    configurations: every cell occupied in ``(0, 0)``, ``x`` without its third value in ``(0, 1)``,
+    ``y`` with one value in ``(1, 0)``, and no row in ``(1, 1)``."""
+    rows = [(a, b, 0, 0) for a in range(3) for b in range(3)] * 2 + [(0, 0, 0, 0), (2, 2, 0, 0)]
+    rows += [(a, b, 0, 1) for a in range(2) for b in range(3)] + [(0, 0, 0, 1)]
+    rows += [(a, 1, 1, 0) for a in range(3)]
+    return np.array(rows, dtype=np.float64)
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+def test_nonempty_degrees_of_freedom_strike_the_empty_rows_and_columns(g_square):
+    """Each configuration counts ``(r_x - 1) * (r_y - 1)`` over the values present: 4 for the full
+    table, 2 without a value of ``x``, 0 with one value of ``y`` or with no row, where the nominal
+    ``(3 - 1) * (3 - 1) * 4 = 16`` counts every cell. The statistic is the same under both rules."""
+    x = _sparse_strata()
+    nonempty = ChiSquare(x, g_square=g_square, degrees_of_freedom="nonempty")
+    mean = ChiSquare(x, g_square=g_square)
+    known = {(): 4, (2,): 4, (3,): 6, (2, 3): 6}
+    for cond, df in known.items():
+        statistic, p_value = nonempty._statistic_pvalue(0, 1, cond)
+        assert statistic == mean._statistic_pvalue(0, 1, cond)[0]
+        assert p_value == chdtrc(df, statistic) == nonempty(1, 0, cond)
+    assert nonempty(0, 1, (2, 3)) != mean(0, 1, (2, 3))
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+def test_nonempty_degrees_of_freedom_count_the_values_present_in_each_configuration(g_square):
+    """Against a direct count over the rows of each configuration, on sparse random tables."""
+    x = _codes(seed=5, n=40, cards=(3, 4, 3, 3))
+    test = ChiSquare(x, g_square=g_square, degrees_of_freedom="nonempty")
+    for a, b in combinations(range(4), 2):
+        others = [c for c in range(4) if c not in (a, b)]
+        for cond in (s for size in range(3) for s in combinations(others, size)):
+            df = 0
+            for key in {tuple(row) for row in x[:, list(cond)]}:
+                rows = np.all(x[:, list(cond)] == key, axis=1)
+                df += (np.unique(x[rows, a]).size - 1) * (np.unique(x[rows, b]).size - 1)
+            statistic = test._statistic_pvalue(a, b, cond)[0]
+            assert test(a, b, cond) == (1.0 if df == 0 else chdtrc(df, statistic))
+
+
+def test_the_degrees_of_freedom_reach_the_categorical_tests_alone():
+    """``make_indep_test`` passes ``degrees_of_freedom`` to ``chisq`` and ``gsq``, also on data with
+    missing values, and the other tests ignore it; an unknown rule raises."""
+    x = _sparse_strata()
+    want = ChiSquare(x, g_square=True, degrees_of_freedom="nonempty")(0, 1, (2, 3))
+    assert ci.make_indep_test("gsq", x, degrees_of_freedom="nonempty")(0, 1, (2, 3)) == want
+    gaps = np.vstack([x, [[np.nan, 0, 0, 0]]])
+    assert ci.make_indep_test("gsq", gaps, degrees_of_freedom="nonempty")(0, 1, (2, 3)) == want
+    fisherz = ci.make_indep_test("fisherz", x)(0, 1, (2,))
+    assert ci.make_indep_test("fisherz", x, degrees_of_freedom="nonempty")(0, 1, (2,)) == fisherz
+    with pytest.raises(ValueError, match="degrees_of_freedom must be one of"):
+        ChiSquare(x, degrees_of_freedom="cells")
+
+
 def test_dependence_and_independence_are_told_apart():
     x = _codes(n=2000)
     test = ChiSquare(x)
@@ -164,6 +220,7 @@ def _fast_path_data(case: str) -> np.ndarray:
     return x
 
 
+@pytest.mark.parametrize("rule", ci.DEGREES_OF_FREEDOM)
 @pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
 @pytest.mark.parametrize("case", ["dependent", "sparse", "one value"])
 @pytest.mark.parametrize(
@@ -172,7 +229,7 @@ def _fast_path_data(case: str) -> np.ndarray:
     ids=["one count", "a count per set", "large tables on the scalar path"],
 )
 def test_every_fast_path_returns_the_scalar_p_values(
-    monkeypatch, g_square, case, batch, rows, table
+    monkeypatch, rule, g_square, case, batch, rows, table
 ):
     """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit,
     and so do the statistics of one pair's queries over many sets: whatever the argument order,
@@ -185,7 +242,7 @@ def test_every_fast_path_returns_the_scalar_p_values(
     monkeypatch.setattr(ci, "DENSE_MIN", table)
     x = _fast_path_data(case)
     d = x.shape[1]
-    test = ChiSquare(x, g_square=g_square)
+    test = ChiSquare(x, g_square=g_square, degrees_of_freedom=rule)
     marginal = test.marginal_pvalues()
     for a, b in combinations(range(d), 2):
         assert marginal[a, b] == marginal[b, a] == test(a, b)

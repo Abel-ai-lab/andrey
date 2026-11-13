@@ -19,7 +19,9 @@ To add a learner, name it in :data:`LEARNERS` with the kind of set it learns and
 facade offers. The adapter finds the function by name, so nothing else changes: a learner the
 installed Andrey does not have yet fails when its adapter is built (:func:`available` lists the
 ones it has), and the lane's solution list takes every row whose function exists. The reference of
-a learner is named in :data:`bnlearn_blanket.COUNTERPART`.
+a learner is named in :data:`bnlearn_blanket.COUNTERPART` or
+:data:`causal_explorer_blanket.COUNTERPART`; a learner no reference implementation runs says so with
+``reference=False``.
 """
 
 from __future__ import annotations
@@ -49,6 +51,10 @@ class Learner:
     kind: str
     #: The graphs the facade's ``structure`` offers, from :data:`~andrey_bench.blanket_lane.STRUCTURES`.
     structures: tuple[str, ...]
+    #: Whether a reference implementation runs the learner's algorithm (a bnlearn or Causal Explorer
+    #: counterpart). A learner without one is judged on its paper's published results and the
+    #: true sets, beside the other solutions and the empty answer.
+    reference: bool = True
 
 
 #: The learners the lane runs, by the name of their function in ``andrey``. A learner is added by
@@ -62,7 +68,7 @@ LEARNERS: dict[str, Learner] = {
     "hiton_pc": Learner("pc", ("skeleton", "cpdag")),
     "hiton_mb": Learner("mb", ("moral", "skeleton", "cpdag")),
     "mmmb": Learner("mb", ("moral", "skeleton", "cpdag")),
-    "pcmb": Learner("mb", ("moral", "skeleton", "cpdag")),
+    "pcmb": Learner("mb", ("moral", "skeleton", "cpdag"), reference=False),
 }
 
 

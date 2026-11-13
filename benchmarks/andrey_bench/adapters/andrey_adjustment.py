@@ -94,11 +94,14 @@ class AndreyAdjustment:
         self.identified_from, self.unordered = row.identified_from, row.unordered
 
     def setup(self) -> None:
-        """Import Andrey and the method before timing, so no fit pays for them."""
+        """Import Andrey and the method before timing, so no fit pays for them: one fit on a
+        small sample imports the modules the facade defers."""
         import andrey
 
         if not callable(getattr(andrey, self.method, None)):
             raise RuntimeError(f"the installed Andrey has no {self.method!r}")
+        rows = np.random.default_rng(0).standard_normal((60, 4))
+        self.fit(rows, {TREATMENT_PARAM: 0, OUTCOME_PARAM: 1, VARIABLES_PARAM: [0, 1]})
 
     def params(self) -> dict[str, Any]:
         """The settings passed to every fit: the method's level and the test."""

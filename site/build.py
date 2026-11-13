@@ -559,7 +559,8 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # own units, where the references read those units and Andrey standardizes. NOTEARS omits its
 # cells in the simulation's own units and its rescaled cells, which its release card reports and
 # does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so ``MEAN_DEGREE``
-# leaves them to the card too.
+# leaves them to the card too. PCMB has no reference implementation: its rows sit beside its
+# paper's published results, with no comparator, on its release card.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -578,6 +579,7 @@ NOT_SHOWN_LANES = {
     "nogam.raw",
     "notears.raw",
     "notears.rescaled",
+    "pcmb.paper",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI

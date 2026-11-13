@@ -33,6 +33,8 @@ from andrey.spec.concepts import (
     CI_SEARCHES,
     CONCEPTS,
     PCMCI_FAMILY,
+    STARTS,
+    TESTED,
     Concept,
 )
 from tests.recovery.helpers import datagen
@@ -366,7 +368,7 @@ UNIT_CASES = {
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
             "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3"),
         ),
         "gauss_5v",
     ),
@@ -768,7 +770,7 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 RANDOMIZED = {
     **{
         m: {"indep_test": "rcot"}
-        for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "y_structures")
+        for m in (*CI_SEARCHES, *PCMCI_FAMILY, *(m for m in TESTED if m not in STARTS))
     },
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }
@@ -1066,6 +1068,81 @@ def test_the_seed_reaches_every_randomized_test_a_search_builds(
     assert built_seeds
     assert set(built_seeds) == {7}
     assert out.metadata["seed"] == 7
+
+
+#: The methods that take ``degrees_of_freedom``, read from the registry.
+DEGREES_OF_FREEDOM_METHODS = [m for m in REGISTRY if tagged(CONCEPTS["degrees_of_freedom"], m)]
+
+
+def categorical_inputs(method: str) -> list:
+    """The method's inputs with every column of its data cut into three categories."""
+
+    def cut(table: pd.DataFrame) -> pd.DataFrame:
+        return table.apply(lambda column: pd.qcut(column, 3, labels=False)).astype("category")
+
+    return [
+        cut(arg)
+        if isinstance(arg, pd.DataFrame)
+        else [cut(t) for t in arg]
+        if isinstance(arg, list)
+        else arg
+        for arg in inputs(method, codes=False)
+    ]
+
+
+@pytest.fixture
+def built_rules(monkeypatch):
+    """The ``degrees_of_freedom`` each categorical test a fit builds receives."""
+    rules = []
+    for name in ci.DISCRETE_INDEP_TESTS:
+
+        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+            rules.append(options.get("degrees_of_freedom"))
+            return _factory(data, *args, **options)
+
+        monkeypatch.setitem(ci._CI_REGISTRY, name, build)
+    return rules
+
+
+def test_the_methods_that_take_a_categorical_test_take_degrees_of_freedom():
+    accepts = [
+        m
+        for m in REGISTRY
+        if (param := tagged(CONCEPTS["indep_test"], m)) is not None
+        and set(ci.DISCRETE_INDEP_TESTS) <= set(param.choices or ())
+    ]
+    assert accepts == DEGREES_OF_FREEDOM_METHODS
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "rule"),
+    [
+        pytest.param(m, s, r, id=f"{m}-{r}-{'+'.join(s) or 'default'}")
+        for m in DEGREES_OF_FREEDOM_METHODS
+        for s in CI_CASES.get(m, [{}])
+        for r in (None, *ci.DEGREES_OF_FREEDOM)
+    ],
+)
+def test_degrees_of_freedom_reach_every_categorical_test_a_fit_builds(
+    method, settings, rule, built_rules
+):
+    """On categorical data every test a fit builds gets the argument, or the method's default."""
+    passed = {} if rule is None else {"degrees_of_freedom": rule}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        facade(method)(*categorical_inputs(method), **settings, **passed)
+    default = tagged(CONCEPTS["degrees_of_freedom"], method).default  # ty: ignore[possibly-missing-attribute]
+    assert built_rules
+    assert set(built_rules) == {default if rule is None else rule}
+
+
+@pytest.mark.parametrize("method", DEGREES_OF_FREEDOM_METHODS)
+def test_degrees_of_freedom_with_a_test_that_does_not_read_it_raises(method):
+    """The call checks it before the fit, and the entry names the error."""
+    with pytest.raises(ValueError, match="degrees_of_freedom sets the degrees of freedom"):
+        facade(method)(*inputs(method, codes=False), degrees_of_freedom="mean")
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")["degrees_of_freedom"]
+    assert "valueerror" in entry
 
 
 @pytest.mark.parametrize("method", (*CI_SEARCHES, *PCMCI_FAMILY))

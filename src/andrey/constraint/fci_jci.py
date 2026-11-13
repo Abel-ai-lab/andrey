@@ -53,6 +53,7 @@ def fci_jci(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> tuple[GraphStructure, list[tuple[int, str]]]:
     """Discover a PAG from multi-domain ``data`` with FCI and the environment index as a context.
@@ -60,10 +61,10 @@ def fci_jci(
     ``data`` is an ``(n_samples, n_features)`` array; ``env`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` environment index (one number per row). ``alpha``, ``indep_test``,
     ``collider_rule``, ``possible_dsep``, ``max_depth``, ``in_column_order``, ``workers``, ``seed``,
-    and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the data with
-    the index appended as a last column; ``categorical``, a boolean mask of the data's categorical
-    columns, reaches a mixed-data test, which also takes the index as categorical. ``constraints``,
-    over the data's columns, act as for FCI, with the index unconstrained.
+    ``degrees_of_freedom``, and ``_ambiguous`` act as for :func:`~andrey.constraint.fci.fci`, on the
+    data with the index appended as a last column; ``categorical``, a boolean mask of the data's
+    categorical columns, reaches a mixed-data test, which also takes the index as categorical.
+    ``constraints``, over the data's columns, act as for FCI, with the index unconstrained.
     ``confounded_index=False`` assumes no hidden variable causes both the index and a data variable.
     With a single domain the index is left out and the search is FCI on ``data`` alone.
 
@@ -91,6 +92,7 @@ def fci_jci(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_rule=collider_rule,
             categorical=categorical,
             possible_dsep=possible_dsep,
@@ -107,7 +109,9 @@ def fci_jci(
     augmented = np.concatenate([X, context], axis=1)
     mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
     padded = None if constraints is None else constraints.padded(d + 1)
-    test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
+    test = make_indep_test(
+        indep_test, augmented, categorical=mask, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     allowed, keep, apart = knowledge_masks(padded)
     workers = backend.worker_count(workers)
     skeleton, sepsets, _ = adjacency_search(
@@ -135,6 +139,7 @@ def fci_jci(
         sepsets,
         possible_dsep=possible_dsep,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=mask,
         seed=seed,
         max_depth=max_depth,

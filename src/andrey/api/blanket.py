@@ -44,6 +44,7 @@ def fit_blanket(
     structure: str,
     alpha: float,
     indep_test: str | None,
+    degrees_of_freedom: str,
     categorical: Sequence[str | int] | None,
     seed: int | None,
     max_depth: int | None,
@@ -62,6 +63,7 @@ def fit_blanket(
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
+        "degrees_of_freedom": degrees_of_freedom,
         "categorical": mask,
         "seed": seed,
         "max_depth": max_depth,
@@ -77,6 +79,7 @@ def fit_blanket(
                 X,
                 alpha=alpha,
                 indep_test=indep_test,
+                degrees_of_freedom=degrees_of_freedom,
                 categorical=mask,
                 seed=seed,
                 max_depth=max_depth,
@@ -105,6 +108,7 @@ def iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -146,6 +150,13 @@ def iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -362,6 +373,7 @@ def iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -377,6 +389,7 @@ def inter_iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -417,6 +430,13 @@ def inter_iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -629,6 +649,7 @@ def inter_iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -644,6 +665,7 @@ def gs(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -686,6 +708,13 @@ def gs(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -889,6 +918,7 @@ def gs(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -904,6 +934,7 @@ def fast_iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -946,6 +977,13 @@ def fast_iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -1158,6 +1196,7 @@ def fast_iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -1173,6 +1212,7 @@ def mmpc(
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -1213,6 +1253,13 @@ def mmpc(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -1431,6 +1478,7 @@ def mmpc(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -1446,6 +1494,7 @@ def hiton_pc(
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -1485,6 +1534,13 @@ def hiton_pc(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -1698,6 +1754,7 @@ def hiton_pc(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -1713,6 +1770,7 @@ def hiton_mb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -1756,6 +1814,13 @@ def hiton_mb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -1969,6 +2034,7 @@ def hiton_mb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -1984,6 +2050,7 @@ def mmmb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -2028,6 +2095,13 @@ def mmmb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -2239,6 +2313,7 @@ def mmmb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -2254,6 +2329,7 @@ def pcmb(
     structure: str = "cpdag",
     alpha: float = 0.01,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "nonempty",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -2298,6 +2374,14 @@ def pcmb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="nonempty"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``. PCMB defaults to ``"nonempty"``, the degrees of freedom of the G-square
+        test its paper runs, after Spirtes, Glymour and Scheines [1]_ [7]_.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -2380,9 +2464,6 @@ def pcmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -2459,19 +2540,26 @@ def pcmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
-    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
-    values missing completely at random. A spouse is found only through a child that the search
-    found, so an edge its tests miss also hides that child's other parents, and each spouse's
-    verdict rests on the one separating set GetPCD recorded for it. GetPCD tests every candidate
-    against every subset of the current set, so a set of ``m`` members takes up to ``2**m`` tests
-    per candidate; the search runs it for the target, for each of its parents and children, and,
-    for the symmetry check, for each of their members, so its cost grows with the sets two steps
-    from the target. The CPDAG tests every subset of the smaller blanket for each unshielded
-    triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    **Limitations.** Measured on samples of the Alarm network (37 variables) at 100 to 5,000 rows
+    and of the Pigs network (441) at 100 to 500 rows, with every variable a target: on Alarm from
+    1,000 rows and on Pigs at every size, its mean distance from perfect precision and recall was at
+    most 0.01 above the paper's [1]_, and on Alarm at 100, 200, and 500 rows its mean recall was
+    0.06, 0.04, and 0.04 below the paper's at a precision within 0.01 of it. Its errors, the members
+    missed plus those added, were below the empty answer's in every setting, and a fit for every
+    variable took a median of 2.6 to 7.6 s on Alarm and 3 to 17 minutes on Pigs on one core. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#pcmb>`_ has the table
+    beside the paper's. Tested with exact d-separation on 15 variables, on simulated linear-Gaussian
+    data with 20 variables and 2,000 rows, and on categorical data with 10 variables and 3,000 rows;
+    missing values on up to 20 variables with up to a fifth of the values missing completely at
+    random. A spouse is found only through a child that the search found, so an edge its tests miss
+    also hides that child's other parents, and each spouse's verdict rests on the one separating set
+    GetPCD recorded for it. GetPCD tests every candidate against every subset of the current set, so
+    a set of ``m`` members takes up to ``2**m`` tests per candidate; the search runs it for the
+    target, for each of its parents and children, and, for the symmetry check, for each of their
+    members, so its cost grows with the sets two steps from the target. The CPDAG tests every subset
+    of the smaller blanket for each unshielded triple, so a triple whose smaller blanket holds ``m``
+    variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2490,6 +2578,8 @@ def pcmb(
     .. [6] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
        discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
        1762-1770.
+    .. [7] Spirtes, P., Glymour, C., and Scheines, R. (1993). Causation, Prediction, and Search.
+       Springer.
 
     Examples
     --------
@@ -2511,6 +2601,7 @@ def pcmb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
