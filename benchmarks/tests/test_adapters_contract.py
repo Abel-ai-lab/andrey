@@ -138,6 +138,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AdjustForNothing(),
     AdjustForEverything(),
     AndreyPCAdjustment(),
+    AndreyAdjustment("covariate_rules"),
     AndreyAdjustment("ldp"),
     AndreyAdjustment("ld3"),
 ]
@@ -188,6 +189,7 @@ DEFERRED_MODULES = {
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
     "andrey.pc.adjustment": "andrey.core.adjustment",
+    "andrey.covariate_rules": "andrey.constraint.covariates",
     "andrey.ldp": "andrey.constraint.partition",
     "andrey.ld3": "andrey.constraint.partition",
     **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
