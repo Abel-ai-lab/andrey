@@ -38,6 +38,9 @@ benchmarks/.maasch/
 # The authors' SNAP and LOAD code that benchmarks/start_schubert.sh fetches, read from disk and never
 # committed.
 benchmarks/.schubert/
+# The authors' LocPC-CDE code that benchmarks/start_ciphod.sh fetches, read from disk and never
+# committed.
+benchmarks/.ciphod/
 env/
 
 .vscode/

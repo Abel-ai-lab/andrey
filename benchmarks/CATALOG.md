@@ -35,7 +35,7 @@ whose Reproduce table lists the driver.
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
 | [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | MMB-by-MMB (total conditioning, IAMB); FCI as context | the authors' MMB-by-MMB code; pcalg (RFCI) | |
 | [Y-structures](comparisons/y-structures.md) | `y_structures_cpu.py` | Y-structures, extended Y-structures | the authors' Y-structure code (sbcd) | |
-| [Treatment-outcome methods](comparisons/adjustment.md) | `adjustment_cpu.py` | the methods that answer for a treatment and an outcome, as they ship (`covariate_rules`, `ldecc`, `ldp`, `ld3`, `snap`, `local_optimal_adjustment`, `locpc_cde`); PC read at the pair | the authors' code for LDECC, LDP, LD3, SNAP, and LOAD | |
+| [Treatment-outcome methods](comparisons/adjustment.md) | `adjustment_cpu.py` | the methods that answer for a treatment and an outcome, as they ship (`covariate_rules`, `ldecc`, `ldp`, `ld3`, `snap`, `local_optimal_adjustment`, `locpc_cde`); PC read at the pair | the authors' code for LDECC, LDP, LD3, SNAP, LOAD, and LocPC-CDE | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | 0.14.0 |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |

@@ -36,11 +36,21 @@ def requires_pair(method: str) -> bool:
     )
 
 
+def requires_variables(method: str) -> bool:
+    """Whether ``method`` answers for the pairs of variables it must be given: its ``variables``
+    entry opens "Required:"."""
+    return any(
+        p.concept == "variables" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
 #: The arguments a method needs beyond its inputs: a target, by position, for each method that
-#: requires one, and a treatment and an outcome for each method that answers for a pair.
+#: requires one, a treatment and an outcome for each method that answers for a pair, and two
+#: variables for each method that answers for the pairs of the variables it is given.
 REQUIRED = {
     **{method: {"target": 2} for method in REGISTRY if requires_target(method)},
     **{method: {"treatment": 1, "outcome": 2} for method in REGISTRY if requires_pair(method)},
+    **{method: {"variables": [1, 2]} for method in REGISTRY if requires_variables(method)},
 }
 
 
