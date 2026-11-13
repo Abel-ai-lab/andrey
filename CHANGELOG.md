@@ -200,6 +200,16 @@ names its pull request.
   them. It learns only the blankets the answer needs. `metadata["effects"]` holds one record per
   direction, the graph the edges at the two variables, and `metadata["blankets_learned"]` the
   variables whose blanket it learned. ([#1003])
+- `andrey.lhts` and `andrey.nhts`, the hierarchical topological sorts LHTS and NHTS followed by edge
+  discovery (Hiremath et al. 2024), experimental, with `alpha=0.05` and `indep_test="kci"` by
+  default. LHTS decides the ancestor relation of each pair of variables from least-squares
+  regressions of the pair on each other, after their known common ancestors are regressed out
+  jointly; NHTS finds the roots from kernel ridge regressions on one variable or a few and places
+  the other variables layer by layer. Edge discovery tests each variable of an earlier layer given
+  its own parents and the candidates found in the layers between, then tests each candidate that
+  shares or follows a layer with another given all the other candidates. Both return a DAG, a causal
+  order that lists the layers in turn, the layers in `metadata["partial_order"]`, and the placements
+  no test decided in `metadata["forced_decisions"]`. ([#1006])
 
 ### Changed
 
@@ -2763,6 +2773,7 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
+[#1006]: https://github.com/Abel-ai-lab/Andrey/pull/1006
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
