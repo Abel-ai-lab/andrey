@@ -35,6 +35,9 @@ The model is a published network, read as a linear-Gaussian structural model
 ## Solutions
 
 Every solution runs at `alpha = 0.01`, the value of the authors' example; the paper states none.
+`andrey.mmb_by_mmb` with total conditioning and the authors' code both test each blanket at
+`alpha / (10 * floor(d / 10))` over `d` columns (`alpha` itself below 10 columns) and the local
+structures at `alpha`.
 
 - `andrey.mmb_by_mmb` and `andrey.mmb_by_mmb.iamb` run `andrey.mmb_by_mmb` with Fisher's z test
   (`indep_test="fisherz"`) and the blanket learner `"total_conditioning"`, the paper's, or

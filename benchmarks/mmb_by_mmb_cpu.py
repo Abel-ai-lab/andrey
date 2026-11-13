@@ -68,8 +68,9 @@ ANDREY_ARMS: list = [AndreyMMBbyMMB(), AndreyMMBbyMMB("iamb")]
 #: The references and the context solutions, then the empty answer that floors the field.
 REFERENCES = [XieMMBbyMMB(), PcalgRFCICounted(), AndreyFCI()]
 
-#: The level of every test, for every solution; the paper states none (the authors' example, and
-#: so their code's default setting here, is 0.01).
+#: The level passed to every solution; the paper states none (the authors' example, and so their
+#: code's default setting here, is 0.01). Andrey's MMB-by-MMB with total conditioning and the
+#: authors' code test each blanket at ALPHA / (10 * floor(d / 10)) over d >= 10 columns.
 ALPHA = 0.01
 
 #: The paper's networks and sample sizes.

@@ -83,19 +83,22 @@ names its pull request.
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
   caps every test, as in the other learners, and sets no cap by default. ([#956])
 - `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
-  effects of one target when unmeasured common causes may exist, the edges the target has in the
-  PAG with their marks, learned one Markov blanket at a time outward from the target until its
-  marks are decided or the paper's stop rules end the search. `metadata` lists the target's
-  `parents`, `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end),
-  its `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
+  effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
+  with their marks, learned one Markov blanket at a time outward from the target until its marks are
+  decided or the paper's stop rules end the search. `metadata` lists the target's `parents`,
+  `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end), its
+  `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
   conditioning, a test of each variable given all the others, as in the paper's runs
   (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
-  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings. Where its authors'
-  code goes beyond the paper, the method follows it, with two safeguards that make the answer
-  correct where the paper's steps as written can be wrong: a v-structure joins the answer only
-  when the variables off the step confirm it from their own blankets, and the stop rules are read
-  only once more blankets have been learned than the target has neighbors. The benchmark lane of
-  MMB-by-MMB runs it beside the authors' code. ([#966], [#980])
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings, and total conditioning
+  tests each blanket at `alpha / (10 * floor(d / 10))` over `d >= 10` columns, as their code does.
+  With a partial-correlation test on complete data, total conditioning answers the tests of every
+  blanket a fit learns from one inverse of the correlation matrix. Where its authors' code goes
+  beyond the paper, the method follows it, with two safeguards that make the answer correct where
+  the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
+  off the step confirm it from their own blankets, and the stop rules are read only once more
+  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
+  beside the authors' code. ([#966], [#980], [#994])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2731,6 +2734,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
