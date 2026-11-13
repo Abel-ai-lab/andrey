@@ -42,10 +42,10 @@ bits count as tied and go to the rank.
 
 What reordering the columns does to each method's result with the default settings. "Relabels" means
 you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the methods
-the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod` the
-p-value order of their colliders, for `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and
-`fci_jci` the order-free rounds of their orientation rules, and for `fci`, `gfci`, and `fci_jci`
-the rank order of their possible-d-separation step.
+the setting below changes: it replaces the rank that breaks their ties, for `pc`, `cdnod`, and
+`snap` the p-value order of their colliders, for `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`,
+`grasp_fci`, and `fci_jci` the order-free rounds of their orientation rules, and for `fci`, `gfci`,
+and `fci_jci` the rank order of their possible-d-separation step.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -80,11 +80,11 @@ two tied scores round to different values.
 
 The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`,
 and the tests of `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`,
-`pcmb`, `mb_by_mb`, `mmb_by_mmb`, `y_structures`, `ldp`, `ld3`, and the restrict phases of `mmhc`
-and `rsmax2`, with the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI
-below 2,000 rows, the scores of `ges` (and so of `gfci`'s first phase), `gies`, `gnies`, `xges`,
-`ages`, `hc`, `tabu`, `mmhc`, and `rsmax2`, the fits of `notears`, `dagma`, `dynotears`, `cam`,
-`resit`, `score_matching`, `nogam`, and `camuv`, and the tests of `pcmci`, `pcmciplus`,
+`pcmb`, `mb_by_mb`, `mmb_by_mmb`, `y_structures`, `ldp`, `ld3`, `snap`, and the restrict phases of
+`mmhc` and `rsmax2`, with the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and
+with KCI below 2,000 rows, the scores of `ges` (and so of `gfci`'s first phase), `gies`, `gnies`,
+`xges`, `ages`, `hc`, `tabu`, `mmhc`, and `rsmax2`, the fits of `notears`, `dagma`, `dynotears`,
+`cam`, `resit`, `score_matching`, `nogam`, and `camuv`, and the tests of `pcmci`, `pcmciplus`,
 `jpcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker processes, so the host's
 thread count cannot change their results. From 2,000 rows, KCI runs on every BLAS thread, where its
 kernel products run faster; its p-values then repeat for a fixed thread count.

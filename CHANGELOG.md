@@ -155,6 +155,16 @@ names its pull request.
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.snap`, sequential non-ancestor pruning (Schubert, Claassen and Magliacane 2025),
+  experimental: the effects among two or more `variables`, given in any order, from the CPDAG over
+  their possible ancestors alone. It runs PC's skeleton search one conditioning-set size at a time
+  and, after each size, drops every column that cannot be an ancestor of one of them, so the larger
+  conditioning sets are tried among fewer columns. `metadata["effects"]` holds one record per
+  ordered pair: the optimal adjustment set when the total effect is identifiable, the parent sets of
+  the treatment the CPDAG allows when it is not, and a zero effect when the outcome cannot be a
+  descendant of the treatment. `metadata["possible_ancestors"]` lists the columns kept, and
+  `max_depth=k` gives SNAP(k), a prefilter. The treatment-outcome benchmark lane runs it beside the
+  authors' code. ([#985])
 
 ### Changed
 
@@ -2709,6 +2719,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#985]: https://github.com/Abel-ai-lab/Andrey/pull/985
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

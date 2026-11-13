@@ -172,7 +172,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures`, `ldp`, `ld3` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `snap` |
 | `undirected` | `mmpc`, `hiton_pc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
@@ -202,6 +202,12 @@ without a record is not claimed either way.
 not an edge, so its answer, an adjustment set or none, is a record in `metadata["effects"]`. `ld3`
 returns a `dag` whose only edges point into its `outcome`, from the parents it finds, the
 `treatment` among them when the structural direct criterion holds.
+
+`snap` returns a `cpdag` over every column whose edges join only the columns in
+`metadata["possible_ancestors"]`, the possible ancestors of its `variables`: a column with no edge
+may have been pruned rather than found unconnected. Its answers, one per ordered pair of the
+`variables`, are records in `metadata["effects"]`. With a `max_depth` that stops the search while
+pairs are left to test, the graph holds the edges and v-structures found up to the cap.
 
 `fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
 `metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for
