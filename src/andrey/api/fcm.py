@@ -1296,8 +1296,9 @@ def nhts(
     ``x_j = f_j(parents) + e_j``. It sorts the variables into layers, a variable's layer being the
     longest directed path from a root to it, starting from the roots, which it finds with
     regressions on one or a few variables; then each variable's parents are found among the
-    earlier layers by conditional-independence tests whose conditioning sets hold only parents
-    already found. It returns a DAG and a causal order consistent with the layers.
+    earlier layers by conditional-independence tests whose conditioning sets hold only parents and
+    candidate parents already found. It returns a DAG and a causal order consistent with the
+    layers.
 
     Parameters
     ----------
@@ -1365,7 +1366,7 @@ def nhts(
     with additive noise of any distribution and no unmeasured common causes [1]_, a model in which
     the DAG is identified [2]_. Its regressions have one regressor plus the variables independent of
     it in the root step, and grow only with the layers found, and its edge tests condition only on
-    parents already found: it suits graphs with few layers.
+    parents and candidate parents already found: it suits graphs with few layers.
 
     **The steps.** The paper's four stages and its edge discovery [1]_, every test at ``alpha``:
 

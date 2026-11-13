@@ -769,8 +769,8 @@ def lhts(
     regressions of the pair on each other after their known common ancestors are regressed out,
     and sorts the variables into layers, a variable's layer being the longest directed path from a
     root to it. Each variable's parents are then found among the earlier layers by
-    conditional-independence tests whose conditioning sets hold only parents already found. It
-    returns a DAG and a causal order consistent with the layers.
+    conditional-independence tests whose conditioning sets hold only parents and candidate parents
+    already found. It returns a DAG and a causal order consistent with the layers.
 
     Parameters
     ----------
@@ -837,8 +837,9 @@ def lhts(
     **When to use.** LHTS suits i.i.d. continuous observational data from a linear model with
     independent non-Gaussian noise and no unmeasured common causes, where the DAG is identified
     [2]_. Besides a causal order it finds pairs of variables with no ancestral relation, so its
-    layers are fewer than the variables, and its edge tests condition only on parents already
-    found. For the most accurate order on such data use :func:`~andrey.direct_lingam`.
+    layers are fewer than the variables, and its edge tests condition only on parents and
+    candidate parents already found. For the most accurate order on such data use
+    :func:`~andrey.direct_lingam`.
 
     **The steps.** The paper's four stages and its edge discovery [1]_, every test at ``alpha``,
     each independence test of two variables the gamma HSIC test:

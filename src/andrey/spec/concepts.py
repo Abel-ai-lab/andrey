@@ -696,8 +696,8 @@ _CONCEPTS = (
                 "lpcmci",
             ),
             *_exempt(
-                "Each edge test conditions on the parents already found, and the paper sets no "
-                "cap on them.",
+                "Each edge test conditions on the parents and candidate parents already found, "
+                "and the paper sets no cap on them.",
                 "lhts",
                 "nhts",
             ),

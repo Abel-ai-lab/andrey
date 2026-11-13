@@ -2349,8 +2349,8 @@ _add(
         summary="LHTS for linear models with non-Gaussian noise: the ancestor relation of every "
         "pair from regressions of the pair on each other after their known common ancestors, its "
         "layers as a hierarchical causal order, then each variable's parents among earlier "
-        "layers by conditional-independence tests given parents already found. Returns a DAG and "
-        "a causal order. Experimental.",
+        "layers by conditional-independence tests given parents and candidate parents already "
+        "found. Returns a DAG and a causal order. Experimental.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -2572,7 +2572,8 @@ _add(
         summary="NHTS for nonlinear effects with additive noise: roots from kernel ridge "
         "regressions on one variable or a few, layers from regressions on the variables already "
         "placed, then each variable's parents among earlier layers by conditional-independence "
-        "tests given parents already found. Returns a DAG and a causal order. Experimental.",
+        "tests given parents and candidate parents already found. Returns a DAG and a causal "
+        "order. Experimental.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
