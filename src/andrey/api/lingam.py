@@ -671,8 +671,8 @@ def local_isa_ling(
     -----
     **When to use.** Local ISA-LiNG suits i.i.d. continuous observational data in which each
     variable is a linear function of its direct causes plus independent non-Gaussian noise, where
-    the graph may hold cycles (no self-loops) and every variable is measured, when only the edges
-    at one variable matter [1]_. It identifies every model of the equivalence class at the target:
+    the graph may hold cycles (no self-loops) and every variable is measured, when only the edges at
+    one variable matter [1]_. It identifies every model of the equivalence class [3]_ at the target:
     one answer when neither the target nor a child lies on a cycle, several otherwise, and with
     disjoint cycles one stable answer [1]_. For the whole graph without cycles use
     :func:`~andrey.direct_lingam`; for the edges at a target with Gaussian noise use
@@ -689,11 +689,13 @@ def local_isa_ling(
     them. Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Tested on the paper's simulation with up to 50 variables
-    and 2,000 rows. Algorithm 1 tries every assignment of the demixing matrix's rows to the local
-    variables that its zero pattern allows, a number that grows quickly with the blanket when the
-    matrix is dense. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 15 variables with 1,500 rows.
+    The blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often
+    many more than the true blanket, and the time grows with them. Algorithm 1 tries every
+    assignment of the demixing matrix's rows to the local variables that its zero pattern allows, a
+    number that grows quickly with the blanket when the matrix is dense. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
