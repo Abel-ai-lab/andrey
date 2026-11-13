@@ -155,6 +155,13 @@ names its pull request.
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+  directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
+  blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
+  eager collider checks that direct the treatment's parents. The step that finds the neighbors
+  tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
+  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
+  lane runs it beside the authors' code. ([#NNN])
 
 ### Changed
 
@@ -2709,6 +2716,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

@@ -286,7 +286,7 @@ def ldecc(
             if np.count_nonzero(adjacent[a]) - 1 < size:
                 continue
             pairs = sorted(
-                (b for b in np.flatnonzero(adjacent[a]).tolist() if b != x), key=place.get
+                (b for b in np.flatnonzero(adjacent[a]).tolist() if b != x), key=place.__getitem__
             )
             if size == 0:  # the tests read no neighbor, so asking them together changes nothing
                 tests.ask(a, pairs)

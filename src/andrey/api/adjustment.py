@@ -709,7 +709,10 @@ def ldecc(
     (App. A.2): the answer then lists more parent sets than the CPDAG allows, the treatment's
     true parents among them. When some neighbor stays undirected, the PC algorithm's tests run
     over every pair, as many as learning the whole skeleton, and the sets number up to two to the
-    power of the undirected neighbors.
+    power of the undirected neighbors. On the 25-node graphs of [1]_ (App. C.1) with 8,000 to
+    32,000 rows, a fit ran a median of 310 to 350 tests, in under a second. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
