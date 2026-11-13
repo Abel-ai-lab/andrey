@@ -509,6 +509,7 @@ PROSE_NAMES = {
     "ldp": "LDP",
     "ld3": "LD3",
     "ldecc": "LDECC",
+    "local_optimal_adjustment": "LOAD",
     "locpc_cde": "LocPC-CDE",
     "ges": "GES",
     "gies": "GIES",

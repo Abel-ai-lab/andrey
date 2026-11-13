@@ -376,6 +376,7 @@ UNIT_CASES = {
             *("cmb", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc", "locpc_cde"),
+            "local_optimal_adjustment",
         ),
         "gauss_5v",
     ),

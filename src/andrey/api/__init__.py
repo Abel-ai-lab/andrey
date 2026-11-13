@@ -12,7 +12,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 ``StructureOutput`` construction.
 """
 
-from .adjustment import ld3, ldecc, ldp, locpc_cde
+from .adjustment import ld3, ldecc, ldp, local_optimal_adjustment, locpc_cde
 from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmmb, mmpc, pcmb
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc, y_structures
 from .continuous import dagma, notears
@@ -61,6 +61,7 @@ __all__ = [
     "ldp",
     "ld3",
     "ldecc",
+    "local_optimal_adjustment",
     "locpc_cde",
     # score-based
     "ges",

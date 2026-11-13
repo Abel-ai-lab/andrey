@@ -141,6 +141,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyAdjustment("ldecc"),
     AndreyAdjustment("ldp"),
     AndreyAdjustment("ld3"),
+    AndreyAdjustment("local_optimal_adjustment"),
     AndreyAdjustment("locpc_cde"),
 ]
 
@@ -193,6 +194,7 @@ DEFERRED_MODULES = {
     "andrey.ldecc": "andrey.constraint.ldecc",
     "andrey.ldp": "andrey.constraint.partition",
     "andrey.ld3": "andrey.constraint.partition",
+    "andrey.local_optimal_adjustment": "andrey.constraint.local_optimal_adjustment",
     "andrey.locpc_cde": "andrey.constraint.locpc",
     **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
     "andrey.pc.kci.numpy": "andrey.core.ci_kernel",

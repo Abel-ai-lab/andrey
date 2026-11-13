@@ -56,6 +56,7 @@ TESTWISE_METHODS = (
     "ldp",
     "ld3",
     "ldecc",
+    "local_optimal_adjustment",
     "locpc_cde",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
