@@ -174,7 +174,7 @@ names its pull request.
   undecided otherwise, one record in `metadata["effects"]`; `metadata["rule_counts"]` counts each
   rule, and the graph has no edges. It checks every set of covariates, so its tests double with each
   covariate unless `max_depth` caps the sets, and it accepts missing values by test-wise deletion.
-  ([#PRB11])
+  ([#1001])
 
 ### Changed
 
@@ -2737,6 +2737,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#1001]: https://github.com/Abel-ai-lab/Andrey/pull/1001
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
