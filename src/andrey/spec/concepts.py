@@ -159,12 +159,12 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3", "local_optimal_adjustment"),
+    *("ldp", "ld3", "ldecc", "local_optimal_adjustment"),
 )
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
-    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3"),
+    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
     "local_isa_ling",
     "local_optimal_adjustment",
 )
@@ -216,6 +216,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_isa_ling",
             "local_optimal_adjustment",
         ),
@@ -677,7 +678,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv", "ldecc"),
         exempt=(
             *_exempt(
                 "Its ancestry and amenability tests condition on sets the local structures fix; no "
@@ -836,6 +837,7 @@ _CONCEPTS = (
                 "pcmb",
                 "mb_by_mb",
                 "mmb_by_mmb",
+                "ldecc",
                 "local_optimal_adjustment",
             ),
             *_exempt(
@@ -938,6 +940,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_optimal_adjustment",
         ),
         exempt=(
@@ -1168,6 +1171,7 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
             ),
+            *_exempt("Its paper gives no rule for background knowledge.", "ldecc"),
         ),
     ),
     Concept(
@@ -1184,7 +1188,7 @@ _CONCEPTS = (
                     for m in NO_KNOWLEDGE
                     if m
                     not in (
-                        *("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling"),
+                        *("icp", "ages", "y_structures", "ldp", "ld3", "ldecc", "local_isa_ling"),
                         "local_optimal_adjustment",
                     )
                 ),
@@ -1196,6 +1200,7 @@ _CONCEPTS = (
                 "y_structures",
                 "ldp",
                 "ld3",
+                "ldecc",
                 "local_isa_ling",
                 "local_optimal_adjustment",
             ),
@@ -1234,6 +1239,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_optimal_adjustment",
         ),
         others_exempt="A continuous model.",
@@ -1279,6 +1285,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "mb_by_mb",
             "mmb_by_mmb",
             *PCMCI_FAMILY,
@@ -1497,6 +1504,11 @@ _CONCEPTS = (
                 "ld3",
             ),
             *_exempt(
+                "A local search around one treatment, with no place for a context variable; cdnod "
+                "is the test-based search that takes env.",
+                "ldecc",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1576,6 +1588,9 @@ _CONCEPTS = (
             *_exempt(
                 "Answers for one target: the edges at it, as its PAG holds them.", "mmb_by_mmb"
             ),
+            *_exempt(
+                "Answers for one treatment: the edges at it, as its CPDAG holds them.", "ldecc"
+            ),
         ),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
@@ -1622,7 +1637,9 @@ _CONCEPTS = (
             *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
         ),
         exempt=(
-            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt(
+                "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+            ),
             *_exempt(
                 "Answers for the ordered pairs of two variables, not one.",
                 "local_optimal_adjustment",
@@ -1644,7 +1661,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "ldecc"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1660,7 +1677,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("ldp", "ld3", "ldecc"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1704,6 +1721,7 @@ _CONCEPTS = (
         suitable=(
             "mb_by_mb",
             "mmb_by_mmb",
+            "ldecc",
             "local_optimal_adjustment",
         ),
         others_exempt="Runs no Markov blanket learner as a step.",
@@ -1752,7 +1770,9 @@ _CONCEPTS = (
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
         exempt=(
-            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt(
+                "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+            ),
             *_exempt(
                 "Answers for the ordered pairs of two variables, not one.",
                 "local_optimal_adjustment",
@@ -1773,6 +1793,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_optimal_adjustment",
         ),
         others_exempt="Does not report its test count.",
@@ -1798,6 +1819,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "ldecc",
             "local_optimal_adjustment",
         ),
         others_exempt="Answers for no ordered pair of variables.",
@@ -1851,6 +1873,11 @@ _CONCEPTS = (
                 "Each local structure decides a triple by the separating set of its endpoints, "
                 "as MMB-by-MMB states (Xie et al. 2024); no vote over several sets.",
                 "mmb_by_mmb",
+            ),
+            *_exempt(
+                "Each eager collider check reads the first separating set found, and check "
+                "picks how it directs parents; no vote over several sets.",
+                "ldecc",
             ),
         ),
         others_exempt="No separating-set orientation.",

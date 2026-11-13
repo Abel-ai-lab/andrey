@@ -3,7 +3,9 @@
 Each method answers for one ordered pair of columns, a treatment and an outcome: the answer is a
 record in ``metadata["effects"]`` (:mod:`andrey.core.effects`) with the adjustment sets it found,
 next to the graph its paper licenses. ``ldp`` finds a valid adjustment set for the total effect;
-``ld3`` finds the parents of the outcome and whether the treatment is one of them.
+``ld3`` finds the parents of the outcome and whether the treatment is one of them; ``ldecc`` finds
+the edges at the treatment and its locally valid parent sets; ``local_optimal_adjustment``
+finds, for two variables, which one causes the other and the optimal adjustment set.
 """
 
 from __future__ import annotations
@@ -494,6 +496,295 @@ def ld3(
     return structure_output(
         dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
     )
+
+
+def _ldecc_record(result, x: int, y: int, name) -> dict:
+    """Build the ``effects`` record of an LDECC answer: its locally valid parent sets.
+
+    The outcome a parent of the treatment makes the effect zero in every graph the answer allows,
+    and no set valid; with one set and no outcome in it, the effect is identified; otherwise the
+    sets are listed with the outcome left out of a set that holds it.
+    """
+    from andrey.core.effects import effect_record
+
+    sets = result.parent_sets
+    if y in result.parents:
+        return effect_record(x, y, estimand="total", nonzero=False, identifiable=False, name=name)
+    if len(sets) == 1:
+        return effect_record(
+            x,
+            y,
+            estimand="total",
+            identifiable=True,
+            adjustment_sets=sets,
+            set_kind="local_parents",
+            name=name,
+        )
+    kept = [[v for v in s if v != y] for s in sets]
+    return effect_record(
+        x,
+        y,
+        estimand="total",
+        adjustment_sets=kept,
+        set_kind="local_parents" if kept else None,
+        name=name,
+    )
+
+
+@method_spec("ldecc")
+def ldecc(
+    data: npt.ArrayLike,
+    *,
+    treatment: str | int | None = None,
+    outcome: str | int | None = None,
+    blanket: str = "iamb",
+    alpha: float = 0.05,
+    check: bool = True,
+    indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+) -> StructureOutput:
+    """Find the parent sets that adjust for a treatment's effect on an outcome, locally (LDECC).
+
+    LDECC learns the edges at the treatment and their directions without the whole graph [1]_. It
+    learns the treatment's Markov blanket and its neighbors among it, then runs the tests of the PC
+    algorithm over the other pairs of variables and reads each independence it finds for what it
+    says about the treatment's neighbors, stopping once every neighbor is directed. Its answer is
+    the set of effects of the treatment on the outcome, one per parent set of the treatment that
+    the local structure allows, each estimated by adjusting for that set (the IDA approach).
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    treatment : str or int
+        Required: the cause of the pair, a column label (a string) or a 0-based position (an
+        integer).
+    outcome : str or int
+        Required: the effect of the pair, a column label (a string) or a 0-based position (an
+        integer).
+    blanket : str, default="iamb"
+        The Markov blanket learner of the first step: :func:`~andrey.iamb`, the learner of the
+        paper's runs [1]_, or :func:`~andrey.inter_iamb`, :func:`~andrey.gs`,
+        :func:`~andrey.fast_iamb`, :func:`~andrey.hiton_mb`, :func:`~andrey.mmmb`,
+        :func:`~andrey.pcmb`, ``"iamb_forward"`` (IAMB's grow phase without its shrink), or
+        ``"total_conditioning"`` (each variable the test finds dependent on the treatment given
+        all the other variables) by name. A superset of the blanket keeps the answer right under
+        exact tests and costs tests.
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a p-value above ``alpha`` is an
+        independence, any other a dependence. The default is the level of the authors' code; the
+        experiments of [1]_ use ``0.01 * 32000 / n`` for ``n`` rows.
+    check : bool, default=True
+        How an eager collider check directs parents when neither variable of the pair is a
+        neighbor of the treatment. ``True`` (the paper's LDECC-checks, Remark 21 of [1]_) marks
+        the minimal neighbor separators of the two as parents only when they are the same set,
+        which needs weaker assumptions and was more accurate in the paper's experiments; ``False``
+        marks both.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`. The
+        paper's runs use Fisher's z test [1]_. ``metadata["indep_test"]`` names the test the fit
+        used: the one picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``;
+        ``None``, the default, sets no limit. A test the cap rules out is not run, and the step
+        that needs it draws no conclusion from it. Under a cap, the blanket learner stops growing
+        at ``max_depth + 1`` members.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
+        edges at the treatment: ``v -> treatment`` for a parent, ``treatment -> v`` for a child, and
+        ``v - treatment`` for a neighbor left undirected. An absent edge away from the treatment
+        means nothing. ``metadata["effects"]`` holds one record (:mod:`andrey.core.effects`) for the
+        pair, by column label or 0-based position: ``estimand`` is ``"total"`` and ``set_kind``
+        ``"local_parents"``; ``adjustment_sets`` lists the locally valid parent sets, the parents
+        with each subset of the undirected neighbors that holds no pair found to be a non-collider
+        at the treatment, the outcome left out of a set that holds it. With one set,
+        ``identifiable`` is ``True``; with several, ``None``. When the outcome is a parent of the
+        treatment, the effect is zero in every graph the answer allows and no set is valid:
+        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``. When the
+        marks conflict, so that no parent set is locally valid, ``adjustment_sets`` is ``[]`` and
+        ``identifiable`` ``None``: the method gives no answer. ``nonzero`` is ``None`` otherwise.
+        ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query asked again reads its kept
+        answer and is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is neither a column label nor a position, or ``categorical`` is not a list of column
+        names and positions.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is missing or names a column ``data`` lacks, or both name one column; or if ``data`` or
+        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** LDECC suits observational data where you want the effect of one variable on
+    another, with no hidden variables, and learning the whole graph would cost too many tests: it
+    learns only the edges at the treatment. Its claim [1]_: when every independence follows from
+    the causal graph (faithfulness) and the tests are exact, the sets it returns give the same
+    effects as the treatment's parent sets over the graphs the CPDAG allows (Theorem 5). Where the
+    parents of the treatment form unshielded colliders with variables far from it, its eager
+    collider checks direct them with fewer tests than learning the structure outward from the
+    treatment, and in other graphs with more (Props. 6-8). The default Fisher-Z test assumes
+    continuous data with linear effects and Gaussian noise; the other tests read categorical or
+    mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes.
+
+    **How it works.** Fig. 5 of [1]_. The first step learns the treatment's Markov blanket with
+    ``blanket``. The neighbors are the blanket members that no subset of the rest of the blanket
+    separates from the treatment, the rule of [2]_ (App. A.1.1, Lemma A.2) for this step: each
+    member is tested against the subsets of the blanket without it. A neighbor outside a spouse's
+    separating set and dependent on the spouse given it is a child, an unshielded collider at the
+    neighbor. The PC algorithm's tests then run over the pairs that do not hold the treatment, the
+    treatment adjacent to its neighbors only. For each independence of ``a`` and ``b`` given
+    ``S``: two neighbors separated without the treatment are parents, as are the neighbors in
+    ``S``; two neighbors separated by a set holding the treatment are a non-collider at it, and a
+    neighbor that makes them dependent again is a child; otherwise, when ``a`` and ``b`` are
+    dependent given ``S`` and the treatment, the treatment is a collider or a descendant of one
+    between them, and their minimal neighbor separators, the smallest sets of neighbors that
+    separate each from the treatment, are parents (Prop. 4; with ``check``, only when the two are
+    equal). A neighbor joined to a parent by a non-collider is a child. A neighbor marked both
+    ways is a child, as in the authors' code. Each query is tested once. Variables and subsets
+    are visited in an order the data fix, the treatment's neighbors first and the treatment first
+    in a conditioning set, as in the authors' code, and the first subset that separates a pair is
+    kept, so the answer does not depend on the column order; it does not depend on the columns'
+    units when the test does not.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample of their own. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graphs of [1]_
+    and [2]_ and on random graphs, and on simulated linear-Gaussian data. In some graphs the
+    eager collider checks leave a parent of the treatment undirected that the CPDAG directs [2]_
+    (App. A.2): the answer then lists more parent sets than the CPDAG allows, the treatment's
+    true parents among them. When some neighbor stays undirected, the PC algorithm's tests run
+    over every pair, as many as learning the whole skeleton, and the sets number up to two to the
+    power of the undirected neighbors. On the 25-node graphs of [1]_ (App. C.1) with 8,000 to
+    32,000 rows, a fit ran a median of 310 to 350 tests, in under a second. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
+
+    References
+    ----------
+    .. [1] Gupta, S., Childers, D., and Lipton, Z. C. (2023). Local causal discovery for
+       estimating causal effects. Proceedings of the Second Conference on Causal Learning and
+       Reasoning, Proceedings of Machine Learning Research 213, 408-447.
+    .. [2] Schubert, M., Claassen, T., and Magliacane, S. (2026). Local causal discovery for
+       statistically efficient causal inference. Proceedings of the 29th International Conference
+       on Artificial Intelligence and Statistics, Proceedings of Machine Learning Research 300.
+    .. [3] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [4] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import ldecc
+    >>> rng = np.random.default_rng(0)
+    >>> a, b = rng.standard_normal((2, 5000))
+    >>> x = a + b + rng.standard_normal(5000)
+    >>> m = x + rng.standard_normal(5000)
+    >>> y = m + a + b + rng.standard_normal(5000)
+    >>> df = pd.DataFrame({"a": a, "b": b, "x": x, "m": m, "y": y})
+    >>> out = ldecc(df, treatment="x", outcome="y")
+    >>> out.metadata["effects"][0]["adjustment_sets"]
+    [['a', 'b']]
+    """
+    from andrey.api._local import pair_columns
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.ldecc import ldecc as engine
+    from andrey.core import ARROW, TAIL
+    from andrey.core.ci import counting_tests
+    from andrey.core.orient import to_structure
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, _ = fit_inputs(
+        data, "indep_test", indep_test, categorical, None, method="ldecc", missing=True
+    )
+    d = X.shape[1]
+    x, y = pair_columns(treatment, outcome, labels, d, "ldecc")
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+        search = local_search(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+            max_depth=max_depth,
+        )
+        with search.pinned():
+            result = engine(search, x, blanket=blanket, check=check)
+    name = label_of(labels)
+    star = np.zeros((d, d), dtype=np.int8)
+    for v in result.neighbors:
+        near = ARROW if v in result.parents else TAIL
+        far = ARROW if v in result.children else TAIL
+        star[x, v], star[v, x] = near, far
+    metadata = {
+        "effects": [_ldecc_record(result, x, y, name)],
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        "n_tests": tests.n,
+    }
+    return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
 
 
 @method_spec("local_optimal_adjustment")

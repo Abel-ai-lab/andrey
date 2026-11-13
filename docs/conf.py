@@ -507,6 +507,7 @@ PROSE_NAMES = {
     "y_structures": "Y-structures",
     "ldp": "LDP",
     "ld3": "LD3",
+    "ldecc": "LDECC",
     "local_optimal_adjustment": "LOAD",
     "ges": "GES",
     "gies": "GIES",

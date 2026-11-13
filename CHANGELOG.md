@@ -165,6 +165,13 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+  directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
+  blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
+  eager collider checks that direct the treatment's parents. The step that finds the neighbors
+  tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
+  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
+  lane runs it beside the authors' code. ([#991])
 - `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), experimental:
   for two `variables` given in any order, finds whether one causes the other and the optimal
   adjustment set for the total effect when it is identifiable, else the locally valid parent sets
@@ -2737,6 +2744,7 @@ First alpha release.
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
