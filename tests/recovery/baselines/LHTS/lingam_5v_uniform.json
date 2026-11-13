@@ -1,0 +1,67 @@
+{
+  "algorithm": "LHTS",
+  "case": "lingam_5v_uniform",
+  "input": {
+    "case": "lingam_5v_uniform",
+    "column_order": [
+      0,
+      4,
+      3,
+      1,
+      2
+    ],
+    "seed": 20240611,
+    "sha256": "ae1f9cbe866dea504596bbeef4619805ceec59f86bc98b15f64b70db626a8ff5",
+    "shape": [
+      1000,
+      5
+    ]
+  },
+  "output": {
+    "causal_order": [
+      0,
+      3,
+      4,
+      2,
+      1
+    ],
+    "graph": [
+      [
+        0,
+        1,
+        0,
+        1,
+        1
+      ],
+      [
+        2,
+        0,
+        2,
+        0,
+        2
+      ],
+      [
+        0,
+        1,
+        0,
+        2,
+        0
+      ],
+      [
+        2,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        2,
+        1,
+        0,
+        2,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

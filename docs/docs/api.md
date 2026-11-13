@@ -146,11 +146,13 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
-test on the lagged values of the series, and order the candidate conditions by the test's statistic,
-as tigramite does: the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's
-conditional mutual information estimate, or GPDC's distance correlation. A test you register that
-reports only p-values is ordered by its p-value, smallest first.
+dummies enter a test as numeric columns. `lhts` and `nhts` take the continuous and nonlinear tests,
+as they read continuous data, and default to `"kci"`, the test of their paper; they take no `None`.
+`pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each test on the lagged values of the series,
+and order the candidate conditions by the test's statistic, as tigramite does: the partial
+correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual information
+estimate, or GPDC's distance correlation. A test you register that reports only p-values is ordered
+by its p-value, smallest first.
 
 % concept: degrees_of_freedom
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -170,7 +172,7 @@ raises a `ValueError`.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `locpc_cde`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
 `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`,
-`nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`nogam`, `nhts`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `lhts`, `varma_lingam`,
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
@@ -349,14 +351,14 @@ tests then orient can put more arrowheads at a node.
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
-random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
-phase visits the variables in a random order on every fit, the methods that test independence draw
-random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with
-`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1, and
-`hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`lhts`, `nhts`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
+`hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes
+their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
+unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
+whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
+independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
+with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
+1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
 `metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
 other method is deterministic and takes no seed.
 
@@ -740,6 +742,8 @@ in a process.
    local_optimal_adjustment
    locpc_cde
    local_isa_ling
+   lhts
+   nhts
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -773,6 +777,20 @@ a child leaves several models the data cannot tell apart; `metadata["equivalent_
 them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
 when neither the target nor a child lies on a cycle. It is experimental until its comparison with
 the authors' code is published.
+
+LHTS (Hiremath et al. 2024) learns a DAG in a linear model with non-Gaussian noise from the top
+down: for each pair of variables it decides from regressions of the pair on each other, after their
+known common ancestors are regressed out, whether one is an ancestor of the other, sorts the
+variables into layers by their longest directed path from a root, and then finds each variable's
+parents among the earlier layers by conditional-independence tests, `indep_test="kci"` by default.
+It returns a DAG and a causal order, and `metadata["partial_order"]` holds the layers. It is
+experimental until its benchmark is published.
+
+NHTS (Hiremath et al. 2024) does the same for nonlinear effects with additive noise of any
+distribution: it finds the roots from kernel ridge regressions on one variable or a few, places each
+next layer from regressions on the variables already placed, and finds the parents among the
+earlier layers as LHTS does. Its tests grow quickly with the layers and the rows, so it suits
+graphs with few layers. It is experimental until its benchmark is published.
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
 `outcome`: it labels each other column by its causal relation to the pair, from tests whose

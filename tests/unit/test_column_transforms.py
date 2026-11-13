@@ -239,8 +239,13 @@ def monotone(x: np.ndarray) -> np.ndarray:
 #: The methods that take ``normal_scores`` and read the data only through their test; the others
 #: that take it, gfci, mmhc, rsmax2, boss_fci, and grasp_fci, also take ``score_func``, whose
 #: default score reads the values, so a monotone transform can change their graph unless the call
-#: also passes ``score_func="normal_scores"`` (:data:`RANK_SCORED`).
-RANK_TESTED = [spec for spec in TABLE_SPECS if accepts(spec, "normal_scores") and not scores(spec)]
+#: also passes ``score_func="normal_scores"`` (:data:`RANK_SCORED`), and the methods of the
+#: functional family, which sort the variables by regressions on the values before their test runs.
+RANK_TESTED = [
+    spec
+    for spec in TABLE_SPECS
+    if accepts(spec, "normal_scores") and not scores(spec) and spec.family != "functional"
+]
 
 
 @pytest.mark.parametrize("spec", RANK_TESTED, ids=lambda spec: spec.name)
