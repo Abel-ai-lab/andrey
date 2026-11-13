@@ -159,12 +159,13 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3"),
+    *("covariate_rules", "ldp", "ld3"),
 )
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = (
     *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3"),
     "local_isa_ling",
+    "covariate_rules",
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -212,6 +213,7 @@ _CONCEPTS = (
             "igsp",
             "ut_igsp",
             "y_structures",
+            "covariate_rules",
             "ldp",
             "ld3",
             "local_isa_ling",
@@ -667,7 +669,10 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(
+            *CI_SEARCHES,
+            *("pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv", "covariate_rules"),
+        ),
         exempt=(
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
@@ -837,6 +842,10 @@ _CONCEPTS = (
             *_exempt("Claims ancestors from fixed test patterns; no parent sets.", "y_structures"),
             *_exempt("Labels variables from fixed test patterns; no parent sets.", "ldp", "ld3"),
             *_exempt(
+                "Decides an effect from fixed test patterns over covariate sets; no parent sets.",
+                "covariate_rules",
+            ),
+            *_exempt(
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
                 "jpcmciplus",
@@ -920,6 +929,7 @@ _CONCEPTS = (
             "calm",
             "ica_lingam",
             "y_structures",
+            "covariate_rules",
             "ldp",
             "ld3",
         ),
@@ -1146,6 +1156,12 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
             ),
+            *_exempt(
+                "Fixed test patterns: the two rules read the tests they name over sets of "
+                "covariates, which no knowledge of edges enters; every covariate is taken to "
+                "precede the treatment.",
+                "covariate_rules",
+            ),
         ),
     ),
     Concept(
@@ -1160,7 +1176,11 @@ _CONCEPTS = (
                 *(
                     m
                     for m in NO_KNOWLEDGE
-                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling")
+                    if m
+                    not in (
+                        *("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling"),
+                        "covariate_rules",
+                    )
                 ),
             ),
             *_exempt(
@@ -1171,6 +1191,7 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
                 "local_isa_ling",
+                "covariate_rules",
             ),
         ),
     ),
@@ -1205,6 +1226,7 @@ _CONCEPTS = (
             "igsp",
             "ut_igsp",
             "y_structures",
+            "covariate_rules",
             "ldp",
             "ld3",
         ),
@@ -1249,6 +1271,7 @@ _CONCEPTS = (
             "mmmb",
             "pcmb",
             "y_structures",
+            "covariate_rules",
             "ldp",
             "ld3",
             "mb_by_mb",
@@ -1464,6 +1487,11 @@ _CONCEPTS = (
                 "ld3",
             ),
             *_exempt(
+                "Its covariates are among the columns of data, and a context variable is one "
+                "more column.",
+                "covariate_rules",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1588,7 +1616,12 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.",
+            "covariate_rules",
+            "ldp",
+            "ld3",
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1605,7 +1638,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("covariate_rules", "ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1621,7 +1654,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3"),
+        suitable=("covariate_rules", "ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1697,7 +1730,12 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=_exempt(
+            "Answers for one treatment-outcome pair, not one variable.",
+            "covariate_rules",
+            "ldp",
+            "ld3",
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1711,6 +1749,7 @@ _CONCEPTS = (
             "mb_by_mb",
             "mmb_by_mmb",
             "y_structures",
+            "covariate_rules",
             "ldp",
             "ld3",
         ),
@@ -1729,7 +1768,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3"),
+        suitable=("y_structures", "covariate_rules", "ldp", "ld3"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

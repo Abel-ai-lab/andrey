@@ -52,6 +52,7 @@ TESTWISE_METHODS = (
     "mb_by_mb",
     "mmb_by_mmb",
     "y_structures",
+    "covariate_rules",
     "ldp",
     "ld3",
 )

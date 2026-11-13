@@ -2,8 +2,10 @@
 
 Each method answers for one ordered pair of columns, a treatment and an outcome: the answer is a
 record in ``metadata["effects"]`` (:mod:`andrey.core.effects`) with the adjustment sets it found,
-next to the graph its paper licenses. ``ldp`` finds a valid adjustment set for the total effect;
-``ld3`` finds the parents of the outcome and whether the treatment is one of them.
+next to the graph its paper licenses. ``covariate_rules`` decides whether the treatment affects the
+outcome and finds valid adjustment sets among pretreatment covariates; ``ldp`` finds a valid
+adjustment set for the total effect; ``ld3`` finds the parents of the outcome and whether the
+treatment is one of them.
 """
 
 from __future__ import annotations
@@ -31,14 +33,28 @@ if TYPE_CHECKING:
 
 
 def _fit(
-    method: str, data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
+    method: str,
+    data,
+    treatment,
+    outcome,
+    alpha,
+    indep_test,
+    degrees_of_freedom,
+    categorical,
+    seed,
+    max_depth=None,
 ):
-    """Run the engine ``method`` of :mod:`andrey.constraint.partition` on the pair.
+    """Run the engine of ``method`` on the pair.
 
-    Returns its result, the fit's columns, labels, and namer, and the shared metadata.
+    The engines are in :mod:`andrey.constraint.partition` for ``ldp`` and ``ld3`` and in
+    :mod:`andrey.constraint.covariates` for ``covariate_rules``. Returns its result, the fit's
+    columns, labels, and namer, and the metadata: the method's own key (``partition`` or
+    ``rule_counts``), then the shared ones.
     """
     from andrey.api._local import pair_columns
     from andrey.constraint.blanket import local_search
+    from andrey.constraint.covariates import CovariateRulesResult
+    from andrey.constraint.covariates import covariate_rules as rules_engine
     from andrey.constraint.partition import ld3 as ld3_engine
     from andrey.constraint.partition import ldp as ldp_engine
     from andrey.core.ci import counting_tests
@@ -60,10 +76,18 @@ def _fit(
             ranked=False,
         )
         with search.pinned():
-            result = (ldp_engine if method == "ldp" else ld3_engine)(search, x, y, others)
+            if method == "covariate_rules":
+                result = rules_engine(search, x, y, others, max_depth=max_depth)
+            else:
+                result = (ldp_engine if method == "ldp" else ld3_engine)(search, x, y, others)
     name = label_of(labels)
+    own = (
+        {"rule_counts": result.counts}
+        if isinstance(result, CovariateRulesResult)
+        else {"partition": {k: [name(j) for j in v] for k, v in result.partition.items()}}
+    )
     metadata = {
-        "partition": {k: [name(j) for j in v] for k, v in result.partition.items()},
+        **own,
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         "n_tests": tests.n,
@@ -491,6 +515,231 @@ def ld3(
     adjacency[result.parents, y] = 1
     if result.direct:
         adjacency[x, y] = 1
+    return structure_output(
+        dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
+    )
+
+
+@method_spec("covariate_rules")
+def covariate_rules(
+    data: npt.ArrayLike,
+    *,
+    treatment: str | int | None = None,
+    outcome: str | int | None = None,
+    alpha: float = 0.05,
+    indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+) -> StructureOutput:
+    """Decide whether a treatment affects an outcome, and find covariate sets to adjust for.
+
+    Every column other than the treatment and the outcome is a covariate measured before the
+    treatment. Rule R1 finds a covariate ``w`` and a set ``Z`` of the others such that ``w`` and
+    the outcome are dependent given ``Z`` and independent given ``Z`` and the treatment: then the
+    treatment affects the outcome and ``Z`` is a valid adjustment set for the effect. Rule R2 finds
+    a set ``Z`` that makes the treatment and the outcome independent, or a covariate ``w`` and a
+    set ``Z`` of the others such that ``w`` and the treatment are dependent given ``Z`` while ``w``
+    and the outcome are independent given ``Z``: then the treatment does not affect the outcome
+    [1]_. The method checks every covariate and every set of the others, so the number of tests
+    doubles with each covariate unless ``max_depth`` caps the sets.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    treatment : str or int
+        Required: the cause of the pair, a column label (a string) or a 0-based position (an
+        integer).
+    outcome : str or int
+        Required: the effect of the pair, a column label (a string) or a 0-based position (an
+        integer). The outcome must not cause the treatment.
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a p-value above ``alpha`` is an
+        independence, any other a dependence. [1]_ leaves the level open.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can leave undecided a pair that a larger conditioning set would decide. R1's
+        second test conditions on the treatment as well, so R1 checks sets of at most
+        ``max_depth - 1`` covariates and R2 sets of at most ``max_depth``. ``None``, the default,
+        checks every set, as [1]_ does for ten covariates; for several tens of covariates [1]_
+        caps the sets.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every column with no edges: the
+        rules decide whether the treatment is an ancestor of the outcome, not adjacencies.
+        ``metadata["effects"]`` holds one record (:mod:`andrey.core.effects`) for the pair, by
+        column label or 0-based position, with ``estimand`` ``"total"``. When only R1 applies, the
+        treatment affects the outcome: ``nonzero`` and ``identifiable`` are ``True`` and
+        ``adjustment_sets`` holds every set ``Z`` for which R1 applies, each a valid adjustment
+        set, with ``set_kind`` ``"valid"``. When only R2 applies, the treatment does not affect
+        the outcome: ``nonzero`` is ``False``, ``identifiable`` is ``None``, and
+        ``adjustment_sets`` is ``[]``. When neither or both apply, the answer is undecided:
+        ``nonzero`` and ``identifiable`` are ``None`` and ``adjustment_sets`` is ``[]``.
+        ``metadata["rule_counts"]`` counts the rules: ``"R1"`` and ``"R2"`` the candidates each
+        applied to, ``"R1_checked"`` and ``"R2_checked"`` the candidates each was checked on; a
+        candidate is a covariate and a set of the others, or for R2's first test a set alone.
+        ``metadata["algorithm"]`` is ``"covariate_rules"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
+        number of conditional-independence tests the fit evaluated.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is neither a column label nor a position, or ``categorical`` is not a list of column
+        names and positions.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is missing or names a column ``data`` lacks, or both name one column; or if ``data`` or
+        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** The covariate selection rules suit observational data where you want to
+    know whether one variable affects another, and which measured covariates to adjust for to
+    estimate the effect, when every covariate was measured before the treatment and hidden
+    variables may confound the pair. Their claim [1]_: when every independence follows from the
+    causal graph (faithfulness), the graph has no cycle and no selection bias, the outcome does
+    not cause the treatment, and neither the treatment nor the outcome causes any covariate,
+    every answer the rules give is right with exact tests (Theorem 2), and when neither rule
+    applies, the independences among the observed variables cannot tell whether the treatment
+    affects the outcome (Theorem 3). The default Fisher-Z test assumes continuous data with
+    linear effects and Gaussian noise; the other tests read categorical or mixed data or detect
+    nonlinear effects, as :func:`~andrey.pc` describes. When some covariates may come after the
+    treatment, use :func:`~andrey.ldp`.
+
+    **How it works.** For each set ``Z`` of covariates, by increasing size, the method tests the
+    outcome against each other covariate and the treatment given ``Z``, the treatment against
+    each other covariate given ``Z``, and the outcome against each other covariate given ``Z``
+    and the treatment, and counts every covariate and set to which a rule applies. The answer
+    follows from the two counts: an effect when only R1 applies, no effect when only R2 applies,
+    and undecided otherwise, which with exact tests is the answer of [1]_, where the two rules
+    never both apply. On finite samples [1]_ decides between the counts with two thresholds and a
+    classifier trained on simulations it does not publish, and reports an undecided answer when
+    the effects estimated with the R1 sets differ; the method uses one level, ``alpha``, and
+    returns the sets, so estimating and comparing the effects is left to you. The answer and the
+    counts do not depend on the column order.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample of their own. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs with
+    hidden pretreatment covariates, and on simulated linear-Gaussian data. With many candidates
+    and one level, each rule applies by chance to some of them, so on finite samples both rules
+    often apply and the answer is undecided. With ten covariates a fit runs 16,384 tests, about
+    half a second with 10,000 rows, and each added covariate doubles the count. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
+
+    References
+    ----------
+    .. [1] Entner, D., Hoyer, P. O., and Spirtes, P. (2013). Data-driven covariate selection for
+       nonparametric estimation of causal effects. Proceedings of the Sixteenth International
+       Conference on Artificial Intelligence and Statistics, Proceedings of Machine Learning
+       Research 31, 256-264.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import covariate_rules
+    >>> rng = np.random.default_rng(0)
+    >>> a, c = rng.standard_normal((2, 5000))
+    >>> x = a + c + rng.standard_normal(5000)
+    >>> y = x + c + rng.standard_normal(5000)
+    >>> df = pd.DataFrame({"a": a, "c": c, "x": x, "y": y})
+    >>> out = covariate_rules(df, treatment="x", outcome="y")
+    >>> record = out.metadata["effects"][0]
+    >>> record["nonzero"], record["adjustment_sets"]
+    (True, [['c']])
+    """
+    from andrey.api._adapt import dag_from_adjacency
+    from andrey.core.effects import effect_record
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    result, (x, y, d, labels, name), metadata = _fit(
+        "covariate_rules",
+        data,
+        treatment,
+        outcome,
+        alpha,
+        indep_test,
+        degrees_of_freedom,
+        categorical,
+        seed,
+        max_depth,
+    )
+    effect = {"+-": True, "0": False, "?": None}[result.verdict]
+    record = effect_record(
+        x,
+        y,
+        estimand="total",
+        nonzero=effect,
+        identifiable=True if effect else None,
+        adjustment_sets=result.sets,
+        set_kind="valid" if result.sets else None,
+        name=name,
+    )
+    adjacency = np.zeros((d, d), dtype=np.int8)
     return structure_output(
         dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
     )

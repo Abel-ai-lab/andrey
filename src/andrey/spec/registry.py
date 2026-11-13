@@ -937,6 +937,44 @@ _PAIR_ALPHA_DOC = (
 
 _add(
     MethodSpec(
+        name="covariate_rules",
+        family="constraint",
+        summary="Covariate selection rules: decides from independence tests whether a treatment "
+        "affects an outcome (an effect, no effect, or undecided) when every other column is a "
+        "covariate measured before the treatment, and returns each set of covariates the first "
+        "rule finds as a valid adjustment set for the total effect; hidden variables allowed. "
+        "Checks every set of covariates unless max_depth caps them. Returns no edges; the answer "
+        "is in metadata['effects'], the rule counts in metadata['rule_counts'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            hidden_causes=True,
+            doc="no edges; metadata['effects'] holds the pair's record: an effect with the valid "
+            "adjustment sets found, no effect, or undecided",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param(
+                "alpha",
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. Entner, Hoyer & Spirtes 2013 leave the level open.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Entner, Hoyer & Spirtes 2013",),
+    )
+)
+
+_add(
+    MethodSpec(
         name="ldp",
         family="constraint",
         summary="Local discovery by partitioning: sorts every other variable by its causal "
@@ -3782,6 +3820,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
     **dict.fromkeys(("ldp", "ld3"), ("partition",)),
+    "covariate_rules": ("rule_counts",),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
