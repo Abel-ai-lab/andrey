@@ -162,7 +162,7 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3", "ldecc"),
+    *("ldp", "ld3", "ldecc", "locpc_cde"),
 )
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = (
@@ -218,6 +218,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "locpc_cde",
             "local_isa_ling",
         ),
         exempt=(
@@ -678,7 +679,16 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv", "ldecc"),
+        suitable=(
+            *CI_SEARCHES,
+            "pcmci",
+            "pcmciplus",
+            "jpcmciplus",
+            "rcd",
+            "camuv",
+            "ldecc",
+            "locpc_cde",
+        ),
         exempt=(
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
@@ -834,6 +844,7 @@ _CONCEPTS = (
                 "cmb",
                 "mmb_by_mmb",
                 "ldecc",
+                "locpc_cde",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -936,6 +947,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "locpc_cde",
         ),
         exempt=(
             *_exempt(
@@ -1225,6 +1237,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "locpc_cde",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1270,6 +1283,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "locpc_cde",
             "mb_by_mb",
             "cmb",
             "mmb_by_mmb",
@@ -1469,6 +1483,11 @@ _CONCEPTS = (
                 "mmb_by_mmb",
             ),
             *_exempt(
+                "A local search around one outcome, with no place for a context variable; cdnod is "
+                "the test-based search that takes env.",
+                "locpc_cde",
+            ),
+            *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
                 "score search that takes env.",
                 "ages",
@@ -1622,7 +1641,11 @@ _CONCEPTS = (
             *("icp", "mb_by_mb", "cmb", "mmb_by_mmb", "local_isa_ling"),
         ),
         exempt=_exempt(
-            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+            "Answers for one treatment-outcome pair, not one variable.",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "locpc_cde",
         ),
         others_exempt="Answers for every variable at once.",
     ),
@@ -1640,7 +1663,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3", "ldecc"),
+        suitable=("ldp", "ld3", "ldecc", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1656,7 +1679,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("ldp", "ld3", "ldecc"),
+        suitable=("ldp", "ld3", "ldecc", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1742,7 +1765,11 @@ _CONCEPTS = (
             *("icp", "mb_by_mb", "cmb", "mmb_by_mmb"),
         ),
         exempt=_exempt(
-            "Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3", "ldecc"
+            "Answers for one treatment-outcome pair, not one variable.",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "locpc_cde",
         ),
         others_exempt="Answers for every variable at once.",
     ),
@@ -1761,6 +1788,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "locpc_cde",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1777,7 +1805,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3", "ldecc"),
+        suitable=("y_structures", "ldp", "ld3", "ldecc", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

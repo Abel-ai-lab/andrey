@@ -12,6 +12,11 @@ names its pull request.
 
 ### Added
 
+- `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), experimental: whether the controlled
+  direct effect of a treatment on an outcome is identifiable, from a graph learned around the
+  outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
+  answer is one record in `metadata["effects"]` with the paper's reason; the graph is the local
+  essential graph it learned. ([#1000])
 - `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
   one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
   arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
@@ -2753,6 +2758,7 @@ First alpha release.
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
+[#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991

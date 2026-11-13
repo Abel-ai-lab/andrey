@@ -56,6 +56,7 @@ TESTWISE_METHODS = (
     "ldp",
     "ld3",
     "ldecc",
+    "locpc_cde",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")

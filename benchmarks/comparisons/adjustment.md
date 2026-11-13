@@ -114,6 +114,7 @@ prints before running the lane.
 | `ldecc.authors` | `acmi-lab/local-causal-discovery`, `605d8d1` | none | `start_ldecc.sh`: Python 3.10 |
 | `ldp.authors`, `ld3.authors` | `jmaasch/ldp`, `838f6e2`; `jmaasch/LD3`, `74b91cb` | none | `start_maasch.sh`: Python 3.10 |
 | `snap.authors`, `load.authors` | `Matyasch/snap`, `432ab5c`; `Matyasch/load`, `7febfc6` (main) | BSD-2-Clause | `start_schubert.sh`: Python 3.12 |
+| `locpc_cde.authors` | `CIPHOD/pyCIPHOD`, `37a62c9` | MIT | `start_ciphod.sh`: Python 3.12 |
 
 Repositories without a license are measurement references only: the harness redistributes none of
 their files. Each solution is called as its repository's own README or notebooks call it:
@@ -133,10 +134,21 @@ their files. Each solution is called as its repository's own README or notebooks
   and returns a graph, whose sets the lane reads in the parent as it reads PC's. LOAD runs at
   `alpha = 0.01` and returns the sets itself. The SNAP main branch orients the last v-structures by
   PC's rule where the paper's Algorithm 2 uses the rule of RFCI.
+- **LocPC-CDE.** `LocPC_CDE(treatment, outcome, sparsity=alpha, ci_test=...).run(frame)`, the
+  repository's class for the method, at `alpha = 0.05` with its Fisher-z test, or its G-square test
+  on binary data, on a frame whose zero-padded column names sort in column order. The code visits
+  variables in sorted-name order and iterates sets of names, so its graph depends on the string hash
+  seed: the lane runs it with `PYTHONHASHSEED=0`. The record is read from the code's final graph
+  with the reasons of Andrey's `locpc_cde`: the effect is zero when the treatment is not adjacent to
+  the outcome or is its child; every edge at the outcome directed gives the outcome's other parents
+  as the set and an identifiable effect; otherwise the effect is not identifiable. A directed edge
+  counts as oriented whatever else the graph stores for the pair, as the code's own final check
+  reads it. The code's own `identifiability` flag is kept in each record as
+  `authors_identifiability`, and its `nb_ci_tests` is the count of tests.
 
 The number of tests the references report is what each code counts, a call of its test wrapper for
-LDECC, LDP, and LD3, and the distinct queries for SNAP and LOAD; it is not the number the Andrey
-methods report, which leaves cached repeats out.
+LDECC, LDP, and LD3, every test run for LocPC-CDE, and the distinct queries for SNAP and LOAD; it is
+not the number the Andrey methods report, which leaves cached repeats out.
 
 ## Run
 
