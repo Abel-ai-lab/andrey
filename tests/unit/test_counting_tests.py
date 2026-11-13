@@ -183,7 +183,8 @@ def test_iamb_under_the_oracle_counts_each_new_query():
 
 
 @pytest.mark.parametrize(
-    "method", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"]
+    "method",
+    ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"],
 )
 def test_the_count_does_not_depend_on_the_column_order(method):
     x, _ = data_for("fisherz")

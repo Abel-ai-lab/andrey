@@ -1,13 +1,15 @@
 """Markov blankets and parents-and-children sets, the engines behind :func:`andrey.iamb`,
 :func:`andrey.inter_iamb`, :func:`andrey.gs`, :func:`andrey.fast_iamb`, :func:`andrey.mmpc`,
-:func:`andrey.hiton_pc`, :func:`andrey.hiton_mb`, and :func:`andrey.mmmb`.
+:func:`andrey.hiton_pc`, :func:`andrey.hiton_mb`, :func:`andrey.mmmb`, and :func:`andrey.pcmb`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target, the ``"gs"`` and ``"fast_iamb"``
 learners Grow-Shrink and Fast-IAMB, the ``"iamb_forward"`` learner IAMB's grow phase alone, the
 ``"total_conditioning"`` learner a test of each variable given all the others,
 :func:`parents_children` the forward and backward phases of MMPC, the ``"hiton_pc"`` learner
 semi-interleaved HITON-PC, the ``"hiton_mb"`` learner semi-interleaved HITON-MB, HITON-PC
-followed by the spouse step, and the ``"mmmb"`` learner MMMB, MMPC followed by the same step.
+followed by the spouse step, the ``"mmmb"`` learner MMMB, MMPC followed by the same step, the
+``"get_pcd"`` learner PCMB's GetPCD, and the ``"pcmb"`` learner PCMB, GetPCD followed by the same
+step.
 :func:`blanket_graph` and :func:`mmpc_sets` run them for every variable. Keeping a pair when each
 lies in the other's set (the AND rule) gives the moral graph and the skeleton that
 :func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2` search within. Each takes any
@@ -702,8 +704,7 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     allowed = None if constraints is None else constraints.support()[target]
 
     def reliable(x: int, cond: tuple[int, ...]) -> bool:
-        size = None if search.levels is None else table_size(search.levels, target, x, cond)
-        return size is None or search.n >= HITON_CELL_ROWS * size
+        return search.reliable(target, x, cond, cell_rows=HITON_CELL_ROWS)
 
     def separating(x: int, among: list[int], tested: set[int]) -> tuple[int, ...] | None:
         """The set that separates ``x`` from ``target`` at the first size at which one does,
@@ -760,6 +761,124 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
             members.remove(x)
             sepsets[x] = found
     return members
+
+
+#: PCMB's least number of rows per degree of freedom of a categorical test for the test to run
+#: (Pena et al. 2007, pp. 5 and 12).
+PCMB_DF_ROWS = 5
+
+
+def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+    """``target``'s parents and children by GetPCD of PCMB [1]_, the set before PCMB's symmetry
+    check, in the order the members joined.
+
+    A candidate's separating set is, among the subsets of the current members, the one with the
+    largest p-value, and its association with ``target`` the weakest over those subsets. Each pass
+    of the search runs three steps [1]_. First, every candidate whose separating set separates it
+    (a p-value above ``alpha``) leaves for good. Second, the candidate whose weakest association
+    is the strongest joins without a further test: by the largest p-value to ``KEY_DP``
+    significant digits, the smallest first, then, where p-values agree, as when they underflow to
+    zero, by the larger smallest strength (:meth:`LocalSearch.weakest`), then by rank. Third, each
+    earlier member is tested against the subsets of the other members, and every member some
+    subset separates leaves for good: all of them at once, each judged against the members before
+    any leaves. The newcomer is not tested then: its subsets are the ones it passed as a candidate.
+    So the set changes on every pass, and the search stops when no candidate is left. A test is
+    run once: each pass
+    tests only the subsets that hold the newest member, and the others are kept from earlier
+    passes, without those that hold a member that left. With no candidate left, no member joins
+    and none leaves, so the paper's rule, repeat "until PCD does not change", stops there too. With
+    ``max_depth``, a test conditions on at most ``max_depth`` variables; the set itself may grow
+    larger.
+
+    On categorical data a test runs only when the data hold at least ``PCMB_DF_ROWS`` rows per
+    degree of freedom of its table (:func:`table_size` with ``df=True``) [1]_: a subset that fails
+    the rule is not tested and takes no part, and a candidate whose unconditional test fails it is
+    never tested and never joins.
+
+    ``constraints`` act as in :func:`parents_children`: each variable a required edge joins to
+    ``target`` is a member from the start, in rank order, and never tested, and a pair the knowledge
+    makes non-adjacent is never a candidate. Each variable that leaves keeps in ``sepsets`` the
+    separating set it left by, of sets whose p-values agree to ``KEY_DP`` decimals the smaller,
+    then the one whose ascending ranks come first (:meth:`LocalSearch.largest_sets`).
+
+    References
+    ----------
+    .. [1] Pena, J. M., Nilsson, R., Bjorkegren, J., and Tegner, J. (2007). Towards scalable and
+       data efficient learning of Markov boundaries. International Journal of Approximate
+       Reasoning 45(2), 211-232.
+    """
+    alpha, max_depth, constraints = search.alpha, search.max_depth, search.constraints
+    required = _required(constraints, target, search.ranks)
+    allowed = None if constraints is None else constraints.support()[target]
+    # The p-value and the strength of each variable's test given each subset of the members.
+    tested: dict[int, dict[tuple[int, ...], tuple[float, float]]] = {}
+    candidates: list[int] = []
+    for x in range(search.d):
+        if x == target or x in required or (allowed is not None and not allowed[x]):
+            continue
+        if search.reliable(target, x, (), df_rows=PCMB_DF_ROWS):
+            candidates.append(x)
+            tested[x] = {}
+    members = list(required)
+
+    def measure(xs: list[int], newest: int | None) -> None:
+        """Test each of ``xs`` given each subset of the other members that holds ``newest`` (every
+        subset when ``newest`` is ``None``), of at most ``max_depth`` variables, that passes the
+        rule; candidates with the same subsets are tested together, one subset at a time."""
+        groups: dict[tuple[tuple[int, ...], ...], list[int]] = {}
+        for x in xs:
+            rest = sorted(z for z in members if z not in (x, newest))
+            top = len(rest) if max_depth is None else max_depth - (newest is not None)
+            conds = [
+                tuple(sorted((*s, newest) if newest is not None else s))
+                for size in range(min(top, len(rest)) + 1)
+                for s in combinations(rest, size)
+            ]
+            usable = tuple(c for c in conds if search.reliable(target, x, c, df_rows=PCMB_DF_ROWS))
+            groups.setdefault(usable, []).append(x)
+        for conds, group in groups.items():
+            for cond in conds:
+                for x, weak in zip(group, search.weakest(target, group, [cond]), strict=True):
+                    tested[x][cond] = weak
+
+    def separating(x: int) -> tuple[int, ...] | None:
+        """``x``'s separating set when it separates ``x`` from ``target``, else ``None``."""
+        conds = list(tested[x])
+        pvalues = np.array([tested[x][c][0] for c in conds])
+        if not pvalues.max() > alpha:
+            return None
+        [found] = search.largest_sets(pvalues.reshape(1, -1), conds)
+        return found
+
+    measure(candidates, None)
+    while True:
+        dropped = {x: z for x in candidates if (z := separating(x)) is not None}
+        sepsets.update(dropped)
+        candidates = [x for x in candidates if x not in dropped]
+        for x in dropped:
+            del tested[x]
+        if not candidates:
+            return members
+        keys = {}
+        for x in candidates:
+            weak = tested[x].values()
+            p, strength = max(p for p, _ in weak), min(s for _, s in weak)
+            keys[x] = (float(f"{p:.{KEY_DP}g}"), -round(strength, KEY_DP))
+        newest = search.strongest(keys)
+        candidates.remove(newest)
+        earlier = [x for x in members if x not in required]
+        members.append(newest)
+        measure(earlier, newest)
+        left = {x: z for x in earlier if (z := separating(x)) is not None}
+        if left:
+            sepsets.update(left)
+            members = [x for x in members if x not in left]
+            for x in left:
+                del tested[x]
+            for weak in tested.values():
+                for cond in [c for c in weak if not left.keys().isdisjoint(c)]:
+                    del weak[cond]
+        measure(candidates, newest)
 
 
 def reach(sets: np.ndarray) -> np.ndarray:
@@ -962,22 +1081,24 @@ class Learner:
     one whose ``search`` returns the parents and children before the symmetry check, and
     ``"pc_spouses"`` for one that runs the ``"pc"`` learner named ``pc`` and adds the spouses
     (:meth:`LocalSearch.spouses`). A ``search`` records a separating set for every candidate it
-    drops after a test, so that :meth:`LocalSearch.local` has one for each. ``cell_rows``, for a
-    ``"pc_spouses"`` learner, is the least number of rows per cell of a categorical spouse test's
-    table for the test to run (:meth:`LocalSearch.spouses`); ``None`` runs every spouse test.
+    drops after a test, so that :meth:`LocalSearch.local` has one for each. ``cell_rows`` and
+    ``df_rows``, for a ``"pc_spouses"`` learner, are the least numbers of rows per cell and per
+    degree of freedom of a categorical spouse test's table for the test to run
+    (:meth:`LocalSearch.reliable`); ``None`` sets no such bound.
     """
 
     kind: Literal["blanket", "pc", "pc_spouses"]
     search: Search | None = None
     pc: str | None = None
     cell_rows: int | None = None
+    df_rows: int | None = None
 
     def __post_init__(self) -> None:
         spouses = self.kind == "pc_spouses"
         if spouses == (self.search is not None) or spouses != (self.pc is not None):
             raise ValueError("a 'pc_spouses' learner names its 'pc' learner; another has a search")
-        if self.cell_rows is not None and not spouses:
-            raise ValueError("only a 'pc_spouses' learner takes cell_rows")
+        if (self.cell_rows is not None or self.df_rows is not None) and not spouses:
+            raise ValueError("only a 'pc_spouses' learner takes cell_rows or df_rows")
 
 
 def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bool) -> list[int]:
@@ -1052,6 +1173,8 @@ LEARNERS: dict[str, Learner] = {
     "hiton_mb": Learner("pc_spouses", pc="hiton_pc", cell_rows=HITON_CELL_ROWS),
     "total_conditioning": Learner("blanket", _total_conditioning),
     "mmmb": Learner("pc_spouses", pc="mmpc"),
+    "get_pcd": Learner("pc", _get_pcd),
+    "pcmb": Learner("pc_spouses", pc="get_pcd", df_rows=PCMB_DF_ROWS),
 }
 
 
@@ -1206,6 +1329,28 @@ class LocalSearch:
         self._asked(start, target, [x], len(trace), lambda: (record["S"] for record in trace))
         return [(record["S"], record["p"]) for record in trace if record["removed"]]
 
+    def reliable(
+        self,
+        x: int,
+        y: int,
+        cond: Sequence[int],
+        *,
+        cell_rows: int | None = None,
+        df_rows: int | None = None,
+    ) -> bool:
+        """Whether a sparse-table rule lets the test of ``x`` and ``y`` given ``cond`` run: on
+        categorical columns, the ``n`` rows are at least ``cell_rows`` times the cells of its table
+        and at least ``df_rows`` times its degrees of freedom (:func:`table_size`); a test that
+        reads a continuous column, or a bound that is ``None``, always passes."""
+        if self.levels is None:
+            return True
+        for rows, df in ((cell_rows, False), (df_rows, True)):
+            if rows is not None:
+                size = table_size(self.levels, x, y, cond, df=df)
+                if size is not None and self.n < rows * size:
+                    return False
+        return True
+
     def strongest(self, keys: Mapping[int, Any]) -> int:
         """The candidate with the smallest key, ties broken by ``ranks`` (:func:`strongest`)."""
         return strongest(keys, self.ranks)
@@ -1325,7 +1470,7 @@ class LocalSearch:
             return pc, None, sepsets
         if (method, target) not in self._spouses:
             self._spouses[method, target] = self.spouses(
-                name, target, pc, sepsets, cell_rows=learner.cell_rows
+                name, target, pc, sepsets, cell_rows=learner.cell_rows, df_rows=learner.df_rows
             )
         return pc, pc + self._spouses[method, target], sepsets
 
@@ -1337,6 +1482,7 @@ class LocalSearch:
         sepsets: Sepsets,
         *,
         cell_rows: int | None = None,
+        df_rows: int | None = None,
     ) -> list[int]:
         """The spouses of ``target``, in the order they join, given its parents and children
         ``pc`` and the separating sets ``sepsets`` of :meth:`local`.
@@ -1353,9 +1499,10 @@ class LocalSearch:
 
         A ``y`` already in the candidate's separating set leaves that set unchanged, so it admits
         nothing and is not tested. With ``max_depth``, a test that would condition on more
-        variables is not run, and with ``cell_rows``, a test of categorical columns whose table
-        (:func:`table_size`) has more cells than ``n / cell_rows``; a test not run admits nothing,
-        so the candidate joins only through another ``y``. A candidate without a separating set,
+        variables is not run, and with ``cell_rows`` or ``df_rows``, a test of categorical columns
+        whose table (:func:`table_size`) has more cells than ``n / cell_rows`` or more degrees of
+        freedom than ``n / df_rows`` (:meth:`reliable`); a test not run admits nothing, so the
+        candidate joins only through another ``y``. A candidate without a separating set,
         one the knowledge makes non-adjacent to ``target``, never joins: such a pair is left out
         of every returned set.
 
@@ -1378,10 +1525,8 @@ class LocalSearch:
                     cond = tuple(sorted((*sepsets[x], y)))
                     if self.max_depth is not None and len(cond) > self.max_depth:
                         continue
-                    if cell_rows is not None and self.levels is not None:
-                        size = table_size(self.levels, target, x, cond)
-                        if size is not None and self.n < cell_rows * size:
-                            continue
+                    if not self.reliable(target, x, cond, cell_rows=cell_rows, df_rows=df_rows):
+                        continue
                     if self.scan(target, [x], cond)[1][0] <= self.alpha:
                         found.append(x)
         return found
