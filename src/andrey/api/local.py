@@ -1,7 +1,9 @@
 """Target-centered facade adapters: the edges at one variable and their directions.
 
 ``mb_by_mb`` and ``mmb_by_mmb`` run :func:`andrey.constraint.sequential.sequential` with the
-choices of their papers and return the target's edges as a CPDAG or a PAG holds them.
+choices of their papers and return the target's edges as a CPDAG or a PAG holds them; ``cmb``
+runs :func:`andrey.constraint.cmb.cmb` and returns the target's edges with the directions it
+decides.
 """
 
 from __future__ import annotations
@@ -603,3 +605,248 @@ def mmb_by_mmb(
     return structure_output(
         GraphStructure.from_numpy(star, kind="pag"), labels=labels, metadata=metadata
     )
+
+
+@method_spec("cmb")
+def cmb(
+    data: npt.ArrayLike,
+    *,
+    target: str | int | None = None,
+    blanket: str = "hiton_mb",
+    alpha: float = 0.02,
+    indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn the edges at one variable and their directions with CMB.
+
+    CMB (Causal Markov Blanket discovery) [1]_ finds the direct causes and the direct effects of a
+    target without learning the whole graph. It learns the target's parents and children and its
+    Markov blanket, labels each neighbor from how its dependence on the other neighbors changes
+    when the target joins the conditioning set, retests an inconclusive pair given one member's
+    blanket, and visits each undecided neighbor in turn to learn the target's identity there. The
+    answer holds the edges at the target with the directions the tests decide.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    target : str, int, or None, default=None
+        Required: the variable to answer for, a column label (a string) or a 0-based position (an
+        integer). ``None`` raises ``ValueError``.
+    blanket : {"hiton_mb", "mmmb", "pcmb"}, default="hiton_mb"
+        The Markov blanket learner run for each variable CMB visits: :func:`~andrey.hiton_mb`, the
+        learner of the paper's runs [1]_, :func:`~andrey.mmmb`, or :func:`~andrey.pcmb`. CMB reads
+        a variable's parents and children apart from its spouses, which these learners return.
+    alpha : float, default=0.02
+        Significance level of the conditional-independence test, in ``(0, 1)``. The paper's runs
+        use 0.02 [1]_, the default.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`. The
+        paper's runs use a mutual-information test on categorical data, ``"gsq"`` [1]_.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, the blanket
+        learner's and CMB's own, at least ``0``; ``None``, the default, sets no limit, as the paper
+        sets none. A pair whose test with the target would condition on more variables runs
+        neither of its two tests and decides nothing.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
+        the other's parents and children from the start, and no test removes it. A pair the
+        knowledge makes non-adjacent never shares an edge. At each variable CMB visits, the
+        direction a tier, a required edge, or an edge forbidden one way gives an edge is fixed
+        before any test, and the tests label the rest from it. ``required_paths`` and
+        ``forbidden_paths`` raise ``NotImplementedError``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
+        edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
+        effect, and ``x - target`` where the direction is left undecided. An absent edge away from
+        the target means nothing. ``metadata["target"]`` names the target, and
+        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["undirected"]`` list
+        those columns, by column label or 0-based position; ``metadata["markov_blanket"]`` lists
+        the target's Markov blanket as ``blanket`` learned it. ``metadata["blankets_learned"]``
+        lists the variables whose Markov blanket the fit learned, in order, the target first, so
+        its length is the number of blankets the answer took. ``metadata["algorithm"]`` is
+        ``"cmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical
+        columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated,
+        the blanket learner's included; a query answered again from a kept answer is not a new
+        test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position, ``categorical`` is not a list of column names and positions, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
+        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
+        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
+        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+    NotImplementedError
+        If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
+        methods that honor them.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** CMB suits i.i.d. observational data with no unmeasured common causes and no
+    selection bias, in which every independence follows from the graph (faithfulness), when you
+    want the direct causes and effects of one variable rather than the whole graph [1]_. Its paper
+    runs it on categorical data with a mutual-information test at 0.02; the default Fisher-Z test
+    assumes continuous data with linear effects and Gaussian noise, and the other tests read
+    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is
+    designed for large graphs in which each variable has a small Markov blanket: it learns few
+    blankets beyond the target's, two to three on average in the paper's runs [1]_. For the whole
+    CPDAG, use :func:`~andrey.pc`; for the target's edges with the CPDAG's directions by a search
+    that grows a local graph, :func:`~andrey.mb_by_mb`.
+
+    **How it works.** Each neighbor of a variable gets an identity: parent, child, or undecided
+    [1]_. Two neighbors ``x`` and ``y`` of the target ``t`` are tested given a set ``Z`` and given
+    ``Z`` with ``t``. Independent, then dependent once ``t`` joins, makes both parents: ``t`` is a
+    collider between them. Dependent, then independent, makes at least one a child: once one is a
+    parent, the other is a child. A pair that neither decides is inconclusive [1]_. The first
+    round takes ``Z`` empty. Each inconclusive pair is then retested given the blanket of its
+    member of lower rank, less ``t`` and the other member, until no neighbor is inconclusive
+    [1]_. A neighbor still inconclusive with two parents becomes a parent when it lies in the set
+    that separated them (Meek's rule R3 [2]_): ``t`` is a collider between the two parents, so no
+    descendant of ``t`` lies in that set. The remaining inconclusive neighbors become undecided.
+    Last, each undecided neighbor ``x`` is visited in turn and the same steps run there, without
+    returning to a variable whose own steps are still open [1]_: ``t`` a child of ``x`` makes
+    ``x`` a parent of ``t`` and the other member of each pair that made one of the two a child a
+    child; ``t`` a parent of ``x`` makes ``x`` a child. The paper's steps have no acyclicity rule;
+    Andrey adds Meek's rule R2 [2]_ to the visit, so that an edge the CPDAG directs only because
+    the opposite direction would close a cycle is directed too. A visited ``x`` directs each edge
+    of ``t`` that closes a triangle with it: ``t -> x -> w`` makes ``w`` a child of ``t``,
+    ``w -> x -> t`` makes ``w`` a parent, and a direction already found for ``w`` directs ``x``
+    the same way. The rule reads only directions the steps found, so it adds no test and no edge.
+    A label once given is never replaced by a weaker one: a parent or child stays so. A neighbor
+    still undecided at the end keeps an undirected edge.
+
+    Every choice between candidates of equal strength goes to the column whose rank, computed from
+    the data, comes first, as for :func:`~andrey.iamb`, and pairs are tested in rank order, so the
+    answer does not depend on the column order unless two columns are identical.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [4]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
+    With exact tests and exact blankets, every edge and every direction it returns is the true
+    CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows from
+    a separating set its steps never test, or from directions its visits do not find. Over every
+    target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets
+    at an average of 1.5, 2.5, and 4 neighbors per variable. Tested with exact d-separation on
+    those graphs and the paper's two examples, and on simulated linear-Gaussian data with 20
+    variables and categorical data with 10. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Gao, T., and Ji, Q. (2015). Local causal discovery of direct causes and effects.
+       Advances in Neural Information Processing Systems 28, 2512-2520.
+    .. [2] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
+       UAI, 403-410.
+    .. [3] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [4] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import cmb
+    >>> rng = np.random.default_rng(0)
+    >>> a, b = rng.standard_normal((2, 1000))
+    >>> c = a + b + 0.5 * rng.standard_normal(1000)
+    >>> out = cmb(np.column_stack([a, b, c]), target=2)
+    >>> out.metadata["parents"], out.metadata["children"]
+    ([0, 1], [])
+    """
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.cmb import CHILD, PARENT
+    from andrey.constraint.cmb import cmb as identities
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method="cmb", missing=True
+    )
+    d = X.shape[1]
+    t = target_column(target, labels, d, "cmb")
+    name = label_of(labels)
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+        search = local_search(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+            max_depth=max_depth,
+            constraints=constraints,
+        )
+        decided = None if constraints is None else constraints.decided()
+        result = identities(search, t, blanket, decided=decided)
+    star = np.zeros((d, d), dtype=np.int8)
+    for x, code in result.codes.items():
+        star[t, x] = ARROW if code == PARENT else TAIL
+        star[x, t] = ARROW if code == CHILD else TAIL
+    sets = {"markov_blanket": result.blanket, **_edge_sets(star, t)}
+    metadata = target_metadata(t, sets, name)
+    metadata["blankets_learned"] = [name(x) for x in result.learned]
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
+    return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)

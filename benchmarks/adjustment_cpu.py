@@ -46,6 +46,7 @@ from andrey_bench import rundir
 from andrey_bench.adapters import andrey_adjustment
 from andrey_bench.adapters.andrey_adjustment import AndreyAdjustment, AndreyPCAdjustment
 from andrey_bench.adapters.baseline_adjustment import AdjustForEverything, AdjustForNothing
+from andrey_bench.adapters.ciphod_locpc import CiphodLocPCCDE
 from andrey_bench.adapters.gupta_ldecc import GuptaLDECC
 from andrey_bench.adapters.maasch_ldp import MaaschLD3, MaaschLDP
 from andrey_bench.adapters.schubert_load import SchubertLOAD
@@ -66,7 +67,14 @@ from andrey_bench.runner import available_cores, check_interpreters, run_task, s
 FIXED_ARMS: list = [AdjustForNothing(), AdjustForEverything(), AndreyPCAdjustment()]
 
 #: The references, the authors' code each in its own environment (the ``start_*.sh`` scripts).
-REFERENCES: list = [GuptaLDECC(), MaaschLDP(), MaaschLD3(), SchubertSNAP(), SchubertLOAD()]
+REFERENCES: list = [
+    GuptaLDECC(),
+    MaaschLDP(),
+    MaaschLD3(),
+    SchubertSNAP(),
+    SchubertLOAD(),
+    CiphodLocPCCDE(),
+]
 
 #: The claimed settings of the papers at sizes they report, one row of cells per paper; a campaign
 #: chooses its own grid.

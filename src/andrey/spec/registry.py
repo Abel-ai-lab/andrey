@@ -15,7 +15,7 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
+from .concepts import CMB_BLANKETS, CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -803,6 +803,54 @@ _add(
 
 _add(
     MethodSpec(
+        name="cmb",
+        family="constraint",
+        summary="The direct causes and direct effects of one variable by Causal Markov Blanket "
+        "discovery: its parents and children labeled from how their dependence changes once the "
+        "variable is conditioned on, inconclusive pairs retested given a neighbor's blanket, and "
+        "undecided neighbors visited in turn. For one variable of a large graph with small "
+        "blankets.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at target alone, with the directions the tests decide; "
+            "metadata['parents'], metadata['children'], and metadata['undirected'] list the "
+            "columns joined to it, metadata['markov_blanket'] its Markov blanket, and "
+            "metadata['blankets_learned'] the variables whose blanket the fit learned, in order",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            REQUIRED_TARGET,
+            concept_param(
+                "blanket",
+                default="hiton_mb",
+                choices=CMB_BLANKETS,
+                doc="The Markov blanket learner run for each variable CMB visits, one that returns "
+                "the parents and children apart from the spouses: hiton_mb, the learner of Gao & "
+                "Ji 2015's runs, mmmb, or pcmb.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.02,
+                doc="Significance level of the conditional-independence test, in (0, 1). Smaller "
+                "values give smaller sets. Gao & Ji 2015 run CMB at 0.02, the default.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+        ),
+        references=("Gao & Ji 2015", "Meek 1995"),
+    )
+)
+
+_add(
+    MethodSpec(
         name="mmb_by_mmb",
         family="constraint",
         summary="The edges at one variable in the PAG when unmeasured common causes may exist, by "
@@ -1053,6 +1101,106 @@ _add(
             concept_param("max_depth"),
         ),
         references=("Gupta, Childers & Lipton 2023", "Schubert, Claassen & Magliacane 2026"),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="local_optimal_adjustment",
+        family="constraint",
+        summary="Local optimal adjustments discovery (LOAD): for two variables given unordered, "
+        "learns the edges at each one Markov blanket at a time (MB-by-MB), tests from them whether "
+        "one is an explicit, a possible, or no ancestor of the other, and returns the optimal "
+        "adjustment set for the total effect when it is identifiable, the locally valid parent "
+        "sets of the treatment otherwise. The answer is in metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at the two variables as their own searches directed them, no edge "
+            "away from them; metadata['effects'] holds one record per ordered pair of them",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The number of tests can change with the column order: the identifiability "
+        "step stops at the first undirected neighbor of the treatment that fails it.",
+        tie_break=True,
+        params=(
+            concept_param(
+                "variables",
+                doc="Required: the two variables to answer for, in any order: a list of column "
+                "names from the data file's header or 0-based positions. The method answers for "
+                "both ordered pairs of them.",
+            ),
+            concept_param(
+                "blanket",
+                default="gs",
+                doc="The Markov blanket learner run for each variable the search visits: gs = "
+                "Grow-Shrink, the learner of Schubert, Claassen & Magliacane 2026; iamb_forward = "
+                "IAMB's grow phase without its shrink; total_conditioning = each variable the test "
+                "finds dependent on it given all the other variables (Pellet & Elisseeff 2008); "
+                "the others are the functions of those names.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. The default is the level of the experiments of Schubert, "
+                "Claassen & Magliacane 2026 and of the authors' code.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=(
+            "Schubert, Claassen & Magliacane 2026",
+            "Fang, Liu, Geng, Zhu & He 2022",
+            "Wang, Zhou, Zhao & Geng 2014",
+        ),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="locpc_cde",
+        family="constraint",
+        summary="Local PC-style discovery for the controlled direct effect: learns the graph "
+        "around an outcome one hop at a time with PC's tests, run only near the outcome, until "
+        "every edge at the outcome is oriented, so that its parents are a valid adjustment set, "
+        "or a larger hop adds no variable. Returns the local essential graph; the answer is in "
+        "metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the local essential graph of the outcome at the last hop learned; "
+            "metadata['effects'] holds the pair's record: whether the effect is identifiable, "
+            "the outcome's other parents as its set, and the paper's reason; metadata['hop'], "
+            "metadata['visited'], and metadata['double_bar'] describe the search",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param(
+                "alpha",
+                default=0.05,
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. The default is the level of the paper's experiments and "
+                "of the authors' code.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+        ),
+        references=("Loranchet & Assaad 2026", "Meek 1995"),
     )
 )
 
@@ -3533,6 +3681,17 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
     "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
     "forbidden_paths raise NotImplementedError.",
+    "locpc_cde": "A required edge is joined and never tested; a pair the knowledge makes "
+    "non-adjacent never shares an edge. Every edge a tier or an edge "
+    "forbidden one way directs is directed before the colliders, and Meek's rules R1-R4 follow. "
+    "A variable a tier or a required edge places before another is not its descendant, so their "
+    "edge is not tested again when the later one is visited. required_paths and forbidden_paths "
+    "raise NotImplementedError.",
+    "cmb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent never shares an edge. At each variable CMB visits, "
+    "the direction a tier, a required edge, or an edge forbidden one way gives an edge is fixed "
+    "before any test, and the tests label the rest from it. required_paths and forbidden_paths "
+    "raise NotImplementedError.",
     "mmb_by_mmb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent never shares an edge. As each local structure joins "
     "the growing graph, a tier or an edge forbidden one way puts an arrowhead at the variable it "
@@ -3829,10 +3988,12 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "mmmb": ("target", "markov_blanket", "parents_and_children"),
     "pcmb": ("target", "markov_blanket", "parents_and_children"),
     "mb_by_mb": ("target", "parents", "children", "undirected"),
+    "cmb": ("target", "markov_blanket", "parents", "children", "undirected"),
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
     **dict.fromkeys(("ldp", "ld3"), ("partition",)),
+    "locpc_cde": ("hop", "visited", "double_bar"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

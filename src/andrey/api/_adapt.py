@@ -50,11 +50,14 @@ TESTWISE_METHODS = (
     "mmmb",
     "pcmb",
     "mb_by_mb",
+    "cmb",
     "mmb_by_mmb",
     "y_structures",
     "ldp",
     "ld3",
     "ldecc",
+    "local_optimal_adjustment",
+    "locpc_cde",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")
