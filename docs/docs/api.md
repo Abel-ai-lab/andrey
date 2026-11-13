@@ -710,6 +710,7 @@ in a process.
    y_structures
    ldp
    ld3
+   snap
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a

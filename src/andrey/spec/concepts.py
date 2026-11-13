@@ -159,10 +159,11 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3"),
+    *("ldp", "ld3", "snap"),
 )
-#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3")
+#: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
+#: take none yet.
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "snap")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -211,6 +212,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "snap",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -646,7 +648,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv", "snap"),
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
@@ -792,6 +794,7 @@ _CONCEPTS = (
                 "pcmb",
                 "mb_by_mb",
                 "mmb_by_mmb",
+                "snap",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -893,6 +896,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "snap",
         ),
         exempt=(
             *_exempt(
@@ -1108,6 +1112,11 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
             ),
+            *_exempt(
+                "Its paper and the authors' code take no knowledge, and how a required or "
+                "forbidden edge would steer its pruning is not defined yet.",
+                "snap",
+            ),
         ),
     ),
     Concept(
@@ -1122,7 +1131,7 @@ _CONCEPTS = (
                 *(
                     m
                     for m in NO_KNOWLEDGE
-                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3")
+                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3", "snap")
                 ),
             ),
             *_exempt(
@@ -1132,6 +1141,7 @@ _CONCEPTS = (
                 "y_structures",
                 "ldp",
                 "ld3",
+                "snap",
             ),
         ),
     ),
@@ -1168,6 +1178,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "snap",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1212,6 +1223,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "snap",
             "mb_by_mb",
             "mmb_by_mmb",
             *PCMCI_FAMILY,
@@ -1416,6 +1428,10 @@ _CONCEPTS = (
                 "ld3",
             ),
             *_exempt(
+                "Its graph is over the columns of data, and a context variable is one more column.",
+                "snap",
+            ),
+            *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
                 *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
@@ -1540,7 +1556,10 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=(
+            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt("Answers for the ordered pairs of several variables, not one.", "snap"),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1591,7 +1610,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="in any order",
-        suitable=("y_structures",),
+        suitable=("y_structures", "snap"),
         others_exempt="Answers for no set of variables given together.",
     ),
     Concept(
@@ -1649,7 +1668,10 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=(
+            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt("Answers for the ordered pairs of several variables, not one.", "snap"),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1665,6 +1687,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "snap",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1681,7 +1704,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3"),
+        suitable=("y_structures", "ldp", "ld3", "snap"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

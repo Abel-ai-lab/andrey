@@ -1003,6 +1003,56 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="snap",
+        family="constraint",
+        summary="Sequential non-ancestor pruning: learns the CPDAG over the possible ancestors of "
+        "a few variables, given unordered, by PC's skeleton search one conditioning-set size at a "
+        "time, dropping after each size the variables that cannot be their ancestors, and reads "
+        "the total effect of each ordered pair off it: the optimal adjustment set when "
+        "identifiable, the parent sets of the treatment the CPDAG allows otherwise. The answer is "
+        "in metadata['effects'], the columns kept in metadata['possible_ancestors'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the CPDAG over the possible ancestors of the variables, no edge at any other "
+            "column; metadata['effects'] holds one record per ordered pair of them",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        params=(
+            concept_param(
+                "variables",
+                doc="Required: the variables to answer for, in any order, at least two: a list of "
+                "column names from the data file's header or 0-based positions. The method "
+                "answers for every ordered pair of them.",
+            ),
+            concept_param(
+                "alpha",
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. The default is the level of the experiments of Schubert, "
+                "Claassen & Magliacane 2025 and of the authors' code.",
+            ),
+            concept_param(
+                "max_depth",
+                doc="The maximum conditioning-set size of every conditional-independence test, at "
+                "least 0: 0 runs only unconditional tests, and null sets no limit, which runs the "
+                "search to the end. A cap that stops the search while pairs are left to test "
+                "returns the possible ancestors as a prefilter and decides an effect only where "
+                "it is zero.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=("Schubert, Claassen & Magliacane 2025",),
+    )
+)
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(
@@ -3729,6 +3779,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
     **dict.fromkeys(("ldp", "ld3"), ("partition",)),
+    "snap": ("possible_ancestors",),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

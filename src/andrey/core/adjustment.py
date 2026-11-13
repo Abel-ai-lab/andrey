@@ -43,6 +43,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Iterable
 from itertools import combinations
+from typing import Any
 
 import numpy as np
 
@@ -223,6 +224,15 @@ def local_parent_sets(graph: GraphStructure, x: int) -> list[list[int]]:
     marks = checked(graph, "the local parent sets", ("dag", "cpdag"))
     if not 0 <= x < graph.n_nodes:
         raise ValueError(f"the treatment must be a node of the graph, got position {x}")
+    return parent_choices(marks, x)
+
+
+def parent_choices(marks: np.ndarray, x: int) -> list[list[int]]:
+    """The parent sets of ``x`` that the marks around it allow, ascending: its parents with each
+    subset of its undirected neighbors that makes no new v-structure at ``x``, the rule of
+    :func:`local_parent_sets`, read from the marks alone. A caller that holds only the edges near
+    ``x``, such as a local search, gets the same sets as from the whole CPDAG, since the rule reads
+    the edges at ``x`` and the adjacencies among its neighbors."""
     parents = np.flatnonzero(directed(marks)[:, x]).tolist()
     siblings = np.flatnonzero(undirected(marks)[x]).tolist()
     found = []
@@ -321,3 +331,34 @@ def adjustment_set(
         keep &= set(among)
     found = sorted(keep)
     return found if is_adjustment_set(graph, x, y, found) else None
+
+
+def effect_in_class(graph: GraphStructure, x: int, y: int) -> dict[str, Any]:
+    """What a ``dag`` or ``cpdag`` says of the total effect of ``x`` on ``y``: the ``nonzero``,
+    ``identifiable``, ``adjustment_sets``, and ``set_kind`` fields of its ``effects`` record
+    (:func:`~andrey.core.effects.effect_record`), nodes by position.
+
+    When some set is an adjustment set in every DAG of the class (:func:`adjustment_set`), the
+    effect is identifiable: the optimal set (:func:`optimal_set`) is the one set, and the effect is
+    nonzero; when ``y`` is no descendant of ``x`` the effect is zero and no set is needed. Otherwise
+    the effect is not identifiable, and the sets are the parent sets of ``x`` the class allows
+    (:func:`local_parent_sets`), the local IDA estimates. A record holds neither node of the pair,
+    so ``y`` is left out of a set that holds it, and sets that then agree are one; where ``y`` is
+    a parent of ``x`` the effect is zero in that DAG. The effect is zero in every DAG of the class
+    when ``y`` is no possible descendant of ``x``, so ``nonzero`` is ``False`` then and ``None``
+    otherwise. An edge ``y -> x`` is such a case: the effect of ``x`` on ``y`` is zero, and no set
+    is an adjustment set, since none blocks the path the edge makes.
+    """
+    if adjustment_set(graph, x, y) is not None:
+        optimal = optimal_set(graph, x, y)
+        if optimal is None:
+            return dict(nonzero=False, identifiable=True, adjustment_sets=[], set_kind=None)
+        return dict(nonzero=True, identifiable=True, adjustment_sets=[optimal], set_kind="optimal")
+    sets = {tuple(v for v in s if v != y) for s in local_parent_sets(graph, x)}
+    zero = y not in possible_descendants(graph.to_numpy(), [x])
+    return dict(
+        nonzero=False if zero else None,
+        identifiable=False,
+        adjustment_sets=[list(s) for s in sorted(sets)],
+        set_kind="local_parents",
+    )

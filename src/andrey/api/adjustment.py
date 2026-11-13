@@ -1,13 +1,16 @@
 """Treatment-outcome facade adapters.
 
-Each method answers for one ordered pair of columns, a treatment and an outcome: the answer is a
-record in ``metadata["effects"]`` (:mod:`andrey.core.effects`) with the adjustment sets it found,
-next to the graph its paper licenses. ``ldp`` finds a valid adjustment set for the total effect;
-``ld3`` finds the parents of the outcome and whether the treatment is one of them.
+Each method answers for ordered pairs of columns, a treatment and an outcome each: the answer is a
+record per pair in ``metadata["effects"]`` (:mod:`andrey.core.effects`) with the adjustment sets
+it found, next to the graph its paper licenses. ``ldp`` finds a valid adjustment set for the total
+effect; ``ld3`` finds the parents of the outcome and whether the treatment is one of them. ``snap``
+answers for every ordered pair of a few variables, given unordered, from the CPDAG over their
+possible ancestors.
 """
 
 from __future__ import annotations
 
+from itertools import permutations
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -23,7 +26,7 @@ from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import numpy.typing as npt
 
@@ -494,3 +497,274 @@ def ld3(
     return structure_output(
         dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
     )
+
+
+def _snap_reading(result, shown: np.ndarray) -> Callable[[int, int], dict]:
+    """Read the fields of each pair's ``effects`` record from SNAP's ``result``.
+
+    ``shown`` is its graph with conflicting edges undirected. A finished search is read from the
+    CPDAG that extends ``shown`` (:func:`~andrey.core.orient.cpdag_of_pdag`,
+    :func:`~andrey.core.adjustment.effect_in_class`), and decides nothing when no DAG extends it. A
+    capped search decides only a zero effect, where the treatment has no possibly directed path to
+    the outcome in its graph.
+    """
+    from andrey.core.adjustment import effect_in_class, possible_ancestors
+    from andrey.core.orient import cpdag_of_pdag
+    from andrey.core.structure import GraphStructure
+
+    if not result.complete:
+        return lambda x, y: {} if x in possible_ancestors(result.marks, [y]) else {"nonzero": False}
+    try:
+        graph = GraphStructure.from_numpy(cpdag_of_pdag(shown), kind="cpdag")
+    except ValueError:
+        return lambda x, y: {}
+    return lambda x, y: effect_in_class(graph, x, y)
+
+
+@method_spec("snap")
+def snap(
+    data: npt.ArrayLike,
+    *,
+    variables: Sequence[str | int] | None = None,
+    alpha: float = 0.05,
+    max_depth: int | None = None,
+    indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Find the effects among a few variables from the CPDAG over their possible ancestors (SNAP).
+
+    SNAP learns the CPDAG over the possible ancestors of the variables it answers for, not over
+    every column [1]_. It runs PC's skeleton search one conditioning-set size at a time; after each
+    size it orients the v-structures the tests have shown and drops every variable that cannot be
+    an ancestor of one of the variables, so the larger conditioning sets are tried among fewer
+    variables. The variables it drops are needed neither for the effects among the variables nor
+    for their optimal adjustment sets. For each ordered pair of the variables it reads the answer
+    off the CPDAG: the optimal adjustment set when the effect is identifiable, the parent sets of
+    the treatment the CPDAG allows when it is not, and a zero effect when the outcome cannot be a
+    descendant of the treatment.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    variables : sequence of str or int
+        Required: the variables to answer for, in any order, at least two: column labels
+        (strings) or 0-based positions (integers). The method answers for every ordered pair of
+        them and does not need to know which causes which.
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a p-value above ``alpha`` is an
+        independence, any other a dependence. The default is the level of the experiments of [1]_
+        and of the authors' code.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit, which runs the search to
+        the end (SNAP(infinity) of [1]_). A cap the search does not reach changes nothing. A cap
+        that stops the search while pairs are left to test gives SNAP(k), a prefilter:
+        ``metadata["possible_ancestors"]`` then holds every possible ancestor of the variables
+        and possibly more, the graph holds the edges and v-structures found so far, and an effect
+        is decided only where it is zero.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column: the CPDAG over
+        the possible ancestors of ``variables``, and no edge at any other column.
+        ``metadata["effects"]`` holds one record (:mod:`andrey.core.effects`) per ordered pair of
+        ``variables``, by column label or 0-based position, for the total effect (``estimand``
+        ``"total"``). When one adjustment set is valid in every DAG of the CPDAG's class,
+        ``identifiable`` is ``True``: ``adjustment_sets`` is the optimal set, with ``set_kind``
+        ``"optimal"`` and ``nonzero`` ``True``, or no set and ``nonzero`` ``False`` when the
+        outcome is no descendant of the treatment. Otherwise ``identifiable`` is ``False``,
+        ``adjustment_sets`` are the parent sets of the treatment the class allows, with
+        ``set_kind`` ``"local_parents"``, and ``nonzero`` is ``False`` when the outcome cannot be
+        a descendant of the treatment and ``None`` when it can; see Notes.
+        ``metadata["possible_ancestors"]`` lists the columns kept, ``variables`` included.
+        ``metadata["algorithm"]`` is ``"snap"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
+        number of conditional-independence tests the fit evaluated.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``variables`` is a string or
+        holds a member that is neither a column label nor a position, or ``categorical`` is not a
+        list of column names and positions.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``variables`` is missing,
+        names a column ``data`` lacks or one column twice, or names fewer than two; or if ``data``
+        or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** SNAP suits observational data where you want the effects among a few
+    variables, and sets of covariates to adjust for, without learning the whole graph and without
+    knowing which of them causes which. Its claim [1]_: with no hidden common causes and no
+    selection of the rows, when every independence follows from the causal graph (faithfulness)
+    and the tests are exact, every variable it drops is a definite non-ancestor of the variables
+    (Theorem 3.1), and the graph it returns is the CPDAG over their possible ancestors (Theorem
+    3.2), so its sets are the ones the CPDAG over every column gives. The default Fisher-Z test
+    assumes continuous data with linear effects and Gaussian noise; the other tests read
+    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. As a
+    prefilter (Corollary 3.1), run it with a small ``max_depth`` and pass the columns of
+    ``metadata["possible_ancestors"]`` to a discovery method such as :func:`~andrey.pc`.
+
+    **How it works.** Algorithms 1 to 4 of [1]_. At each conditioning-set size, from 0 up, PC's
+    skeleton step tests each remaining edge against the subsets of that size of one end's current
+    neighbors and removes it at the first separating set [1]_. Below size 2, each unshielded
+    triple whose separating set lacks its middle node becomes a v-structure; from size 2 on, RFCI's
+    rule [2]_ also needs both edges of the triple to test dependent given that set, and removes an
+    edge that tests independent, with a minimal separating set. Two v-structures that disagree
+    leave an edge with arrowheads at both ends, so neither end can be an ancestor of the other.
+    After each size, a variable with no possibly directed path to one of ``variables`` is dropped.
+    When no pair is left to test, Meek's rules [3]_ complete the orientation and the variables are
+    pruned once more; an edge left with two arrowheads is then made undirected. The search visits
+    the variables, their neighbors, and the conditioning sets in an order computed from the data,
+    so the answer and the number of tests do not depend on the column order, and it tests each
+    query once. The effects are read from the CPDAG that extends the graph: the same skeleton and
+    v-structures, each edge oriented as its class requires. The optimal set is that of [4]_, and
+    the parent sets are those of local IDA [5]_; a set holds neither variable of the pair, so the
+    outcome is left out of a parent set that holds it, where the effect in that DAG is zero. An
+    edge from the outcome into the treatment makes the effect zero with no valid adjustment set,
+    so ``nonzero`` and ``identifiable`` are both ``False`` there. A graph that no DAG extends
+    leaves every field undecided.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [7]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample of their own. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and on
+    simulated linear-Gaussian data. Among the possible ancestors the search is PC's, so its tests
+    grow with their neighborhoods; a test error that orients an edge into a variable can drop a
+    true ancestor, and with it a member of the optimal set.
+
+    References
+    ----------
+    .. [1] Schubert, M., Claassen, T., and Magliacane, S. (2025). SNAP: Sequential non-ancestor
+       pruning for targeted causal effect estimation with an unknown graph. Proceedings of the 28th
+       International Conference on Artificial Intelligence and Statistics, Proceedings of Machine
+       Learning Research 258.
+    .. [2] Colombo, D., Maathuis, M. H., Kalisch, M., and Richardson, T. S. (2012). Learning
+       high-dimensional directed acyclic graphs with latent and selection variables. The Annals of
+       Statistics 40(1), 294-321.
+    .. [3] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
+       Proceedings of the 11th Conference on Uncertainty in Artificial Intelligence (UAI),
+       403-410.
+    .. [4] Henckel, L., Perkovic, E., and Maathuis, M. H. (2022). Graphical criteria for efficient
+       total effect estimation via adjustment in causal linear models. Journal of the Royal
+       Statistical Society Series B 84(2), 579-599.
+    .. [5] Maathuis, M. H., Kalisch, M., and Buhlmann, P. (2009). Estimating high-dimensional
+       intervention effects from observational data. The Annals of Statistics 37(6A), 3133-3164.
+    .. [6] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [7] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import snap
+    >>> rng = np.random.default_rng(0)
+    >>> a, b, c = rng.standard_normal((3, 5000))
+    >>> x = a + b + rng.standard_normal(5000)
+    >>> y = x + a + c + rng.standard_normal(5000)
+    >>> z = y + rng.standard_normal(5000)
+    >>> df = pd.DataFrame({"a": a, "b": b, "c": c, "x": x, "y": y, "z": z})
+    >>> out = snap(df, variables=["x", "y"])
+    >>> out.metadata["possible_ancestors"]
+    ['a', 'b', 'c', 'x', 'y']
+    >>> record = out.metadata["effects"][0]
+    >>> record["treatment"], record["outcome"], record["adjustment_sets"]
+    ('x', 'y', [['a']])
+    """
+    from andrey.api._local import variable_columns
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.pc import undirect_conflicts
+    from andrey.constraint.snap import snap as snap_engine
+    from andrey.core.ci import counting_tests
+    from andrey.core.effects import effect_record
+    from andrey.core.orient import to_structure
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, _ = fit_inputs(
+        data, "indep_test", indep_test, categorical, None, method="snap", missing=True
+    )
+    d = X.shape[1]
+    targets = variable_columns(variables, labels, d, "snap")
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+        search = local_search(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+        )
+        with search.pinned():
+            result = snap_engine(search, targets, max_depth=max_depth)
+    name = label_of(labels)
+    shown = undirect_conflicts(result.marks)
+    read = _snap_reading(result, shown)
+    records = [
+        effect_record(x, y, estimand="total", name=name, **read(x, y))
+        for x, y in permutations(targets, 2)
+    ]
+    metadata = {
+        "effects": records,
+        "possible_ancestors": [name(j) for j in result.kept],
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        "n_tests": tests.n,
+    }
+    return structure_output(to_structure(shown, kind="cpdag"), labels=labels, metadata=metadata)
