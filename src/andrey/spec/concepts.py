@@ -159,12 +159,14 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3"),
+    *("ldp", "ld3", "local_optimal_adjustment"),
 )
-#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
+#: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
+#: take none yet.
 NO_KNOWLEDGE = (
     *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3"),
     "local_isa_ling",
+    "local_optimal_adjustment",
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -215,6 +217,7 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "local_isa_ling",
+            "local_optimal_adjustment",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -670,6 +673,11 @@ _CONCEPTS = (
         suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
+                "Its ancestry and amenability tests condition on sets the local structures fix; no "
+                "cap is defined for them.",
+                "local_optimal_adjustment",
+            ),
+            *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
                 "local_isa_ling",
             ),
@@ -821,6 +829,7 @@ _CONCEPTS = (
                 "pcmb",
                 "mb_by_mb",
                 "mmb_by_mmb",
+                "local_optimal_adjustment",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -922,6 +931,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "local_optimal_adjustment",
         ),
         exempt=(
             *_exempt(
@@ -1117,6 +1127,11 @@ _CONCEPTS = (
         suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
             *_exempt(
+                "Its paper and the authors' code take no knowledge, and how knowledge would steer "
+                "its ancestry tests is not defined yet.",
+                "local_optimal_adjustment",
+            ),
+            *_exempt(
                 "The paper gives no rule for background knowledge: the edges are the rows of "
                 "the demixing matrix that the admissible assignments read.",
                 "local_isa_ling",
@@ -1160,7 +1175,11 @@ _CONCEPTS = (
                 *(
                     m
                     for m in NO_KNOWLEDGE
-                    if m not in ("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling")
+                    if m
+                    not in (
+                        *("icp", "ages", "y_structures", "ldp", "ld3", "local_isa_ling"),
+                        "local_optimal_adjustment",
+                    )
                 ),
             ),
             *_exempt(
@@ -1171,6 +1190,7 @@ _CONCEPTS = (
                 "ldp",
                 "ld3",
                 "local_isa_ling",
+                "local_optimal_adjustment",
             ),
         ),
     ),
@@ -1207,6 +1227,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "local_optimal_adjustment",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1258,6 +1279,7 @@ _CONCEPTS = (
             "pnl",
             "loci",
             *EM_METHODS,
+            "local_optimal_adjustment",
         ),
         exempt=(
             *_exempt(
@@ -1401,6 +1423,10 @@ _CONCEPTS = (
             "ut_igsp",
         ),
         exempt=(
+            *_exempt(
+                "Its graph is over the columns of data, and a context variable is one more column.",
+                "local_optimal_adjustment",
+            ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment "
                 "label does not have.",
@@ -1588,7 +1614,13 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb", "local_isa_ling"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=(
+            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt(
+                "Answers for the ordered pairs of two variables, not one.",
+                "local_optimal_adjustment",
+            ),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1639,7 +1671,10 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="in any order",
-        suitable=("y_structures",),
+        suitable=(
+            "y_structures",
+            "local_optimal_adjustment",
+        ),
         others_exempt="Answers for no set of variables given together.",
     ),
     Concept(
@@ -1659,7 +1694,11 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=("mb_by_mb", "mmb_by_mmb"),
+        suitable=(
+            "mb_by_mb",
+            "mmb_by_mmb",
+            "local_optimal_adjustment",
+        ),
         others_exempt="Runs no Markov blanket learner as a step.",
         deviations=(
             Deviation(
@@ -1670,6 +1709,14 @@ _CONCEPTS = (
                 reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
                 "to keep a variable added in error rather than lose a member; any blanket "
                 "learner, or a superset of the blanket, satisfies its proof.",
+            ),
+            Deviation(
+                method="local_optimal_adjustment",
+                name="blanket",
+                default="gs",
+                choices=BLANKET_LEARNERS,
+                reason="Schubert, Claassen and Magliacane 2026 run MB-by-MB with Grow-Shrink in "
+                "place of IAMB; any blanket learner satisfies the proof of MB-by-MB it relies on.",
             ),
             Deviation(
                 method="mmb_by_mmb",
@@ -1697,7 +1744,13 @@ _CONCEPTS = (
             "pcmb",
             *("icp", "mb_by_mb", "mmb_by_mmb"),
         ),
-        exempt=_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+        exempt=(
+            *_exempt("Answers for one treatment-outcome pair, not one variable.", "ldp", "ld3"),
+            *_exempt(
+                "Answers for the ordered pairs of two variables, not one.",
+                "local_optimal_adjustment",
+            ),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1713,6 +1766,7 @@ _CONCEPTS = (
             "y_structures",
             "ldp",
             "ld3",
+            "local_optimal_adjustment",
         ),
         others_exempt="Does not report its test count.",
     ),
@@ -1721,7 +1775,11 @@ _CONCEPTS = (
         summary="A method that learns the Markov blankets of several variables in turn lists them "
         "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
         "of blankets it needed is the list's length.",
-        suitable=("mb_by_mb", "mmb_by_mmb"),
+        suitable=(
+            "mb_by_mb",
+            "mmb_by_mmb",
+            "local_optimal_adjustment",
+        ),
         others_exempt="Learns no sequence of Markov blankets.",
     ),
     Concept(
@@ -1729,7 +1787,12 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=("y_structures", "ldp", "ld3"),
+        suitable=(
+            "y_structures",
+            "ldp",
+            "ld3",
+            "local_optimal_adjustment",
+        ),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(

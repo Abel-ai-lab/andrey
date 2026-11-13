@@ -1005,6 +1005,64 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="local_optimal_adjustment",
+        family="constraint",
+        summary="Local optimal adjustments discovery (LOAD): for two variables given unordered, "
+        "learns the edges at each one Markov blanket at a time (MB-by-MB), tests from them whether "
+        "one is an explicit, a possible, or no ancestor of the other, and returns the optimal "
+        "adjustment set for the total effect when it is identifiable, the locally valid parent "
+        "sets of the treatment otherwise. The answer is in metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at the two variables as their own searches directed them, no edge "
+            "away from them; metadata['effects'] holds one record per ordered pair of them",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The number of tests can change with the column order: the identifiability "
+        "step stops at the first undirected neighbor of the treatment that fails it.",
+        tie_break=True,
+        params=(
+            concept_param(
+                "variables",
+                doc="Required: the two variables to answer for, in any order: a list of column "
+                "names from the data file's header or 0-based positions. The method answers for "
+                "both ordered pairs of them.",
+            ),
+            concept_param(
+                "blanket",
+                default="gs",
+                doc="The Markov blanket learner run for each variable the search visits: gs = "
+                "Grow-Shrink, the learner of Schubert, Claassen & Magliacane 2026; iamb_forward = "
+                "IAMB's grow phase without its shrink; total_conditioning = each variable the test "
+                "finds dependent on it given all the other variables (Pellet & Elisseeff 2008); "
+                "the others are the functions of those names.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. The default is the level of the experiments of Schubert, "
+                "Claassen & Magliacane 2026 and of the authors' code.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+        ),
+        references=(
+            "Schubert, Claassen & Magliacane 2026",
+            "Fang, Liu, Geng, Zhu & He 2022",
+            "Wang, Zhou, Zhao & Geng 2014",
+        ),
+    )
+)
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(
