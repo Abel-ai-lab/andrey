@@ -786,8 +786,8 @@ def cmb(
     **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
     With exact tests and exact blankets, every edge and every direction it returns is the true
     CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows from
-    acyclicity alone (Meek's rule R2), or from a separating set its steps never test. Over every
-    target of 100 random graphs of 6 to 20 variables, that happened at 3%, 7%, and 27% of targets
+    a separating set its steps never test, or from directions its visits do not find. Over every
+    target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets
     at an average of 1.5, 2.5, and 4 neighbors per variable. Tested with exact d-separation on
     those graphs and the paper's two examples, and on simulated linear-Gaussian data with 20
     variables and categorical data with 10. The numbers are a reference, not a hard limit: they
