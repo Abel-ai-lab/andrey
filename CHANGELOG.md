@@ -17,23 +17,29 @@ names its pull request.
   outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
   answer is one record in `metadata["effects"]` with the paper's reason; the graph is the local
   essential graph it learned. ([#1000])
-- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000), experimental:
-  the blanket of one target, or every variable's blanket joined into the CPDAG, skeleton, or moral
-  graph, with the arguments and metadata of `iamb`. It visits the other variables in one order,
-  the most dependent first, and adds each at once when a test finds it dependent given the blanket
-  so far, in passes until none joins, then shrinks the blanket in passes until none leaves.
-  ([#931])
-- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005),
-  experimental, with the arguments and metadata of `iamb`. Each round tests every variable outside
-  the blanket and adds those that test dependent together, the most dependent first, while a
-  categorical test's table holds more than five rows per cell, then shrinks the blanket once.
-  ([#935])
+- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
+  one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
+  arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
+  first, and adds each at once when a test finds it dependent given the blanket so far, in passes
+  until none joins, then shrinks the blanket in passes until none leaves. It is supported: against
+  bnlearn's `gs` on four published networks and linear-Gaussian graphs, every variable a target, its
+  sets were better in 13 of 20 settings and worse in 1. On hepar2 they have more errors than the
+  empty set, as those of `iamb` do. ([#931], [#993])
+- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005), with
+  the arguments and metadata of `iamb`. Each round tests every variable outside the blanket and adds
+  those that test dependent together, the most dependent first, while a categorical test's table
+  holds more than five rows per cell, then shrinks the blanket once. It is supported: against
+  bnlearn's `fast.iamb` on the same data, its sets were better in 10 of 20 settings and worse in 3,
+  and on hepar2 they have more errors than the empty set. It runs 42% to 73% of the tests of `iamb`
+  and is less accurate than `iamb` outside hepar2. ([#935], [#993])
 - `andrey.hiton_pc`, the semi-interleaved HITON-PC learner of parents and children (Aliferis et al.
-  2010), experimental, with the arguments and metadata of `mmpc` and `max_depth=3` by default. It
-  orders the candidates once by their unconditional test, tests each newcomer against the subsets
-  of the members before it, tests every member again once all have joined, and keeps a member only
-  when the target is in that member's own set. On categorical data a test runs only with at least
-  five rows per cell of its table. ([#950])
+  2010), with the arguments and metadata of `mmpc` and `max_depth=3` by default. It orders the
+  candidates once by their unconditional test, tests each newcomer against the subsets of the
+  members before it, tests every member again once all have joined, and keeps a member only when the
+  target is in that member's own set. On categorical data a test runs only with at least five rows
+  per cell of its table. It is supported: against bnlearn's `si.hiton.pc` on the same networks and
+  graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
+  empty set in every setting. ([#950], [#993])
 - `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
   experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
   target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
@@ -170,6 +176,13 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+  directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
+  blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
+  eager collider checks that direct the treatment's parents. The step that finds the neighbors
+  tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
+  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
+  lane runs it beside the authors' code. ([#991])
 
 ### Changed
 
@@ -2732,10 +2745,12 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

@@ -375,7 +375,7 @@ UNIT_CASES = {
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
             "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "locpc_cde"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc", "locpc_cde"),
         ),
         "gauss_5v",
     ),

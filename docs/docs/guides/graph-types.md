@@ -175,7 +175,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures`, `ldp`, `ld3` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `locpc_cde` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `ldecc`, `locpc_cde` |
 | `undirected` | `mmpc`, `hiton_pc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `digraph` | `local_isa_ling` |
@@ -208,6 +208,10 @@ returns a `dag` whose only edges point into its `outcome`, from the parents it f
 `treatment` among them when the structural direct criterion holds. `locpc_cde` returns a `cpdag`,
 the local essential graph it learned around its `outcome`: the edges at the variables it visited,
 directed where its tests decide, and its answer is a record in `metadata["effects"]`.
+
+`ldecc` returns a `cpdag` that holds only the edges at its `treatment`, as `mb_by_mb`'s does at its
+`target`: an absent edge away from the treatment means nothing. Its answer, the locally valid parent
+sets for the effect on its `outcome`, is a record in `metadata["effects"]`.
 
 `fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
 `metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for

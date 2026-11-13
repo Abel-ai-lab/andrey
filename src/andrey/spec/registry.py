@@ -610,7 +610,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Margaritis & Thrun 2000", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "fast_iamb",
@@ -623,7 +623,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Yaramakala & Margaritis 2005", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "mmpc",
@@ -664,7 +664,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ),
         "undirected",
         ("Aliferis et al. 2010", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "hiton_mb",
@@ -1007,13 +1007,64 @@ _add(
 
 _add(
     MethodSpec(
+        name="ldecc",
+        family="constraint",
+        summary="Local discovery using eager collider checks: the edges at a treatment and their "
+        "directions, from its Markov blanket, its neighbors among it, and PC's tests over the "
+        "other pairs, read as they come (an independence that the treatment turns into a "
+        "dependence directs its parents), stopping once every neighbor is directed. Returns the "
+        "edges at the treatment; the locally valid parent sets, one per effect the local "
+        "structure allows, are in metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at the treatment alone, with the directions the method finds; "
+            "metadata['effects'] holds the pair's record: the locally valid parent sets of the "
+            "treatment",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param(
+                "blanket",
+                doc="The Markov blanket learner of the first step: iamb, the learner of Gupta et "
+                "al. 2023's runs, or any other by name; a superset of the blanket keeps the answer "
+                "right under exact tests.",
+            ),
+            concept_param("alpha", default=0.05, doc=_PAIR_ALPHA_DOC + "0.01 * 32000 / n."),
+            ParamSpec(
+                name="check",
+                type="bool",
+                default=True,
+                doc="true = LDECC-checks (Gupta et al. 2023, Remark 21): an eager collider check "
+                "between two variables that are not neighbors of the treatment directs parents "
+                "only when their minimal neighbor separators are the same set; false = it directs "
+                "both separators.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+        ),
+        references=("Gupta, Childers & Lipton 2023", "Schubert, Claassen & Magliacane 2026"),
+    )
+)
+
+_add(
+    MethodSpec(
         name="locpc_cde",
         family="constraint",
         summary="Local PC-style discovery for the controlled direct effect: learns the graph "
         "around an outcome one hop at a time with PC's tests, run only near the outcome, until "
         "every edge at the outcome is oriented, so that its parents are a valid adjustment set, "
-        "or a criterion shows that no larger hop orients them. Returns the local essential "
-        "graph; the answer is in metadata['effects'].",
+        "or a larger hop adds no variable. Returns the local essential graph; the answer is in "
+        "metadata['effects'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",

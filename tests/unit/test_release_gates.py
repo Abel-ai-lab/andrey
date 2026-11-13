@@ -930,6 +930,27 @@ def test_parity_judges_the_metric_an_entry_names():
         _entry_rows(row)
 
 
+@pytest.mark.parametrize(
+    ("metric", "text"), [("set_distance", "set distance"), ("set_f1_loss", "set F1 loss")]
+)
+def test_parity_judges_a_set_learned_at_every_target(metric, text):
+    from qa import reference_parity
+
+    row = {
+        "d": 37,
+        "n": 1000,
+        "paired": 20,
+        f"andrey_{metric}_mean": 0.3,
+        f"comparator_{metric}_mean": 0.2,
+        "mean_D": 0.1,
+        "bootstrap_95": [0.05, 0.15],
+        "above_zero": True,
+    }
+    [parsed] = _entry_rows(row, metric=metric)
+    [failure] = reference_parity.check([parsed], [])[0]
+    assert f"metric={metric}" in failure and f"mean {text} Andrey 0.30" in failure
+
+
 def test_parity_fails_a_row_where_andrey_timed_out_on_a_dataset_the_reference_finished():
     from qa import reference_parity
 

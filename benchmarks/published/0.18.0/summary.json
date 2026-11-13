@@ -2,21 +2,29 @@
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-12",
- "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets)",
- "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row",
- "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network",
- "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target",
- "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number)",
- "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9",
+ "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+ "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun",
+ "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+ "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted)",
+ "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
  "regimes": {
-  "network_tables": "net:<network>:<rows>: forward samples of the Alarm (37 variables) or Pigs (441) network's own tables, the columns in an order drawn from the seed, columns that hold one value left out of the fit"
+  "network_tables": "net:<network>:<rows>: forward samples of the Alarm (37 variables) or Pigs (441) network's own tables, the columns in an order drawn from the seed, columns that hold one value left out of the fit",
+  "discrete": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network",
+  "gaussian": "gauss:<d>:<rows>[:<mean degree>]: linear-Gaussian Erdos-Renyi graph, standardized, mean degree 2 unless given"
  },
  "coverage": {},
  "packages": {
-  "NumPy (Andrey)": "2.5.4"
+  "PCMB": {
+   "NumPy (Andrey)": "2.5.4"
+  },
+  "GS, Fast-IAMB, and HITON-PC": {
+   "bnlearn": "5.2.1",
+   "R": "4.6.1"
+  }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -502,6 +510,5682 @@
       }
      },
      "andrey_s": 1022.3
+    }
+   ]
+  },
+  {
+   "method": "GS",
+   "family": "local",
+   "solution": "andrey.gs",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 gs",
+   "comparator_solution": "bnlearn.gs",
+   "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3948,
+     "comparator_set_distance_mean": 0.9428,
+     "mean_D": -0.548,
+     "bootstrap_95": [
+      -0.5871,
+      -0.5096
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4311,
+       "bootstrap_95": [
+        -1.5365,
+        -1.3203
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.9473,
+       "bootstrap_95": [
+        0.8013,
+        1.096
+       ]
+      }
+     },
+     "andrey_s": 2.3485,
+     "comparator_s": 0.191,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3379,
+     "comparator_set_distance_mean": 0.8889,
+     "mean_D": -0.5509,
+     "bootstrap_95": [
+      -0.5861,
+      -0.5142
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7,
+       "bootstrap_95": [
+        -1.8041,
+        -1.5986
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.4297,
+       "bootstrap_95": [
+        1.2068,
+        1.65
+       ]
+      }
+     },
+     "andrey_s": 3.847,
+     "comparator_s": 0.4886,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2602,
+     "comparator_set_distance_mean": 0.8838,
+     "mean_D": -0.6236,
+     "bootstrap_95": [
+      -0.6621,
+      -0.5853
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.1365,
+       "bootstrap_95": [
+        -2.2135,
+        -2.0649
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.9784,
+       "bootstrap_95": [
+        1.727,
+        2.2311
+       ]
+      }
+     },
+     "andrey_s": 7.8518,
+     "comparator_s": 1.5951,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2633,
+     "comparator_set_distance_mean": 0.8252,
+     "mean_D": -0.5619,
+     "bootstrap_95": [
+      -0.6054,
+      -0.5166
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8325,
+       "bootstrap_95": [
+        -1.9275,
+        -1.7425
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.6875,
+       "bootstrap_95": [
+        0.5075,
+        0.865
+       ]
+      }
+     },
+     "andrey_s": 1.2933,
+     "comparator_s": 0.1154,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2236,
+     "comparator_set_distance_mean": 0.9046,
+     "mean_D": -0.681,
+     "bootstrap_95": [
+      -0.7377,
+      -0.6219
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.07,
+       "bootstrap_95": [
+        -2.1725,
+        -1.9725
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.9275,
+       "bootstrap_95": [
+        1.5399,
+        2.2951
+       ]
+      }
+     },
+     "andrey_s": 1.891,
+     "comparator_s": 0.2435,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1638,
+     "comparator_set_distance_mean": 0.9284,
+     "mean_D": -0.7645,
+     "bootstrap_95": [
+      -0.8085,
+      -0.7191
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.37,
+       "bootstrap_95": [
+        -2.46,
+        -2.2725
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 3.1225,
+       "bootstrap_95": [
+        2.72,
+        3.53
+       ]
+      }
+     },
+     "andrey_s": 3.2186,
+     "comparator_s": 0.7085,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.8283,
+     "comparator_set_distance_mean": 1.1035,
+     "mean_D": -0.2752,
+     "bootstrap_95": [
+      -0.3045,
+      -0.2462
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.0886,
+       "bootstrap_95": [
+        1.0029,
+        1.1736
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.62,
+       "bootstrap_95": [
+        2.46,
+        2.7793
+       ]
+      }
+     },
+     "andrey_s": 7.808,
+     "comparator_s": 0.5737,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.6643,
+     "comparator_set_distance_mean": 1.0901,
+     "mean_D": -0.4257,
+     "bootstrap_95": [
+      -0.4519,
+      -0.4
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5579,
+       "bootstrap_95": [
+        0.4564,
+        0.6664
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 3.7029,
+       "bootstrap_95": [
+        3.5293,
+        3.8679
+       ]
+      }
+     },
+     "andrey_s": 12.6935,
+     "comparator_s": 1.5142,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5939,
+     "comparator_set_distance_mean": 1.0956,
+     "mean_D": -0.5018,
+     "bootstrap_95": [
+      -0.5388,
+      -0.465
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.2336,
+       "bootstrap_95": [
+        0.1264,
+        0.3522
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 4.9543,
+       "bootstrap_95": [
+        4.6857,
+        5.2279
+       ]
+      }
+     },
+     "andrey_s": 26.1234,
+     "comparator_s": 5.1968,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4661,
+     "comparator_set_distance_mean": 1.0313,
+     "mean_D": -0.5652,
+     "bootstrap_95": [
+      -0.6071,
+      -0.5231
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.337,
+       "bootstrap_95": [
+        -2.3944,
+        -2.2778
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.7556,
+       "bootstrap_95": [
+        0.5593,
+        0.9519
+       ]
+      }
+     },
+     "andrey_s": 1.4596,
+     "comparator_s": 0.1277,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3679,
+     "comparator_set_distance_mean": 1.0381,
+     "mean_D": -0.6703,
+     "bootstrap_95": [
+      -0.7121,
+      -0.6274
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.8852,
+       "bootstrap_95": [
+        -2.9833,
+        -2.7833
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.5352,
+       "bootstrap_95": [
+        1.2667,
+        1.7833
+       ]
+      }
+     },
+     "andrey_s": 2.8746,
+     "comparator_s": 0.3403,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2853,
+     "comparator_set_distance_mean": 1.0352,
+     "mean_D": -0.7499,
+     "bootstrap_95": [
+      -0.7907,
+      -0.7063
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.35,
+       "bootstrap_95": [
+        -3.4333,
+        -3.2704
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.3685,
+       "bootstrap_95": [
+        2.0444,
+        2.6648
+       ]
+      }
+     },
+     "andrey_s": 5.0972,
+     "comparator_s": 0.9353,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "GS",
+   "family": "local",
+   "solution": "andrey.gs",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 gs",
+   "comparator_solution": "bnlearn.gs",
+   "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2758,
+     "comparator_set_f1_loss_mean": 0.6758,
+     "mean_D": -0.4,
+     "bootstrap_95": [
+      -0.4284,
+      -0.3717
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4311,
+       "bootstrap_95": [
+        -1.5365,
+        -1.3203
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.9473,
+       "bootstrap_95": [
+        0.8013,
+        1.096
+       ]
+      }
+     },
+     "andrey_s": 2.3485,
+     "comparator_s": 0.191,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.234,
+     "comparator_set_f1_loss_mean": 0.6356,
+     "mean_D": -0.4017,
+     "bootstrap_95": [
+      -0.4274,
+      -0.3748
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7,
+       "bootstrap_95": [
+        -1.8041,
+        -1.5986
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.4297,
+       "bootstrap_95": [
+        1.2068,
+        1.65
+       ]
+      }
+     },
+     "andrey_s": 3.847,
+     "comparator_s": 0.4886,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1793,
+     "comparator_set_f1_loss_mean": 0.6343,
+     "mean_D": -0.455,
+     "bootstrap_95": [
+      -0.4822,
+      -0.4281
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.1365,
+       "bootstrap_95": [
+        -2.2135,
+        -2.0649
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.9784,
+       "bootstrap_95": [
+        1.727,
+        2.2311
+       ]
+      }
+     },
+     "andrey_s": 7.8518,
+     "comparator_s": 1.5951,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1752,
+     "comparator_set_f1_loss_mean": 0.5918,
+     "mean_D": -0.4166,
+     "bootstrap_95": [
+      -0.4478,
+      -0.3836
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8325,
+       "bootstrap_95": [
+        -1.9275,
+        -1.7425
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.6875,
+       "bootstrap_95": [
+        0.5075,
+        0.865
+       ]
+      }
+     },
+     "andrey_s": 1.2933,
+     "comparator_s": 0.1154,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1512,
+     "comparator_set_f1_loss_mean": 0.654,
+     "mean_D": -0.5028,
+     "bootstrap_95": [
+      -0.5431,
+      -0.4606
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.07,
+       "bootstrap_95": [
+        -2.1725,
+        -1.9725
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.9275,
+       "bootstrap_95": [
+        1.5399,
+        2.2951
+       ]
+      }
+     },
+     "andrey_s": 1.891,
+     "comparator_s": 0.2435,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1131,
+     "comparator_set_f1_loss_mean": 0.6771,
+     "mean_D": -0.564,
+     "bootstrap_95": [
+      -0.5958,
+      -0.5311
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.37,
+       "bootstrap_95": [
+        -2.46,
+        -2.2725
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 3.1225,
+       "bootstrap_95": [
+        2.72,
+        3.53
+       ]
+      }
+     },
+     "andrey_s": 3.2186,
+     "comparator_s": 0.7085,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.6179,
+     "comparator_set_f1_loss_mean": 0.8069,
+     "mean_D": -0.189,
+     "bootstrap_95": [
+      -0.2095,
+      -0.1688
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.0886,
+       "bootstrap_95": [
+        1.0029,
+        1.1736
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.62,
+       "bootstrap_95": [
+        2.46,
+        2.7793
+       ]
+      }
+     },
+     "andrey_s": 7.808,
+     "comparator_s": 0.5737,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.5026,
+     "comparator_set_f1_loss_mean": 0.8008,
+     "mean_D": -0.2982,
+     "bootstrap_95": [
+      -0.3166,
+      -0.28
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5579,
+       "bootstrap_95": [
+        0.4564,
+        0.6664
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 3.7029,
+       "bootstrap_95": [
+        3.5293,
+        3.8679
+       ]
+      }
+     },
+     "andrey_s": 12.6935,
+     "comparator_s": 1.5142,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.4544,
+     "comparator_set_f1_loss_mean": 0.8121,
+     "mean_D": -0.3577,
+     "bootstrap_95": [
+      -0.3816,
+      -0.3341
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.2336,
+       "bootstrap_95": [
+        0.1264,
+        0.3522
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 4.9543,
+       "bootstrap_95": [
+        4.6857,
+        5.2279
+       ]
+      }
+     },
+     "andrey_s": 26.1234,
+     "comparator_s": 5.1968,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3245,
+     "comparator_set_f1_loss_mean": 0.753,
+     "mean_D": -0.4285,
+     "bootstrap_95": [
+      -0.4586,
+      -0.3974
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.337,
+       "bootstrap_95": [
+        -2.3944,
+        -2.2778
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.7556,
+       "bootstrap_95": [
+        0.5593,
+        0.9519
+       ]
+      }
+     },
+     "andrey_s": 1.4596,
+     "comparator_s": 0.1277,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.252,
+     "comparator_set_f1_loss_mean": 0.7456,
+     "mean_D": -0.4936,
+     "bootstrap_95": [
+      -0.5228,
+      -0.4638
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.8852,
+       "bootstrap_95": [
+        -2.9833,
+        -2.7833
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.5352,
+       "bootstrap_95": [
+        1.2667,
+        1.7833
+       ]
+      }
+     },
+     "andrey_s": 2.8746,
+     "comparator_s": 0.3403,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.193,
+     "comparator_set_f1_loss_mean": 0.7407,
+     "mean_D": -0.5476,
+     "bootstrap_95": [
+      -0.5757,
+      -0.5181
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.35,
+       "bootstrap_95": [
+        -3.4333,
+        -3.2704
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.3685,
+       "bootstrap_95": [
+        2.0444,
+        2.6648
+       ]
+      }
+     },
+     "andrey_s": 5.0972,
+     "comparator_s": 0.9353,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "GS",
+   "family": "local",
+   "solution": "andrey.gs",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 gs",
+   "comparator_solution": "bnlearn.gs",
+   "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4964,
+     "comparator_set_distance_mean": 0.4962,
+     "mean_D": 0.0002,
+     "bootstrap_95": [
+      -0.0064,
+      0.0077
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.3147,
+       "bootstrap_95": [
+        -0.457,
+        -0.1733
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.2018,
+       "bootstrap_95": [
+        -0.3355,
+        -0.0751
+       ]
+      }
+     },
+     "andrey_s": 2.0442,
+     "comparator_s": 27.4768,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4889,
+     "comparator_set_distance_mean": 0.4982,
+     "mean_D": -0.0093,
+     "bootstrap_95": [
+      -0.0143,
+      -0.0049
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.3921,
+       "bootstrap_95": [
+        -0.5532,
+        -0.215
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.1384,
+       "bootstrap_95": [
+        -0.2846,
+        0.0185
+       ]
+      }
+     },
+     "andrey_s": 4.0809,
+     "comparator_s": 161.944,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1445,
+     "comparator_set_distance_mean": 0.1414,
+     "mean_D": 0.0032,
+     "bootstrap_95": [
+      -0.0072,
+      0.0136
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.775,
+       "bootstrap_95": [
+        -2.9482,
+        -2.6056
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.7685,
+       "bootstrap_95": [
+        -2.9471,
+        -2.5989
+       ]
+      }
+     },
+     "andrey_s": 0.3522,
+     "comparator_s": 0.17,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1506,
+     "comparator_set_distance_mean": 0.1555,
+     "mean_D": -0.0049,
+     "bootstrap_95": [
+      -0.0146,
+      0.005
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.7514,
+       "bootstrap_95": [
+        -2.8984,
+        -2.6106
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.7015,
+       "bootstrap_95": [
+        -2.8465,
+        -2.5649
+       ]
+      }
+     },
+     "andrey_s": 0.4533,
+     "comparator_s": 0.5732,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3165,
+     "comparator_set_distance_mean": 0.3176,
+     "mean_D": -0.0011,
+     "bootstrap_95": [
+      -0.0093,
+      0.0072
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0097,
+       "bootstrap_95": [
+        -2.1653,
+        -1.8567
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9688,
+       "bootstrap_95": [
+        -2.1379,
+        -1.8112
+       ]
+      }
+     },
+     "andrey_s": 0.682,
+     "comparator_s": 2.5212,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.195,
+     "comparator_set_distance_mean": 0.1727,
+     "mean_D": 0.0223,
+     "bootstrap_95": [
+      0.0109,
+      0.0349
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.5934,
+       "bootstrap_95": [
+        -6.877,
+        -6.3209
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.7489,
+       "bootstrap_95": [
+        -7.0476,
+        -6.4604
+       ]
+      }
+     },
+     "andrey_s": 0.8079,
+     "comparator_s": 9.8147,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.1908,
+      "comparator_set_distance_mean": 0.1834,
+      "mean_D": 0.0074,
+      "bootstrap_95": [
+       -0.0088,
+       0.023
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3113,
+     "comparator_set_distance_mean": 0.313,
+     "mean_D": -0.0018,
+     "bootstrap_95": [
+      -0.0117,
+      0.0075
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0859,
+       "bootstrap_95": [
+        -2.2729,
+        -1.889
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.966,
+       "bootstrap_95": [
+        -2.1634,
+        -1.7611
+       ]
+      }
+     },
+     "andrey_s": 1.2076,
+     "comparator_s": 12.7487,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1687,
+     "comparator_set_distance_mean": 0.1561,
+     "mean_D": 0.0126,
+     "bootstrap_95": [
+      0.0023,
+      0.0228
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.9245,
+       "bootstrap_95": [
+        -7.1973,
+        -6.6707
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.0385,
+       "bootstrap_95": [
+        -7.3597,
+        -6.7392
+       ]
+      }
+     },
+     "andrey_s": 1.3279,
+     "comparator_s": 46.3015,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.1699,
+      "comparator_set_distance_mean": 0.1588,
+      "mean_D": 0.0111,
+      "bootstrap_95": [
+       0.0006,
+       0.0221
+      ],
+      "above_zero": true
+     }
+    }
+   ]
+  },
+  {
+   "method": "GS",
+   "family": "local",
+   "solution": "andrey.gs",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 gs",
+   "comparator_solution": "bnlearn.gs",
+   "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3588,
+     "comparator_set_f1_loss_mean": 0.3605,
+     "mean_D": -0.0017,
+     "bootstrap_95": [
+      -0.0072,
+      0.0044
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.3147,
+       "bootstrap_95": [
+        -0.457,
+        -0.1733
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.2018,
+       "bootstrap_95": [
+        -0.3355,
+        -0.0751
+       ]
+      }
+     },
+     "andrey_s": 2.0442,
+     "comparator_s": 27.4768,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3528,
+     "comparator_set_f1_loss_mean": 0.3622,
+     "mean_D": -0.0094,
+     "bootstrap_95": [
+      -0.0138,
+      -0.0053
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.3921,
+       "bootstrap_95": [
+        -0.5532,
+        -0.215
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.1384,
+       "bootstrap_95": [
+        -0.2846,
+        0.0185
+       ]
+      }
+     },
+     "andrey_s": 4.0809,
+     "comparator_s": 161.944,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0928,
+     "comparator_set_f1_loss_mean": 0.0906,
+     "mean_D": 0.0022,
+     "bootstrap_95": [
+      -0.0048,
+      0.0091
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.775,
+       "bootstrap_95": [
+        -2.9482,
+        -2.6056
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.7685,
+       "bootstrap_95": [
+        -2.9471,
+        -2.5989
+       ]
+      }
+     },
+     "andrey_s": 0.3522,
+     "comparator_s": 0.17,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0968,
+     "comparator_set_f1_loss_mean": 0.1015,
+     "mean_D": -0.0047,
+     "bootstrap_95": [
+      -0.0116,
+      0.0024
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.7514,
+       "bootstrap_95": [
+        -2.8984,
+        -2.6106
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.7015,
+       "bootstrap_95": [
+        -2.8465,
+        -2.5649
+       ]
+      }
+     },
+     "andrey_s": 0.4533,
+     "comparator_s": 0.5732,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2117,
+     "comparator_set_f1_loss_mean": 0.2137,
+     "mean_D": -0.002,
+     "bootstrap_95": [
+      -0.0078,
+      0.004
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0097,
+       "bootstrap_95": [
+        -2.1653,
+        -1.8567
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9688,
+       "bootstrap_95": [
+        -2.1379,
+        -1.8112
+       ]
+      }
+     },
+     "andrey_s": 0.682,
+     "comparator_s": 2.5212,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1254,
+     "comparator_set_f1_loss_mean": 0.11,
+     "mean_D": 0.0154,
+     "bootstrap_95": [
+      0.0065,
+      0.0252
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.5934,
+       "bootstrap_95": [
+        -6.877,
+        -6.3209
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.7489,
+       "bootstrap_95": [
+        -7.0476,
+        -6.4604
+       ]
+      }
+     },
+     "andrey_s": 0.8079,
+     "comparator_s": 9.8147,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.1231,
+      "comparator_set_f1_loss_mean": 0.1178,
+      "mean_D": 0.0052,
+      "bootstrap_95": [
+       -0.0067,
+       0.0167
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2083,
+     "comparator_set_f1_loss_mean": 0.2133,
+     "mean_D": -0.005,
+     "bootstrap_95": [
+      -0.012,
+      0.0015
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0859,
+       "bootstrap_95": [
+        -2.2729,
+        -1.889
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.966,
+       "bootstrap_95": [
+        -2.1634,
+        -1.7611
+       ]
+      }
+     },
+     "andrey_s": 1.2076,
+     "comparator_s": 12.7487,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1052,
+     "comparator_set_f1_loss_mean": 0.0976,
+     "mean_D": 0.0076,
+     "bootstrap_95": [
+      0.0005,
+      0.0148
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.9245,
+       "bootstrap_95": [
+        -7.1973,
+        -6.6707
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.0385,
+       "bootstrap_95": [
+        -7.3597,
+        -6.7392
+       ]
+      }
+     },
+     "andrey_s": 1.3279,
+     "comparator_s": 46.3015,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.1061,
+      "comparator_set_f1_loss_mean": 0.1005,
+      "mean_D": 0.0056,
+      "bootstrap_95": [
+       -0.0018,
+       0.0136
+      ],
+      "above_zero": false
+     }
+    }
+   ]
+  },
+  {
+   "method": "Fast-IAMB",
+   "family": "local",
+   "solution": "andrey.fast_iamb",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 fast.iamb",
+   "comparator_solution": "bnlearn.fast-iamb",
+   "comparator_setting": "learn.mb(method = 'fast.iamb') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4603,
+     "comparator_set_distance_mean": 0.4345,
+     "mean_D": 0.0258,
+     "bootstrap_95": [
+      0.0159,
+      0.0353
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.3162,
+       "bootstrap_95": [
+        -1.3865,
+        -1.2446
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4176,
+       "bootstrap_95": [
+        -1.4865,
+        -1.3473
+       ]
+      }
+     },
+     "andrey_s": 1.1348,
+     "comparator_s": 0.1852,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.4488,
+      "comparator_set_distance_mean": 0.4256,
+      "mean_D": 0.0232,
+      "bootstrap_95": [
+       0.0093,
+       0.0377
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4124,
+     "comparator_set_distance_mean": 0.408,
+     "mean_D": 0.0044,
+     "bootstrap_95": [
+      -0.012,
+      0.0211
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.3324,
+       "bootstrap_95": [
+        -1.4405,
+        -1.223
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.2932,
+       "bootstrap_95": [
+        -1.4,
+        -1.1959
+       ]
+      }
+     },
+     "andrey_s": 2.2221,
+     "comparator_s": 0.4143,
+     "result": "tie"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3992,
+     "comparator_set_distance_mean": 0.4101,
+     "mean_D": -0.0108,
+     "bootstrap_95": [
+      -0.0347,
+      0.0099
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.277,
+       "bootstrap_95": [
+        -1.4027,
+        -1.1649
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.1662,
+       "bootstrap_95": [
+        -1.3014,
+        -1.0338
+       ]
+      }
+     },
+     "andrey_s": 5.4774,
+     "comparator_s": 1.2224,
+     "result": "tie"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3438,
+     "comparator_set_distance_mean": 0.4118,
+     "mean_D": -0.068,
+     "bootstrap_95": [
+      -0.0849,
+      -0.0509
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.475,
+       "bootstrap_95": [
+        -1.555,
+        -1.395
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.16,
+       "bootstrap_95": [
+        -1.255,
+        -1.0525
+       ]
+      }
+     },
+     "andrey_s": 0.7806,
+     "comparator_s": 0.1197,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3021,
+     "comparator_set_distance_mean": 0.4052,
+     "mean_D": -0.1031,
+     "bootstrap_95": [
+      -0.1158,
+      -0.0905
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.585,
+       "bootstrap_95": [
+        -1.67,
+        -1.505
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9075,
+       "bootstrap_95": [
+        -1.0325,
+        -0.795
+       ]
+      }
+     },
+     "andrey_s": 1.3319,
+     "comparator_s": 0.2406,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2615,
+     "comparator_set_distance_mean": 0.4785,
+     "mean_D": -0.2171,
+     "bootstrap_95": [
+      -0.2493,
+      -0.1823
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7375,
+       "bootstrap_95": [
+        -1.885,
+        -1.5925
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.065,
+       "bootstrap_95": [
+        -0.32,
+        0.1875
+       ]
+      }
+     },
+     "andrey_s": 2.6273,
+     "comparator_s": 0.6377,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.8391,
+     "comparator_set_distance_mean": 0.8733,
+     "mean_D": -0.0343,
+     "bootstrap_95": [
+      -0.0431,
+      -0.0258
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.8564,
+       "bootstrap_95": [
+        0.7793,
+        0.9307
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.475,
+       "bootstrap_95": [
+        1.4036,
+        1.545
+       ]
+      }
+     },
+     "andrey_s": 3.0421,
+     "comparator_s": 0.4752,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.6699,
+     "comparator_set_distance_mean": 0.7448,
+     "mean_D": -0.0749,
+     "bootstrap_95": [
+      -0.0856,
+      -0.0654
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.4193,
+       "bootstrap_95": [
+        0.3329,
+        0.5086
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.6614,
+       "bootstrap_95": [
+        1.5678,
+        1.7543
+       ]
+      }
+     },
+     "andrey_s": 6.034,
+     "comparator_s": 1.1876,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5941,
+     "comparator_set_distance_mean": 0.75,
+     "mean_D": -0.1559,
+     "bootstrap_95": [
+      -0.1669,
+      -0.144
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.1871,
+       "bootstrap_95": [
+        0.0957,
+        0.2757
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.6807,
+       "bootstrap_95": [
+        2.5764,
+        2.7814
+       ]
+      }
+     },
+     "andrey_s": 16.1534,
+     "comparator_s": 3.5538,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5794,
+     "comparator_set_distance_mean": 0.5975,
+     "mean_D": -0.0182,
+     "bootstrap_95": [
+      -0.0338,
+      -0.0037
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7463,
+       "bootstrap_95": [
+        -1.8148,
+        -1.6741
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.6111,
+       "bootstrap_95": [
+        -1.6778,
+        -1.5481
+       ]
+      }
+     },
+     "andrey_s": 0.8208,
+     "comparator_s": 0.1338,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5017,
+     "comparator_set_distance_mean": 0.5225,
+     "mean_D": -0.0208,
+     "bootstrap_95": [
+      -0.0315,
+      -0.0097
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9259,
+       "bootstrap_95": [
+        -2.0167,
+        -1.8296
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.6685,
+       "bootstrap_95": [
+        -1.7796,
+        -1.563
+       ]
+      }
+     },
+     "andrey_s": 1.7289,
+     "comparator_s": 0.3006,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4044,
+     "comparator_set_distance_mean": 0.4707,
+     "mean_D": -0.0663,
+     "bootstrap_95": [
+      -0.1035,
+      -0.0323
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.3278,
+       "bootstrap_95": [
+        -2.4926,
+        -2.1685
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.7574,
+       "bootstrap_95": [
+        -1.9741,
+        -1.5296
+       ]
+      }
+     },
+     "andrey_s": 3.8098,
+     "comparator_s": 0.7925,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "Fast-IAMB",
+   "family": "local",
+   "solution": "andrey.fast_iamb",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 fast.iamb",
+   "comparator_solution": "bnlearn.fast-iamb",
+   "comparator_setting": "learn.mb(method = 'fast.iamb') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.325,
+     "comparator_set_f1_loss_mean": 0.3059,
+     "mean_D": 0.0191,
+     "bootstrap_95": [
+      0.0125,
+      0.0256
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.3162,
+       "bootstrap_95": [
+        -1.3865,
+        -1.2446
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4176,
+       "bootstrap_95": [
+        -1.4865,
+        -1.3473
+       ]
+      }
+     },
+     "andrey_s": 1.1348,
+     "comparator_s": 0.1852,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.3181,
+      "comparator_set_f1_loss_mean": 0.2993,
+      "mean_D": 0.0187,
+      "bootstrap_95": [
+       0.0088,
+       0.029
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2852,
+     "comparator_set_f1_loss_mean": 0.2811,
+     "mean_D": 0.0041,
+     "bootstrap_95": [
+      -0.0082,
+      0.0168
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.3324,
+       "bootstrap_95": [
+        -1.4405,
+        -1.223
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.2932,
+       "bootstrap_95": [
+        -1.4,
+        -1.1959
+       ]
+      }
+     },
+     "andrey_s": 2.2221,
+     "comparator_s": 0.4143,
+     "result": "tie"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2782,
+     "comparator_set_f1_loss_mean": 0.2852,
+     "mean_D": -0.007,
+     "bootstrap_95": [
+      -0.0253,
+      0.0087
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.277,
+       "bootstrap_95": [
+        -1.4027,
+        -1.1649
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.1662,
+       "bootstrap_95": [
+        -1.3014,
+        -1.0338
+       ]
+      }
+     },
+     "andrey_s": 5.4774,
+     "comparator_s": 1.2224,
+     "result": "tie"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2358,
+     "comparator_set_f1_loss_mean": 0.288,
+     "mean_D": -0.0522,
+     "bootstrap_95": [
+      -0.0646,
+      -0.0395
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.475,
+       "bootstrap_95": [
+        -1.555,
+        -1.395
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.16,
+       "bootstrap_95": [
+        -1.255,
+        -1.0525
+       ]
+      }
+     },
+     "andrey_s": 0.7806,
+     "comparator_s": 0.1197,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2086,
+     "comparator_set_f1_loss_mean": 0.2891,
+     "mean_D": -0.0804,
+     "bootstrap_95": [
+      -0.0901,
+      -0.0706
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.585,
+       "bootstrap_95": [
+        -1.67,
+        -1.505
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9075,
+       "bootstrap_95": [
+        -1.0325,
+        -0.795
+       ]
+      }
+     },
+     "andrey_s": 1.3319,
+     "comparator_s": 0.2406,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1781,
+     "comparator_set_f1_loss_mean": 0.3509,
+     "mean_D": -0.1727,
+     "bootstrap_95": [
+      -0.1994,
+      -0.1444
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7375,
+       "bootstrap_95": [
+        -1.885,
+        -1.5925
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.065,
+       "bootstrap_95": [
+        -0.32,
+        0.1875
+       ]
+      }
+     },
+     "andrey_s": 2.6273,
+     "comparator_s": 0.6377,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.6214,
+     "comparator_set_f1_loss_mean": 0.6544,
+     "mean_D": -0.033,
+     "bootstrap_95": [
+      -0.0396,
+      -0.0266
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.8564,
+       "bootstrap_95": [
+        0.7793,
+        0.9307
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.475,
+       "bootstrap_95": [
+        1.4036,
+        1.545
+       ]
+      }
+     },
+     "andrey_s": 3.0421,
+     "comparator_s": 0.4752,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.5048,
+     "comparator_set_f1_loss_mean": 0.5785,
+     "mean_D": -0.0737,
+     "bootstrap_95": [
+      -0.0828,
+      -0.0655
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.4193,
+       "bootstrap_95": [
+        0.3329,
+        0.5086
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 1.6614,
+       "bootstrap_95": [
+        1.5678,
+        1.7543
+       ]
+      }
+     },
+     "andrey_s": 6.034,
+     "comparator_s": 1.1876,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.4514,
+     "comparator_set_f1_loss_mean": 0.5953,
+     "mean_D": -0.1439,
+     "bootstrap_95": [
+      -0.1524,
+      -0.1346
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.1871,
+       "bootstrap_95": [
+        0.0957,
+        0.2757
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 2.6807,
+       "bootstrap_95": [
+        2.5764,
+        2.7814
+       ]
+      }
+     },
+     "andrey_s": 16.1534,
+     "comparator_s": 3.5538,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.4207,
+     "comparator_set_f1_loss_mean": 0.4349,
+     "mean_D": -0.0141,
+     "bootstrap_95": [
+      -0.0262,
+      -0.0031
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7463,
+       "bootstrap_95": [
+        -1.8148,
+        -1.6741
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.6111,
+       "bootstrap_95": [
+        -1.6778,
+        -1.5481
+       ]
+      }
+     },
+     "andrey_s": 0.8208,
+     "comparator_s": 0.1338,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3524,
+     "comparator_set_f1_loss_mean": 0.3693,
+     "mean_D": -0.0169,
+     "bootstrap_95": [
+      -0.025,
+      -0.0086
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9259,
+       "bootstrap_95": [
+        -2.0167,
+        -1.8296
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.6685,
+       "bootstrap_95": [
+        -1.7796,
+        -1.563
+       ]
+      }
+     },
+     "andrey_s": 1.7289,
+     "comparator_s": 0.3006,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 20000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2785,
+     "comparator_set_f1_loss_mean": 0.33,
+     "mean_D": -0.0516,
+     "bootstrap_95": [
+      -0.0795,
+      -0.0261
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.3278,
+       "bootstrap_95": [
+        -2.4926,
+        -2.1685
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.7574,
+       "bootstrap_95": [
+        -1.9741,
+        -1.5296
+       ]
+      }
+     },
+     "andrey_s": 3.8098,
+     "comparator_s": 0.7925,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "Fast-IAMB",
+   "family": "local",
+   "solution": "andrey.fast_iamb",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 fast.iamb",
+   "comparator_solution": "bnlearn.fast-iamb",
+   "comparator_setting": "learn.mb(method = 'fast.iamb') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5147,
+     "comparator_set_distance_mean": 0.5131,
+     "mean_D": 0.0017,
+     "bootstrap_95": [
+      0.001,
+      0.0024
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0645,
+       "bootstrap_95": [
+        -0.2065,
+        0.0728
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0941,
+       "bootstrap_95": [
+        -0.2403,
+        0.0492
+       ]
+      }
+     },
+     "andrey_s": 1.3722,
+     "comparator_s": 1.5451,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.5093,
+      "comparator_set_distance_mean": 0.5068,
+      "mean_D": 0.0025,
+      "bootstrap_95": [
+       0.0018,
+       0.0031
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.5087,
+     "comparator_set_distance_mean": 0.5071,
+     "mean_D": 0.0016,
+     "bootstrap_95": [
+      0.0008,
+      0.0025
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.1229,
+       "bootstrap_95": [
+        -0.2847,
+        0.0432
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.1438,
+       "bootstrap_95": [
+        -0.305,
+        0.0224
+       ]
+      }
+     },
+     "andrey_s": 3.4694,
+     "comparator_s": 4.1309,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.5006,
+      "comparator_set_distance_mean": 0.4988,
+      "mean_D": 0.0019,
+      "bootstrap_95": [
+       0.0008,
+       0.003
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1646,
+     "comparator_set_distance_mean": 0.164,
+     "mean_D": 0.0006,
+     "bootstrap_95": [
+      -0.0023,
+      0.0032
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6699,
+       "bootstrap_95": [
+        -2.8388,
+        -2.5011
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.673,
+       "bootstrap_95": [
+        -2.8485,
+        -2.499
+       ]
+      }
+     },
+     "andrey_s": 0.3467,
+     "comparator_s": 0.0841,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1709,
+     "comparator_set_distance_mean": 0.1719,
+     "mean_D": -0.001,
+     "bootstrap_95": [
+      -0.0064,
+      0.0031
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6478,
+       "bootstrap_95": [
+        -2.814,
+        -2.4895
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.6469,
+       "bootstrap_95": [
+        -2.8078,
+        -2.4926
+       ]
+      }
+     },
+     "andrey_s": 0.4428,
+     "comparator_s": 0.1498,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3387,
+     "comparator_set_distance_mean": 0.3381,
+     "mean_D": 0.0006,
+     "bootstrap_95": [
+      0.0001,
+      0.0012
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8569,
+       "bootstrap_95": [
+        -2.0228,
+        -1.7038
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8637,
+       "bootstrap_95": [
+        -2.0339,
+        -1.7092
+       ]
+      }
+     },
+     "andrey_s": 0.5614,
+     "comparator_s": 0.3278,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_distance_mean": 0.3334,
+      "comparator_set_distance_mean": 0.3325,
+      "mean_D": 0.0009,
+      "bootstrap_95": [
+       -0.0011,
+       0.0026
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2345,
+     "comparator_set_distance_mean": 0.2388,
+     "mean_D": -0.0044,
+     "bootstrap_95": [
+      -0.0077,
+      -0.001
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.2379,
+       "bootstrap_95": [
+        -6.5217,
+        -5.9669
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.1222,
+       "bootstrap_95": [
+        -6.42,
+        -5.8449
+       ]
+      }
+     },
+     "andrey_s": 0.7269,
+     "comparator_s": 0.7973,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3433,
+     "comparator_set_distance_mean": 0.3425,
+     "mean_D": 0.0008,
+     "bootstrap_95": [
+      -0.0012,
+      0.0026
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7907,
+       "bootstrap_95": [
+        -2.006,
+        -1.5718
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8037,
+       "bootstrap_95": [
+        -2.0242,
+        -1.5829
+       ]
+      }
+     },
+     "andrey_s": 1.0927,
+     "comparator_s": 0.8462,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2351,
+     "comparator_set_distance_mean": 0.2314,
+     "mean_D": 0.0037,
+     "bootstrap_95": [
+      -0.0007,
+      0.0087
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.1863,
+       "bootstrap_95": [
+        -6.5369,
+        -5.8557
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.2295,
+       "bootstrap_95": [
+        -6.5702,
+        -5.9171
+       ]
+      }
+     },
+     "andrey_s": 1.2758,
+     "comparator_s": 1.932,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "Fast-IAMB",
+   "family": "local",
+   "solution": "andrey.fast_iamb",
+   "setting": "alpha=0.05, max_depth=None (the default), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 fast.iamb",
+   "comparator_solution": "bnlearn.fast-iamb",
+   "comparator_setting": "learn.mb(method = 'fast.iamb') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "Markov blanket at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3746,
+     "comparator_set_f1_loss_mean": 0.3732,
+     "mean_D": 0.0015,
+     "bootstrap_95": [
+      0.0009,
+      0.0022
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0645,
+       "bootstrap_95": [
+        -0.2065,
+        0.0728
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0941,
+       "bootstrap_95": [
+        -0.2403,
+        0.0492
+       ]
+      }
+     },
+     "andrey_s": 1.3722,
+     "comparator_s": 1.5451,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.3681,
+      "comparator_set_f1_loss_mean": 0.366,
+      "mean_D": 0.0021,
+      "bootstrap_95": [
+       0.0015,
+       0.0026
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3692,
+     "comparator_set_f1_loss_mean": 0.3679,
+     "mean_D": 0.0013,
+     "bootstrap_95": [
+      0.0007,
+      0.0019
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.1229,
+       "bootstrap_95": [
+        -0.2847,
+        0.0432
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.1438,
+       "bootstrap_95": [
+        -0.305,
+        0.0224
+       ]
+      }
+     },
+     "andrey_s": 3.4694,
+     "comparator_s": 4.1309,
+     "result": "worse",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.3601,
+      "comparator_set_f1_loss_mean": 0.3584,
+      "mean_D": 0.0017,
+      "bootstrap_95": [
+       0.0007,
+       0.0026
+      ],
+      "above_zero": true
+     }
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1067,
+     "comparator_set_f1_loss_mean": 0.1064,
+     "mean_D": 0.0004,
+     "bootstrap_95": [
+      -0.0013,
+      0.0019
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6699,
+       "bootstrap_95": [
+        -2.8388,
+        -2.5011
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.673,
+       "bootstrap_95": [
+        -2.8485,
+        -2.499
+       ]
+      }
+     },
+     "andrey_s": 0.3467,
+     "comparator_s": 0.0841,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1098,
+     "comparator_set_f1_loss_mean": 0.1103,
+     "mean_D": -0.0005,
+     "bootstrap_95": [
+      -0.004,
+      0.0022
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6478,
+       "bootstrap_95": [
+        -2.814,
+        -2.4895
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.6469,
+       "bootstrap_95": [
+        -2.8078,
+        -2.4926
+       ]
+      }
+     },
+     "andrey_s": 0.4428,
+     "comparator_s": 0.1498,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2284,
+     "comparator_set_f1_loss_mean": 0.2279,
+     "mean_D": 0.0004,
+     "bootstrap_95": [
+      0.0001,
+      0.0008
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8569,
+       "bootstrap_95": [
+        -2.0228,
+        -1.7038
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8637,
+       "bootstrap_95": [
+        -2.0339,
+        -1.7092
+       ]
+      }
+     },
+     "andrey_s": 0.5614,
+     "comparator_s": 0.3278,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_set_f1_loss_mean": 0.2242,
+      "comparator_set_f1_loss_mean": 0.2237,
+      "mean_D": 0.0005,
+      "bootstrap_95": [
+       -0.0009,
+       0.0017
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1502,
+     "comparator_set_f1_loss_mean": 0.1541,
+     "mean_D": -0.0039,
+     "bootstrap_95": [
+      -0.0064,
+      -0.0015
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.2379,
+       "bootstrap_95": [
+        -6.5217,
+        -5.9669
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.1222,
+       "bootstrap_95": [
+        -6.42,
+        -5.8449
+       ]
+      }
+     },
+     "andrey_s": 0.7269,
+     "comparator_s": 0.7973,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2327,
+     "comparator_set_f1_loss_mean": 0.2323,
+     "mean_D": 0.0004,
+     "bootstrap_95": [
+      -0.0012,
+      0.0018
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.7907,
+       "bootstrap_95": [
+        -2.006,
+        -1.5718
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8037,
+       "bootstrap_95": [
+        -2.0242,
+        -1.5829
+       ]
+      }
+     },
+     "andrey_s": 1.0927,
+     "comparator_s": 0.8462,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1496,
+     "comparator_set_f1_loss_mean": 0.1471,
+     "mean_D": 0.0025,
+     "bootstrap_95": [
+      -0.0006,
+      0.006
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.1863,
+       "bootstrap_95": [
+        -6.5369,
+        -5.8557
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.2295,
+       "bootstrap_95": [
+        -6.5702,
+        -5.9171
+       ]
+      }
+     },
+     "andrey_s": 1.2758,
+     "comparator_s": 1.932,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "HITON-PC",
+   "family": "local",
+   "solution": "andrey.hiton_pc",
+   "setting": "alpha=0.05, max_depth=None (no cap, as bnlearn's max.sx = Inf; the default is 3), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 si.hiton.pc",
+   "comparator_solution": "bnlearn.si-hiton-pc",
+   "comparator_setting": "learn.nbr(method = 'si.hiton.pc') per target, kept by the AND rule over the targets' runs as Andrey's symmetry check, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "parents and children at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4629,
+     "comparator_set_distance_mean": 0.6483,
+     "mean_D": -0.1854,
+     "bootstrap_95": [
+      -0.2112,
+      -0.1603
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5108,
+       "bootstrap_95": [
+        -0.6027,
+        -0.4243
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.7324,
+       "bootstrap_95": [
+        -0.7865,
+        -0.6784
+       ]
+      }
+     },
+     "andrey_s": 2.6723,
+     "comparator_s": 0.2533,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.285,
+     "comparator_set_distance_mean": 0.4356,
+     "mean_D": -0.1507,
+     "bootstrap_95": [
+      -0.1632,
+      -0.1374
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4919,
+       "bootstrap_95": [
+        -1.5432,
+        -1.4459
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.2243,
+       "bootstrap_95": [
+        -1.2541,
+        -1.1973
+       ]
+      }
+     },
+     "andrey_s": 3.0935,
+     "comparator_s": 0.3173,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.0907,
+     "comparator_set_distance_mean": 0.3134,
+     "mean_D": -0.2227,
+     "bootstrap_95": [
+      -0.2404,
+      -0.2055
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.2378,
+       "bootstrap_95": [
+        -2.2514,
+        -2.2243
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4676,
+       "bootstrap_95": [
+        -1.5378,
+        -1.3973
+       ]
+      }
+     },
+     "andrey_s": 5.8122,
+     "comparator_s": 1.0455,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4437,
+     "comparator_set_distance_mean": 0.5614,
+     "mean_D": -0.1177,
+     "bootstrap_95": [
+      -0.1491,
+      -0.0852
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.38,
+       "bootstrap_95": [
+        -0.475,
+        -0.275
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.84,
+       "bootstrap_95": [
+        -0.88,
+        -0.795
+       ]
+      }
+     },
+     "andrey_s": 1.6614,
+     "comparator_s": 0.1437,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2045,
+     "comparator_set_distance_mean": 0.4034,
+     "mean_D": -0.1989,
+     "bootstrap_95": [
+      -0.2177,
+      -0.1813
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.81,
+       "bootstrap_95": [
+        -1.86,
+        -1.765
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.26,
+       "bootstrap_95": [
+        -1.305,
+        -1.215
+       ]
+      }
+     },
+     "andrey_s": 2.1811,
+     "comparator_s": 0.1776,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.0056,
+     "comparator_set_distance_mean": 0.2359,
+     "mean_D": -0.2303,
+     "bootstrap_95": [
+      -0.2468,
+      -0.2135
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.475,
+       "bootstrap_95": [
+        -2.49,
+        -2.455
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.725,
+       "bootstrap_95": [
+        -1.785,
+        -1.67
+       ]
+      }
+     },
+     "andrey_s": 5.3136,
+     "comparator_s": 0.5888,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.9299,
+     "comparator_set_distance_mean": 0.9556,
+     "mean_D": -0.0257,
+     "bootstrap_95": [
+      -0.0412,
+      -0.0097
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.1543,
+       "bootstrap_95": [
+        -0.2129,
+        -0.0914
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0157,
+       "bootstrap_95": [
+        -0.0843,
+        0.0543
+       ]
+      }
+     },
+     "andrey_s": 2.5032,
+     "comparator_s": 0.6985,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.8004,
+     "comparator_set_distance_mean": 0.8193,
+     "mean_D": -0.0189,
+     "bootstrap_95": [
+      -0.0298,
+      -0.0084
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5329,
+       "bootstrap_95": [
+        -0.5829,
+        -0.4814
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.4286,
+       "bootstrap_95": [
+        -0.4857,
+        -0.3714
+       ]
+      }
+     },
+     "andrey_s": 3.8878,
+     "comparator_s": 0.8351,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4891,
+     "comparator_set_distance_mean": 0.5103,
+     "mean_D": -0.0212,
+     "bootstrap_95": [
+      -0.0281,
+      -0.0144
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.5714,
+       "bootstrap_95": [
+        -1.6014,
+        -1.5414
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4614,
+       "bootstrap_95": [
+        -1.5,
+        -1.4257
+       ]
+      }
+     },
+     "andrey_s": 18.1015,
+     "comparator_s": 4.5112,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.6133,
+     "comparator_set_distance_mean": 0.7948,
+     "mean_D": -0.1815,
+     "bootstrap_95": [
+      -0.1949,
+      -0.1676
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5111,
+       "bootstrap_95": [
+        -0.6259,
+        -0.3963
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.7481,
+       "bootstrap_95": [
+        -0.7963,
+        -0.6963
+       ]
+      }
+     },
+     "andrey_s": 2.0135,
+     "comparator_s": 0.181,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4885,
+     "comparator_set_distance_mean": 0.6836,
+     "mean_D": -0.1951,
+     "bootstrap_95": [
+      -0.2112,
+      -0.1791
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.6889,
+       "bootstrap_95": [
+        -1.7519,
+        -1.6222
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.1815,
+       "bootstrap_95": [
+        -1.2222,
+        -1.137
+       ]
+      }
+     },
+     "andrey_s": 3.1067,
+     "comparator_s": 0.2617,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.2734,
+     "comparator_set_distance_mean": 0.5451,
+     "mean_D": -0.2717,
+     "bootstrap_95": [
+      -0.2921,
+      -0.251
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.7963,
+       "bootstrap_95": [
+        -2.8296,
+        -2.763
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.7259,
+       "bootstrap_95": [
+        -1.7889,
+        -1.663
+       ]
+      }
+     },
+     "andrey_s": 8.892,
+     "comparator_s": 1.1457,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "HITON-PC",
+   "family": "local",
+   "solution": "andrey.hiton_pc",
+   "setting": "alpha=0.05, max_depth=None (no cap, as bnlearn's max.sx = Inf; the default is 3), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 si.hiton.pc",
+   "comparator_solution": "bnlearn.si-hiton-pc",
+   "comparator_setting": "learn.nbr(method = 'si.hiton.pc') per target, kept by the AND rule over the targets' runs as Andrey's symmetry check, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "parents and children at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "discrete",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3598,
+     "comparator_set_f1_loss_mean": 0.5457,
+     "mean_D": -0.1859,
+     "bootstrap_95": [
+      -0.2084,
+      -0.1639
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5108,
+       "bootstrap_95": [
+        -0.6027,
+        -0.4243
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.7324,
+       "bootstrap_95": [
+        -0.7865,
+        -0.6784
+       ]
+      }
+     },
+     "andrey_s": 2.6723,
+     "comparator_s": 0.2533,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2163,
+     "comparator_set_f1_loss_mean": 0.3629,
+     "mean_D": -0.1466,
+     "bootstrap_95": [
+      -0.1585,
+      -0.1343
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4919,
+       "bootstrap_95": [
+        -1.5432,
+        -1.4459
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.2243,
+       "bootstrap_95": [
+        -1.2541,
+        -1.1973
+       ]
+      }
+     },
+     "andrey_s": 3.0935,
+     "comparator_s": 0.3173,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0652,
+     "comparator_set_f1_loss_mean": 0.2606,
+     "mean_D": -0.1953,
+     "bootstrap_95": [
+      -0.2118,
+      -0.1799
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.2378,
+       "bootstrap_95": [
+        -2.2514,
+        -2.2243
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4676,
+       "bootstrap_95": [
+        -1.5378,
+        -1.3973
+       ]
+      }
+     },
+     "andrey_s": 5.8122,
+     "comparator_s": 1.0455,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3439,
+     "comparator_set_f1_loss_mean": 0.4787,
+     "mean_D": -0.1348,
+     "bootstrap_95": [
+      -0.1623,
+      -0.1061
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.38,
+       "bootstrap_95": [
+        -0.475,
+        -0.275
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.84,
+       "bootstrap_95": [
+        -0.88,
+        -0.795
+       ]
+      }
+     },
+     "andrey_s": 1.6614,
+     "comparator_s": 0.1437,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1466,
+     "comparator_set_f1_loss_mean": 0.3143,
+     "mean_D": -0.1677,
+     "bootstrap_95": [
+      -0.1825,
+      -0.1535
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.81,
+       "bootstrap_95": [
+        -1.86,
+        -1.765
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.26,
+       "bootstrap_95": [
+        -1.305,
+        -1.215
+       ]
+      }
+     },
+     "andrey_s": 2.1811,
+     "comparator_s": 0.1776,
+     "result": "better"
+    },
+    {
+     "network": "child",
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0032,
+     "comparator_set_f1_loss_mean": 0.1788,
+     "mean_D": -0.1757,
+     "bootstrap_95": [
+      -0.189,
+      -0.1622
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.475,
+       "bootstrap_95": [
+        -2.49,
+        -2.455
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.725,
+       "bootstrap_95": [
+        -1.785,
+        -1.67
+       ]
+      }
+     },
+     "andrey_s": 5.3136,
+     "comparator_s": 0.5888,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.7499,
+     "comparator_set_f1_loss_mean": 0.7626,
+     "mean_D": -0.0127,
+     "bootstrap_95": [
+      -0.0229,
+      -0.0013
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.1543,
+       "bootstrap_95": [
+        -0.2129,
+        -0.0914
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0157,
+       "bootstrap_95": [
+        -0.0843,
+        0.0543
+       ]
+      }
+     },
+     "andrey_s": 2.5032,
+     "comparator_s": 0.6985,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.6422,
+     "comparator_set_f1_loss_mean": 0.654,
+     "mean_D": -0.0118,
+     "bootstrap_95": [
+      -0.0188,
+      -0.0049
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5329,
+       "bootstrap_95": [
+        -0.5829,
+        -0.4814
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.4286,
+       "bootstrap_95": [
+        -0.4857,
+        -0.3714
+       ]
+      }
+     },
+     "andrey_s": 3.8878,
+     "comparator_s": 0.8351,
+     "result": "better"
+    },
+    {
+     "network": "hepar2",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3776,
+     "comparator_set_f1_loss_mean": 0.3978,
+     "mean_D": -0.0201,
+     "bootstrap_95": [
+      -0.0261,
+      -0.0141
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.5714,
+       "bootstrap_95": [
+        -1.6014,
+        -1.5414
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.4614,
+       "bootstrap_95": [
+        -1.5,
+        -1.4257
+       ]
+      }
+     },
+     "andrey_s": 18.1015,
+     "comparator_s": 4.5112,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 200,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.4563,
+     "comparator_set_f1_loss_mean": 0.679,
+     "mean_D": -0.2227,
+     "bootstrap_95": [
+      -0.2388,
+      -0.2069
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.5111,
+       "bootstrap_95": [
+        -0.6259,
+        -0.3963
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.7481,
+       "bootstrap_95": [
+        -0.7963,
+        -0.6963
+       ]
+      }
+     },
+     "andrey_s": 2.0135,
+     "comparator_s": 0.181,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 500,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.3579,
+     "comparator_set_f1_loss_mean": 0.554,
+     "mean_D": -0.196,
+     "bootstrap_95": [
+      -0.2089,
+      -0.183
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.6889,
+       "bootstrap_95": [
+        -1.7519,
+        -1.6222
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.1815,
+       "bootstrap_95": [
+        -1.2222,
+        -1.137
+       ]
+      }
+     },
+     "andrey_s": 3.1067,
+     "comparator_s": 0.2617,
+     "result": "better"
+    },
+    {
+     "network": "insurance",
+     "d": 27,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1897,
+     "comparator_set_f1_loss_mean": 0.4307,
+     "mean_D": -0.241,
+     "bootstrap_95": [
+      -0.2593,
+      -0.223
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.7963,
+       "bootstrap_95": [
+        -2.8296,
+        -2.763
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.7259,
+       "bootstrap_95": [
+        -1.7889,
+        -1.663
+       ]
+      }
+     },
+     "andrey_s": 8.892,
+     "comparator_s": 1.1457,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "HITON-PC",
+   "family": "local",
+   "solution": "andrey.hiton_pc",
+   "setting": "alpha=0.05, max_depth=None (no cap, as bnlearn's max.sx = Inf; the default is 3), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 si.hiton.pc",
+   "comparator_solution": "bnlearn.si-hiton-pc",
+   "comparator_setting": "learn.nbr(method = 'si.hiton.pc') per target, kept by the AND rule over the targets' runs as Andrey's symmetry check, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "parents and children at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_distance",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1557,
+     "comparator_set_distance_mean": 0.1545,
+     "mean_D": 0.0012,
+     "bootstrap_95": [
+      -0.0008,
+      0.0035
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8376,
+       "bootstrap_95": [
+        -1.887,
+        -1.7873
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8445,
+       "bootstrap_95": [
+        -1.8919,
+        -1.7961
+       ]
+      }
+     },
+     "andrey_s": 2.062,
+     "comparator_s": 1.8566,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1269,
+     "comparator_set_distance_mean": 0.1254,
+     "mean_D": 0.0015,
+     "bootstrap_95": [
+      -0.001,
+      0.0043
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9309,
+       "bootstrap_95": [
+        -1.9765,
+        -1.8852
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9349,
+       "bootstrap_95": [
+        -1.9811,
+        -1.8897
+       ]
+      }
+     },
+     "andrey_s": 4.3358,
+     "comparator_s": 13.9002,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.0936,
+     "comparator_set_distance_mean": 0.0987,
+     "mean_D": -0.005,
+     "bootstrap_95": [
+      -0.0103,
+      -0.0004
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9253,
+       "bootstrap_95": [
+        -2.0275,
+        -1.8189
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9083,
+       "bootstrap_95": [
+        -2.0155,
+        -1.7958
+       ]
+      }
+     },
+     "andrey_s": 0.4153,
+     "comparator_s": 0.1675,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.0674,
+     "comparator_set_distance_mean": 0.0684,
+     "mean_D": -0.001,
+     "bootstrap_95": [
+      -0.0084,
+      0.0065
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0269,
+       "bootstrap_95": [
+        -2.1056,
+        -1.9319
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0275,
+       "bootstrap_95": [
+        -2.0972,
+        -1.948
+       ]
+      }
+     },
+     "andrey_s": 0.5118,
+     "comparator_s": 0.5278,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.1098,
+     "comparator_set_distance_mean": 0.1109,
+     "mean_D": -0.0011,
+     "bootstrap_95": [
+      -0.0038,
+      0.0008
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9604,
+       "bootstrap_95": [
+        -2.0156,
+        -1.9083
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9581,
+       "bootstrap_95": [
+        -2.0166,
+        -1.9035
+       ]
+      }
+     },
+     "andrey_s": 0.8096,
+     "comparator_s": 0.621,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.4152,
+     "comparator_set_distance_mean": 0.419,
+     "mean_D": -0.0038,
+     "bootstrap_95": [
+      -0.0116,
+      0.0039
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0358,
+       "bootstrap_95": [
+        -2.1793,
+        -1.9032
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0563,
+       "bootstrap_95": [
+        -2.1871,
+        -1.9367
+       ]
+      }
+     },
+     "andrey_s": 2.0228,
+     "comparator_s": 3.8332,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.0839,
+     "comparator_set_distance_mean": 0.0846,
+     "mean_D": -0.0008,
+     "bootstrap_95": [
+      -0.0068,
+      0.0055
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0431,
+       "bootstrap_95": [
+        -2.0937,
+        -1.9944
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0431,
+       "bootstrap_95": [
+        -2.0929,
+        -1.9948
+       ]
+      }
+     },
+     "andrey_s": 1.3988,
+     "comparator_s": 4.4924,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_distance_mean": 0.3808,
+     "comparator_set_distance_mean": 0.3923,
+     "mean_D": -0.0115,
+     "bootstrap_95": [
+      -0.0262,
+      0.0017
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.1566,
+       "bootstrap_95": [
+        -2.3192,
+        -2.0027
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.1492,
+       "bootstrap_95": [
+        -2.2885,
+        -2.0248
+       ]
+      }
+     },
+     "andrey_s": 3.4571,
+     "comparator_s": 97.4174,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "HITON-PC",
+   "family": "local",
+   "solution": "andrey.hiton_pc",
+   "setting": "alpha=0.05, max_depth=None (no cap, as bnlearn's max.sx = Inf; the default is 3), G-square on categorical data and Fisher's z on continuous data",
+   "comparator": "bnlearn 5.2.1 si.hiton.pc",
+   "comparator_solution": "bnlearn.si-hiton-pc",
+   "comparator_setting": "learn.nbr(method = 'si.hiton.pc') per target, kept by the AND rule over the targets' runs as Andrey's symmetry check, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
+   "lane": "blanket",
+   "output": "parents and children at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "cores": 1,
+   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "regime": "gaussian",
+   "claim": "in",
+   "metric": "set_f1_loss",
+   "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+   "complete": true,
+   "rows": [
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.1049,
+     "comparator_set_f1_loss_mean": 0.1041,
+     "mean_D": 0.0008,
+     "bootstrap_95": [
+      -0.0004,
+      0.0023
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.8376,
+       "bootstrap_95": [
+        -1.887,
+        -1.7873
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.8445,
+       "bootstrap_95": [
+        -1.8919,
+        -1.7961
+       ]
+      }
+     },
+     "andrey_s": 2.062,
+     "comparator_s": 1.8566,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 100,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0856,
+     "comparator_set_f1_loss_mean": 0.0845,
+     "mean_D": 0.0012,
+     "bootstrap_95": [
+      -0.0005,
+      0.003
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9309,
+       "bootstrap_95": [
+        -1.9765,
+        -1.8852
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9349,
+       "bootstrap_95": [
+        -1.9811,
+        -1.8897
+       ]
+      }
+     },
+     "andrey_s": 4.3358,
+     "comparator_s": 13.9002,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.063,
+     "comparator_set_f1_loss_mean": 0.0661,
+     "mean_D": -0.0032,
+     "bootstrap_95": [
+      -0.0065,
+      -0.0002
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9253,
+       "bootstrap_95": [
+        -2.0275,
+        -1.8189
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9083,
+       "bootstrap_95": [
+        -2.0155,
+        -1.7958
+       ]
+      }
+     },
+     "andrey_s": 0.4153,
+     "comparator_s": 0.1675,
+     "result": "better"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 20,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.045,
+     "comparator_set_f1_loss_mean": 0.0453,
+     "mean_D": -0.0003,
+     "bootstrap_95": [
+      -0.0049,
+      0.0045
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0269,
+       "bootstrap_95": [
+        -2.1056,
+        -1.9319
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0275,
+       "bootstrap_95": [
+        -2.0972,
+        -1.948
+       ]
+      }
+     },
+     "andrey_s": 0.5118,
+     "comparator_s": 0.5278,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0738,
+     "comparator_set_f1_loss_mean": 0.0745,
+     "mean_D": -0.0007,
+     "bootstrap_95": [
+      -0.0022,
+      0.0006
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.9604,
+       "bootstrap_95": [
+        -2.0156,
+        -1.9083
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.9581,
+       "bootstrap_95": [
+        -2.0166,
+        -1.9035
+       ]
+      }
+     },
+     "andrey_s": 0.8096,
+     "comparator_s": 0.621,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.2924,
+     "comparator_set_f1_loss_mean": 0.2965,
+     "mean_D": -0.0041,
+     "bootstrap_95": [
+      -0.01,
+      0.0023
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0358,
+       "bootstrap_95": [
+        -2.1793,
+        -1.9032
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0563,
+       "bootstrap_95": [
+        -2.1871,
+        -1.9367
+       ]
+      }
+     },
+     "andrey_s": 2.0228,
+     "comparator_s": 3.8332,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 2.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.0552,
+     "comparator_set_f1_loss_mean": 0.0555,
+     "mean_D": -0.0002,
+     "bootstrap_95": [
+      -0.0044,
+      0.0042
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.0431,
+       "bootstrap_95": [
+        -2.0937,
+        -1.9944
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.0431,
+       "bootstrap_95": [
+        -2.0929,
+        -1.9948
+       ]
+      }
+     },
+     "andrey_s": 1.3988,
+     "comparator_s": 4.4924,
+     "result": "tie"
+    },
+    {
+     "mean_degree": 4.0,
+     "d": 50,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_set_f1_loss_mean": 0.265,
+     "comparator_set_f1_loss_mean": 0.2755,
+     "mean_D": -0.0105,
+     "bootstrap_95": [
+      -0.0231,
+      0.0006
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.1566,
+       "bootstrap_95": [
+        -2.3192,
+        -2.0027
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.1492,
+       "bootstrap_95": [
+        -2.2885,
+        -2.0248
+       ]
+      }
+     },
+     "andrey_s": 3.4571,
+     "comparator_s": 97.4174,
+     "result": "tie"
     }
    ]
   }

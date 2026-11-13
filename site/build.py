@@ -2440,13 +2440,14 @@ COMPARISON = (
 # once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
 # score or test in the same search, a wrapper, and a search that only orients a given graph count
 # with the method they extend, or not at all. Andrey's count is the supported methods of its
-# registry: gies runs ges's search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a
-# variant of iamb, and mmhc is rsmax2 with its default phases, as bnlearn's are counted. The others
-# are read from each package's released code.
+# registry: gies runs ges's search, multi_group_direct_lingam extends direct_lingam, inter_iamb and
+# fast_iamb are variants of iamb, and mmhc is rsmax2 with its default phases, as bnlearn's are
+# counted. The others are read from each package's released code.
 COUNTED_WITH = {
     "gies": "ges",
     "multi_group_direct_lingam": "direct_lingam",
     "inter_iamb": "iamb",
+    "fast_iamb": "iamb",
     "mmhc": "rsmax2",
 }
 METHOD_COUNTS = {
