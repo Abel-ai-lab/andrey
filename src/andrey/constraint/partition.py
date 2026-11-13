@@ -190,8 +190,8 @@ def ld3(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LD3Result
     Lines 3 to 5 are three separate tests of each variable against the pair; line 8 keeps each
     remaining variable dependent on the outcome given the treatment, the ``Z4`` variables, and the
     other remaining ones; line 10 keeps each ``Z4`` variable dependent on the outcome given the
-    treatment, the parents line 8 found, and the other ``Z4`` variables; line 12 tests the
-    treatment against the outcome given the parents line 8 found.
+    treatment, the parents line 8 found, and the other ``Z4`` variables. The criterion tests the
+    treatment against the outcome given every parent found, the ``Z4`` parents included.
     """
     tests = _Tests(search)
     indep = tests.independent
@@ -208,7 +208,7 @@ def ld3(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LD3Result
 
     parents13 = [z for z in rest if not indep(z, y, (x, *z4, *(w for w in rest if w != z)))]
     parents4 = [w for w in z4 if not indep(w, y, (x, *parents13, *(v for v in z4 if v != w)))]
-    direct = not indep(x, y, parents13)
+    direct = not indep(x, y, (*parents13, *parents4))
 
     sets = {
         "Z1,3": parents13,

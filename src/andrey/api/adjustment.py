@@ -284,11 +284,10 @@ def ld3(
 
     LD3 sorts every other variable by its causal relation to the pair from tests that read the
     pair and the variables already sorted, keeps those that are parents of the outcome, and tests
-    the treatment against the outcome given the parents that are confounders or mediators [1]_.
-    The treatment is a parent of the outcome (the structural direct criterion of fairness
-    analysis) when the two stay dependent. The parents it finds are a valid adjustment set for
-    the weighted controlled direct effect. It runs a number of tests linear in the number of
-    variables.
+    the treatment against the outcome given those parents [1]_. The treatment is a parent of the
+    outcome (the structural direct criterion of fairness analysis) when the two stay dependent.
+    The parents it finds are a valid adjustment set for the weighted controlled direct effect. It
+    runs a number of tests linear in the number of variables.
 
     Parameters
     ----------
@@ -378,13 +377,13 @@ def ld3(
     affects a decision directly, and to estimate that direct effect, without learning a graph.
     Its claim [1]_: when every independence follows from the causal graph (faithfulness), the
     tests are exact, the outcome has no descendant among the columns (its assumption A1), and
-    every parent of the outcome is observed (A2), it finds exactly the parents of the outcome and
-    whether the treatment is one (Theorem 1; see Limitations for graphs where the second part
-    fails); hidden variables that are not parents of the outcome are allowed (Theorem 2), and
-    the parents other than the treatment are a valid adjustment set for the weighted controlled
-    direct effect (Theorem 3). The default
-    Fisher-Z test assumes continuous data with linear effects and Gaussian noise; the other tests
-    read categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes.
+    every parent of the outcome is observed (A2), it finds exactly the parents of the outcome
+    (Theorem 1), and the criterion **How it works.** describes says whether the treatment is one;
+    hidden variables that are not parents of the outcome are allowed (Theorem 2), and the
+    parents other than the treatment are a valid adjustment set for the weighted controlled
+    direct effect (Theorem 3). The default Fisher-Z test assumes continuous data with linear
+    effects and Gaussian noise; the other tests read categorical or mixed data or detect
+    nonlinear effects, as :func:`~andrey.pc` describes.
     For an adjustment set for the total effect, use :func:`~andrey.ldp`.
 
     **How it works.** Algorithm 1 of [1]_. Three tests sort each variable on its own: independent
@@ -393,9 +392,13 @@ def ld3(
     remaining variable dependent on the outcome given the treatment, the ``Z4`` variables, and the
     other remaining variables is a parent of the outcome. A ``Z4`` variable dependent on the
     outcome given the treatment, those parents, and the other ``Z4`` variables is a parent too.
-    The criterion holds when the treatment and the outcome are dependent given the parents found
-    among the remaining variables. Each query is tested once. The answer does not depend on the
-    column order.
+    The criterion holds when the treatment and the outcome are dependent given every parent found,
+    the ``Z4`` parents included. A parent can be a common effect of the treatment and of a parent
+    independent of it (``X -> M <- W`` with ``M -> Y <- W``): given ``M`` without ``W``, the path
+    ``X -> M <- W -> Y`` is open. Given every parent, a treatment that is not a parent is
+    independent of the outcome (the local Markov property, since the outcome has no descendants),
+    so with exact tests the criterion is exact, on the graph of Figure D.1 of [1]_ without the
+    direct effect too. Each query is tested once. The answer does not depend on the column order.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
@@ -408,11 +411,7 @@ def ld3(
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graph of [1]_
     and on random graphs whose outcome has no descendants, and on simulated linear-Gaussian data.
-    The criterion's test leaves out the parents independent of the treatment: when one of them
-    also causes a mediator that is a parent, as in the graph of Figure D.1 of [1]_, the test
-    finds a dependence through that mediator, and the criterion says the treatment is a parent
-    when it is not. A descendant of the outcome among the columns, or a hidden parent of it,
-    breaks the claim.
+    A descendant of the outcome among the columns, or a hidden parent of it, breaks the claim.
     The parent tests condition on most of the other variables, so they need more rows as the
     number of variables grows. With 5,000 rows a fit ran about 65 tests on the 18-node graph of
     [1]_ and about 190 on random 50-node graphs, each in under a second. The numbers are a

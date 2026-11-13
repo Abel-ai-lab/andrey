@@ -7,8 +7,9 @@ Figure 3 exactly, and the set it returns is a valid adjustment set in the true g
 returns one, hidden variables included (Theorem 4.5); its ``Z4`` variables are never descendants
 of the outcome and its ``Z7`` variables are descendants of the treatment (Theorem 4.6). LD3 finds
 exactly the parents of a sink outcome whose parents are all observed (Theorem 1), even with other
-variables hidden (Theorem 2); the graphs where its structural direct criterion is wrong are
-listed by name.
+variables hidden (Theorem 2), and its structural direct criterion, tested given every parent found,
+is right on them, including graphs where the confounder and mediator parents alone do not separate
+the treatment from the outcome.
 """
 
 from __future__ import annotations
@@ -185,23 +186,30 @@ def test_ld3_finds_the_parents_in_figure_d1():
         assert result.direct
 
 
-def test_ld3_criterion_fails_when_a_mediator_and_a_cause_of_the_outcome_collide():
-    # X -> M <- W, M -> Y <- W: W is independent of X and so in Z4; the criterion's test
-    # conditions on M alone, which opens X -> M <- W -> Y, so it says X is a parent of Y.
+def test_ld3_criterion_is_right_when_a_mediator_and_a_cause_of_the_outcome_collide():
+    # X -> M <- W, M -> Y <- W: W is independent of X and so in Z4. Given M alone,
+    # X -> M <- W -> Y is open; given M and W, X and Y are d-separated.
     edges = [("X", "M"), ("W", "M"), ("M", "Y"), ("W", "Y")]
     observed = ["X", "M", "W", "Y"]
+    assert not nx.is_d_separator(nx.DiGraph(edges), "X", "Y", {"M"})
     result = oracle_answer("ld3", edges, observed)
     assert names(observed, result.parents) == {"M", "W"}
     assert names(observed, result.partition["Z4"]) == {"W"}
-    assert result.direct
+    assert not result.direct
+    assert oracle_answer("ld3", [*edges, ("X", "Y")], observed).direct
 
 
-def test_ld3_criterion_fails_on_figure_d1_without_the_direct_effect():
+def test_ld3_criterion_is_right_on_figure_d1_without_the_direct_effect():
     # The same collider in the paper's own graph: X -> Z3d <- Z4a -> Z4b -> Y with Z3d -> Y.
     nodes = [*all_nodes(FIGURE_D1), "Z8"]
-    result = oracle_answer("ld3", [e for e in FIGURE_D1 if e != ("X", "Y")], nodes)
-    assert names(nodes, result.parents) == {"Z1", "Z3c", "Z3d", "Z4b", "M2", "B2", "B3"}
-    assert result.direct
+    edges = [e for e in FIGURE_D1 if e != ("X", "Y")]
+    without_z4 = {"Z1", "Z3c", "Z3d", "M2", "B2", "B3"}
+    assert not nx.is_d_separator(nx.DiGraph(edges), "X", "Y", without_z4)
+    for hidden in ((), ("B1",), ("Z4a",), ("M1",), ("Z3a",)):
+        observed = [v for v in nodes if v not in hidden]
+        result = oracle_answer("ld3", edges, observed)
+        assert names(observed, result.parents) == {*without_z4, "Z4b"}
+        assert not result.direct
 
 
 def sink_dag(rng, d, p):
@@ -214,7 +222,7 @@ def sink_dag(rng, d, p):
 
 def test_ld3_parents_on_random_sink_graphs():
     rng = np.random.default_rng(11)
-    checked = wrong_criterion = 0
+    checked = needs_z4 = 0
     for _ in range(150):
         d = int(rng.integers(6, 13))
         edges, y = sink_dag(rng, d, 0.3)
@@ -238,13 +246,13 @@ def test_ld3_parents_on_random_sink_graphs():
             latent=sorted(hidden),
         )
         assert [names(observed, result.parents)] == [set(s) for s in truth["adjustment_sets"]]
+        assert result.direct == truth["nonzero"]
         checked += 1
-        wrong_criterion += result.direct != truth["nonzero"]
-        if result.direct != truth["nonzero"]:
-            # Only a false "direct": a Z4 parent of the outcome is a parent of a mediator too.
-            assert result.direct and not truth["nonzero"]
+        without_z4 = names(observed, result.partition["Z1,3"])
+        needs_z4 += nx.is_d_separator(dag, x, y, without_z4) == truth["nonzero"]
     assert checked >= 100
-    assert wrong_criterion < checked / 4
+    # Some graphs need the Z4 parents: the other parents alone do not separate the pair.
+    assert needs_z4 > 0
 
 
 def test_ld3_test_count_is_linear():
@@ -316,25 +324,5 @@ def test_ld3_on_figure_d1_data_beats_the_floor():
         range(4),
         5000,
     )
+    assert figure["nonzero"]["net_rate"] > figure["nonzero"]["floor_rate"]
     assert figure["adjustment"]["net_rate"] > figure["adjustment"]["floor_rate"]
-    # The criterion with and without the direct effect, on the graph of the authors' code, which
-    # lacks the arc Z4a -> Z4b (see test_ld3_criterion_fails_when_...).
-    edges = [e for e in lane.LD3_EDGES if e != ("Z4a", "Z4b")]
-
-    def code_graph(seed):
-        return [
-            lane.from_edges(
-                "ld3-dag",
-                seed,
-                [e for e in edges if effect or e != ("X", "Y")],
-                ("Z8",),
-                coefficient=lambda rng: float(rng.uniform(0.75, 1.1)),
-                special={("X", "Y"): 1.25},
-                pair=("X", "Y", "direct"),
-            )
-            for effect in (True, False)
-        ]
-
-    code = scores(ld3, code_graph, range(4), 5000)
-    assert code["nonzero"]["net_rate"] > code["nonzero"]["floor_rate"]
-    assert code["adjustment"]["net_rate"] > code["adjustment"]["floor_rate"]

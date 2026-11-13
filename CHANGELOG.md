@@ -137,8 +137,11 @@ names its pull request.
   The treatment-outcome benchmark lane runs it beside the authors' code. ([#970])
 - `andrey.ld3`, LD3 (Maasch et al. 2025), experimental: the parents of an outcome that has no
   descendants among the columns, and whether the treatment is one of them (the structural direct
-  criterion), in a number of tests linear in the number of columns. The parents other than the
-  treatment are the adjustment set for the direct effect, and the answer is one record in
+  criterion), in a number of tests linear in the number of columns. The criterion tests the
+  treatment against the outcome given every parent found, those independent of the treatment
+  included, so a parent that is a common effect of the treatment and of another parent opens no
+  path. The parents other than the treatment are the adjustment set for the direct effect, and the
+  answer is one record in
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
