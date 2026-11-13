@@ -688,7 +688,9 @@ def snap(
     **Limitations.** On the benchmark lane's treatment-outcome pairs (a treatment that is an
     ancestor of the outcome, with an identifiable effect) with 100 to 200 variables, the sets it
     returned did not beat adjusting for nothing, because its early independence tests prune true
-    ancestors at finite sample sizes. It has not been benchmarked in the setting of [1]_ yet.
+    ancestors at finite sample sizes. It has not been benchmarked in the setting of [1]_ yet. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
