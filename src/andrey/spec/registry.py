@@ -838,8 +838,10 @@ _add(
             concept_param(
                 "alpha",
                 default=0.01,
-                doc="Significance level of the conditional-independence test, in (0, 1). Xie et "
-                "al. 2024 state none; 0.01 is the level of their code.",
+                doc="Significance level of the conditional-independence tests, in (0, 1). Xie et "
+                "al. 2024 state none; 0.01 is the level of their code. total_conditioning tests "
+                "at alpha / (10 floor(d / 10)) over d columns, alpha itself below 10 columns, as "
+                "that code does.",
             ),
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,

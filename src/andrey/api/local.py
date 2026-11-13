@@ -363,8 +363,10 @@ def mmb_by_mmb(
         :func:`~andrey.inter_iamb`, or :func:`~andrey.fast_iamb` by name, which find the same
         blanket with hidden variables [3]_ with tests that condition on fewer variables.
     alpha : float, default=0.01
-        Significance level of the conditional-independence test, in ``(0, 1)``. The paper states
-        none; 0.01 is the level of its authors' code.
+        Significance level of the conditional-independence tests, in ``(0, 1)``. The paper states
+        none; 0.01 is the level of its authors' code. ``"total_conditioning"`` tests at
+        ``alpha / (10 * floor(d / 10))`` over ``d`` columns, ``alpha`` itself below 10 columns, as
+        that code does; see **How it works.** in Notes.
     indep_test : str or None, default=None
         Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
         ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
@@ -506,6 +508,13 @@ def mmb_by_mmb(
     after its own step, since R3 can stop before a discriminating path decides a circle at the
     target.
 
+    The paper runs total conditioning without stating its level [1]_. The
+    ``"total_conditioning"`` learner tests the ``d - 1`` candidates of each blanket at
+    ``alpha / (10 * floor(d / 10))`` over ``d`` columns, ``alpha`` itself below 10 columns, as the
+    authors' code does; the other learners and the local structures test at ``alpha``. At a flat
+    level the scan admits more variables outside the blanket as ``d`` grows, and each one doubles
+    the subsets a local structure tests.
+
     Every choice between candidates of equal strength goes to the column whose rank, computed from
     the data, comes first, as for :func:`~andrey.iamb`, and a pair separated at some size keeps the
     set with the largest p-value, so the answer does not depend on the column order unless two
@@ -577,6 +586,7 @@ def mmb_by_mmb(
         search = local_search(
             X,
             alpha=alpha,
+            total_alpha=alpha / (10 * (d // 10)) if d >= 10 else alpha,
             indep_test=indep_test,
             degrees_of_freedom=degrees_of_freedom,
             categorical=mask,

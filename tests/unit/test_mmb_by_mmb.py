@@ -4,7 +4,8 @@ Under a d-separation oracle, total conditioning finds every target's Markov blan
 ancestral graph of random graphs with hidden common causes, as IAMB does; the paper's Example 4
 gives the PAG's marks at its target; the answer at every target of random graphs is the PAG's; the
 stop guard decides the circle where the paper's R3 stops early, and the collider check drops the
-edge the PC step keeps on the graph where it does.
+edge the PC step keeps on the graph where it does. Total conditioning tests at the level of the
+authors' code, MB-by-MB's at alpha.
 On data the answer does not depend on the column order or the columns' units, knowledge sets
 marks, and the result holds the target's sets, the blankets learned, and the test count.
 """
@@ -106,6 +107,45 @@ def test_total_conditioning_tests_each_variable_given_all_the_others():
         blanket = LEARNERS["total_conditioning"].search(search, 2, sepsets)
     assert sorted(blanket) == [0, 1, 3] and sepsets == {4: (0, 1, 3)}
     assert tests.n == 4
+
+
+class _GivenTheRest:
+    """The p-value ``p`` for a query given all the other ``d - 2`` columns, 0 for any other."""
+
+    def __init__(self, d: int, p: float) -> None:
+        self.d, self.p = d, p
+
+    def __call__(self, x: int, y: int, condition_set=()) -> float:
+        return self.p if len(tuple(condition_set)) == self.d - 2 else 0.0
+
+
+def _given_the_rest_fit(method, d: int, p: float, **settings):
+    """``method`` at ``alpha=0.01`` on ``d`` columns, every total-conditioning test at ``p``."""
+    register_indep_test("given_rest", lambda x: _GivenTheRest(d, p))
+    try:
+        x = np.random.default_rng(d).standard_normal((40, d))
+        return method(
+            x, target=0, alpha=0.01, indep_test="given_rest", local_max_depth=0, **settings
+        )
+    finally:
+        ci._CI_REGISTRY.pop("given_rest", None)
+
+
+# The level of the authors' code: alpha / (10 * floor(d / 10)) over d >= 10 columns, alpha below.
+@pytest.mark.parametrize(
+    ("d", "level"), [(5, 0.01), (9, 0.01), (10, 0.001), (19, 0.001), (20, 0.0005), (45, 0.00025)]
+)
+def test_total_conditioning_tests_at_the_level_of_the_authors_code(d, level):
+    for p, joins in ((level, True), (level * 1.01, False)):
+        out = _given_the_rest_fit(andrey.mmb_by_mmb, d, p)
+        assert sorted(out.metadata["markov_blanket"]) == (list(range(1, d)) if joins else []), p
+
+
+def test_mb_by_mb_tests_total_conditioning_at_alpha():
+    # Between MMB-by-MMB's level at d = 20 (0.0005) and alpha: MB-by-MB keeps every variable.
+    out = _given_the_rest_fit(andrey.mb_by_mb, 20, 0.005, blanket="total_conditioning")
+    assert np.count_nonzero(out.structure.to_numpy()[0]) == 19
+    assert _given_the_rest_fit(andrey.mmb_by_mmb, 20, 0.005).metadata["markov_blanket"] == []
 
 
 def test_below_a_cap_on_the_rest_total_conditioning_runs_no_test_and_keeps_every_variable():
