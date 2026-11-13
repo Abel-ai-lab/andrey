@@ -679,8 +679,10 @@ def covariate_rules(
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs with
     hidden pretreatment covariates, and on simulated linear-Gaussian data. With many candidates
     and one level, each rule applies by chance to some of them, so on finite samples both rules
-    often apply and the answer is undecided. With ten covariates a fit runs 16,384 tests, about
-    half a second with 10,000 rows, and each added covariate doubles the count. The numbers are a
+    often apply and the answer is undecided: on simulated linear-Gaussian data with ten
+    covariates, five hidden ones, and 100 to 10,000 rows, it was undecided on 97% or more of the
+    fits. With ten covariates a fit runs 16,384 tests, under a second with 10,000 rows, and each
+    added covariate doubles the count. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
