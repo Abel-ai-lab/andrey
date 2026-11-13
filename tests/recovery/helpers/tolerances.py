@@ -164,6 +164,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
+    # LHTS and NHTS: the DAG of edge discovery and the order of the layers, both exact.
+    "LHTS": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
+    "NHTS": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {
         "structural": ["graph", "causal_order"],
