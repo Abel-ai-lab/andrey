@@ -20,7 +20,7 @@ from .fcm import cam, camuv, nogam, resit, score_matching
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd
 from .latent import gin
-from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
+from .lingam import direct_lingam, ica_lingam, local_isa_ling, multi_group_direct_lingam
 from .local import mb_by_mb, mmb_by_mmb
 from .permutation import boss, boss_fci, grasp, grasp_fci, igsp, ut_igsp
 from .score import ages, calm, exact_search, ges, gies, gnies, hc, tabu, xges
@@ -84,6 +84,7 @@ __all__ = [
     # functional causal models: LiNGAM, then nonlinear additive noise
     "direct_lingam",
     "ica_lingam",
+    "local_isa_ling",
     "multi_group_direct_lingam",
     "cam",
     "resit",

@@ -1516,6 +1516,8 @@ def returns_text(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
         return "Temporal graph"
     if spec.output.graph_kind == "undirected":
         return "Undirected graph"
+    if spec.output.graph_kind == "digraph":
+        return "Directed graph"
     return spec.output.graph_kind.upper()
 
 
@@ -1647,6 +1649,8 @@ def experimental_kinds() -> set[str]:
     the kinds of the graphs their ``structure`` can name."""
     specs = list_specs()
     supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
+    if any(s.status == "supported" and s.output.structure_type == "temporal" for s in specs):
+        supported.add("digraph")  # a TemporalStructure's summary graph
     experimental = {spec.output.graph_kind for spec in specs if spec.status == "experimental"}
     for spec in specs:
         structures = [p.choices for p in spec.params if p.concept == "structure" and p.choices]
@@ -2998,6 +3002,7 @@ GRAPH_SECTIONS = {
     "Undirected graph": "undirected-graphs-adjacency-without-direction",
     "Temporal graph": "temporal-graphs",
     "Two-node DAG": "dag-a-directed-model",
+    "Directed graph": "directed-cycles-the-kind-matters",
 }
 
 
