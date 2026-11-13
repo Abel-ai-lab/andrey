@@ -690,11 +690,13 @@ def snap(
     found by chance between an unrelated variable and an ancestor of ``variables``, about
     ``alpha`` of the independent pairs, orients edges into that ancestor and drops it, and with it
     a member of the optimal set. On the random graphs of [1]_ with 20 variables and 5,000 rows,
-    the set it returned was the optimal one in about a third of the fits. Among the variables kept
-    the search is PC's, so its tests grow with their neighborhoods. With 1,000 rows a fit on 100
-    variables ran about 5,000 tests, nearly all of them unconditional, in under a second. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    the set it returned was the optimal one in about a third of the fits; with 100 or 200
+    variables and 1,000 rows, or 100 variables and 10,000 rows, the unconditional tests alone
+    dropped nearly every ancestor of a pair, so the sets missed the confounders. Among the
+    variables kept the search is PC's, so its tests grow with their neighborhoods. With 1,000 rows
+    a fit on 100 variables ran about 5,000 tests, nearly all of them unconditional, in under a
+    second. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
