@@ -25,6 +25,7 @@ import blanket_cpu  # noqa: E402
 
 import andrey  # noqa: E402
 from andrey_bench import blanket_lane as lane  # noqa: E402
+from andrey_bench import datasets  # noqa: E402
 from andrey_bench.adapters import (  # noqa: E402
     andrey_blanket,
     bnlearn_blanket,
@@ -485,6 +486,38 @@ def test_the_driver_records_sets_scores_and_counts_and_rescores_them(asia_cache,
     assert blanket_cpu.main(["--out", str(out), "--rescore"]) == 0
     after = [json.dumps({k: r[k] for k in keys}, sort_keys=True) for r in _records(out)]
     assert after == before
+
+
+def test_constant_columns_leave_the_data_and_the_true_graph():
+    X = np.array([[0, 1, 2], [0, 0, 1], [0, 1, 0]])
+    truth = np.array([[0, 1, 0], [0, 0, 1], [0, 0, 0]])
+    kept, kept_truth, dropped = blanket_cpu.without_constant_columns(X, truth)
+    assert dropped == 1 and kept.tolist() == X[:, 1:].tolist()
+    assert kept_truth.tolist() == [[0, 1], [0, 0]]
+    assert blanket_cpu.without_constant_columns(X[:, 1:], truth[1:, 1:])[2] == 0
+
+
+def test_the_driver_drops_constant_columns_and_rescores_without_them(
+    asia_cache, tmp_path, monkeypatch
+):
+    generate = datasets.generate_one
+
+    def with_a_constant_column(key):
+        X, truth, *rest = generate(key)
+        X = np.column_stack([np.zeros(len(X), dtype=X.dtype), X])
+        truth = np.pad(truth, ((1, 0), (1, 0)))
+        return (X, truth, *rest)
+
+    monkeypatch.setattr(datasets, "generate_one", with_a_constant_column)
+    out = tmp_path / "run"
+    flags = ["--out", str(out), "--smoke", "--drop-constant", "--solutions", "andrey.iamb"]
+    assert blanket_cpu.main(flags) == 0
+    (record,) = _records(out)
+    assert record["dropped"] == 1 and record["d"] == 8 and record["targets"] == list(range(8))
+    assert json.loads((out / "run_meta.json").read_text())["drop_constant"] is True
+    assert blanket_cpu.main(["--out", str(out), "--rescore"]) == 0
+    (again,) = _records(out)
+    assert again["per_target"] == record["per_target"]
 
 
 def test_the_driver_scores_whole_graphs_and_resumes(asia_cache, tmp_path):

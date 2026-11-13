@@ -595,7 +595,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Margaritis & Thrun 2000", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "fast_iamb",
@@ -608,7 +608,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Yaramakala & Margaritis 2005", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "mmpc",
@@ -649,7 +649,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ),
         "undirected",
         ("Aliferis et al. 2010", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "hiton_mb",

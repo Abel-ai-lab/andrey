@@ -258,6 +258,15 @@ def graph_adjacency(marks: np.ndarray) -> np.ndarray:
     return ((np.asarray(marks) != 0) | (np.asarray(marks) != 0).T).astype(np.int8)
 
 
+def without_constant_columns(
+    X: np.ndarray, truth: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """`X` and its true graph without the columns that hold one value, and how many went."""
+    keep = np.flatnonzero((X != X[0]).any(axis=0))
+    dropped = X.shape[1] - keep.size
+    return (X[:, keep], truth[np.ix_(keep, keep)], dropped) if dropped else (X, truth, 0)
+
+
 def score_sets(answer: np.ndarray, truth: np.ndarray, targets: list[int], kind: str) -> dict:
     """A target answer's scores: each target's, and the pool over them."""
     found = sets_of(answer, targets)
@@ -329,9 +338,10 @@ def rescore(out: Path) -> list[dict]:
             continue
         cell = Cell.parse(record["cell"])
         if (record["cell"], record["seed"]) not in truths:
-            truths[record["cell"], record["seed"]] = datasets.generate_one(
-                cell.key(record["seed"])
-            )[1]
+            X, truth = datasets.generate_one(cell.key(record["seed"]))[:2]
+            if record.get("dropped"):
+                truth = without_constant_columns(X, truth)[1]
+            truths[record["cell"], record["seed"]] = truth
         truth = truths[record["cell"], record["seed"]]
         if record["mode"] == "target":
             targets = [int(t) for t in record["sets"]]
@@ -412,6 +422,13 @@ def main(argv: list[str] | None = None) -> int:
         type=parse_max_depth,
         default=None,
         help="largest conditioning set for both sides: none (default) or at least 1",
+    )
+    p.add_argument(
+        "--drop-constant",
+        action="store_true",
+        help="drop the columns of a dataset that hold one value, and the same nodes of its true "
+        "graph, before every fit (a small sample of a skewed network has such columns, which "
+        "Andrey's facade refuses)",
     )
     p.add_argument("--seeds", type=int, default=20, help="datasets per cell (default: 20)")
     p.add_argument("--first-seed", type=int, default=0, help="the first seed (default: 0)")
@@ -512,6 +529,7 @@ def main(argv: list[str] | None = None) -> int:
         "indep_test": {"discrete": args.indep_test, "continuous": CONTINUOUS_TEST},
         "discrete_test": args.discrete_test,
         "sparse_rule": args.discrete_test == "adf",
+        "drop_constant": args.drop_constant,
         "alpha": args.alpha,
         "max_depth": args.max_depth,
         "targets": args.targets,
@@ -545,6 +563,9 @@ def main(argv: list[str] | None = None) -> int:
             for seed in range(args.first_seed, args.first_seed + args.seeds):
                 key = cell.key(seed)
                 X, truth, _, _ = datasets.generate_one(key)
+                dropped = 0
+                if args.drop_constant:
+                    X, truth, dropped = without_constant_columns(X, truth)
                 targets = targets_of(X.shape[1], args.targets, seed)
                 walls: dict[str, list[float]] = {}
                 for structure in structures:
@@ -584,6 +605,7 @@ def main(argv: list[str] | None = None) -> int:
                             "cell": cell.label,
                             "data": cell.kind,
                             "d": int(X.shape[1]),
+                            "dropped": dropped,
                             "n": cell.n,
                             "seed": seed,
                             "dataset": key.digest,
