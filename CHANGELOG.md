@@ -162,6 +162,15 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.cmb`, CMB (Gao and Ji 2015), experimental: the direct causes and direct effects of one
+  target, without learning the whole graph. It learns the target's parents and children and Markov
+  blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
+  labels each neighbor from how its dependence on the others changes once the target is
+  conditioned on, retests an inconclusive pair given one member's blanket, and visits undecided
+  neighbors in turn. `alpha` defaults to 0.02, the level of the paper's runs. `metadata` lists the
+  target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the `blankets_learned`,
+  and `n_tests`. With exact tests every edge and direction it returns is the CPDAG's, and some
+  edges the CPDAG directs stay undirected. ([#PRNUM])
 
 ### Changed
 
@@ -2726,6 +2735,7 @@ First alpha release.
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971

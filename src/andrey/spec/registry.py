@@ -15,7 +15,7 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
+from .concepts import CMB_BLANKETS, CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -798,6 +798,54 @@ _add(
             ),
         ),
         references=("Wang, Zhou, Zhao & Geng 2014", "Meek 1995"),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="cmb",
+        family="constraint",
+        summary="The direct causes and direct effects of one variable by Causal Markov Blanket "
+        "discovery: its parents and children labeled from how their dependence changes once the "
+        "variable is conditioned on, inconclusive pairs retested given a neighbor's blanket, and "
+        "undecided neighbors visited in turn. For one variable of a large graph with small "
+        "blankets.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the edges at target alone, with the directions the tests decide; "
+            "metadata['parents'], metadata['children'], and metadata['undirected'] list the "
+            "columns joined to it, metadata['markov_blanket'] its Markov blanket, and "
+            "metadata['blankets_learned'] the variables whose blanket the fit learned, in order",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            REQUIRED_TARGET,
+            concept_param(
+                "blanket",
+                default="hiton_mb",
+                choices=CMB_BLANKETS,
+                doc="The Markov blanket learner run for each variable CMB visits, one that returns "
+                "the parents and children apart from the spouses: hiton_mb, the learner of Gao & "
+                "Ji 2015's runs, mmmb, or pcmb.",
+            ),
+            concept_param(
+                "alpha",
+                default=0.02,
+                doc="Significance level of the conditional-independence test, in (0, 1). Smaller "
+                "values give smaller sets. Gao & Ji 2015 run CMB at 0.02, the default.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+        ),
+        references=("Gao & Ji 2015", "Meek 1995"),
     )
 )
 
@@ -3480,6 +3528,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
     "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
     "forbidden_paths raise NotImplementedError.",
+    "cmb": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent never shares an edge. At each variable CMB visits, "
+    "the direction a tier, a required edge, or an edge forbidden one way gives an edge is fixed "
+    "before any test, and the tests label the rest from it. required_paths and forbidden_paths "
+    "raise NotImplementedError.",
     "mmb_by_mmb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent never shares an edge. As each local structure joins "
     "the growing graph, a tier or an edge forbidden one way puts an arrowhead at the variable it "
@@ -3776,6 +3829,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "mmmb": ("target", "markov_blanket", "parents_and_children"),
     "pcmb": ("target", "markov_blanket", "parents_and_children"),
     "mb_by_mb": ("target", "parents", "children", "undirected"),
+    "cmb": ("target", "markov_blanket", "parents", "children", "undirected"),
     "mmb_by_mmb": (
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
