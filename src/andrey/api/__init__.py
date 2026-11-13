@@ -16,11 +16,11 @@ from .adjustment import ld3, ldecc, ldp
 from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmmb, mmpc, pcmb
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc, y_structures
 from .continuous import dagma, notears
-from .fcm import cam, camuv, nogam, resit, score_matching
+from .fcm import cam, camuv, nhts, nogam, resit, score_matching
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd
 from .latent import gin
-from .lingam import direct_lingam, ica_lingam, local_isa_ling, multi_group_direct_lingam
+from .lingam import direct_lingam, ica_lingam, lhts, local_isa_ling, multi_group_direct_lingam
 from .local import mb_by_mb, mmb_by_mmb
 from .permutation import boss, boss_fci, grasp, grasp_fci, igsp, ut_igsp
 from .score import ages, calm, exact_search, ges, gies, gnies, hc, tabu, xges
@@ -86,11 +86,13 @@ __all__ = [
     "direct_lingam",
     "ica_lingam",
     "local_isa_ling",
+    "lhts",
     "multi_group_direct_lingam",
     "cam",
     "resit",
     "score_matching",
     "nogam",
+    "nhts",
     # temporal family
     "varma_lingam",
     "longitudinal_lingam",

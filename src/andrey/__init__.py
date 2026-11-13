@@ -55,6 +55,7 @@ from .api import (
     ld3,
     ldecc,
     ldp,
+    lhts,
     local_isa_ling,
     loci,
     longitudinal_lingam,
@@ -65,6 +66,7 @@ from .api import (
     mmmb,
     mmpc,
     multi_group_direct_lingam,
+    nhts,
     nogam,
     notears,
     pc,
@@ -178,10 +180,12 @@ __all__ = [
     "direct_lingam",
     "ica_lingam",
     "local_isa_ling",
+    "lhts",
     "cam",
     "resit",
     "score_matching",
     "nogam",
+    "nhts",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

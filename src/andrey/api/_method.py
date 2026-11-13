@@ -473,7 +473,8 @@ def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, st
         pick = CHOSEN.get(concept)
         if pick is None:
             continue
-        name, columns[concept] = pick(data, arguments.get(param.name), categorical=declared)
+        given = arguments.get(param.name, param.default)
+        name, columns[concept] = pick(data, given, categorical=declared)
         arguments[param.name] = chosen[param.name] = name
     if columns:
         arguments["categorical"] = columns.get("indep_test", columns.get("score_func"))

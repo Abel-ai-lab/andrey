@@ -2344,6 +2344,51 @@ _add(
 )
 _add(
     MethodSpec(
+        name="lhts",
+        family="functional",
+        summary="LHTS for linear models with non-Gaussian noise: the ancestor relation of every "
+        "pair from regressions of the pair on each other after their known common ancestors, its "
+        "layers as a hierarchical causal order, then each variable's parents among earlier "
+        "layers by conditional-independence tests given parents already found. Returns a DAG and "
+        "a causal order. Experimental.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG from edge discovery; ordering lists the layers in turn, and "
+            "metadata['partial_order'] holds the layers.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.05,
+                doc="Significance level of every test: a pair is independent when its p-value is "
+                "above alpha. 0.05 is the value of the paper's experiments.",
+            ),
+            concept_param(
+                "indep_test",
+                default="kci",
+                choices=CONTINUOUS_INDEP_TESTS,
+                nullable=False,
+                doc="Conditional-independence test of edge discovery, a test of continuous data: "
+                "kci = kernel test, the paper's; rcot = its random-feature approximation; "
+                "cmiknn = nearest-neighbor conditional mutual information; gpdc = Gaussian-process "
+                "regression and distance correlation; fisherz, student_t, and normal_scores run on "
+                "the partial correlation, as in pc. The tests of the ancestor relation of a pair "
+                "are the gamma HSIC test whatever this is.",
+            ),
+            _TEST_SEED,
+        ),
+        references=("Hiremath, Maasch, Gao, Ghosal & Gan 2024",),
+    )
+)
+_add(
+    MethodSpec(
         name="multi_group_direct_lingam",
         family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
@@ -2517,6 +2562,51 @@ _add(
             "Li & Turner 2018",
             "Buhlmann, Peters & Ernest 2014",
         ),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="nhts",
+        family="functional",
+        summary="NHTS for nonlinear effects with additive noise: roots from kernel ridge "
+        "regressions on one variable or a few, layers from regressions on the variables already "
+        "placed, then each variable's parents among earlier layers by conditional-independence "
+        "tests given parents already found. Returns a DAG and a causal order. Experimental.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG from edge discovery; ordering lists the layers in turn, and "
+            "metadata['partial_order'] holds the layers.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.05,
+                doc="Significance level of every test: a pair is independent when its p-value is "
+                "above alpha. 0.05 is the value of the paper's experiments.",
+            ),
+            concept_param(
+                "indep_test",
+                default="kci",
+                choices=CONTINUOUS_INDEP_TESTS,
+                nullable=False,
+                doc="Conditional-independence test of the root step's conditional checks and of "
+                "edge discovery, a test of continuous data: kci = kernel test, the paper's; rcot = "
+                "its random-feature approximation; cmiknn = nearest-neighbor conditional mutual "
+                "information; gpdc = Gaussian-process regression and distance correlation; "
+                "fisherz, student_t, and normal_scores run on the partial correlation, as in pc. "
+                "The marginal and residual tests are the gamma HSIC test whatever this is.",
+            ),
+            _TEST_SEED,
+        ),
+        references=("Hiremath, Maasch, Gao, Ghosal & Gan 2024",),
     )
 )
 
@@ -3561,6 +3651,15 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pairs outside the allowed set are in no pruning fit and never in the result; the score "
     "estimate and the residual regressions still read every remaining variable. The pruning never "
     "removes a required edge.",
+    "lhts": "A required edge makes its tail an ancestor of its head before any test, and no "
+    "variable is placed before one that a tier or a required edge puts before it. A required edge "
+    "is in the DAG without a test; forbidden edges, edges into an earlier tier, and pairs outside "
+    "the allowed set are never in it. The tests of the ancestor relation of a pair still read "
+    "every variable.",
+    "nhts": "A variable waits, and is not a root, while a variable that a tier or a required edge "
+    "puts before it is unplaced. A required edge is in the DAG without a test; forbidden edges, "
+    "edges into an earlier tier, and pairs outside the allowed set are never in it. The tests of "
+    "the sort still read every variable.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -3861,6 +3960,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
+    **dict.fromkeys(("lhts", "nhts"), ("partial_order", "forced_decisions")),
     "camuv": ("latent_pairs", "cycle_edges"),
     "local_isa_ling": (
         *("target", "markov_blanket", "parents", "children", "equivalent_models", "subspaces"),

@@ -751,3 +751,166 @@ def local_isa_ling(
         metadata["subspaces"] = [[name(j) for j in space] for space in first.subspaces]
     structure = GraphStructure.from_numpy(directed_marks(weights.T), kind="digraph")
     return structure_output(structure, labels=labels, weighted_adjacency=weights, metadata=metadata)
+
+
+@method_spec("lhts")
+def lhts(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    indep_test: str = "kci",
+    seed: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with LHTS, a layered causal order from pairwise regressions, then edge discovery.
+
+    LHTS [1]_ models the data as linear with independent non-Gaussian noise, ``x = B x + e``. It
+    decides, for each pair of variables, whether one is an ancestor of the other or neither, from
+    regressions of the pair on each other after their known common ancestors are regressed out,
+    and sorts the variables into layers, a variable's layer being the longest directed path from a
+    root to it. Each variable's parents are then found among the earlier layers by
+    conditional-independence tests whose conditioning sets hold only parents already found. It
+    returns a DAG and a causal order consistent with the layers.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a pair is independent when its p-value is
+        above ``alpha``. 0.05 is the value of the paper's experiments.
+    indep_test : str, default="kci"
+        Conditional-independence test of edge discovery, a test of continuous data: ``"kci"``, the
+        kernel test, which is the paper's, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"``, as :func:`~andrey.pc` describes. The tests of the
+        ancestor relation of a pair are the gamma HSIC test whatever this is.
+        ``metadata["indep_test"]`` names the test the fit used.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A required edge makes its tail an
+        ancestor of its head before any test, and no variable is placed before one that a tier or a
+        required edge puts before it. A required edge is in the DAG without a test; forbidden
+        edges, edges into an earlier tier, and pairs outside the allowed set are never in it. The
+        tests of the ancestor relation of a pair still read every variable.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"lhts"``. ``ordering`` lists the layers in turn, each layer's columns in rank order, as a
+        tuple of column indices, causes first. ``metadata["partial_order"]`` holds the layers as
+        lists of column labels (or positions), ``metadata["forced_decisions"]`` the ancestor
+        decisions no test decided, and ``metadata["n_tests"]`` the independence tests the fit
+        computed. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows, or with a constant
+        column, each named in the message. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** LHTS suits i.i.d. continuous observational data from a linear model with
+    independent non-Gaussian noise and no unmeasured common causes, where the DAG is identified
+    [2]_. Besides a causal order it finds pairs of variables with no ancestral relation, so its
+    layers are fewer than the variables, and its edge tests condition only on parents already
+    found. For the most accurate order on such data use :func:`~andrey.direct_lingam`.
+
+    **The steps.** The paper's four stages and its edge discovery [1]_, every test at ``alpha``,
+    each independence test of two variables the gamma HSIC test:
+
+    1. A pair of independent variables has no ancestral relation.
+    2. Each other pair is regressed both ways by least squares: when ``x_i`` is independent of the
+       residual of ``x_j`` on ``x_i`` and ``x_j`` is not independent of the residual of ``x_i`` on
+       ``x_j``, ``x_i`` is an ancestor of ``x_j``.
+    3. In rounds until every pair is decided, each undecided pair is first regressed by least
+       squares on its known common ancestors jointly, and the two residuals take the places of
+       ``x_i`` and ``x_j`` in step 2's test; both directions independent means no ancestral
+       relation.
+    4. The layers: repeatedly, the variables with no ancestor among those left form the next layer
+       (the paper's Algorithm 4).
+    5. Edge discovery: for each variable, from the second layer on, the variables of each earlier
+       layer, nearest first, are candidate parents when ``indep_test`` finds them dependent on it
+       given their own parents and the candidates found in the layers between (the paper's
+       Appendix C.2). Every parent passes this step. Each candidate that shares a layer with
+       another or follows one is then tested again given all the other candidates, which hold
+       every parent; given the parents, a variable before it in the order and not its parent is
+       independent of it (the local Markov property [3]_), so it is dropped.
+
+    The choices the paper leaves open. A round's decisions are applied together after the round,
+    so no pair's answer depends on the order the pairs are visited, and the ancestor relation is
+    kept transitive; a decision that would make a variable its own ancestor is skipped. A round
+    that decides nothing, which exact tests never produce under the model, makes the ancestor
+    decision with the largest p-value that keeps the relation acyclic and counts it in
+    ``metadata["forced_decisions"]``. The columns are centered and divided by their standard
+    deviations before the fit, so rescaling or shifting a column changes no step.
+
+    **Ties.** P-values are compared at 9 significant digits; a tie goes to the column with the
+    lower rank computed from the data, and the fit runs on the columns in that rank order, so the
+    result does not depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the regressions and the tests
+    read every row of every variable, so a row with a missing value has no place in them. Drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** LHTS is not benchmarked yet. Its tests run it on up to 6 variables with 500
+    rows. Its order puts fewer edges in the true direction than :func:`~andrey.direct_lingam`'s on
+    the same data, as its paper reports. A round tests every undecided pair, so the time grows with
+    the cube of ``n_variables``; the kernel test of edge discovery grows with the cube of
+    ``n_samples``. Gaussian noise leaves the order unidentified. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Hiremath, S., Maasch, J. R. M. A., Gao, M., Ghosal, P., and Gan, K. (2024). Hybrid
+       top-down global causal discovery with local search for linear and nonlinear additive noise
+       models. NeurIPS 37.
+    .. [2] Shimizu, S., Hoyer, P. O., Hyvarinen, A., and Kerminen, A. (2006). A linear non-Gaussian
+       acyclic model for causal discovery. Journal of Machine Learning Research 7, 2003-2030.
+    .. [3] Lauritzen, S. L., Dawid, A. P., Larsen, B. N., and Leimer, H.-G. (1990). Independence
+       properties of directed Markov fields. Networks 20(5), 491-505.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import lhts
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.uniform(-1, 1, 300)
+    >>> y = 2 * x + rng.uniform(-1, 1, 300)
+    >>> out = lhts(np.column_stack([x, y]))
+    >>> out.structure.kind, out.metadata["partial_order"]
+    ('dag', [[0], [1]])
+    """
+    from andrey.api.fcm import hierarchical_sort_fit
+
+    return hierarchical_sort_fit(
+        data, "lhts", alpha=alpha, indep_test=indep_test, seed=seed, knowledge=knowledge
+    )

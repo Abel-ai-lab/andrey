@@ -159,8 +159,10 @@ STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_ig
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3", "ldecc"),
+    *("ldp", "ld3", "ldecc", "lhts", "nhts"),
 )
+#: The methods that take a conditional-independence test of continuous data only.
+CONTINUOUS_TESTED = ("jpcmciplus", "lhts", "nhts")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 NO_KNOWLEDGE = (
     *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
@@ -216,6 +218,8 @@ _CONCEPTS = (
             "ld3",
             "ldecc",
             "local_isa_ling",
+            "lhts",
+            "nhts",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -405,6 +409,18 @@ _CONCEPTS = (
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
                 "tests of continuous data.",
             ),
+            *(
+                Deviation(
+                    method=m,
+                    name="indep_test",
+                    default="kci",
+                    choices=CONTINUOUS_INDEP_TESTS,
+                    reason="Its edge discovery runs the kernel test, kci, in the method's "
+                    "published experiments (Hiremath et al. 2024), and it reads continuous data "
+                    "only, so it takes the tests of continuous data.",
+                )
+                for m in ("lhts", "nhts")
+            ),
         ),
     ),
     Concept(
@@ -426,7 +442,7 @@ _CONCEPTS = (
             choices=DEGREES_OF_FREEDOM,
         ),
         fragment="degrees of freedom",
-        suitable=tuple(m for m in TESTED if m != "jpcmciplus"),
+        suitable=tuple(m for m in TESTED if m not in CONTINUOUS_TESTED),
         others_exempt="Takes no categorical conditional-independence test.",
         deviations=(
             Deviation(
@@ -680,6 +696,12 @@ _CONCEPTS = (
                 "lpcmci",
             ),
             *_exempt(
+                "Each edge test conditions on the parents already found, and the paper sets no "
+                "cap on them.",
+                "lhts",
+                "nhts",
+            ),
+            *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
                 *PURE_SCORE,
                 "gnies",
@@ -836,6 +858,12 @@ _CONCEPTS = (
                 "ages",
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
+            *_exempt(
+                "The paper sets no cap: a candidate earlier in the order is a parent when its edge "
+                "tests find it dependent on the variable.",
+                "lhts",
+                "nhts",
+            ),
             *_exempt("Claims ancestors from fixed test patterns; no parent sets.", "y_structures"),
             *_exempt("Labels variables from fixed test patterns; no parent sets.", "ldp", "ld3"),
             *_exempt(
@@ -925,6 +953,8 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "lhts",
+            "nhts",
         ),
         exempt=(
             *_exempt(
@@ -1292,6 +1322,8 @@ _CONCEPTS = (
                 "resit",
                 "score_matching",
                 "nogam",
+                "lhts",
+                "nhts",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1479,12 +1511,12 @@ _CONCEPTS = (
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
                 "does not have; multi_group_direct_lingam takes one dataset per environment.",
-                *("direct_lingam", "ica_lingam", "rcd", "bottom_up_parce_lingam", "gin"),
+                *("direct_lingam", "ica_lingam", "lhts", "rcd", "bottom_up_parce_lingam", "gin"),
             ),
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "nogam", "nhts", "camuv", "anm", "pnl", "loci"),
             ),
         ),
     ),
@@ -1734,6 +1766,8 @@ _CONCEPTS = (
             "ldp",
             "ld3",
             "ldecc",
+            "lhts",
+            "nhts",
         ),
         others_exempt="Does not report its test count.",
     ),

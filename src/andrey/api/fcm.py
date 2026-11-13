@@ -12,6 +12,7 @@ from andrey.api._adapt import (
     column_namer,
     dag_from_adjacency,
     data_matrix,
+    label_of,
     structure_output,
 )
 from andrey.api._marks import marks_from_signed
@@ -1222,3 +1223,226 @@ def camuv(
     latent = [[int(i), int(j)] for i, j in zip(*np.nonzero(np.triu(pairs)), strict=True)]
     metadata = {"latent_pairs": latent, "cycle_edges": cycle_edges}
     return structure_output(structure, labels=labels, metadata=metadata)
+
+
+def hierarchical_sort_fit(
+    data: npt.ArrayLike,
+    sort: str,
+    *,
+    alpha: float,
+    indep_test: str,
+    seed: int | None,
+    knowledge: Knowledge | None,
+) -> StructureOutput:
+    """Fit ``sort`` (``"lhts"`` or ``"nhts"``) and edge discovery; the facade of both methods.
+
+    The fit runs on the columns in rank order (:func:`~andrey.core.ties.tie_ranks`), so the result
+    does not depend on the column order; layers and their members are mapped back to the columns.
+    """
+    from andrey.core.ci import counting_tests, make_indep_test
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.hts import fit_hts, total_order
+
+    X = data_matrix(data, method=sort, min_rows=6)
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method=sort)
+    order = np.argsort(tie_ranks(X), kind="stable")
+    ranked_X = X[:, order]
+    required = forbidden = precedence = None
+    if constraints is not None:
+        ranked = constraints.permuted(order)
+        required, forbidden, precedence = ranked.required, ranked.forbidden, ranked.precedence()
+    with one_blas_thread(), counting_tests() as tests:
+        scaled = (ranked_X - ranked_X.mean(axis=0)) / ranked_X.std(axis=0)
+        ci = make_indep_test(indep_test, scaled, seed=seed)
+        fit = fit_hts(
+            ranked_X,
+            sort,
+            alpha=alpha,
+            ci=ci,
+            required=required,
+            forbidden=forbidden,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    name = label_of(labels)
+    metadata = {
+        "partial_order": [
+            [name(j) for j in sorted(int(order[v]) for v in layer)] for layer in fit.layers
+        ],
+        "forced_decisions": fit.forced,
+        "n_tests": tests.n,
+    }
+    return structure_output(
+        dag_from_adjacency(fit.dag[np.ix_(back, back)]),
+        labels=labels,
+        ordering=order[total_order(fit.layers)],
+        metadata=metadata,
+    )
+
+
+@method_spec("nhts")
+def nhts(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    indep_test: str = "kci",
+    seed: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with NHTS, a layered causal order from local regressions, then edge discovery.
+
+    NHTS [1]_ models each variable as a nonlinear function of its parents plus independent noise,
+    ``x_j = f_j(parents) + e_j``. It sorts the variables into layers, a variable's layer being the
+    longest directed path from a root to it, starting from the roots, which it finds with
+    regressions on one or a few variables; then each variable's parents are found among the
+    earlier layers by conditional-independence tests whose conditioning sets hold only parents
+    already found. It returns a DAG and a causal order consistent with the layers.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a pair is independent when its p-value is
+        above ``alpha``. 0.05 is the value of the paper's experiments.
+    indep_test : str, default="kci"
+        Conditional-independence test of the root step's conditional checks and of edge discovery,
+        a test of continuous data: ``"kci"``, the kernel test, which is the paper's, ``"rcot"``,
+        ``"cmiknn"``, ``"gpdc"``, ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, as
+        :func:`~andrey.pc` describes. The marginal and residual tests are the gamma HSIC test
+        whatever this is. ``metadata["indep_test"]`` names the test the fit used.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable waits, and is not a
+        root, while a variable that a tier or a required edge puts before it is unplaced. A
+        required edge is in the DAG without a test; forbidden edges, edges into an earlier tier,
+        and pairs outside the allowed set are never in it. The tests of the sort still read every
+        variable.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"nhts"``. ``ordering`` lists the layers in turn, each layer's columns in rank order, as a
+        tuple of column indices, causes first. ``metadata["partial_order"]`` holds the layers as
+        lists of column labels (or positions), ``metadata["forced_decisions"]`` the placements no
+        test decided, and ``metadata["n_tests"]`` the independence tests the fit computed.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows, or with a constant
+        column, each named in the message. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** NHTS suits i.i.d. continuous observational data whose effects are nonlinear
+    with additive noise of any distribution and no unmeasured common causes [1]_, a model in which
+    the DAG is identified [2]_. Its regressions have one regressor plus the variables independent of
+    it in the root step, and grow only with the layers found, and its edge tests condition only on
+    parents already found: it suits graphs with few layers.
+
+    **The steps.** The paper's four stages and its edge discovery [1]_, every test at ``alpha``:
+
+    1. Each pair is tested for marginal dependence by the gamma HSIC test; a variable independent
+       of all others is a root with no children.
+    2. ``x_i`` is a parent of a dependent ``x_j`` when ``x_i`` is independent of the residual of a
+       kernel ridge regression of ``x_j`` on ``x_i`` alone, or on ``x_i`` and every variable
+       independent of ``x_i`` and dependent on ``x_j`` (Lemma 4.3).
+    3. A variable with a child from step 2 is a root when it has no parent from step 2 and, for
+       every other such variable ``x_j``, the two are independent, ``x_j`` is its child, or ``x_j``
+       and one of its children are dependent given it by ``indep_test`` (Lemma 4.4).
+    4. Layer by layer, a variable that depends on a placed one joins the next layer when the
+       residual of its kernel ridge regression on all placed variables is independent of each of
+       them by the HSIC test.
+    5. Edge discovery: for each variable, from the second layer on, the variables of each earlier
+       layer, nearest first, are candidate parents when ``indep_test`` finds them dependent on it
+       given their own parents and the candidates found in the layers between (the paper's
+       Appendix C.2). Every parent passes this step. Each candidate that shares a layer with
+       another or follows one is then tested again given all the other candidates, which hold
+       every parent; given the parents, a variable before it in the order and not its parent is
+       independent of it (the local Markov property [3]_), so it is dropped.
+
+    The kernel ridge regressions take the paper's settings: the polynomial kernel ``(<x, y> / q +
+    1)^3`` over ``q`` regressors with ridge term 1 in step 2, and the Gaussian kernel
+    ``exp(-0.01 ||x - y||^2)`` with ridge term 0.1 in step 4, fit and read on all rows. The HSIC
+    tests use Gaussian kernels with the median distance as bandwidth and the gamma approximation.
+
+    The choices the paper leaves open. Step 4 places a variable only if some placed variable
+    depends on it, as every variable outside layer 0 does under the model. A round of step 4 that
+    places none places the variable whose smallest p-value is largest; so does a fit whose step 3
+    finds no root among dependent variables; each such placement is counted in
+    ``metadata["forced_decisions"]``. Under the model and with exact tests none occurs.
+
+    The kernels read the columns' units, which the model does not, so the columns are centered and
+    divided by their standard deviations before the fit: rescaling or shifting a column changes no
+    step.
+
+    **Ties.** P-values are compared at 9 significant digits; a tie goes to the column with the
+    lower rank computed from the data, and the fit runs on the columns in that rank order, so the
+    result does not depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the regressions and the tests
+    read every row of every variable, so a row with a missing value has no place in them. Drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** NHTS is not benchmarked yet. Its tests run it on up to 5 variables with 300
+    rows. Each test of the kernel kind takes time growing with the cube of ``n_samples``, and edge
+    discovery runs one test per pair of layers' members, so fits beyond a few hundred rows or a few
+    tens of variables are slow. Its model has nonlinear effects: on linear data use
+    :func:`~andrey.lhts` or :func:`~andrey.direct_lingam`. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Hiremath, S., Maasch, J. R. M. A., Gao, M., Ghosal, P., and Gan, K. (2024). Hybrid
+       top-down global causal discovery with local search for linear and nonlinear additive noise
+       models. NeurIPS 37.
+    .. [2] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. Journal of Machine Learning Research 15, 2009-2053.
+    .. [3] Lauritzen, S. L., Dawid, A. P., Larsen, B. N., and Leimer, H.-G. (1990). Independence
+       properties of directed Markov fields. Networks 20(5), 491-505.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import nhts
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.uniform(-1, 1, 200)
+    >>> y = (2 * x) ** 2 + 0.3 * rng.uniform(-1, 1, 200)
+    >>> out = nhts(np.column_stack([x, y]))
+    >>> out.structure.kind, out.metadata["partial_order"]
+    ('dag', [[0], [1]])
+    """
+    return hierarchical_sort_fit(
+        data, "nhts", alpha=alpha, indep_test=indep_test, seed=seed, knowledge=knowledge
+    )
