@@ -183,6 +183,14 @@ names its pull request.
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
   pooled F1 is never lower. ([#969])
 
+### Fixed
+
+- The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
+  answers both directions of a pair, the summary reads the record for the treatment and the outcome
+  asked, not the last record of the fit, and a record that says the effect is zero estimates 0
+  instead of adjusting for the sets it lists. `--rescore` recomputes the errors of a stored run.
+  ([#988])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights
@@ -2719,6 +2727,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981

@@ -56,6 +56,7 @@ from andrey_bench.adjustment_lane import (
     TREATMENT_PARAM,
     VARIABLES_PARAM,
     answer_records,
+    error_key,
     oracle_records,
     score_answer,
 )
@@ -437,21 +438,39 @@ def _mean(values: list[float]) -> float:
     return statistics.mean(values) if values else float("nan")
 
 
-def gave_an_answer(record: dict) -> bool:
-    """Whether a fit's records give sets or say the effect is zero, rather than abstain."""
-    return any(a["adjustment_sets"] or a["nonzero"] is False for a in record["answer"])
+def asked_record(fit: dict) -> dict | None:
+    """The answer record of a fit for the treatment and the outcome it asked, ``None`` when the
+    answer has none. A method that does not know the order answers both directions; only this
+    record is the answer to the question."""
+    asked = (fit["treatment"], fit["outcome"])
+    return next((a for a in fit["answer"] if (a["treatment"], a["outcome"]) == asked), None)
+
+
+def asked_error(fit: dict) -> dict | None:
+    """The effect estimate (:func:`andrey_bench.adjustment_lane.effect_estimates`) of the record
+    for the treatment and the outcome a fit asked, ``None`` when that record abstains."""
+    return (fit["scores"]["error"] or {}).get(error_key(fit["treatment"], fit["outcome"]))
+
+
+def gave_an_answer(fit: dict) -> bool:
+    """Whether a fit's record for the pair asked gives sets or says the effect is zero, rather
+    than abstain."""
+    record = asked_record(fit)
+    return record is not None and bool(record["adjustment_sets"] or record["nonzero"] is False)
 
 
 def summarize(records: list[dict]) -> list[dict[str, Any]]:
     """One row per cell and solution: fits, answer rate, how the answers fare, and the effect error.
 
-    ``answered`` is the share of fits that gave sets or said the effect is zero (:func:`gave_an_answer`); ``adj`` counts the
-    adjustment answers (``correct``, ``wrong``, ``incomplete``) of the pairs whose effect is not
-    zero; ``valid`` is the share of returned sets that satisfy the adjustment criterion and ``f1``
-    the mean F1 of a returned set against the optimal set (total effects, no hidden variables).
-    ``error`` is the mean effect error over the fits the solution answered and ``empty`` the
-    unadjusted regression's on the same fits; ``paired`` is their paired comparison
-    (:func:`andrey_bench.pairing.compare`, ``better`` when the solution's error is lower).
+    ``answered`` is the share of fits whose record for the pair asked gave sets or said the effect
+    is zero (:func:`gave_an_answer`); ``adj`` counts the adjustment answers (``correct``,
+    ``wrong``, ``incomplete``) of the pairs whose effect is not zero; ``valid`` is the share of
+    returned sets that satisfy the adjustment criterion and ``f1`` the mean F1 of a returned set
+    against the optimal set (total effects, no hidden variables), over every record the fit gave.
+    ``error`` is the mean effect error of the record for the pair asked (:func:`asked_error`) over
+    the fits that have one, and ``empty`` the unadjusted regression's on the same fits; ``paired``
+    is their paired comparison (:func:`andrey_bench.pairing.compare`, ``better`` when the
+    solution's error is lower).
     """
     from andrey_bench import pairing
 
@@ -459,8 +478,8 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
     by_empty: dict[tuple, float | None] = {}
     for r in records:
         if r["solution"] == AdjustForNothing.name and r["status"] == "ok":
-            errs = [e["error"] for e in (r["scores"]["error"] or {}).values() if e]
-            by_empty[(r["cell"], r["seed"], r["pair"])] = errs[0] if errs else None
+            estimate = asked_error(r)
+            by_empty[(r["cell"], r["seed"], r["pair"])] = estimate["error"] if estimate else None
     for cell in dict.fromkeys(r["cell"] for r in records):
         for name in dict.fromkeys(r["solution"] for r in records if r["cell"] == cell):
             mine = [r for r in records if r["cell"] == cell and r["solution"] == name]
@@ -468,9 +487,8 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
             sets = [s for r in ok for s in r["scores"]["sets"]]
             errors = {}
             for r in ok:
-                for estimate in r["scores"]["error"].values():
-                    if estimate:
-                        errors[(r["seed"], r["pair"])] = estimate["error"]
+                if estimate := asked_error(r):
+                    errors[(r["seed"], r["pair"])] = estimate["error"]
             paired = [
                 (errors[(r["seed"], r["pair"])], by_empty[(cell, r["seed"], r["pair"])])
                 for r in ok
