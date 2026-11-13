@@ -140,6 +140,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyPCAdjustment(),
     AndreyAdjustment("ldp"),
     AndreyAdjustment("ld3"),
+    AndreyAdjustment("snap"),
 ]
 
 
@@ -190,6 +191,7 @@ DEFERRED_MODULES = {
     "andrey.pc.adjustment": "andrey.core.adjustment",
     "andrey.ldp": "andrey.constraint.partition",
     "andrey.ld3": "andrey.constraint.partition",
+    "andrey.snap": "andrey.constraint.snap",
     **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
     "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
     "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",
