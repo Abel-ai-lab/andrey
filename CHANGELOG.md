@@ -170,7 +170,7 @@ names its pull request.
   neighbors in turn. `alpha` defaults to 0.02, the level of the paper's runs. `metadata` lists the
   target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the `blankets_learned`,
   and `n_tests`. With exact tests every edge and direction it returns is the CPDAG's, and some
-  edges the CPDAG directs stay undirected. ([#PRNUM])
+  edges the CPDAG directs stay undirected. ([#995])
 
 ### Changed
 
@@ -2735,7 +2735,7 @@ First alpha release.
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
-[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
+[#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
