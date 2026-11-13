@@ -51,6 +51,9 @@ from andrey.metrics import target_oracle
 
 #: MMB-by-MMB with the stop rules R1 and R2, which stop only once the target's marks are decided.
 MMB_R1_R2 = Rules(local="pc", expand="adjacent", orient="pag", stop="r1_r2")
+#: MMB-by-MMB as its paper states it: every v-structure at the node merged, the stop rules read
+#: after every step.
+MMB_PAPER = Rules(local="pc", expand="adjacent", orient="pag", stop="r1_r3")
 
 
 def _dag(edges, d: int) -> nx.DiGraph:
@@ -139,15 +142,19 @@ def test_the_pag_rules_give_the_true_pag_at_every_target(seed, d, hidden, mediat
         assert np.array_equal(answer, oracle), target
 
 
-def test_r3_stops_at_an_arrowhead_before_the_pag_decides_the_circle():
+def test_r3_stops_at_an_arrowhead_before_the_pag_decides_the_circle_unless_it_waits():
     # The PAG has 1 -> 4: the discriminating path 0 *-> 5 <-* 1, 5 -> 4 decides the circle.
     dag = _dag([(0, 3), (1, 3), (2, 3), (1, 4), (2, 4), (0, 5), (1, 5), (5, 4)], 6)
     assert _pag(dag, 6)[1, 4] == TAIL
-    stopped = sequential(_search(dag), 1, "iamb", MMB_BY_MMB)
+    stopped = sequential(_search(dag), 1, "iamb", MMB_PAPER)
     assert stopped.stopped == "blocked" and stopped.done == [1]
     assert stopped.network.mark(1, 4) == CIRCLE
+    # The target has three neighbors after its own step, so the guard reads R3 after four steps.
+    guarded = sequential(_search(dag), 1, "iamb", MMB_BY_MMB)
+    assert len(guarded.done) == 4
     full = sequential(_search(dag), 1, "iamb", MMB_R1_R2)
-    assert full.network.mark(1, 4) == TAIL and full.network.mark(4, 1) == ARROW
+    for result in (guarded, full):
+        assert np.array_equal(result.network.star(1, 6), _star(_pag(dag, 6), 1))
 
 
 # ---- the papers' examples ------------------------------------------------------------------------
@@ -202,7 +209,7 @@ _XIE = [
 ]  # fmt: skip
 
 
-@pytest.mark.parametrize("rules", [MMB_BY_MMB, MMB_R1_R2], ids=["r1_r3", "r1_r2"])
+@pytest.mark.parametrize("rules", [MMB_PAPER, MMB_R1_R2], ids=["r1_r3", "r1_r2"])
 def test_mmb_by_mmb_walks_example_4(rules):
     dag = _dag([(_V[a], _V[b]) for a, b in _XIE], 12)
     search = _search(dag, list(range(10)))
@@ -339,6 +346,10 @@ def test_the_stop_rules():
 def test_rules_refuse_unknown_choices_and_a_learner_of_parents_and_children():
     with pytest.raises(ValueError, match="stop"):
         Rules(stop="never")
+    with pytest.raises(ValueError, match="colliders"):
+        Rules(colliders="never")
+    with pytest.raises(ValueError, match="stop_after"):
+        Rules(stop_after="degree")
     with pytest.raises(ValueError, match="parents and children"):
         sequential(_search(_dag([(0, 1)], 2)), 0, "mmpc")
 

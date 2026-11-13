@@ -494,8 +494,17 @@ def mmb_by_mmb(
     waitlist [1]_. The search stops at the first of three rules [1]_: every mark at the target's
     edges is decided (R1); the waitlist is empty (R2); every path from the target that begins with
     an edge with a circle meets an arrowhead pointing away from the target before it reaches a
-    waitlist variable (R3). With exact tests, the paper shows the edges at the target and their
-    marks are those of the true PAG [1]_.
+    waitlist variable (R3).
+
+    Where its authors' implementation goes beyond the paper, the method follows it, with two
+    safeguards, each of which makes the answer correct where the paper's steps as written can be
+    wrong. A v-structure at ``x`` joins the growing graph only when the variables off ``x`` confirm
+    it from their own blankets, its far edge present in the far variable's own local structure or
+    its two ends separated there by a set without ``x``, since the local search can keep an edge
+    that only a larger subset of the blanket separates and bring it in through a v-structure. The
+    stop rules are read only once more blankets have been learned than the target has neighbors
+    after its own step, since R3 can stop before a discriminating path decides a circle at the
+    target.
 
     Every choice between candidates of equal strength goes to the column whose rank, computed from
     the data, comes first, as for :func:`~andrey.iamb`, and a pair separated at some size keeps the
@@ -513,19 +522,15 @@ def mmb_by_mmb(
     other tests, or when a continuous column is constant on its rows.
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on every target of random
-    graphs with hidden common causes, and on simulated linear-Gaussian data with hidden nodes. Two
-    of the paper's steps can leave the answer short of the PAG even with exact tests. The stop rule
-    R3 can end the search before a circle at the target is decided: on the graph
-    ``0 -> 3 <- 1 -> 4 <- 2 -> 3``, ``0 -> 5 <- 1``, ``5 -> 4``, the answer at ``1`` keeps
-    ``1 o-> 4`` where the PAG has ``1 -> 4``, and about 4% of the targets of random graphs keep such
-    a circle. The local structures follow PC's search, which tests a pair only against sets of
-    either end's neighbors, so a v-structure can bring in an edge the PAG lacks, between its middle
-    and an end that only a larger set of the blanket separates; this is rare, 2 of 657 targets of
-    random graphs. ``"total_conditioning"`` tests each variable given all the others, so it needs
-    more rows than variables and continuous data with linear effects; on other data, choose another
-    learner. Each local structure tests up to ``local_max_depth`` members per set, and a pair that
-    only a larger set separates keeps its edge. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    graphs with hidden common causes, where the answer holds the PAG's edges with each mark the
+    PAG's or a circle, the PAG's at 654 of 657 targets, and on simulated linear-Gaussian data with
+    hidden nodes. The collider check learns the blanket and local structure of each variable it
+    reads, so a fit runs more tests than the paper's steps alone. ``"total_conditioning"`` tests
+    each variable given all the others, so it needs more rows than variables and continuous data
+    with linear effects; on other data, choose another learner. Each local structure tests up to
+    ``local_max_depth`` members per set, and a pair that only a larger set separates keeps its
+    edge. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
