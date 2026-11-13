@@ -270,7 +270,9 @@ _CONCEPTS = (
                 method="mmb_by_mmb",
                 name="alpha",
                 default=0.01,
-                reason="Xie et al. 2024 state no level; 0.01 is the level of their code.",
+                reason="Xie et al. 2024 state no level; 0.01 is the level of their code, whose "
+                "total-conditioning blanket learner tests at alpha / (10 floor(d / 10)) over d "
+                "columns, alpha itself below 10 columns, as mmb_by_mmb does.",
             ),
             Deviation(
                 method="pcmb",

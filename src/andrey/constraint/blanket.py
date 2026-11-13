@@ -1124,8 +1124,8 @@ def _iamb_forward(search: LocalSearch, target: int, sepsets: Sepsets) -> list[in
 
 def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     """``target``'s Markov blanket by total conditioning (TC) [1]_: every other variable that the
-    test finds dependent on ``target`` given all the rest, from the strongest dependence to the
-    weakest (:meth:`LocalSearch.by_strength`), ties by rank.
+    test finds dependent on ``target`` given all the rest at the level ``search.total_alpha``, from
+    the strongest dependence to the weakest (:meth:`LocalSearch.by_strength`), ties by rank.
 
     Under faithfulness these are exactly the blanket's members: the variables outside the blanket
     are independent of ``target`` given the blanket, and each member is dependent given the rest
@@ -1155,7 +1155,7 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
         for x in others:
             rest = [z for z in range(search.d) if z not in (target, x)]
             strength, pvalue = search.scan(target, [x], rest)
-            if pvalue[0] <= search.alpha:
+            if pvalue[0] <= search.total_alpha:
                 dependent.append(x)
                 strengths.append(strength[0])
             else:
@@ -1224,7 +1224,9 @@ class LocalSearch:
 
     ``test`` answers every query of every run; ``ranks`` orders candidates whose strengths agree
     (:func:`~andrey.core.ties.tie_ranks`); ``alpha``, ``max_depth``, and ``constraints`` are as
-    for :func:`markov_blanket` and :func:`parents_children`. ``levels`` holds each column's number
+    for :func:`markov_blanket` and :func:`parents_children`. ``total_alpha`` is the level of the
+    ``"total_conditioning"`` learner's tests, ``alpha`` when ``None``; every other test runs at
+    ``alpha``. ``levels`` holds each column's number
     of categories, ``0`` for a column the test reads as continuous, or is ``None`` when it reads
     none as categories, and ``n`` is the number of rows: what :func:`table_size` and a learner's
     sparse-table rule read. A run, and the spouses :meth:`local` finds, are kept for the life of
@@ -1250,11 +1252,13 @@ class LocalSearch:
         levels: np.ndarray | None = None,
         n: int = 0,
         trace: bool = False,
+        total_alpha: float | None = None,
     ) -> None:
         self.test = test
         self.ranks = ranks
         self.d = len(ranks)
         self.alpha = alpha
+        self.total_alpha = alpha if total_alpha is None else total_alpha
         self.max_depth = max_depth
         self.constraints = constraints
         self.levels = levels
@@ -1610,17 +1614,19 @@ def local_search(
     constraints: Constraints | None = None,
     trace: bool = False,
     ranked: bool = True,
+    total_alpha: float | None = None,
 ) -> LocalSearch:
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
     ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes the draws
     of a stochastic test (``None`` uses ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a
-    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``max_depth``, and
-    ``constraints`` are as :class:`LocalSearch` takes them, and ``trace`` keeps the distinct queries
-    in its ``counts``. A column the test reads as categories (:func:`~andrey.core.ties.tie_mask`)
-    has as many levels as distinct observed values. With ``ranked=False``, the ranks are the column
-    positions and ``andrey.config.tie_break`` is not read: for a caller that asks the tests only
-    through :meth:`~LocalSearch.scan` and never picks between tied candidates.
+    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``total_alpha``,
+    ``max_depth``, and ``constraints`` are as :class:`LocalSearch` takes them, and ``trace`` keeps
+    the distinct queries in its ``counts``. A column the test reads as categories
+    (:func:`~andrey.core.ties.tie_mask`) has as many levels as distinct observed values. With
+    ``ranked=False``, the ranks are the column positions and ``andrey.config.tie_break`` is not
+    read: for a caller that asks the tests only through :meth:`~LocalSearch.scan` and never picks
+    between tied candidates.
     """
     if ranked:
         test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
@@ -1644,6 +1650,7 @@ def local_search(
         levels=levels,
         n=X.shape[0],
         trace=trace,
+        total_alpha=total_alpha,
     )
 
 
