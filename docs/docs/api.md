@@ -102,25 +102,25 @@ single column gives a one-node graph.
 % concept: missing
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`,
 `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`, `y_structures`, `ldp`, `ld3`, `ldecc`,
-`local_optimal_adjustment`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a `NaN` cell,
-pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each conditional-independence test
-reads only the rows where all of its variables are observed (test-wise deletion), and so do the pair
-tests `anm`, `pnl`, and `loci`, which read the rows where both columns are observed;
-`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read. Their argument
-`missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the default, picks the
-method's default handling, `"testwise"`; `metadata["missing"]` records the one a fit used. `pc` also
-takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness
-indicator and tests again the edges they could have kept. `ges`, `xges`, `hc`, `tabu`,
-`exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose fits read the data only
-through their covariance, refuse missing values under `None` and take `missing="em"`: structural EM
-runs the search on the expected covariance of the data 10 times, refitting a linear-Gaussian model
-of each graph it returns, with 5 parameter-only EM steps on that graph before the next search
-(Friedman's alternating scheme). `metadata["em"]` records the rounds, the observed-data
-log-likelihood after each, and whether each changed the graph; a fit whose last round changed it
-logs a warning. A row that observes no value is dropped first. It takes `score_func="bic"` only and
-no `env`, and it assumes values missing completely at random or at random given observed values.
-`missing="mvpc"` is supported, and so is `missing="em"` in `ges`, `hc`, `tabu`, `boss`, `grasp`, and
-`notears`: in the [missing-data
+`local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a
+`NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
+conditional-independence test reads only the rows where all of its variables are observed (test-wise
+deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where both columns
+are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read.
+Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
+default, picks the method's default handling, `"testwise"`; `metadata["missing"]` records the one a
+fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of
+each missingness indicator and tests again the edges they could have kept. `ges`, `xges`, `hc`,
+`tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose fits read the data
+only through their covariance, refuse missing values under `None` and take `missing="em"`:
+structural EM runs the search on the expected covariance of the data 10 times, refitting a
+linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that graph before
+the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds, the
+observed-data log-likelihood after each, and whether each changed the graph; a fit whose last round
+changed it logs a warning. A row that observes no value is dropped first. It takes
+`score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
+random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
+`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
 comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
@@ -140,10 +140,10 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `ldecc`,
-`local_optimal_adjustment`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices:
-`"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for
-categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests
-`"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
+`local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` take the same
+`indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data,
+`"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and
+the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
 dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
@@ -156,21 +156,22 @@ reports only p-values is ordered by its p-value, smallest first.
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `ldecc`,
-`local_optimal_adjustment`, `pcmci`, `pcmciplus`, and `lpcmci` take `degrees_of_freedom`, the
-degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`: `"mean"`, the default, is the
-mean of the statistic when `y` is shuffled within each configuration of the conditioning set, and
-`"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of `x` and `y` present in
-it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The two differ
-only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its paper runs. Only `"chisq"` and
-`"gsq"` read it, so passing `degrees_of_freedom` with another test raises a `ValueError`.
+`local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` take
+`degrees_of_freedom`, the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`:
+`"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
+of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
+values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
+Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
+paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
+raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`, `ges`,
-`gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
+`locpc_cde`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+`igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`,
+`nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
 parameter says how it honors them. Every required edge is in the result, whatever its weight, test,
@@ -274,12 +275,12 @@ in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite
 % concept: max_depth
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
-`mmhc`, `rsmax2`, `ldecc`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and `camuv` take `max_depth`,
-the maximum conditioning-set size of their conditional-independence tests; `None`, the default, sets
-no cap, except in `hiton_pc` and `hiton_mb`, whose default 3 is the cap of their paper's
-Markov-blanket experiments; a spouse test of `hiton_mb`, `mmmb`, and `pcmb` conditions on the common
-child as well. `mb_by_mb` and `mmb_by_mmb` also take `local_max_depth`, a cap on their local
-structures' tests alone: 5 by default for `mb_by_mb`, the cap of its paper's runs, and 10 for
+`mmhc`, `rsmax2`, `ldecc`, `locpc_cde`, `pcmci`, `pcmciplus`, `jpcmciplus`, `rcd`, and `camuv` take
+`max_depth`, the maximum conditioning-set size of their conditional-independence tests; `None`, the
+default, sets no cap, except in `hiton_pc` and `hiton_mb`, whose default 3 is the cap of their
+paper's Markov-blanket experiments; a spouse test of `hiton_mb`, `mmmb`, and `pcmb` conditions on
+the common child as well. `mb_by_mb` and `mmb_by_mmb` also take `local_max_depth`, a cap on their
+local structures' tests alone: 5 by default for `mb_by_mb`, the cap of its paper's runs, and 10 for
 `mmb_by_mmb`, the cap of its authors' code. `mmhc` and `rsmax2` cap their restrict phase and
 `pcmci`, `pcmciplus`, and `jpcmciplus` their PC1 step; the blankets of `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mb_by_mb`, and `mmb_by_mmb` stop growing at the cap, and the blanket of `ldecc` at
@@ -347,17 +348,17 @@ tests then orient can put more arrowheads at a node.
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
-`mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `pcmci`,
-`pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and
-`ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`,
-the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so
-a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the
-variables in a random order on every fit, the methods that test independence draw random numbers
-only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data
-with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only
-with `n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
-that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
-seed.
+`mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
+`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
+random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
+phase visits the variables in a random order on every fit, the methods that test independence draw
+random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with
+`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1, and
+`hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
+other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -737,6 +738,7 @@ in a process.
    ld3
    ldecc
    local_optimal_adjustment
+   locpc_cde
    local_isa_ling
 ```
 
@@ -801,6 +803,15 @@ the total effect when it is identifiable, and the parent sets of the treatment t
 one estimate each, when it is not. The graph holds only the edges at the two variables, and
 `metadata["blankets_learned"]` lists the variables whose blanket it learned, in order. It is
 experimental until its comparison with the authors' code is published.
+
+LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the graph
+around the outcome one hop at a time with PC's tests, run only near the outcome, until every edge at
+the outcome is oriented, so that the outcome's parents are a valid adjustment set for the controlled
+direct effect, or until a larger hop adds no variable. It stops at once when the treatment is not
+adjacent to the outcome or is its child. `metadata["effects"]` holds the answer with the paper's
+reason, the graph is the local essential graph it learned, and `metadata["hop"]`,
+`metadata["visited"]`, and `metadata["double_bar"]` describe the search. It is experimental until
+its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

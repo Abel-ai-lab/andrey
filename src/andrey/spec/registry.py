@@ -1162,6 +1162,48 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="locpc_cde",
+        family="constraint",
+        summary="Local PC-style discovery for the controlled direct effect: learns the graph "
+        "around an outcome one hop at a time with PC's tests, run only near the outcome, until "
+        "every edge at the outcome is oriented, so that its parents are a valid adjustment set, "
+        "or a larger hop adds no variable. Returns the local essential graph; the answer is in "
+        "metadata['effects'].",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="the local essential graph of the outcome at the last hop learned; "
+            "metadata['effects'] holds the pair's record: whether the effect is identifiable, "
+            "the outcome's other parents as its set, and the paper's reason; metadata['hop'], "
+            "metadata['visited'], and metadata['double_bar'] describe the search",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _TREATMENT,
+            _OUTCOME,
+            concept_param(
+                "alpha",
+                default=0.05,
+                doc="Significance level of every test: a p-value above alpha is an independence, "
+                "any other a dependence. The default is the level of the paper's experiments and "
+                "of the authors' code.",
+            ),
+            _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
+            _CATEGORICAL,
+            _TEST_SEED,
+            concept_param("max_depth"),
+        ),
+        references=("Loranchet & Assaad 2026", "Meek 1995"),
+    )
+)
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(
@@ -3639,6 +3681,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "forbidden one way directs is directed as each local structure joins the growing graph, over "
     "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
     "forbidden_paths raise NotImplementedError.",
+    "locpc_cde": "A required edge is joined and never tested; a pair the knowledge makes "
+    "non-adjacent never shares an edge. Every edge a tier or an edge "
+    "forbidden one way directs is directed before the colliders, and Meek's rules R1-R4 follow. "
+    "A variable a tier or a required edge places before another is not its descendant, so their "
+    "edge is not tested again when the later one is visited. required_paths and forbidden_paths "
+    "raise NotImplementedError.",
     "cmb": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent never shares an edge. At each variable CMB visits, "
     "the direction a tier, a required edge, or an edge forbidden one way gives an edge is fixed "
@@ -3945,6 +3993,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
     ),
     **dict.fromkeys(("ldp", "ld3"), ("partition",)),
+    "locpc_cde": ("hop", "visited", "double_bar"),
     **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")

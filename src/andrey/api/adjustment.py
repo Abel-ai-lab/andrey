@@ -4,8 +4,10 @@ Each method answers for one ordered pair of columns, a treatment and an outcome:
 record in ``metadata["effects"]`` (:mod:`andrey.core.effects`) with the adjustment sets it found,
 next to the graph its paper licenses. ``ldp`` finds a valid adjustment set for the total effect;
 ``ld3`` finds the parents of the outcome and whether the treatment is one of them; ``ldecc`` finds
-the edges at the treatment and its locally valid parent sets; ``local_optimal_adjustment``
-finds, for two variables, which one causes the other and the optimal adjustment set.
+the edges at the treatment and its locally valid parent sets; ``local_optimal_adjustment`` finds,
+for two variables, which one causes the other and the optimal adjustment set; ``locpc_cde`` decides
+whether the controlled direct effect is identifiable and finds the outcome's parents from a graph it
+learns around the outcome.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+    from andrey.core.knowledge import Knowledge
 
 
 def _fit(
@@ -1059,4 +1062,296 @@ def local_optimal_adjustment(
     }
     return structure_output(
         to_structure(result.marks, kind="cpdag"), labels=labels, metadata=metadata
+    )
+
+
+@method_spec("locpc_cde")
+def locpc_cde(
+    data: npt.ArrayLike,
+    *,
+    treatment: str | int | None = None,
+    outcome: str | int | None = None,
+    alpha: float = 0.05,
+    indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
+    categorical: Sequence[str | int] | None = None,
+    missing: str | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Find whether a direct effect is identifiable, and the outcome's parents (LocPC-CDE).
+
+    LocPC-CDE learns the graph around the outcome one hop at a time with PC's tests, run only at
+    the variables near the outcome, until every edge at the outcome is oriented, so that its
+    parents are known and are a valid adjustment set for the controlled direct effect, or until a
+    larger hop adds no variable, so that an edge at the outcome left unoriented stays so [1]_. It
+    stops at once when the treatment is not adjacent to the outcome or is its child: the direct
+    effect is then zero.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    treatment : str or int
+        Required: the cause of the pair, a column label (a string) or a 0-based position (an
+        integer).
+    outcome : str or int
+        Required: the effect of the pair, a column label (a string) or a 0-based position (an
+        integer).
+    alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a p-value above ``alpha`` is an
+        independence, any other a dependence. The default is the level of the paper's experiments
+        and of the authors' code [1]_.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`. The
+        paper's runs use Fisher-Z on linear-Gaussian data and the likelihood-ratio test,
+        ``"gsq"``, on binary data [1]_. ``metadata["indep_test"]`` names the test the fit used:
+        the one picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``;
+        ``None``, the default, sets no limit, as the paper's runs do.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A required edge is joined and
+        never tested; a pair the knowledge makes non-adjacent, forbidden both ways or outside
+        ``allowed``, never shares an edge. Every edge a tier or an edge forbidden one way directs
+        is directed before the colliders, and Meek's rules, R4 included, direct the edges that
+        follow. A variable the knowledge places before another, by a tier or a required edge, is
+        not its descendant, so their edge is not tested again when the later one is visited
+        [1]_. ``required_paths`` and ``forbidden_paths`` raise ``NotImplementedError``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column, the local
+        essential graph of the outcome at the last hop learned: the edges at every variable the
+        tests visited, directed where those tests decide. An edge between two variables within
+        the hop of the outcome is an adjacency of the true graph; an edge from one of them to a
+        variable farther out may join a descendant that no set of the inner variable's neighbors
+        separates; an absent edge between two variables outside the hop means nothing.
+        ``metadata["effects"]`` holds one record (:mod:`andrey.core.effects`) for the pair, by
+        column label or 0-based position, with ``estimand`` ``"direct"`` and the paper's verdict in
+        ``reason``: ``"not adjacent"`` or ``"treatment is a child"``, where ``nonzero`` is
+        ``False``; ``"oriented"``, where every edge at the outcome is directed, ``identifiable``
+        is ``True``, ``nonzero`` says whether the treatment is a parent, and ``adjustment_sets``
+        is ``[parents]``, the outcome's other parents, with ``set_kind``
+        ``"parents_of_outcome"``; or ``"not orientable"``, where ``identifiable`` is ``False``
+        and ``nonzero`` is ``True`` when the treatment's edge into the outcome is directed, else
+        ``None``. After an early stop with a zero effect, ``identifiable`` and the set are as for
+        ``"oriented"`` when every edge at the outcome is directed, else ``None`` and ``[]``.
+        ``metadata["hop"]`` is the last hop learned, ``metadata["visited"]`` lists the variables
+        whose tests ran, in order, the outcome first, and ``metadata["double_bar"]`` lists the
+        undirected edges ``[inner, outer]`` the no-non-collider rule marks. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
+        evaluated; a query answered again from a kept answer is not a new test.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is neither a column label nor a position, ``categorical`` is not a list of column names and
+        positions, or ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
+        is missing or names a column ``data`` lacks, or both name one column; or if ``data`` or
+        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+    NotImplementedError
+        If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
+        methods that honor them.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
+
+    Notes
+    -----
+    **When to use.** LocPC-CDE suits i.i.d. observational data with no unmeasured common causes,
+    when you want to know whether the controlled direct effect of one variable on another can be
+    estimated, the effect with every other parent of the outcome held fixed, and which variables to
+    adjust for, without learning the whole graph. Its claim [1]_: when every independence the tests
+    near the outcome read follows from the graph (local faithfulness) and the tests are exact, the
+    effect is identifiable exactly when the CPDAG directs every edge at the outcome, and then the
+    outcome's parents are a valid adjustment set; an edge at the outcome that the graph learned
+    around it directs is directed so in the CPDAG, so an identifiable effect is often found without
+    learning the whole graph. The default Fisher-Z test assumes continuous data with linear effects
+    and Gaussian noise; the other tests read categorical or mixed data or detect nonlinear effects,
+    as :func:`~andrey.pc` describes. Regressing the outcome on the treatment and the set estimates
+    the effect in a linear model. For the whole CPDAG, use :func:`~andrey.pc`.
+
+    **How it works.** LocPC [1]_ (Algorithm 1) learns the graph around the outcome at hop ``h``.
+    It joins the outcome to every other variable and runs PC's levels over it: at size ``s``,
+    the outcome is tested against each neighbor given each size-``s`` subset of its neighbors at
+    the start of the level, and the edge goes at the first set that separates them. The next
+    round does the same for the outcome's neighbors, then for theirs, ``h + 1`` rounds in all; a
+    variable visited again is tested again with its new neighbors, which removes an edge to a
+    descendant that the first round could not separate. The colliders among the variables
+    within ``h`` edges of the outcome are oriented, by the most clearly separated pair first,
+    Meek's rules [2]_ run among them, and an undirected edge from an inner variable to an outer
+    one is double-bar when no outer variable needs the outer end to be separated from the inner
+    one. LocPC-CDE (Algorithm 2) runs LocPC at hop 0, 1, 2, ..., keeping every separating set
+    and test result for the next hop, while the treatment is adjacent to the outcome and not its
+    child and some edge at the outcome is undirected or double-bar, and stops when the hop adds
+    no variable. Variables, neighbors, and conditioning sets are visited in the order of
+    :func:`~andrey.core.ties.tie_ranks`, so the answer does not depend on the column order.
+
+    **When it stops.** Algorithm 2 of [1]_ also stops after a hop when the variables that undirected
+    and double-bar edges join to the outcome within the hop have no undirected edge leaving them and
+    at most one double-bar edge each leaving them (the non-orientability criterion), which its
+    Theorem 13 states makes the effect not identifiable. Andrey leaves this stop out and grows the
+    hop until every edge at the outcome is oriented or the hop adds no variable, the strategy that
+    Section 6 of [1]_ describes before the criterion. With exact tests, on the pairs ``x -> y`` of
+    300 random graphs of 6 to 15 variables, the stop ended 23 of 3,091 searches for an identifiable
+    direct effect while an edge at the outcome was undirected: a double-bar edge from a variable
+    near the outcome to one farther out was directed into the nearer one, by a collider with another
+    variable near the outcome, once the hop reached the farther one. Without it, every verdict on
+    those graphs is the CPDAG's.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample of their own. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+
+    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and the
+    paper's figures, and on simulated linear-Gaussian data. Without the paper's early stop (see
+    **When it stops.**), a non-identifiable effect is searched until a hop adds no variable: with
+    exact tests the mean hop of a search rose from 1.41 to 1.79 on random graphs of 6 to 15
+    variables and from 1.46 to 2.16 on graphs of 20 to 30. An unmeasured common cause breaks the
+    claim. With 5,000 rows a fit ran about 40 to 250 tests on the paper's random 10-node graphs, and
+    on its 50-node graphs about 200 to 2,000 for an identifiable effect and 300 to 5,000 for one
+    that is not, each in under a second. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Loranchet, T., and Assaad, C. K. (2026). Local Markov equivalence for PC-style local
+       causal discovery and identification of controlled direct effects. Proceedings of the Fifth
+       Conference on Causal Learning and Reasoning, PMLR 323, 84-118.
+    .. [2] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
+       Proceedings of the Eleventh Conference on Uncertainty in Artificial Intelligence, 403-410.
+    .. [3] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [4] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import locpc_cde
+    >>> rng = np.random.default_rng(0)
+    >>> a, b, c = rng.standard_normal((3, 5000))
+    >>> x = a + rng.standard_normal(5000)
+    >>> y = x + b + rng.standard_normal(5000)
+    >>> df = pd.DataFrame({"a": a, "b": b, "c": c, "x": x, "y": y})
+    >>> record = locpc_cde(df, treatment="x", outcome="y").metadata["effects"][0]
+    >>> record["identifiable"], record["nonzero"], record["adjustment_sets"]
+    (True, True, [['b']])
+    """
+    from andrey.api._local import pair_columns
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.locpc import locpc_cde as locpc_cde_engine
+    from andrey.core.ci import counting_tests
+    from andrey.core.effects import effect_record
+    from andrey.core.orient import to_structure
+
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method="locpc_cde", missing=True
+    )
+    d = X.shape[1]
+    x, y = pair_columns(treatment, outcome, labels, d, "locpc_cde")
+    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+        search = local_search(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
+            categorical=mask,
+            seed=seed,
+            max_depth=max_depth,
+            constraints=constraints,
+        )
+        with search.pinned():
+            answer = locpc_cde_engine(search, x, y)
+    graph = answer.graph
+    parents = graph.parents(y)
+    oriented = not graph.non_arrow(y)
+    if answer.reason in ("not adjacent", "treatment is a child"):
+        nonzero = False
+    elif x in parents:
+        nonzero = True
+    else:
+        nonzero = None
+    if answer.reason == "not orientable":
+        identifiable = False
+    else:
+        identifiable = True if oriented else None
+    name = label_of(labels)
+    record = effect_record(
+        x,
+        y,
+        estimand="direct",
+        nonzero=nonzero,
+        identifiable=identifiable,
+        adjustment_sets=[[v for v in parents if v != x]] if identifiable else [],
+        set_kind="parents_of_outcome" if identifiable else None,
+        name=name,
+        reason=answer.reason,
+    )
+    metadata = {
+        "effects": [record],
+        "hop": answer.hop,
+        "visited": [name(v) for v in graph.visited],
+        "double_bar": [[name(a), name(b)] for a, b in sorted(graph.double_bar)],
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        "n_tests": tests.n,
+    }
+    return structure_output(
+        to_structure(graph.marks, kind="cpdag"), labels=labels, metadata=metadata
     )

@@ -1,0 +1,23 @@
+# Python 3.12, installed with uv pip install (start_ciphod.sh): the packages pyCIPHOD's
+# requirements.txt names (networkx, numpy, pandas, scikit-learn, matplotlib, seaborn) and SciPy,
+# which the code imports and that file omits, each resolved once and pinned with their dependencies.
+cloudpickle==3.1.2
+contourpy==1.4.0
+cycler==0.12.1
+fonttools==4.68.0
+joblib==1.6.0
+kiwisolver==1.5.1
+matplotlib==3.11.2
+narwhals==2.28.0
+networkx==3.7
+numpy==2.5.4
+packaging==26.3
+pandas==3.1.1
+pillow==13.0.0
+pyparsing==3.3.3
+python-dateutil==4.0.0
+scikit-learn==1.9.1
+scipy==1.18.1
+seaborn==0.13.2
+threadpoolctl==3.8.0
+tzdata==2026.6
