@@ -202,7 +202,7 @@ def cell(comp: Comparison, cell: str, a: dict, b: dict, first: range, fresh: ran
     pairs = _pairs(a, b, first)
     row: dict = {"method": comp.method, "against": comp.against, "judged": comp.judged}
     some = next(iter(a.values()))
-    row.update(cell=cell, n=some["n"], d=some["d"] + some.get("dropped", 0))
+    row.update(cell=cell, n=some["n"], d=some["d"])
     datasets = {s for (_, s), r in a.items() if s in first}
     ok_a = {s for (_, s), r in a.items() if s in first and r["status"] == "ok"}
     ok_b = {s for (_, s), r in b.items() if s in first and r["status"] == "ok"}

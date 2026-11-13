@@ -15,7 +15,7 @@
  "error_metric": "set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
  "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored",
  "seeds_note": "every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
- "cells_note": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value dropped with their nodes; gauss:<d>:<rows>[:<mean degree>]: linear-Gaussian Erdos-Renyi graph, standardized, mean degree 2 unless given",
+ "cells_note": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network; gauss:<d>:<rows>[:<mean degree>]: linear-Gaussian Erdos-Renyi graph, standardized, mean degree 2 unless given",
  "bootstrap": {
   "resamples": 10000,
   "interval": "percentile 95%",
@@ -2169,14 +2169,14 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.2765,
+     "mean_D": -0.2752,
      "bootstrap_95": [
-      -0.3063,
-      -0.247
+      -0.3045,
+      -0.2462
      ],
      "verdict": "better",
-     "andrey_mean": 0.8274,
-     "other_mean": 1.1039,
+     "andrey_mean": 0.8283,
+     "other_mean": 1.1035,
      "D_by_seed": {
       "0": -0.2804,
       "1": -0.1641,
@@ -2188,28 +2188,28 @@
       "7": -0.1652,
       "8": -0.2828,
       "9": -0.3297,
-      "10": -0.371,
-      "11": -0.4195,
+      "10": -0.3656,
+      "11": -0.413,
       "12": -0.1735,
       "13": -0.2781,
       "14": -0.2361,
       "15": -0.2851,
-      "16": -0.2428,
+      "16": -0.2388,
       "17": -0.304,
-      "18": -0.3244,
-      "19": -0.2632
+      "18": -0.3191,
+      "19": -0.2592
      }
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.1899,
+     "mean_D": 0.189,
      "bootstrap_95": [
-      0.1695,
-      0.2108
+      0.1688,
+      0.2095
      ],
      "verdict": "better",
-     "andrey_mean": 0.3837,
-     "other_mean": 0.1938,
+     "andrey_mean": 0.3821,
+     "other_mean": 0.1931,
      "D_by_seed": {
       "0": 0.1963,
       "1": 0.1244,
@@ -2221,16 +2221,16 @@
       "7": 0.1131,
       "8": 0.1894,
       "9": 0.2229,
-      "10": 0.2667,
-      "11": 0.2882,
+      "10": 0.2627,
+      "11": 0.2837,
       "12": 0.1146,
       "13": 0.19,
       "14": 0.1523,
       "15": 0.1914,
-      "16": 0.1656,
+      "16": 0.1628,
       "17": 0.1967,
-      "18": 0.227,
-      "19": 0.1792
+      "18": 0.2232,
+      "19": 0.1764
      }
     },
     "same_sets": 0.0
@@ -2239,19 +2239,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 1.0924,
+     "mean": 1.0886,
      "bootstrap_95": [
-      1.0065,
-      1.178
+      1.0029,
+      1.1736
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 2.6301,
+     "mean": 2.62,
      "bootstrap_95": [
-      2.4682,
-      2.7932
+      2.46,
+      2.7793
      ],
      "pass": false
     }
@@ -2261,11 +2261,11 @@
    "result": "better",
    "andrey_tests_per_target": 206.4,
    "andrey_s": 7.808,
-   "andrey_errors_mean": 5.6086,
+   "andrey_errors_mean": 5.6029,
    "other_tests_per_target": 144.1,
    "other_s": 0.5737,
-   "other_errors_mean": 7.1462,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 7.1343,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "gs",
@@ -2529,29 +2529,29 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.5751,
+     "mean_D": -0.5652,
      "bootstrap_95": [
-      -0.6162,
-      -0.5332
+      -0.6071,
+      -0.5231
      ],
      "verdict": "better",
-     "andrey_mean": 0.4566,
-     "other_mean": 1.0317,
+     "andrey_mean": 0.4661,
+     "other_mean": 1.0313,
      "D_by_seed": {
       "0": -0.6323,
       "1": -0.5866,
       "2": -0.4259,
       "3": -0.4485,
       "4": -0.4871,
-      "5": -0.6203,
+      "5": -0.5367,
       "6": -0.5243,
       "7": -0.5175,
-      "8": -0.6502,
+      "8": -0.5678,
       "9": -0.7152,
       "10": -0.5605,
       "11": -0.7189,
       "12": -0.6416,
-      "13": -0.4237,
+      "13": -0.392,
       "14": -0.495,
       "15": -0.6455,
       "16": -0.6671,
@@ -2562,29 +2562,29 @@
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.4354,
+     "mean_D": 0.4285,
      "bootstrap_95": [
-      0.4044,
-      0.465
+      0.3974,
+      0.4586
      ],
      "verdict": "better",
-     "andrey_mean": 0.6841,
-     "other_mean": 0.2486,
+     "andrey_mean": 0.6755,
+     "other_mean": 0.247,
      "D_by_seed": {
       "0": 0.4784,
       "1": 0.4589,
       "2": 0.3185,
       "3": 0.3377,
       "4": 0.3749,
-      "5": 0.4647,
+      "5": 0.4045,
       "6": 0.4038,
       "7": 0.4121,
-      "8": 0.4873,
+      "8": 0.4299,
       "9": 0.5366,
       "10": 0.4285,
       "11": 0.5409,
       "12": 0.4793,
-      "13": 0.3166,
+      "13": 0.2949,
       "14": 0.3829,
       "15": 0.4838,
       "16": 0.4941,
@@ -2599,19 +2599,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -2.3387,
+     "mean": -2.337,
      "bootstrap_95": [
-      -2.3996,
-      -2.275
+      -2.3944,
+      -2.2778
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 0.7663,
+     "mean": 0.7556,
      "bootstrap_95": [
-      0.5702,
-      0.9591
+      0.5593,
+      0.9519
      ],
      "pass": false
     }
@@ -2621,11 +2621,11 @@
    "result": "better",
    "andrey_tests_per_target": 66.3,
    "andrey_s": 1.4596,
-   "andrey_errors_mean": 2.7841,
+   "andrey_errors_mean": 2.8481,
    "other_tests_per_target": 39.3,
    "other_s": 0.1277,
-   "other_errors_mean": 5.8891,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 5.9407,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "gs",
@@ -3345,25 +3345,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0172,
+     "mean_D": -0.017,
      "bootstrap_95": [
-      -0.0454,
-      0.0127
+      -0.045,
+      0.0129
      ],
      "verdict": "tie",
-     "andrey_mean": 0.8274,
-     "other_mean": 0.8446
+     "andrey_mean": 0.8283,
+     "other_mean": 0.8453
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0062,
+     "mean_D": 0.006,
      "bootstrap_95": [
-      -0.0164,
-      0.0277
+      -0.0165,
+      0.0274
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3837,
-     "other_mean": 0.3776
+     "andrey_mean": 0.3821,
+     "other_mean": 0.3761
     },
     "same_sets": 0.0
    },
@@ -3371,19 +3371,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 1.0924,
+     "mean": 1.0886,
      "bootstrap_95": [
-      1.0065,
-      1.178
+      1.0029,
+      1.1736
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 0.2676,
+     "mean": 0.2664,
      "bootstrap_95": [
-      0.1702,
-      0.3609
+      0.1693,
+      0.3593
      ],
      "pass": false
     }
@@ -3393,11 +3393,11 @@
    "result": "tie",
    "andrey_tests_per_target": 206.4,
    "andrey_s": 7.808,
-   "andrey_errors_mean": 5.6086,
+   "andrey_errors_mean": 5.6029,
    "other_tests_per_target": 140.9,
    "other_s": 0.5373,
-   "other_errors_mean": 4.7838,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 4.7807,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "gs",
@@ -3573,25 +3573,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.3116,
+     "mean_D": -0.309,
      "bootstrap_95": [
-      -0.3514,
-      -0.2674
+      -0.3486,
+      -0.266
      ],
      "verdict": "better",
-     "andrey_mean": 0.4566,
-     "other_mean": 0.7681
+     "andrey_mean": 0.4661,
+     "other_mean": 0.7751
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.2595,
+     "mean_D": 0.2583,
      "bootstrap_95": [
       0.2259,
-      0.2898
+      0.2883
      ],
      "verdict": "better",
-     "andrey_mean": 0.6841,
-     "other_mean": 0.4246
+     "andrey_mean": 0.6755,
+     "other_mean": 0.4172
     },
     "same_sets": 0.0
    },
@@ -3599,19 +3599,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -2.3387,
+     "mean": -2.337,
      "bootstrap_95": [
-      -2.3996,
-      -2.275
+      -2.3944,
+      -2.2778
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.9602,
+     "mean": -0.9574,
      "bootstrap_95": [
-      -1.0891,
-      -0.8377
+      -1.0834,
+      -0.8352
      ],
      "pass": true
     }
@@ -3621,11 +3621,11 @@
    "result": "better",
    "andrey_tests_per_target": 66.3,
    "andrey_s": 1.4596,
-   "andrey_errors_mean": 2.7841,
+   "andrey_errors_mean": 2.8481,
    "other_tests_per_target": 45.6,
    "other_s": 0.1558,
-   "other_errors_mean": 4.1626,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 4.2278,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "gs",
@@ -5015,25 +5015,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0014,
+     "mean_D": -0.0015,
      "bootstrap_95": [
       -0.0095,
       0.0073
      ],
      "verdict": "tie",
-     "andrey_mean": 0.8274,
-     "other_mean": 0.8288
+     "andrey_mean": 0.8283,
+     "other_mean": 0.8297
     },
     "f1": {
      "paired": 20,
      "mean_D": 0.0003,
      "bootstrap_95": [
-      -0.0061,
+      -0.006,
       0.0063
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3837,
-     "other_mean": 0.3834
+     "andrey_mean": 0.3821,
+     "other_mean": 0.3818
     },
     "same_sets": 0.0
    },
@@ -5041,19 +5041,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 1.0924,
+     "mean": 1.0886,
      "bootstrap_95": [
-      1.0065,
-      1.178
+      1.0029,
+      1.1736
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 1.2062,
+     "mean": 1.2021,
      "bootstrap_95": [
-      1.1096,
-      1.3003
+      1.105,
+      1.2964
      ],
      "pass": false
     }
@@ -5063,11 +5063,11 @@
    "result": "tie",
    "andrey_tests_per_target": 206.4,
    "andrey_s": 7.808,
-   "andrey_errors_mean": 5.6086,
+   "andrey_errors_mean": 5.6029,
    "other_tests_per_target": 426.3,
    "other_s": 3.0462,
-   "other_errors_mean": 5.7223,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 5.7164,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "gs",
@@ -5243,25 +5243,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.007,
+     "mean_D": 0.0053,
      "bootstrap_95": [
-      -0.0053,
-      0.0182
+      -0.0067,
+      0.0162
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4566,
-     "other_mean": 0.4496
+     "andrey_mean": 0.4661,
+     "other_mean": 0.4608
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0047,
+     "mean_D": -0.0034,
      "bootstrap_95": [
-      -0.0128,
-      0.0042
+      -0.0112,
+      0.0053
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6841,
-     "other_mean": 0.6888
+     "andrey_mean": 0.6755,
+     "other_mean": 0.6789
     },
     "same_sets": 0.0
    },
@@ -5269,19 +5269,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -2.3387,
+     "mean": -2.337,
      "bootstrap_95": [
-      -2.3996,
-      -2.275
+      -2.3944,
+      -2.2778
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -2.3897,
+     "mean": -2.3759,
      "bootstrap_95": [
-      -2.4755,
-      -2.3005
+      -2.4611,
+      -2.2889
      ],
      "pass": true
     }
@@ -5291,11 +5291,11 @@
    "result": "tie",
    "andrey_tests_per_target": 66.3,
    "andrey_s": 1.4596,
-   "andrey_errors_mean": 2.7841,
+   "andrey_errors_mean": 2.8481,
    "other_tests_per_target": 119.3,
    "other_s": 1.0314,
-   "other_errors_mean": 2.7331,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 2.8093,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "gs",
@@ -7568,11 +7568,11 @@
      "mean_D": -0.0343,
      "bootstrap_95": [
       -0.0431,
-      -0.0259
+      -0.0258
      ],
      "verdict": "better",
-     "andrey_mean": 0.8383,
-     "other_mean": 0.8726,
+     "andrey_mean": 0.8391,
+     "other_mean": 0.8733,
      "D_by_seed": {
       "0": -0.0212,
       "1": -0.033,
@@ -7584,28 +7584,28 @@
       "7": -0.034,
       "8": -0.0223,
       "9": -0.0228,
-      "10": -0.0149,
-      "11": -0.0201,
+      "10": -0.0147,
+      "11": -0.0204,
       "12": -0.0509,
       "13": -0.0641,
       "14": -0.0182,
       "15": -0.0562,
-      "16": -0.008,
+      "16": -0.0076,
       "17": -0.0282,
-      "18": -0.004,
-      "19": -0.0629
+      "18": -0.0038,
+      "19": -0.0622
      }
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0331,
+     "mean_D": 0.033,
      "bootstrap_95": [
-      0.0267,
-      0.0397
+      0.0266,
+      0.0396
      ],
      "verdict": "better",
-     "andrey_mean": 0.3802,
-     "other_mean": 0.347,
+     "andrey_mean": 0.3786,
+     "other_mean": 0.3456,
      "D_by_seed": {
       "0": 0.0262,
       "1": 0.04,
@@ -7617,16 +7617,16 @@
       "7": 0.0412,
       "8": 0.0212,
       "9": 0.0276,
-      "10": 0.0277,
+      "10": 0.0273,
       "11": 0.0237,
       "12": 0.0442,
       "13": 0.0554,
       "14": 0.0132,
       "15": 0.0495,
-      "16": 0.0155,
+      "16": 0.0151,
       "17": 0.0239,
-      "18": 0.0107,
-      "19": 0.0503
+      "18": 0.0104,
+      "19": 0.0496
      }
     },
     "same_sets": 0.0
@@ -7635,19 +7635,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 0.8597,
+     "mean": 0.8564,
      "bootstrap_95": [
-      0.7818,
-      0.9348
+      0.7793,
+      0.9307
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 1.4801,
+     "mean": 1.475,
      "bootstrap_95": [
-      1.4097,
-      1.5496
+      1.4036,
+      1.545
      ],
      "pass": false
     }
@@ -7657,11 +7657,11 @@
    "result": "better",
    "andrey_tests_per_target": 256.4,
    "andrey_s": 3.0421,
-   "andrey_errors_mean": 5.3758,
+   "andrey_errors_mean": 5.3707,
    "other_tests_per_target": 220.6,
    "other_s": 0.4752,
-   "other_errors_mean": 5.9963,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 5.9893,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "fast_iamb",
@@ -7925,29 +7925,29 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0184,
+     "mean_D": -0.0182,
      "bootstrap_95": [
-      -0.0342,
-      -0.0038
+      -0.0338,
+      -0.0037
      ],
      "verdict": "better",
-     "andrey_mean": 0.5711,
-     "other_mean": 0.5895,
+     "andrey_mean": 0.5794,
+     "other_mean": 0.5975,
      "D_by_seed": {
       "0": -0.0244,
       "1": -0.0692,
       "2": 0.0235,
       "3": -0.027,
       "4": -0.0484,
-      "5": 0.0275,
+      "5": 0.0242,
       "6": -0.0686,
       "7": 0.0197,
-      "8": -0.0172,
+      "8": -0.0102,
       "9": -0.0303,
       "10": 0.0172,
       "11": 0.0146,
       "12": -0.0918,
-      "13": -0.0261,
+      "13": -0.0252,
       "14": 0.0164,
       "15": -0.0564,
       "16": -0.035,
@@ -7958,29 +7958,29 @@
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0143,
+     "mean_D": 0.0141,
      "bootstrap_95": [
-      0.0032,
-      0.0263
+      0.0031,
+      0.0262
      ],
      "verdict": "better",
-     "andrey_mean": 0.5873,
-     "other_mean": 0.573,
+     "andrey_mean": 0.5793,
+     "other_mean": 0.5651,
      "D_by_seed": {
       "0": 0.0157,
       "1": 0.0599,
       "2": -0.0178,
       "3": 0.0189,
       "4": 0.0296,
-      "5": -0.0236,
+      "5": -0.0223,
       "6": 0.0486,
       "7": -0.0008,
-      "8": 0.0092,
+      "8": 0.0054,
       "9": 0.031,
       "10": -0.0134,
       "11": -0.0144,
       "12": 0.0717,
-      "13": 0.0192,
+      "13": 0.0185,
       "14": -0.0147,
       "15": 0.0414,
       "16": 0.0257,
@@ -7995,19 +7995,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.748,
+     "mean": -1.7463,
      "bootstrap_95": [
-      -1.8152,
-      -1.6771
+      -1.8148,
+      -1.6741
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.6123,
+     "mean": -1.6111,
      "bootstrap_95": [
       -1.6778,
-      -1.5491
+      -1.5481
      ],
      "pass": true
     }
@@ -8017,11 +8017,11 @@
    "result": "better",
    "andrey_tests_per_target": 55.6,
    "andrey_s": 0.8208,
-   "andrey_errors_mean": 3.3748,
+   "andrey_errors_mean": 3.4389,
    "other_tests_per_target": 56.5,
    "other_s": 0.1338,
-   "other_errors_mean": 3.5105,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 3.5741,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "fast_iamb",
@@ -8743,23 +8743,23 @@
      "paired": 20,
      "mean_D": -0.0047,
      "bootstrap_95": [
-      -0.0187,
+      -0.0186,
       0.0088
      ],
      "verdict": "tie",
-     "andrey_mean": 0.8383,
-     "other_mean": 0.843
+     "andrey_mean": 0.8391,
+     "other_mean": 0.8438
     },
     "f1": {
      "paired": 20,
      "mean_D": -0.0023,
      "bootstrap_95": [
-      -0.0125,
+      -0.0124,
       0.0086
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3802,
-     "other_mean": 0.3824
+     "andrey_mean": 0.3786,
+     "other_mean": 0.3809
     },
     "same_sets": 0.0
    },
@@ -8767,19 +8767,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 0.8597,
+     "mean": 0.8564,
      "bootstrap_95": [
-      0.7818,
-      0.9348
+      0.7793,
+      0.9307
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 0.2701,
+     "mean": 0.2693,
      "bootstrap_95": [
-      0.189,
-      0.347
+      0.1886,
+      0.3457
      ],
      "pass": false
     }
@@ -8789,11 +8789,11 @@
    "result": "tie",
    "andrey_tests_per_target": 256.4,
    "andrey_s": 3.0421,
-   "andrey_errors_mean": 5.3758,
+   "andrey_errors_mean": 5.3707,
    "other_tests_per_target": 276.2,
    "other_s": 0.4754,
-   "other_errors_mean": 4.7863,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 4.7836,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "fast_iamb",
@@ -8969,25 +8969,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0709,
+     "mean_D": -0.0739,
      "bootstrap_95": [
-      -0.0936,
-      -0.0481
+      -0.0953,
+      -0.0524
      ],
      "verdict": "better",
-     "andrey_mean": 0.5711,
-     "other_mean": 0.642
+     "andrey_mean": 0.5794,
+     "other_mean": 0.6533
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0599,
+     "mean_D": 0.062,
      "bootstrap_95": [
-      0.0434,
-      0.0764
+      0.0463,
+      0.0776
      ],
      "verdict": "better",
-     "andrey_mean": 0.5873,
-     "other_mean": 0.5274
+     "andrey_mean": 0.5793,
+     "other_mean": 0.5173
     },
     "same_sets": 0.0
    },
@@ -8995,19 +8995,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.748,
+     "mean": -1.7463,
      "bootstrap_95": [
-      -1.8152,
-      -1.6771
+      -1.8148,
+      -1.6741
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.5495,
+     "mean": -1.5407,
      "bootstrap_95": [
-      -1.6047,
-      -1.4919
+      -1.5963,
+      -1.4833
      ],
      "pass": true
     }
@@ -9017,11 +9017,11 @@
    "result": "better",
    "andrey_tests_per_target": 55.6,
    "andrey_s": 0.8208,
-   "andrey_errors_mean": 3.3748,
+   "andrey_errors_mean": 3.4389,
    "other_tests_per_target": 61.1,
    "other_s": 0.1364,
-   "other_errors_mean": 3.5733,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 3.6444,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "fast_iamb",
@@ -10411,25 +10411,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0094,
+     "mean_D": 0.0093,
      "bootstrap_95": [
       -0.0035,
-      0.0236
+      0.0233
      ],
      "verdict": "tie",
-     "andrey_mean": 0.8383,
-     "other_mean": 0.8288
+     "andrey_mean": 0.8391,
+     "other_mean": 0.8297
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0033,
+     "mean_D": -0.0032,
      "bootstrap_95": [
-      -0.0128,
+      -0.0126,
       0.0057
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3802,
-     "other_mean": 0.3834
+     "andrey_mean": 0.3786,
+     "other_mean": 0.3818
     },
     "same_sets": 0.0
    },
@@ -10437,19 +10437,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 0.8597,
+     "mean": 0.8564,
      "bootstrap_95": [
-      0.7818,
-      0.9348
+      0.7793,
+      0.9307
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 1.2062,
+     "mean": 1.2021,
      "bootstrap_95": [
-      1.1096,
-      1.3003
+      1.105,
+      1.2964
      ],
      "pass": false
     }
@@ -10459,11 +10459,11 @@
    "result": "tie",
    "andrey_tests_per_target": 256.4,
    "andrey_s": 3.0421,
-   "andrey_errors_mean": 5.3758,
+   "andrey_errors_mean": 5.3707,
    "other_tests_per_target": 426.3,
    "other_s": 3.0462,
-   "other_errors_mean": 5.7223,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 5.7164,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "fast_iamb",
@@ -10639,25 +10639,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.1215,
+     "mean_D": 0.1185,
      "bootstrap_95": [
-      0.1005,
-      0.1437
+      0.0976,
+      0.1399
      ],
      "verdict": "worse",
-     "andrey_mean": 0.5711,
-     "other_mean": 0.4496
+     "andrey_mean": 0.5794,
+     "other_mean": 0.4608
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.1015,
+     "mean_D": -0.0996,
      "bootstrap_95": [
-      -0.1177,
-      -0.0858
+      -0.1157,
+      -0.084
      ],
      "verdict": "worse",
-     "andrey_mean": 0.5873,
-     "other_mean": 0.6888
+     "andrey_mean": 0.5793,
+     "other_mean": 0.6789
     },
     "same_sets": 0.0
    },
@@ -10665,19 +10665,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.748,
+     "mean": -1.7463,
      "bootstrap_95": [
-      -1.8152,
-      -1.6771
+      -1.8148,
+      -1.6741
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -2.3897,
+     "mean": -2.3759,
      "bootstrap_95": [
-      -2.4755,
-      -2.3005
+      -2.4611,
+      -2.2889
      ],
      "pass": true
     }
@@ -10687,11 +10687,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 55.6,
    "andrey_s": 0.8208,
-   "andrey_errors_mean": 3.3748,
+   "andrey_errors_mean": 3.4389,
    "other_tests_per_target": 119.3,
    "other_s": 1.0314,
-   "other_errors_mean": 2.7331,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 2.8093,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "fast_iamb",
@@ -12081,25 +12081,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0143,
+     "mean_D": 0.0142,
      "bootstrap_95": [
       0.0002,
-      0.0282
+      0.028
      ],
      "verdict": "worse",
-     "andrey_mean": 0.8383,
-     "other_mean": 0.824
+     "andrey_mean": 0.8391,
+     "other_mean": 0.8249
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0065,
+     "mean_D": -0.0064,
      "bootstrap_95": [
-      -0.0157,
+      -0.0156,
       0.0029
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3802,
-     "other_mean": 0.3866
+     "andrey_mean": 0.3786,
+     "other_mean": 0.385
     },
     "same_sets": 0.0
    },
@@ -12107,19 +12107,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": 0.8597,
+     "mean": 0.8564,
      "bootstrap_95": [
-      0.7818,
-      0.9348
+      0.7793,
+      0.9307
      ],
      "pass": false
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": 1.2019,
+     "mean": 1.1979,
      "bootstrap_95": [
-      1.0982,
-      1.3105
+      1.0936,
+      1.3071
      ],
      "pass": false
     }
@@ -12129,11 +12129,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 256.4,
    "andrey_s": 3.0421,
-   "andrey_errors_mean": 5.3758,
+   "andrey_errors_mean": 5.3707,
    "other_tests_per_target": 441.1,
    "other_s": 3.702,
-   "other_errors_mean": 5.718,
-   "empty_errors_mean": 4.5161
+   "other_errors_mean": 5.7121,
+   "empty_errors_mean": 4.5143
   },
   {
    "method": "fast_iamb",
@@ -12309,25 +12309,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.12,
+     "mean_D": 0.117,
      "bootstrap_95": [
-      0.0994,
-      0.1422
+      0.0964,
+      0.1385
      ],
      "verdict": "worse",
-     "andrey_mean": 0.5711,
-     "other_mean": 0.4512
+     "andrey_mean": 0.5794,
+     "other_mean": 0.4624
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.1006,
+     "mean_D": -0.0988,
      "bootstrap_95": [
-      -0.117,
-      -0.0853
+      -0.1149,
+      -0.0835
      ],
      "verdict": "worse",
-     "andrey_mean": 0.5873,
-     "other_mean": 0.6879
+     "andrey_mean": 0.5793,
+     "other_mean": 0.678
     },
     "same_sets": 0.0
    },
@@ -12335,19 +12335,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.748,
+     "mean": -1.7463,
      "bootstrap_95": [
-      -1.8152,
-      -1.6771
+      -1.8148,
+      -1.6741
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -2.3842,
+     "mean": -2.3704,
      "bootstrap_95": [
-      -2.4628,
-      -2.3028
+      -2.4463,
+      -2.2926
      ],
      "pass": true
     }
@@ -12357,11 +12357,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 55.6,
    "andrey_s": 0.8208,
-   "andrey_errors_mean": 3.3748,
+   "andrey_errors_mean": 3.4389,
    "other_tests_per_target": 125.4,
    "other_s": 1.1418,
-   "other_errors_mean": 2.7386,
-   "empty_errors_mean": 5.1228
+   "other_errors_mean": 2.8148,
+   "empty_errors_mean": 5.1852
   },
   {
    "method": "fast_iamb",
@@ -13497,19 +13497,19 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1872,
+     "mean_D": -0.1854,
      "bootstrap_95": [
-      -0.2135,
-      -0.1618
+      -0.2112,
+      -0.1603
      ],
      "verdict": "better",
-     "andrey_mean": 0.4587,
-     "other_mean": 0.6459,
+     "andrey_mean": 0.4629,
+     "other_mean": 0.6483,
      "D_by_seed": {
       "0": -0.2323,
       "1": -0.1095,
       "2": -0.2446,
-      "3": -0.1994,
+      "3": -0.1775,
       "4": -0.1231,
       "5": -0.0952,
       "6": -0.1798,
@@ -13521,7 +13521,7 @@
       "12": -0.1848,
       "13": -0.1521,
       "14": -0.2221,
-      "15": -0.271,
+      "15": -0.2564,
       "16": -0.2651,
       "17": -0.1457,
       "18": -0.2112,
@@ -13530,19 +13530,19 @@
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.187,
+     "mean_D": 0.1859,
      "bootstrap_95": [
-      0.1648,
-      0.2097
+      0.1639,
+      0.2084
      ],
      "verdict": "better",
-     "andrey_mean": 0.6445,
-     "other_mean": 0.4574,
+     "andrey_mean": 0.6402,
+     "other_mean": 0.4543,
      "D_by_seed": {
       "0": 0.2201,
       "1": 0.1219,
       "2": 0.2545,
-      "3": 0.1916,
+      "3": 0.1813,
       "4": 0.1359,
       "5": 0.106,
       "6": 0.1893,
@@ -13554,7 +13554,7 @@
       "12": 0.1877,
       "13": 0.1653,
       "14": 0.2231,
-      "15": 0.227,
+      "15": 0.2148,
       "16": 0.241,
       "17": 0.1311,
       "18": 0.2182,
@@ -13567,19 +13567,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.7363,
+     "mean": -0.7324,
      "bootstrap_95": [
-      -0.7905,
-      -0.6839
+      -0.7865,
+      -0.6784
      ],
      "pass": true
     }
@@ -13589,11 +13589,11 @@
    "result": "better",
    "andrey_tests_per_target": 292.4,
    "andrey_s": 2.6723,
-   "andrey_errors_mean": 1.9724,
+   "andrey_errors_mean": 1.9757,
    "other_tests_per_target": 144.3,
    "other_s": 0.2533,
-   "other_errors_mean": 1.753,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.7541,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc",
@@ -14217,68 +14217,68 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0261,
+     "mean_D": -0.0257,
      "bootstrap_95": [
-      -0.042,
-      -0.0099
+      -0.0412,
+      -0.0097
      ],
      "verdict": "better",
-     "andrey_mean": 0.9285,
-     "other_mean": 0.9546,
+     "andrey_mean": 0.9299,
+     "other_mean": 0.9556,
      "D_by_seed": {
-      "0": -0.0413,
+      "0": -0.0407,
       "1": 0.008,
-      "2": -0.1009,
+      "2": -0.0968,
       "3": -0.0296,
-      "4": -0.015,
+      "4": -0.0147,
       "5": -0.0777,
-      "6": -0.0259,
-      "7": -0.0166,
-      "8": 0.0719,
-      "9": -0.0242,
-      "10": -0.0292,
-      "11": -0.0204,
+      "6": -0.025,
+      "7": -0.0164,
+      "8": 0.0703,
+      "9": -0.0235,
+      "10": -0.0287,
+      "11": -0.0199,
       "12": -0.0384,
       "13": 0.0076,
-      "14": -0.0602,
+      "14": -0.0584,
       "15": -0.0655,
-      "16": -0.0475,
-      "17": 0.0233,
-      "18": -0.0286,
-      "19": -0.0122
+      "16": -0.0468,
+      "17": 0.0227,
+      "18": -0.0278,
+      "19": -0.0128
      }
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.013,
+     "mean_D": 0.0127,
      "bootstrap_95": [
       0.0013,
-      0.0235
+      0.0229
      ],
      "verdict": "better",
-     "andrey_mean": 0.2546,
-     "other_mean": 0.2416,
+     "andrey_mean": 0.2501,
+     "other_mean": 0.2374,
      "D_by_seed": {
-      "0": 0.0298,
+      "0": 0.0293,
       "1": -0.029,
-      "2": 0.0552,
+      "2": 0.0519,
       "3": 0.0204,
-      "4": 0.0141,
+      "4": 0.0137,
       "5": 0.0223,
-      "6": 0.0093,
+      "6": 0.0086,
       "7": 0.0021,
-      "8": -0.0458,
-      "9": 0.0394,
-      "10": 0.0242,
-      "11": 0.0131,
+      "8": -0.0447,
+      "9": 0.0383,
+      "10": 0.0237,
+      "11": 0.0127,
       "12": 0.0378,
       "13": 0.0087,
-      "14": 0.031,
+      "14": 0.0301,
       "15": 0.0259,
-      "16": 0.0258,
-      "17": -0.0394,
-      "18": 0.0221,
-      "19": -0.0077
+      "16": 0.0255,
+      "17": -0.0383,
+      "18": 0.0215,
+      "19": -0.0063
      }
     },
     "same_sets": 0.0
@@ -14287,19 +14287,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.0154,
+     "mean": -0.0157,
      "bootstrap_95": [
-      -0.0857,
-      0.0559
+      -0.0843,
+      0.0543
      ],
      "pass": false
     }
@@ -14309,11 +14309,11 @@
    "result": "better",
    "andrey_tests_per_target": 235.5,
    "andrey_s": 2.5032,
-   "andrey_errors_mean": 3.3502,
+   "andrey_errors_mean": 3.36,
    "other_tests_per_target": 253.8,
    "other_s": 0.6985,
-   "other_errors_mean": 3.4911,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.4986,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -14337,68 +14337,68 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.019,
+     "mean_D": -0.0189,
      "bootstrap_95": [
       -0.0298,
       -0.0084
      ],
      "verdict": "better",
-     "andrey_mean": 0.7982,
-     "other_mean": 0.8172,
+     "andrey_mean": 0.8004,
+     "other_mean": 0.8193,
      "D_by_seed": {
       "0": 0.0075,
       "1": -0.0545,
-      "2": -0.0126,
+      "2": -0.0124,
       "3": -0.0719,
-      "4": -0.0503,
+      "4": -0.0495,
       "5": 0.0074,
-      "6": -0.0056,
+      "6": -0.0055,
       "7": -0.0309,
       "8": -0.0079,
       "9": 0.0095,
-      "10": -0.0263,
-      "11": -0.0349,
+      "10": -0.0264,
+      "11": -0.0344,
       "12": -0.0148,
       "13": -0.0123,
       "14": -0.0232,
       "15": -0.0508,
-      "16": 0.0324,
-      "17": -0.0002,
-      "18": -0.0122,
-      "19": -0.0275
+      "16": 0.0319,
+      "17": -0.0008,
+      "18": -0.0125,
+      "19": -0.0267
      }
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0119,
+     "mean_D": 0.0118,
      "bootstrap_95": [
       0.0049,
       0.0188
      ],
      "verdict": "better",
-     "andrey_mean": 0.3613,
-     "other_mean": 0.3495,
+     "andrey_mean": 0.3578,
+     "other_mean": 0.346,
      "D_by_seed": {
       "0": -0.013,
       "1": 0.0274,
-      "2": 0.0038,
+      "2": 0.0037,
       "3": 0.0354,
-      "4": 0.0289,
+      "4": 0.0284,
       "5": 0.0102,
-      "6": -0.0074,
+      "6": -0.0072,
       "7": 0.0268,
       "8": 0.0201,
       "9": -0.0145,
-      "10": 0.0072,
-      "11": 0.0353,
+      "10": 0.0073,
+      "11": 0.0348,
       "12": 0.014,
       "13": -0.0076,
       "14": 0.022,
       "15": 0.0293,
-      "16": -0.0077,
-      "17": -0.0023,
+      "16": -0.0076,
+      "17": -0.0019,
       "18": 0.0109,
-      "19": 0.0183
+      "19": 0.0178
      }
     },
     "same_sets": 0.0
@@ -14407,19 +14407,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5372,
+     "mean": -0.5329,
      "bootstrap_95": [
-      -0.5884,
-      -0.4855
+      -0.5829,
+      -0.4814
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.4321,
+     "mean": -0.4286,
      "bootstrap_95": [
-      -0.489,
-      -0.3745
+      -0.4857,
+      -0.3714
      ],
      "pass": true
     }
@@ -14429,11 +14429,11 @@
    "result": "better",
    "andrey_tests_per_target": 319.6,
    "andrey_s": 3.8878,
-   "andrey_errors_mean": 2.9732,
+   "andrey_errors_mean": 2.9814,
    "other_tests_per_target": 323.5,
    "other_s": 0.8351,
-   "other_errors_mean": 3.0783,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 3.0857,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -14577,68 +14577,68 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1874,
+     "mean_D": -0.1815,
      "bootstrap_95": [
-      -0.2018,
-      -0.1726
+      -0.1949,
+      -0.1676
      ],
      "verdict": "better",
-     "andrey_mean": 0.5907,
-     "other_mean": 0.778,
+     "andrey_mean": 0.6133,
+     "other_mean": 0.7948,
      "D_by_seed": {
       "0": -0.1436,
-      "1": -0.1959,
-      "2": -0.2011,
+      "1": -0.1886,
+      "2": -0.1955,
       "3": -0.1833,
-      "4": -0.2104,
-      "5": -0.1998,
-      "6": -0.1935,
+      "4": -0.2026,
+      "5": -0.1895,
+      "6": -0.1851,
       "7": -0.1863,
-      "8": -0.22,
-      "9": -0.1738,
-      "10": -0.2002,
-      "11": -0.1272,
-      "12": -0.167,
-      "13": -0.2235,
-      "14": -0.2144,
-      "15": -0.1516,
+      "8": -0.2048,
+      "9": -0.1701,
+      "10": -0.1895,
+      "11": -0.1241,
+      "12": -0.1659,
+      "13": -0.2118,
+      "14": -0.2114,
+      "15": -0.1453,
       "16": -0.2374,
-      "17": -0.1707,
-      "18": -0.2325,
-      "19": -0.1155
+      "17": -0.1634,
+      "18": -0.2192,
+      "19": -0.1118
      }
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.2298,
+     "mean_D": 0.2227,
      "bootstrap_95": [
-      0.2131,
-      0.2467
+      0.2069,
+      0.2388
      ],
      "verdict": "better",
-     "andrey_mean": 0.5699,
-     "other_mean": 0.3401,
+     "andrey_mean": 0.5437,
+     "other_mean": 0.321,
      "D_by_seed": {
       "0": 0.1664,
-      "1": 0.2505,
-      "2": 0.2273,
+      "1": 0.2414,
+      "2": 0.2205,
       "3": 0.1965,
-      "4": 0.2396,
-      "5": 0.2349,
-      "6": 0.232,
+      "4": 0.2283,
+      "5": 0.2217,
+      "6": 0.2214,
       "7": 0.2419,
-      "8": 0.2524,
-      "9": 0.2209,
-      "10": 0.2567,
-      "11": 0.1652,
-      "12": 0.2114,
-      "13": 0.2558,
-      "14": 0.2751,
-      "15": 0.1956,
+      "8": 0.2381,
+      "9": 0.2167,
+      "10": 0.2429,
+      "11": 0.1595,
+      "12": 0.2073,
+      "13": 0.2434,
+      "14": 0.2706,
+      "15": 0.1897,
       "16": 0.2971,
-      "17": 0.2117,
-      "18": 0.2975,
-      "19": 0.1675
+      "17": 0.2068,
+      "18": 0.2812,
+      "19": 0.1625
      }
     },
     "same_sets": 0.0
@@ -14647,19 +14647,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.7715,
+     "mean": -0.7481,
      "bootstrap_95": [
-      -0.8239,
-      -0.7164
+      -0.7963,
+      -0.6963
      ],
      "pass": true
     }
@@ -14669,11 +14669,11 @@
    "result": "better",
    "andrey_tests_per_target": 281.1,
    "andrey_s": 2.0135,
-   "andrey_errors_mean": 3.1967,
+   "andrey_errors_mean": 3.3407,
    "other_tests_per_target": 125.2,
    "other_s": 0.181,
-   "other_errors_mean": 2.9527,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 3.1037,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -14697,29 +14697,29 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1964,
+     "mean_D": -0.1951,
      "bootstrap_95": [
-      -0.2137,
-      -0.1795
+      -0.2112,
+      -0.1791
      ],
      "verdict": "better",
-     "andrey_mean": 0.4739,
-     "other_mean": 0.6703,
+     "andrey_mean": 0.4885,
+     "other_mean": 0.6836,
      "D_by_seed": {
       "0": -0.1354,
       "1": -0.1535,
-      "2": -0.262,
+      "2": -0.2581,
       "3": -0.15,
-      "4": -0.2318,
-      "5": -0.1949,
-      "6": -0.1644,
+      "4": -0.2314,
+      "5": -0.1918,
+      "6": -0.1642,
       "7": -0.1841,
-      "8": -0.1782,
-      "9": -0.2544,
+      "8": -0.1833,
+      "9": -0.2427,
       "10": -0.1678,
       "11": -0.216,
       "12": -0.229,
-      "13": -0.2687,
+      "13": -0.2563,
       "14": -0.2217,
       "15": -0.1584,
       "16": -0.1965,
@@ -14730,29 +14730,29 @@
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.1979,
+     "mean_D": 0.196,
      "bootstrap_95": [
-      0.1842,
-      0.2117
+      0.183,
+      0.2089
      ],
      "verdict": "better",
-     "andrey_mean": 0.6571,
-     "other_mean": 0.4592,
+     "andrey_mean": 0.6421,
+     "other_mean": 0.446,
      "D_by_seed": {
       "0": 0.1581,
       "1": 0.1649,
-      "2": 0.2388,
+      "2": 0.2335,
       "3": 0.1566,
-      "4": 0.2005,
-      "5": 0.1885,
-      "6": 0.1587,
+      "4": 0.1986,
+      "5": 0.1849,
+      "6": 0.1564,
       "7": 0.2004,
-      "8": 0.1828,
-      "9": 0.2459,
+      "8": 0.1821,
+      "9": 0.2348,
       "10": 0.1968,
       "11": 0.1976,
       "12": 0.2303,
-      "13": 0.257,
+      "13": 0.245,
       "14": 0.2281,
       "15": 0.145,
       "16": 0.1939,
@@ -14767,19 +14767,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.1967,
+     "mean": -1.1815,
      "bootstrap_95": [
-      -1.2359,
-      -1.1533
+      -1.2222,
+      -1.137
      ],
      "pass": true
     }
@@ -14789,11 +14789,11 @@
    "result": "better",
    "andrey_tests_per_target": 344.8,
    "andrey_s": 3.1067,
-   "andrey_errors_mean": 2.0839,
+   "andrey_errors_mean": 2.163,
    "other_tests_per_target": 201.9,
    "other_s": 0.2617,
-   "other_errors_mean": 2.5993,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.6704,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -14937,25 +14937,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1603,
+     "mean_D": -0.1591,
      "bootstrap_95": [
-      -0.1812,
-      -0.1381
+      -0.1798,
+      -0.1369
      ],
      "verdict": "better",
-     "andrey_mean": 0.4587,
-     "other_mean": 0.619
+     "andrey_mean": 0.4629,
+     "other_mean": 0.622
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.1601,
+     "mean_D": 0.1594,
      "bootstrap_95": [
-      0.1388,
-      0.1797
+      0.1381,
+      0.179
      ],
      "verdict": "better",
-     "andrey_mean": 0.6445,
-     "other_mean": 0.4844
+     "andrey_mean": 0.6402,
+     "other_mean": 0.4809
     },
     "same_sets": 0.0
    },
@@ -14963,19 +14963,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.7889,
+     "mean": -0.7838,
      "bootstrap_95": [
-      -0.8434,
-      -0.74
+      -0.8351,
+      -0.7378
      ],
      "pass": true
     }
@@ -14985,11 +14985,11 @@
    "result": "better",
    "andrey_tests_per_target": 292.4,
    "andrey_s": 2.6723,
-   "andrey_errors_mean": 1.9724,
+   "andrey_errors_mean": 1.9757,
    "other_tests_per_target": 134.4,
    "other_s": 0.2458,
-   "other_errors_mean": 1.7004,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.7027,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc",
@@ -15393,25 +15393,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0122,
+     "mean_D": -0.0118,
      "bootstrap_95": [
-      -0.0265,
-      0.0018
+      -0.0258,
+      0.0019
      ],
      "verdict": "tie",
-     "andrey_mean": 0.9285,
-     "other_mean": 0.9406
+     "andrey_mean": 0.9299,
+     "other_mean": 0.9417
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0313,
+     "mean_D": 0.0306,
      "bootstrap_95": [
-      0.0221,
-      0.0409
+      0.0215,
+      0.04
      ],
      "verdict": "better",
-     "andrey_mean": 0.2546,
-     "other_mean": 0.2233
+     "andrey_mean": 0.2501,
+     "other_mean": 0.2195
     },
     "same_sets": 0.0
    },
@@ -15419,19 +15419,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.1084,
+     "mean": -0.1071,
      "bootstrap_95": [
-      -0.1607,
-      -0.0522
+      -0.1586,
+      -0.0514
      ],
      "pass": true
     }
@@ -15441,11 +15441,11 @@
    "result": "better",
    "andrey_tests_per_target": 235.5,
    "andrey_s": 2.5032,
-   "andrey_errors_mean": 3.3502,
+   "andrey_errors_mean": 3.36,
    "other_tests_per_target": 219.2,
    "other_s": 0.6266,
-   "other_errors_mean": 3.3981,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.4071,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -15469,25 +15469,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0212,
+     "mean_D": -0.0209,
      "bootstrap_95": [
-      -0.0344,
-      -0.0077
+      -0.034,
+      -0.0075
      ],
      "verdict": "better",
-     "andrey_mean": 0.7982,
-     "other_mean": 0.8195
+     "andrey_mean": 0.8004,
+     "other_mean": 0.8213
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0399,
+     "mean_D": 0.0393,
      "bootstrap_95": [
-      0.0301,
-      0.0497
+      0.0298,
+      0.0491
      ],
      "verdict": "better",
-     "andrey_mean": 0.3613,
-     "other_mean": 0.3214
+     "andrey_mean": 0.3578,
+     "other_mean": 0.3185
     },
     "same_sets": 0.0
    },
@@ -15495,19 +15495,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5372,
+     "mean": -0.5329,
      "bootstrap_95": [
-      -0.5884,
-      -0.4855
+      -0.5829,
+      -0.4814
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.4679,
+     "mean": -0.4643,
      "bootstrap_95": [
-      -0.5072,
-      -0.4289
+      -0.5043,
+      -0.4257
      ],
      "pass": true
     }
@@ -15517,11 +15517,11 @@
    "result": "better",
    "andrey_tests_per_target": 319.6,
    "andrey_s": 3.8878,
-   "andrey_errors_mean": 2.9732,
+   "andrey_errors_mean": 2.9814,
    "other_tests_per_target": 270.7,
    "other_s": 0.7446,
-   "other_errors_mean": 3.0425,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 3.05,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -15621,25 +15621,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1429,
+     "mean_D": -0.1413,
      "bootstrap_95": [
-      -0.1619,
-      -0.1233
+      -0.1592,
+      -0.1227
      ],
      "verdict": "better",
-     "andrey_mean": 0.5907,
-     "other_mean": 0.7336
+     "andrey_mean": 0.6133,
+     "other_mean": 0.7545
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.1967,
+     "mean_D": 0.1933,
      "bootstrap_95": [
-      0.1788,
-      0.2135
+      0.1767,
+      0.2088
      ],
      "verdict": "better",
-     "andrey_mean": 0.5699,
-     "other_mean": 0.3732
+     "andrey_mean": 0.5437,
+     "other_mean": 0.3503
     },
     "same_sets": 0.0
    },
@@ -15647,19 +15647,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.9919,
+     "mean": -0.963,
      "bootstrap_95": [
-      -1.0437,
-      -0.9403
+      -1.0148,
+      -0.9111
      ],
      "pass": true
     }
@@ -15669,11 +15669,11 @@
    "result": "better",
    "andrey_tests_per_target": 281.1,
    "andrey_s": 2.0135,
-   "andrey_errors_mean": 3.1967,
+   "andrey_errors_mean": 3.3407,
    "other_tests_per_target": 115.2,
    "other_s": 0.1822,
-   "other_errors_mean": 2.7323,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 2.8889,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -15697,25 +15697,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.1597,
+     "mean_D": -0.16,
      "bootstrap_95": [
-      -0.1749,
-      -0.1428
+      -0.1751,
+      -0.143
      ],
      "verdict": "better",
-     "andrey_mean": 0.4739,
-     "other_mean": 0.6336
+     "andrey_mean": 0.4885,
+     "other_mean": 0.6485
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.1728,
+     "mean_D": 0.172,
      "bootstrap_95": [
-      0.157,
-      0.1873
+      0.1563,
+      0.1865
      ],
      "verdict": "better",
-     "andrey_mean": 0.6571,
-     "other_mean": 0.4843
+     "andrey_mean": 0.6421,
+     "other_mean": 0.4701
     },
     "same_sets": 0.0
    },
@@ -15723,19 +15723,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.3399,
+     "mean": -1.3222,
      "bootstrap_95": [
-      -1.3721,
-      -1.3087
+      -1.3556,
+      -1.2926
      ],
      "pass": true
     }
@@ -15745,11 +15745,11 @@
    "result": "better",
    "andrey_tests_per_target": 344.8,
    "andrey_s": 3.1067,
-   "andrey_errors_mean": 2.0839,
+   "andrey_errors_mean": 2.163,
    "other_tests_per_target": 160.3,
    "other_s": 0.2357,
-   "other_errors_mean": 2.4561,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.5296,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -16457,25 +16457,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0105,
+     "mean_D": 0.0112,
      "bootstrap_95": [
-      -0.0043,
-      0.0253
+      -0.0038,
+      0.0262
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4587,
-     "other_mean": 0.4482
+     "andrey_mean": 0.4629,
+     "other_mean": 0.4517
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0005,
+     "mean_D": -0.0007,
      "bootstrap_95": [
-      -0.0136,
-      0.0125
+      -0.0137,
+      0.0123
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6445,
-     "other_mean": 0.645
+     "andrey_mean": 0.6402,
+     "other_mean": 0.6409
     },
     "same_sets": 0.0
    },
@@ -16483,19 +16483,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.229,
+     "mean": -1.2216,
      "bootstrap_95": [
-      -1.2891,
-      -1.1689
+      -1.2784,
+      -1.1649
      ],
      "pass": true
     }
@@ -16505,11 +16505,11 @@
    "result": "tie",
    "andrey_tests_per_target": 292.4,
    "andrey_s": 2.6723,
-   "andrey_errors_mean": 1.9724,
+   "andrey_errors_mean": 1.9757,
    "other_tests_per_target": 160.3,
    "other_s": 1.2552,
-   "other_errors_mean": 1.2602,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.2649,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc",
@@ -16913,25 +16913,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0118,
+     "mean_D": -0.0114,
      "bootstrap_95": [
-      -0.0193,
-      -0.0046
+      -0.0188,
+      -0.0044
      ],
      "verdict": "better",
-     "andrey_mean": 0.9285,
-     "other_mean": 0.9402
+     "andrey_mean": 0.9299,
+     "other_mean": 0.9413
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0165,
+     "mean_D": 0.016,
      "bootstrap_95": [
-      0.0105,
-      0.0229
+      0.0102,
+      0.0223
      ],
      "verdict": "better",
-     "andrey_mean": 0.2546,
-     "other_mean": 0.2381
+     "andrey_mean": 0.2501,
+     "other_mean": 0.234
     },
     "same_sets": 0.0
    },
@@ -16939,19 +16939,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.0997,
+     "mean": -0.0986,
      "bootstrap_95": [
-      -0.1538,
-      -0.0452
+      -0.1514,
+      -0.0443
      ],
      "pass": true
     }
@@ -16961,11 +16961,11 @@
    "result": "better",
    "andrey_tests_per_target": 235.5,
    "andrey_s": 2.5032,
-   "andrey_errors_mean": 3.3502,
+   "andrey_errors_mean": 3.36,
    "other_tests_per_target": 220.5,
    "other_s": 2.0427,
-   "other_errors_mean": 3.4068,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.4157,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -16989,14 +16989,14 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.004,
+     "mean_D": -0.0041,
      "bootstrap_95": [
       -0.0106,
       0.0024
      ],
      "verdict": "tie",
-     "andrey_mean": 0.7982,
-     "other_mean": 0.8023
+     "andrey_mean": 0.8004,
+     "other_mean": 0.8045
     },
     "f1": {
      "paired": 20,
@@ -17006,8 +17006,8 @@
       0.0098
      ],
      "verdict": "tie",
-     "andrey_mean": 0.3613,
-     "other_mean": 0.3564
+     "andrey_mean": 0.3578,
+     "other_mean": 0.3529
     },
     "same_sets": 0.0
    },
@@ -17015,19 +17015,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5372,
+     "mean": -0.5329,
      "bootstrap_95": [
-      -0.5884,
-      -0.4855
+      -0.5829,
+      -0.4814
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.4985,
+     "mean": -0.4943,
      "bootstrap_95": [
-      -0.5488,
-      -0.4459
+      -0.5443,
+      -0.4429
      ],
      "pass": true
     }
@@ -17037,11 +17037,11 @@
    "result": "tie",
    "andrey_tests_per_target": 319.6,
    "andrey_s": 3.8878,
-   "andrey_errors_mean": 2.9732,
+   "andrey_errors_mean": 2.9814,
    "other_tests_per_target": 286.0,
    "other_s": 3.0184,
-   "other_errors_mean": 3.0119,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 3.02,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc",
@@ -17141,25 +17141,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.005,
+     "mean_D": -0.0046,
      "bootstrap_95": [
-      -0.0155,
-      0.0243
+      -0.0246,
+      0.014
      ],
      "verdict": "tie",
-     "andrey_mean": 0.5907,
-     "other_mean": 0.5856
+     "andrey_mean": 0.6133,
+     "other_mean": 0.6179
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0329,
+     "mean_D": 0.0385,
      "bootstrap_95": [
-      0.015,
-      0.0518
+      0.0213,
+      0.0566
      ],
      "verdict": "better",
-     "andrey_mean": 0.5699,
-     "other_mean": 0.537
+     "andrey_mean": 0.5437,
+     "other_mean": 0.5052
     },
     "same_sets": 0.0
    },
@@ -17167,19 +17167,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.4771,
+     "mean": -1.4333,
      "bootstrap_95": [
-      -1.5413,
-      -1.4127
+      -1.4963,
+      -1.3704
      ],
      "pass": true
     }
@@ -17189,11 +17189,11 @@
    "result": "better",
    "andrey_tests_per_target": 281.1,
    "andrey_s": 2.0135,
-   "andrey_errors_mean": 3.1967,
+   "andrey_errors_mean": 3.3407,
    "other_tests_per_target": 148.4,
    "other_s": 1.0046,
-   "other_errors_mean": 2.2472,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 2.4185,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -17217,25 +17217,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0193,
+     "mean_D": -0.024,
      "bootstrap_95": [
-      -0.0322,
-      -0.0052
+      -0.0376,
+      -0.0092
      ],
      "verdict": "better",
-     "andrey_mean": 0.4739,
-     "other_mean": 0.4932
+     "andrey_mean": 0.4885,
+     "other_mean": 0.5124
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.031,
+     "mean_D": 0.0324,
      "bootstrap_95": [
-      0.0192,
-      0.0418
+      0.0205,
+      0.0433
      ],
      "verdict": "better",
-     "andrey_mean": 0.6571,
-     "other_mean": 0.6261
+     "andrey_mean": 0.6421,
+     "other_mean": 0.6097
     },
     "same_sets": 0.0
    },
@@ -17243,19 +17243,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.8729,
+     "mean": -1.8481,
      "bootstrap_95": [
-      -1.9219,
-      -1.8239
+      -1.8963,
+      -1.8
      ],
      "pass": true
     }
@@ -17265,11 +17265,11 @@
    "result": "better",
    "andrey_tests_per_target": 344.8,
    "andrey_s": 3.1067,
-   "andrey_errors_mean": 2.0839,
+   "andrey_errors_mean": 2.163,
    "other_tests_per_target": 223.1,
    "other_s": 1.8409,
-   "other_errors_mean": 1.9231,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.0037,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc",
@@ -17977,25 +17977,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0105,
+     "mean_D": 0.0112,
      "bootstrap_95": [
-      -0.0043,
-      0.0253
+      -0.0038,
+      0.0262
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4587,
-     "other_mean": 0.4482
+     "andrey_mean": 0.4629,
+     "other_mean": 0.4517
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0005,
+     "mean_D": -0.0007,
      "bootstrap_95": [
-      -0.0136,
-      0.0125
+      -0.0137,
+      0.0123
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6445,
-     "other_mean": 0.645
+     "andrey_mean": 0.6402,
+     "other_mean": 0.6409
     },
     "same_sets": 0.0
    },
@@ -18003,19 +18003,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.229,
+     "mean": -1.2216,
      "bootstrap_95": [
-      -1.2891,
-      -1.1689
+      -1.2784,
+      -1.1649
      ],
      "pass": true
     }
@@ -18025,11 +18025,11 @@
    "result": "tie",
    "andrey_tests_per_target": 292.4,
    "andrey_s": 2.5751,
-   "andrey_errors_mean": 1.9724,
+   "andrey_errors_mean": 1.9757,
    "other_tests_per_target": 160.3,
    "other_s": 1.2552,
-   "other_errors_mean": 1.2602,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.2649,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -18433,25 +18433,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0118,
+     "mean_D": -0.0114,
      "bootstrap_95": [
-      -0.0193,
-      -0.0046
+      -0.0188,
+      -0.0044
      ],
      "verdict": "better",
-     "andrey_mean": 0.9285,
-     "other_mean": 0.9402
+     "andrey_mean": 0.9299,
+     "other_mean": 0.9413
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0165,
+     "mean_D": 0.016,
      "bootstrap_95": [
-      0.0105,
-      0.0229
+      0.0102,
+      0.0223
      ],
      "verdict": "better",
-     "andrey_mean": 0.2546,
-     "other_mean": 0.2381
+     "andrey_mean": 0.2501,
+     "other_mean": 0.234
     },
     "same_sets": 0.0
    },
@@ -18459,19 +18459,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.0997,
+     "mean": -0.0986,
      "bootstrap_95": [
-      -0.1538,
-      -0.0452
+      -0.1514,
+      -0.0443
      ],
      "pass": true
     }
@@ -18481,11 +18481,11 @@
    "result": "better",
    "andrey_tests_per_target": 235.5,
    "andrey_s": 2.5741,
-   "andrey_errors_mean": 3.3502,
+   "andrey_errors_mean": 3.36,
    "other_tests_per_target": 220.5,
    "other_s": 2.0427,
-   "other_errors_mean": 3.4068,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.4157,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -18515,8 +18515,8 @@
       0.0008
      ],
      "verdict": "tie",
-     "andrey_mean": 0.7969,
-     "other_mean": 0.8023
+     "andrey_mean": 0.799,
+     "other_mean": 0.8045
     },
     "f1": {
      "paired": 20,
@@ -18526,8 +18526,8 @@
       0.0103
      ],
      "verdict": "better",
-     "andrey_mean": 0.362,
-     "other_mean": 0.3564
+     "andrey_mean": 0.3585,
+     "other_mean": 0.3529
     },
     "same_sets": 0.0
    },
@@ -18535,19 +18535,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5386,
+     "mean": -0.5343,
      "bootstrap_95": [
-      -0.5895,
-      -0.487
+      -0.5843,
+      -0.4829
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.4985,
+     "mean": -0.4943,
      "bootstrap_95": [
-      -0.5488,
-      -0.4459
+      -0.5443,
+      -0.4429
      ],
      "pass": true
     }
@@ -18557,11 +18557,11 @@
    "result": "better",
    "andrey_tests_per_target": 320.4,
    "andrey_s": 3.9659,
-   "andrey_errors_mean": 2.9718,
+   "andrey_errors_mean": 2.98,
    "other_tests_per_target": 286.0,
    "other_s": 3.0184,
-   "other_errors_mean": 3.0119,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 3.02,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -18661,25 +18661,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.005,
+     "mean_D": -0.0046,
      "bootstrap_95": [
-      -0.0155,
-      0.0243
+      -0.0246,
+      0.014
      ],
      "verdict": "tie",
-     "andrey_mean": 0.5907,
-     "other_mean": 0.5856
+     "andrey_mean": 0.6133,
+     "other_mean": 0.6179
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0329,
+     "mean_D": 0.0385,
      "bootstrap_95": [
-      0.015,
-      0.0518
+      0.0213,
+      0.0566
      ],
      "verdict": "better",
-     "andrey_mean": 0.5699,
-     "other_mean": 0.537
+     "andrey_mean": 0.5437,
+     "other_mean": 0.5052
     },
     "same_sets": 0.0
    },
@@ -18687,19 +18687,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.4771,
+     "mean": -1.4333,
      "bootstrap_95": [
-      -1.5413,
-      -1.4127
+      -1.4963,
+      -1.3704
      ],
      "pass": true
     }
@@ -18709,11 +18709,11 @@
    "result": "better",
    "andrey_tests_per_target": 281.1,
    "andrey_s": 1.9479,
-   "andrey_errors_mean": 3.1967,
+   "andrey_errors_mean": 3.3407,
    "other_tests_per_target": 148.4,
    "other_s": 1.0046,
-   "other_errors_mean": 2.2472,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 2.4185,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -18737,25 +18737,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0193,
+     "mean_D": -0.024,
      "bootstrap_95": [
-      -0.0322,
-      -0.0052
+      -0.0376,
+      -0.0092
      ],
      "verdict": "better",
-     "andrey_mean": 0.4739,
-     "other_mean": 0.4932
+     "andrey_mean": 0.4885,
+     "other_mean": 0.5124
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.031,
+     "mean_D": 0.0324,
      "bootstrap_95": [
-      0.0192,
-      0.0418
+      0.0205,
+      0.0433
      ],
      "verdict": "better",
-     "andrey_mean": 0.6571,
-     "other_mean": 0.6261
+     "andrey_mean": 0.6421,
+     "other_mean": 0.6097
     },
     "same_sets": 0.0
    },
@@ -18763,19 +18763,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.8729,
+     "mean": -1.8481,
      "bootstrap_95": [
-      -1.9219,
-      -1.8239
+      -1.8963,
+      -1.8
      ],
      "pass": true
     }
@@ -18785,11 +18785,11 @@
    "result": "better",
    "andrey_tests_per_target": 344.8,
    "andrey_s": 3.0033,
-   "andrey_errors_mean": 2.0839,
+   "andrey_errors_mean": 2.163,
    "other_tests_per_target": 223.1,
    "other_s": 1.8409,
-   "other_errors_mean": 1.9231,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.0037,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -19503,8 +19503,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4587,
-     "other_mean": 0.4587
+     "andrey_mean": 0.4629,
+     "other_mean": 0.4629
     },
     "f1": {
      "paired": 20,
@@ -19514,8 +19514,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6445,
-     "other_mean": 0.6445
+     "andrey_mean": 0.6402,
+     "other_mean": 0.6402
     },
     "same_sets": 1.0
    },
@@ -19523,19 +19523,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     }
@@ -19545,11 +19545,11 @@
    "result": "tie",
    "andrey_tests_per_target": 292.4,
    "andrey_s": 2.5751,
-   "andrey_errors_mean": 1.9724,
+   "andrey_errors_mean": 1.9757,
    "other_tests_per_target": 292.4,
    "other_s": 2.6723,
-   "other_errors_mean": 1.9724,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.9757,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -19959,8 +19959,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.9285,
-     "other_mean": 0.9285
+     "andrey_mean": 0.9299,
+     "other_mean": 0.9299
     },
     "f1": {
      "paired": 20,
@@ -19970,8 +19970,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.2546,
-     "other_mean": 0.2546
+     "andrey_mean": 0.2501,
+     "other_mean": 0.2501
     },
     "same_sets": 1.0
    },
@@ -19979,19 +19979,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     }
@@ -20001,11 +20001,11 @@
    "result": "tie",
    "andrey_tests_per_target": 235.5,
    "andrey_s": 2.5741,
-   "andrey_errors_mean": 3.3502,
+   "andrey_errors_mean": 3.36,
    "other_tests_per_target": 235.5,
    "other_s": 2.5032,
-   "other_errors_mean": 3.3502,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.36,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -20035,19 +20035,19 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.7969,
-     "other_mean": 0.7982
+     "andrey_mean": 0.799,
+     "other_mean": 0.8004
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.0007,
+     "mean_D": 0.0006,
      "bootstrap_95": [
       0.0,
       0.0016
      ],
      "verdict": "tie",
-     "andrey_mean": 0.362,
-     "other_mean": 0.3613
+     "andrey_mean": 0.3585,
+     "other_mean": 0.3578
     },
     "same_sets": 0.85
    },
@@ -20055,19 +20055,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5386,
+     "mean": -0.5343,
      "bootstrap_95": [
-      -0.5895,
-      -0.487
+      -0.5843,
+      -0.4829
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5372,
+     "mean": -0.5329,
      "bootstrap_95": [
-      -0.5884,
-      -0.4855
+      -0.5829,
+      -0.4814
      ],
      "pass": true
     }
@@ -20077,11 +20077,11 @@
    "result": "tie",
    "andrey_tests_per_target": 320.4,
    "andrey_s": 3.9659,
-   "andrey_errors_mean": 2.9718,
+   "andrey_errors_mean": 2.98,
    "other_tests_per_target": 319.6,
    "other_s": 3.8878,
-   "other_errors_mean": 2.9732,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 2.9814,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -20187,8 +20187,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.5907,
-     "other_mean": 0.5907
+     "andrey_mean": 0.6133,
+     "other_mean": 0.6133
     },
     "f1": {
      "paired": 20,
@@ -20198,8 +20198,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.5699,
-     "other_mean": 0.5699
+     "andrey_mean": 0.5437,
+     "other_mean": 0.5437
     },
     "same_sets": 1.0
    },
@@ -20207,19 +20207,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     }
@@ -20229,11 +20229,11 @@
    "result": "tie",
    "andrey_tests_per_target": 281.1,
    "andrey_s": 1.9479,
-   "andrey_errors_mean": 3.1967,
+   "andrey_errors_mean": 3.3407,
    "other_tests_per_target": 281.1,
    "other_s": 2.0135,
-   "other_errors_mean": 3.1967,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 3.3407,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -20263,8 +20263,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4739,
-     "other_mean": 0.4739
+     "andrey_mean": 0.4885,
+     "other_mean": 0.4885
     },
     "f1": {
      "paired": 20,
@@ -20274,8 +20274,8 @@
       0.0
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6571,
-     "other_mean": 0.6571
+     "andrey_mean": 0.6421,
+     "other_mean": 0.6421
     },
     "same_sets": 1.0
    },
@@ -20283,19 +20283,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     }
@@ -20305,11 +20305,11 @@
    "result": "tie",
    "andrey_tests_per_target": 344.8,
    "andrey_s": 3.0033,
-   "andrey_errors_mean": 2.0839,
+   "andrey_errors_mean": 2.163,
    "other_tests_per_target": 344.8,
    "other_s": 3.1067,
-   "other_errors_mean": 2.0839,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.163,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc, max_depth 3",
@@ -20409,25 +20409,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.01,
+     "mean_D": -0.0107,
      "bootstrap_95": [
-      -0.0221,
-      0.0016
+      -0.023,
+      0.001
      ],
      "verdict": "tie",
-     "andrey_mean": 0.4487,
-     "other_mean": 0.4587
+     "andrey_mean": 0.4522,
+     "other_mean": 0.4629
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0031,
+     "mean_D": -0.0029,
      "bootstrap_95": [
-      -0.0136,
-      0.0077
+      -0.0134,
+      0.008
      ],
      "verdict": "tie",
-     "andrey_mean": 0.6413,
-     "other_mean": 0.6445
+     "andrey_mean": 0.6373,
+     "other_mean": 0.6402
     },
     "same_sets": 0.0
    },
@@ -20435,19 +20435,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.2292,
+     "mean": -1.2216,
      "bootstrap_95": [
-      -1.2773,
-      -1.1814
+      -1.2649,
+      -1.1784
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5169,
+     "mean": -0.5108,
      "bootstrap_95": [
-      -0.6104,
-      -0.427
+      -0.6027,
+      -0.4243
      ],
      "pass": true
     }
@@ -20457,11 +20457,11 @@
    "result": "tie",
    "andrey_tests_per_target": 185.7,
    "andrey_s": 1.9541,
-   "andrey_errors_mean": 1.2601,
+   "andrey_errors_mean": 1.2649,
    "other_tests_per_target": 292.4,
    "other_s": 2.6723,
-   "other_errors_mean": 1.9724,
-   "empty_errors_mean": 2.4893
+   "other_errors_mean": 1.9757,
+   "empty_errors_mean": 2.4865
   },
   {
    "method": "hiton_pc without the rows-per-cell rule",
@@ -20865,25 +20865,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0101,
+     "mean_D": 0.0099,
      "bootstrap_95": [
-      0.0073,
-      0.013
+      0.0072,
+      0.0127
      ],
      "verdict": "worse",
-     "andrey_mean": 0.9386,
-     "other_mean": 0.9285
+     "andrey_mean": 0.9398,
+     "other_mean": 0.9299
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0112,
+     "mean_D": -0.0109,
      "bootstrap_95": [
-      -0.0139,
-      -0.0084
+      -0.0136,
+      -0.0082
      ],
      "verdict": "worse",
-     "andrey_mean": 0.2434,
-     "other_mean": 0.2546
+     "andrey_mean": 0.2392,
+     "other_mean": 0.2501
     },
     "same_sets": 0.1
    },
@@ -20891,19 +20891,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.1112,
+     "mean": -0.11,
      "bootstrap_95": [
-      -0.169,
-      -0.0506
+      -0.1671,
+      -0.05
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.1563,
+     "mean": -0.1543,
      "bootstrap_95": [
-      -0.2161,
-      -0.0932
+      -0.2129,
+      -0.0914
      ],
      "pass": true
     }
@@ -20913,11 +20913,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 233.1,
    "andrey_s": 2.5723,
-   "andrey_errors_mean": 3.3952,
+   "andrey_errors_mean": 3.4043,
    "other_tests_per_target": 235.5,
    "other_s": 2.5032,
-   "other_errors_mean": 3.3502,
-   "empty_errors_mean": 3.5065
+   "other_errors_mean": 3.36,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc without the rows-per-cell rule",
@@ -20947,19 +20947,19 @@
       0.0095
      ],
      "verdict": "worse",
-     "andrey_mean": 0.8053,
-     "other_mean": 0.7982
+     "andrey_mean": 0.8074,
+     "other_mean": 0.8004
     },
     "f1": {
      "paired": 20,
      "mean_D": -0.0071,
      "bootstrap_95": [
-      -0.0097,
-      -0.0047
+      -0.0096,
+      -0.0046
      ],
      "verdict": "worse",
-     "andrey_mean": 0.3542,
-     "other_mean": 0.3613
+     "andrey_mean": 0.3507,
+     "other_mean": 0.3578
     },
     "same_sets": 0.1
    },
@@ -20967,19 +20967,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -0.4997,
+     "mean": -0.4957,
      "bootstrap_95": [
-      -0.5473,
-      -0.4518
+      -0.5429,
+      -0.4486
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5372,
+     "mean": -0.5329,
      "bootstrap_95": [
-      -0.5884,
-      -0.4855
+      -0.5829,
+      -0.4814
      ],
      "pass": true
     }
@@ -20989,11 +20989,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 315.8,
    "andrey_s": 3.8694,
-   "andrey_errors_mean": 3.0107,
+   "andrey_errors_mean": 3.0186,
    "other_tests_per_target": 319.6,
    "other_s": 3.8878,
-   "other_errors_mean": 2.9732,
-   "empty_errors_mean": 3.5104
+   "other_errors_mean": 2.9814,
+   "empty_errors_mean": 3.5143
   },
   {
    "method": "hiton_pc without the rows-per-cell rule",
@@ -21093,25 +21093,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.0052,
+     "mean_D": 0.0046,
      "bootstrap_95": [
-      -0.0246,
-      0.0152
+      -0.0151,
+      0.0249
      ],
      "verdict": "tie",
-     "andrey_mean": 0.5855,
-     "other_mean": 0.5907
+     "andrey_mean": 0.6179,
+     "other_mean": 0.6133
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0334,
+     "mean_D": -0.0388,
      "bootstrap_95": [
-      -0.0517,
-      -0.016
+      -0.0567,
+      -0.0218
      ],
      "verdict": "worse",
-     "andrey_mean": 0.5366,
-     "other_mean": 0.5699
+     "andrey_mean": 0.5048,
+     "other_mean": 0.5437
     },
     "same_sets": 0.0
    },
@@ -21119,19 +21119,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.5034,
+     "mean": -1.4593,
      "bootstrap_95": [
-      -1.5674,
-      -1.4348
+      -1.5222,
+      -1.3889
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.5275,
+     "mean": -0.5111,
      "bootstrap_95": [
-      -0.6457,
-      -0.4093
+      -0.6259,
+      -0.3963
      ],
      "pass": true
     }
@@ -21141,11 +21141,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 177.5,
    "andrey_s": 1.4275,
-   "andrey_errors_mean": 2.2208,
+   "andrey_errors_mean": 2.3926,
    "other_tests_per_target": 281.1,
    "other_s": 2.0135,
-   "other_errors_mean": 3.1967,
-   "empty_errors_mean": 3.7242
+   "other_errors_mean": 3.3407,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc without the rows-per-cell rule",
@@ -21169,25 +21169,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.0207,
+     "mean_D": 0.0253,
      "bootstrap_95": [
-      0.0042,
-      0.0345
+      0.0081,
+      0.0397
      ],
      "verdict": "worse",
-     "andrey_mean": 0.4946,
-     "other_mean": 0.4739
+     "andrey_mean": 0.5138,
+     "other_mean": 0.4885
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.0343,
+     "mean_D": -0.0358,
      "bootstrap_95": [
-      -0.0461,
-      -0.0206
+      -0.0477,
+      -0.0218
      ],
      "verdict": "worse",
-     "andrey_mean": 0.6228,
-     "other_mean": 0.6571
+     "andrey_mean": 0.6063,
+     "other_mean": 0.6421
     },
     "same_sets": 0.0
    },
@@ -21195,19 +21195,19 @@
    "floor": {
     "andrey_minus_empty": {
      "paired": 20,
-     "mean": -1.858,
+     "mean": -1.8333,
      "bootstrap_95": [
-      -1.8996,
-      -1.8171
+      -1.8704,
+      -1.7963
      ],
      "pass": true
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -1.7121,
+     "mean": -1.6889,
      "bootstrap_95": [
-      -1.7826,
-      -1.642
+      -1.7519,
+      -1.6222
      ],
      "pass": true
     }
@@ -21217,11 +21217,11 @@
    "result": "worse, not rerun",
    "andrey_tests_per_target": 294.8,
    "andrey_s": 3.0187,
-   "andrey_errors_mean": 1.938,
+   "andrey_errors_mean": 2.0185,
    "other_tests_per_target": 344.8,
    "other_s": 3.1067,
-   "other_errors_mean": 2.0839,
-   "empty_errors_mean": 3.796
+   "other_errors_mean": 2.163,
+   "empty_errors_mean": 3.8519
   },
   {
    "method": "hiton_pc without the rows-per-cell rule",

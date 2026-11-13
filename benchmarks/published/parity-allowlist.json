@@ -241,6 +241,83 @@
         "comparator_errors": 2.76,
         "note": "Seeds 100-119, the row's replication. Andrey's igsp does not depend on the column order, so its tie ranks are reversed."
       }
+    },
+    {
+      "summary": "0.18.0",
+      "method": "GS",
+      "comparator": "bnlearn 5.2.1 gs",
+      "row": {"regime": "gaussian", "metric": "set_distance", "mean_degree": 4.0, "d": 50, "n": 5000},
+      "andrey_errors": 0.1699,
+      "comparator_errors": 0.1588,
+      "cause": "trade-off",
+      "reason": "The difference is the shrink phase, which the paper states as removing a member while one tests independent of the target given the others, without saying which goes first. After a removal Andrey's search goes on to the next member in its order and repeats passes until none is removed; bnlearn's gs starts again from the first member after each removal. A trace running one Fisher z test under ports of both searches reproduces both packages' records on every target. With bnlearn's restart in Andrey's search the difference is +0.0004 [-0.0099, +0.0109] on seeds 0-19 and -0.0023 [-0.0124, +0.0093] on seeds 20-39; the visit order alone changes nothing (+0.0149, +0.0111), nor does bnlearn's grow. Over the 40 datasets the two rules end differently at 264 targets, and every member they keep differently is outside the true blanket: 451 kept by Andrey's rule only, 169 by the restart only. In the other seven Gaussian cells the restart moves the difference by at most 0.0066 and in no cell makes Andrey's distance significantly larger; the discrete cells were not traced for it. Both are readings of the paper's rule.",
+      "citation": "Margaritis, D. and Thrun, S. (1999). Bayesian network induction via local neighborhoods. NIPS 12, Fig. 2, step 3, and Margaritis, D. (2003), PhD thesis CMU-CS-03-153, Fig. 3.2 step 3 and p. 31: while there exists Y in S independent of X given S - {Y}, remove Y. bnlearn 5.2.1 (GPL): R/grow-shrink.R, gs.markov.blanket, the shrinking phase restarts after each removal."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "discrete", "metric": "set_distance", "d": 37, "n": 1000},
+      "andrey_errors": 0.4488,
+      "comparator_errors": 0.4256,
+      "cause": "trade-off",
+      "reason": "Both packages compute the same G-square statistic and count its degrees of freedom differently on sparse tables: Andrey refers it to the statistic's mean when one variable is shuffled within each configuration, bnlearn's mi-adf to (r_x - 1)(r_y - 1) summed over the configurations, counting the values present. With mi-adf's degrees of freedom in Andrey's search, which degrees_of_freedom=\"nonempty\" gives (the same sets on all 740 targets of seeds 0-19), Andrey returns bnlearn's sets on 97% of the targets and ties it on both seed halves (distance -0.0009 [-0.0043, +0.0025] and +0.0007 [-0.0021, +0.0040]); bnlearn's sparse-table rule and each rule where its search differs from the paper's Fig. 1 move the difference by at most 0.002. The paper orders candidates by the significance of a G-square test and gives no degrees of freedom. The same swap turns Andrey's lead at 1,000 rows into a tie on child (distance -0.068 -> -0.001), cuts it on hepar2 (-0.034 -> -0.004), and turns it into a deficit on insurance (-0.018 -> +0.005): on child, mi-adf's degrees of freedom reject up to 13.5% of the true independences at level 0.05.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, and p. 3: h is the significance of a G-square test; no degrees of freedom are given. bnlearn 5.2.1 (GPL): the mi-adf test (adjusted degrees of freedom)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "discrete", "metric": "set_f1_loss", "d": 37, "n": 1000},
+      "andrey_errors": 0.3181,
+      "comparator_errors": 0.2993,
+      "cause": "trade-off",
+      "reason": "Both packages compute the same G-square statistic and count its degrees of freedom differently on sparse tables: Andrey refers it to the statistic's mean when one variable is shuffled within each configuration, bnlearn's mi-adf to (r_x - 1)(r_y - 1) summed over the configurations, counting the values present. With mi-adf's degrees of freedom in Andrey's search, which degrees_of_freedom=\"nonempty\" gives (the same sets on all 740 targets of seeds 0-19), Andrey returns bnlearn's sets on 97% of the targets and ties it on both seed halves (distance -0.0009 [-0.0043, +0.0025] and +0.0007 [-0.0021, +0.0040]); bnlearn's sparse-table rule and each rule where its search differs from the paper's Fig. 1 move the difference by at most 0.002. The paper orders candidates by the significance of a G-square test and gives no degrees of freedom. The same swap turns Andrey's lead at 1,000 rows into a tie on child (distance -0.068 -> -0.001), cuts it on hepar2 (-0.034 -> -0.004), and turns it into a deficit on insurance (-0.018 -> +0.005): on child, mi-adf's degrees of freedom reject up to 13.5% of the true independences at level 0.05.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, and p. 3: h is the significance of a G-square test; no degrees of freedom are given. bnlearn 5.2.1 (GPL): the mi-adf test (adjusted degrees of freedom)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "gaussian", "metric": "set_distance", "mean_degree": 2.0, "d": 100, "n": 1000},
+      "andrey_errors": 0.5093,
+      "comparator_errors": 0.5068,
+      "cause": "correct-by-paper",
+      "reason": "The difference is the candidates of each round. The paper's line 24 tests every variable outside the blanket given it, and Andrey's search does; bnlearn's fast.iamb drops from its pool every variable that was in the blanket at the end of a round, so a variable a later shrink removes is never tested again. A trace running one Fisher z test (bnlearn's zf agrees to 5e-7) under ports of both searches, with every rule switchable, reproduces Andrey's records on every target and bnlearn's on 1,976 to 1,998 of 2,000 per seed half. With bnlearn's pool rule in Andrey's search the difference is 0.0000 to -0.0002 on both seed halves at 1,000 and 5,000 rows, and with Andrey's rule in bnlearn's search the gap returns; the batch order, the shrink, and the stop move nothing. At all but one of the 333 targets where the two differ, the first difference is a variable that left the blanket in a shrink and tests dependent again given the current blanket; where it stays in Andrey's set it is outside the true blanket in 171 of 174 cases at 1,000 rows and 140 of 141 at 5,000. On the graphs with 50 variables and mean degree 4 at 1,000 rows the paper's rule gives the smaller distance, by 0.003.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, line 24: S <- {A | A in U - {T} - B(T) and A dependent on T given B(T)}. bnlearn 5.2.1 (GPL): R/fast-iamb.R, fast.ia.markov.blanket, nodes = nodes[nodes %!in% mb] at the end of each round."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "gaussian", "metric": "set_distance", "mean_degree": 2.0, "d": 100, "n": 5000},
+      "andrey_errors": 0.5006,
+      "comparator_errors": 0.4988,
+      "cause": "correct-by-paper",
+      "reason": "The difference is the candidates of each round. The paper's line 24 tests every variable outside the blanket given it, and Andrey's search does; bnlearn's fast.iamb drops from its pool every variable that was in the blanket at the end of a round, so a variable a later shrink removes is never tested again. A trace running one Fisher z test (bnlearn's zf agrees to 5e-7) under ports of both searches, with every rule switchable, reproduces Andrey's records on every target and bnlearn's on 1,976 to 1,998 of 2,000 per seed half. With bnlearn's pool rule in Andrey's search the difference is 0.0000 to -0.0002 on both seed halves at 1,000 and 5,000 rows, and with Andrey's rule in bnlearn's search the gap returns; the batch order, the shrink, and the stop move nothing. At all but one of the 333 targets where the two differ, the first difference is a variable that left the blanket in a shrink and tests dependent again given the current blanket; where it stays in Andrey's set it is outside the true blanket in 171 of 174 cases at 1,000 rows and 140 of 141 at 5,000. On the graphs with 50 variables and mean degree 4 at 1,000 rows the paper's rule gives the smaller distance, by 0.003.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, line 24: S <- {A | A in U - {T} - B(T) and A dependent on T given B(T)}. bnlearn 5.2.1 (GPL): R/fast-iamb.R, fast.ia.markov.blanket, nodes = nodes[nodes %!in% mb] at the end of each round."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "gaussian", "metric": "set_f1_loss", "mean_degree": 2.0, "d": 100, "n": 1000},
+      "andrey_errors": 0.3681,
+      "comparator_errors": 0.366,
+      "cause": "correct-by-paper",
+      "reason": "The difference is the candidates of each round. The paper's line 24 tests every variable outside the blanket given it, and Andrey's search does; bnlearn's fast.iamb drops from its pool every variable that was in the blanket at the end of a round, so a variable a later shrink removes is never tested again. A trace running one Fisher z test (bnlearn's zf agrees to 5e-7) under ports of both searches, with every rule switchable, reproduces Andrey's records on every target and bnlearn's on 1,976 to 1,998 of 2,000 per seed half. With bnlearn's pool rule in Andrey's search the difference is 0.0000 to -0.0002 on both seed halves at 1,000 and 5,000 rows, and with Andrey's rule in bnlearn's search the gap returns; the batch order, the shrink, and the stop move nothing. At all but one of the 333 targets where the two differ, the first difference is a variable that left the blanket in a shrink and tests dependent again given the current blanket; where it stays in Andrey's set it is outside the true blanket in 171 of 174 cases at 1,000 rows and 140 of 141 at 5,000. On the graphs with 50 variables and mean degree 4 at 1,000 rows the paper's rule gives the smaller distance, by 0.003.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, line 24: S <- {A | A in U - {T} - B(T) and A dependent on T given B(T)}. bnlearn 5.2.1 (GPL): R/fast-iamb.R, fast.ia.markov.blanket, nodes = nodes[nodes %!in% mb] at the end of each round."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "Fast-IAMB",
+      "comparator": "bnlearn 5.2.1 fast.iamb",
+      "row": {"regime": "gaussian", "metric": "set_f1_loss", "mean_degree": 2.0, "d": 100, "n": 5000},
+      "andrey_errors": 0.3601,
+      "comparator_errors": 0.3584,
+      "cause": "correct-by-paper",
+      "reason": "The difference is the candidates of each round. The paper's line 24 tests every variable outside the blanket given it, and Andrey's search does; bnlearn's fast.iamb drops from its pool every variable that was in the blanket at the end of a round, so a variable a later shrink removes is never tested again. A trace running one Fisher z test (bnlearn's zf agrees to 5e-7) under ports of both searches, with every rule switchable, reproduces Andrey's records on every target and bnlearn's on 1,976 to 1,998 of 2,000 per seed half. With bnlearn's pool rule in Andrey's search the difference is 0.0000 to -0.0002 on both seed halves at 1,000 and 5,000 rows, and with Andrey's rule in bnlearn's search the gap returns; the batch order, the shrink, and the stop move nothing. At all but one of the 333 targets where the two differ, the first difference is a variable that left the blanket in a shrink and tests dependent again given the current blanket; where it stays in Andrey's set it is outside the true blanket in 171 of 174 cases at 1,000 rows and 140 of 141 at 5,000. On the graphs with 50 variables and mean degree 4 at 1,000 rows the paper's rule gives the smaller distance, by 0.003.",
+      "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, line 24: S <- {A | A in U - {T} - B(T) and A dependent on T given B(T)}. bnlearn 5.2.1 (GPL): R/fast-iamb.R, fast.ia.markov.blanket, nodes = nodes[nodes %!in% mb] at the end of each round."
     }
   ]
 }

@@ -868,14 +868,16 @@ def gs(
     and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
     1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#gs>`_ shows; the benchmark scores the set at
-    each target, not the graphs the sets give. On hepar2 the sets have more errors, missing plus
-    extra members, than the empty set at every size: 5.6, 5.1, and 4.7 per target against 4.5, as
-    for :func:`~andrey.iamb`. In every other setting they have fewer. The median fit for every
-    target took 1.3 to 26 s on the networks and 0.35 to 4.1 s on the Gaussian graphs. Tested with
-    exact d-separation on 15 variables. Missing values are not benchmarked; the tests run them on up
-    to 20 variables with up to a fifth of the values missing completely at random. At a fixed
-    ``alpha``, the grow phase tests every variable outside the blanket, so the false members grow
-    with the number of variables: of the many variables independent of the target, those whose
+    each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
+    members, than the empty set in every measured setting except hepar2, where they have more at
+    every size, 5.6, 5.1, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
+    hepar2, with 70 variables, 2.8 to 3.4 members per target are extra, close to ``alpha`` times the
+    variables outside the blanket, while 1.3 to 2.8 of its 4.5 members are missed. The median fit
+    for every target took 1.3 to 26 s on the networks and 0.35 to 4.1 s on the Gaussian graphs.
+    Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
+    run them on up to 20 variables with up to a fifth of the values missing completely at random. At
+    a fixed ``alpha``, the grow phase tests every variable outside the blanket, so the false members
+    grow with the number of variables: of the many variables independent of the target, those whose
     p-values fall below ``alpha`` by chance join, each pass tests the ones left out again, and the
     shrink phase, which retests the members given nearly the same set with the same test, keeps most
     of them. It conditions on the whole current blanket, so each test needs more rows as the blanket
@@ -1140,26 +1142,28 @@ def fast_iamb(
     and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
     1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#fast-iamb>`_ shows; the benchmark scores the
-    set at each target, not the graphs the sets give. On hepar2 the sets have more errors, missing
-    plus extra members, than the empty set at every size, 5.4, 4.9, and 4.7 per target against 4.5,
-    and on the Gaussian graphs with 100 variables their errors tie the empty set's. It ran 42% to
-    73% of the tests of :func:`~andrey.iamb` but was less accurate in every setting except hepar2,
-    where the two tied: its mean F1 was 0.054 to 0.106 lower on the other networks and 0.010 to
-    0.052 lower on the Gaussian graphs. The median fit for every target took 0.78 to 16 s on the
-    networks and 0.35 to 3.5 s on the Gaussian graphs. Tested with exact d-separation on 15
-    variables. Missing values are not benchmarked; the tests run them on up to 20 variables with up
-    to a fifth of the values missing completely at random. At a fixed ``alpha``, every round tests
-    every variable outside the blanket, so the false members grow with the number of variables: of
-    the many variables independent of the target, those whose p-values fall below ``alpha`` by
-    chance join, and the shrink, which retests them given nearly the same set with the same test,
-    keeps most of them. Without the rule, on continuous data, the first round adds every variable
-    that depends on the target at all, ancestors and descendants included, and the shrink must
-    remove them given all the others. It conditions on the whole current blanket, so each test needs
-    more rows as the blanket grows. The skeleton and the CPDAG test every subset of the smaller
-    blanket for each pair of the moral graph and each unshielded triple, so a triple whose smaller
-    blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    set at each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
+    members, than the empty set in every measured setting except hepar2, where they have more at
+    every size, 5.4, 4.9, and 4.7 per target against 4.5, and the Gaussian graphs with 100
+    variables, where they have as many. There, 2.5 to 3.2 members per target on hepar2 and 3.8 on
+    the Gaussian graphs are extra, close to ``alpha`` times the variables outside the blanket,
+    against blankets of 4.5 and 3.9 members. It ran 42% to 73% of the tests of :func:`~andrey.iamb`
+    but was less accurate in every setting except hepar2, where the two tied: its mean F1 was 0.054
+    to 0.106 lower on the other networks and 0.010 to 0.052 lower on the Gaussian graphs. The median
+    fit for every target took 0.78 to 16 s on the networks and 0.35 to 3.5 s on the Gaussian graphs.
+    Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
+    run them on up to 20 variables with up to a fifth of the values missing completely at random. At
+    a fixed ``alpha``, every round tests every variable outside the blanket, so the false members
+    grow with the number of variables: of the many variables independent of the target, those whose
+    p-values fall below ``alpha`` by chance join, and the shrink, which retests them given nearly
+    the same set with the same test, keeps most of them. Without the rule, on continuous data, the
+    first round adds every variable that depends on the target at all, ancestors and descendants
+    included, and the shrink must remove them given all the others. It conditions on the whole
+    current blanket, so each test needs more rows as the blanket grows. The skeleton and the CPDAG
+    test every subset of the smaller blanket for each pair of the moral graph and each unshielded
+    triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
