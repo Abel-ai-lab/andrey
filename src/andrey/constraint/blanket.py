@@ -825,11 +825,14 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     def measure(xs: list[int], newest: int | None) -> None:
         """Test each of ``xs`` given each subset of the other members that holds ``newest`` (every
         subset when ``newest`` is ``None``), of at most ``max_depth`` variables, that passes the
-        rule; candidates with the same subsets are tested together, one subset at a time."""
+        rule, listing only the sizes whose smallest table passes it; candidates with the same
+        subsets are tested together, one subset at a time."""
         groups: dict[tuple[tuple[int, ...], ...], list[int]] = {}
         for x in xs:
             rest = sorted(z for z in members if z not in (x, newest))
             top = len(rest) if max_depth is None else max_depth - (newest is not None)
+            forced = () if newest is None else (newest,)
+            top = min(top, search.reliable_depth(target, x, rest, forced, df_rows=PCMB_DF_ROWS))
             conds = [
                 tuple(sorted((*s, newest) if newest is not None else s))
                 for size in range(min(top, len(rest)) + 1)
@@ -1351,6 +1354,28 @@ class LocalSearch:
                 if size is not None and self.n < rows * size:
                     return False
         return True
+
+    def reliable_depth(
+        self, x: int, y: int, among: Sequence[int], forced: Sequence[int] = (), *, df_rows: int
+    ) -> int:
+        """The most variables of ``among`` that can join ``forced`` in a conditioning set of ``x``
+        and ``y`` and still pass the rule of :meth:`reliable` with ``df_rows``: the set of the
+        fewest categories grows until its table has too many degrees of freedom for the rows, and a
+        larger set only adds categories. ``len(among)`` when no bound follows, on a test that
+        reads a continuous column or a column of one category."""
+        if self.levels is None or any(self.levels[c] == 0 for c in (x, y, *forced, *among)):
+            return len(among)
+        size = (int(self.levels[x]) - 1) * (int(self.levels[y]) - 1)
+        size *= math.prod(int(self.levels[c]) for c in forced)
+        if size == 0:
+            return len(among)
+        depth = 0
+        for categories in sorted(int(self.levels[c]) for c in among):
+            size *= categories
+            if self.n < df_rows * size:
+                break
+            depth += 1
+        return depth
 
     def strongest(self, keys: Mapping[int, Any]) -> int:
         """The candidate with the smallest key, ties broken by ``ranks`` (:func:`strongest`)."""
