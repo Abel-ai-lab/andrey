@@ -944,6 +944,7 @@ SUPPORTED: dict[str, Method] = {
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
+    "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),

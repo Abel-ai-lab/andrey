@@ -128,6 +128,50 @@ its targets. A set is scored against the true set of its kind, per target and po
 where a learner offers it) and scores the graph's adjacencies, `precision`, `recall`, `f1`, and
 `shd` against the empty graph's. The CPDAG's `shd` is `andrey.metrics`', against the true CPDAG.
 
+## PCMB against its paper
+
+PCMB has no reference implementation (Pena et al., 2007), so `pcmb_summary.py` sets its sets beside
+Table 6 of its paper: the mean and standard deviation, over 10 databases, of the precision, the
+recall, and the distance from perfect precision and recall of the set learned at every node of the
+Alarm and Pigs networks, at significance level 0.01. The cells are `net:alarm:<n>` at 100, 200, 500,
+1,000, 2,000, and 5,000 rows and `net:pigs:<n>` at 100, 200, and 500, with every node a target, on
+datasets the lane draws: 20 per Alarm cell (seeds 0-19) and 10 per Pigs cell (seeds 0-9). The fits
+run G-square at `--alpha 0.01` with no limit on the conditioning set (`--max-depth none`). On
+categorical data `pcmb` counts degrees of freedom as Spirtes, Glymour, and Scheines (1993) do, its
+default `degrees_of_freedom="nonempty"`, where the other learners default to `"mean"`.
+`--drop-constant` fits only the columns that hold more than one value, as Andrey refuses a column
+of one value: an Alarm sample at 100 rows has a few, and their targets answer the empty set and
+count against the full network.
+
+A dataset's value is the mean over its targets of the lane's per-target scores, in two readings of
+an empty answer:
+
+- `skip`, the reading of the comparison with the paper: an empty answer has no precision or
+  distance and counts in the recall as 0, so the means of the precision and of the distance leave
+  it out;
+- `one`: an empty answer has the precision 1, so its distance is 1.
+
+The floor is the errors of the sets, the members missed plus the members added, against the empty
+set's, the size of the true set, with the paired bootstrap interval of the difference over the
+datasets. The table beside the paper's is on the
+[0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#pcmb). Here are the other reading, the
+floor, and the time of a fit for every node on one core:
+
+| Network | Rows | Datasets | Empty answers per dataset | Distance, empty counted 1 | Errors | Empty set's errors | Errors minus the empty set's [95% interval] | Median fit |
+|---|---:|---:|---:|---:|---:|---:|---|---:|
+| Alarm | 100 | 20 | 8.6 | 0.662 | 2.89 | 3.51 | -0.63 [-0.69, -0.56] | 2.6 s |
+| Alarm | 200 | 20 | 6.3 | 0.516 | 2.16 | 3.51 | -1.35 [-1.40, -1.30] | 2.8 s |
+| Alarm | 500 | 20 | 3.5 | 0.358 | 1.63 | 3.51 | -1.89 [-1.96, -1.82] | 3.9 s |
+| Alarm | 1,000 | 20 | 2.5 | 0.229 | 1.02 | 3.51 | -2.49 [-2.56, -2.43] | 4.3 s |
+| Alarm | 2,000 | 20 | 1.3 | 0.146 | 0.72 | 3.51 | -2.79 [-2.83, -2.74] | 5.8 s |
+| Alarm | 5,000 | 20 | 1.0 | 0.111 | 0.58 | 3.51 | -2.94 [-2.96, -2.91] | 7.6 s |
+| Pigs | 100 | 10 | 3.5 | 0.305 | 1.39 | 3.66 | -2.27 [-2.30, -2.24] | 3 min |
+| Pigs | 200 | 10 | 0.4 | 0.074 | 0.35 | 3.66 | -3.31 [-3.32, -3.29] | 9 min |
+| Pigs | 500 | 10 | 0.0 | 0.020 | 0.08 | 3.66 | -3.58 [-3.59, -3.57] | 17 min |
+
+On Alarm, the datasets of seeds 0-9 and of seeds 10-19 give mean distances that differ by at most
+0.03 in each cell.
+
 ## Run
 
 Load R as [The R lane](../README.md#the-r-lane) describes, with bnlearn 5.2.1 in the library, and

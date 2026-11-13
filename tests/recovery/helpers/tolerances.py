@@ -35,6 +35,7 @@ SPEC: dict[str, dict] = {
     "IAMB": GRAPH_ONLY,
     "InterIAMB": GRAPH_ONLY,
     "MMPC": GRAPH_ONLY,
+    "PCMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,

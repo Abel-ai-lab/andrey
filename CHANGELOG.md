@@ -45,7 +45,7 @@ names its pull request.
   variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
   ([#965])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
-  experimental, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
+  supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
   parents-and-children search, GetPCD, adds the candidate most dependent on the target and then
   removes every member that a subset of the others separates from it, until no candidate is left;
@@ -53,7 +53,9 @@ names its pull request.
   other parent when a test finds it dependent on the target given the set that separated the two
   and the common child. On categorical data a test runs only with at least five rows per degree of
   freedom of its table, and the categorical tests take `degrees_of_freedom="nonempty"` by default,
-  the degrees of freedom of the G-square test its paper runs. ([#971], [#981])
+  the degrees of freedom of the G-square test its paper runs. The 0.18.0 release card sets its
+  results on samples of the Alarm and Pigs networks beside the published results of its paper.
+  ([#971], [#981], [#982])
 - `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
   `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
   statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
@@ -2707,6 +2709,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969

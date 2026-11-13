@@ -23,6 +23,7 @@ _GRAPH = (
             "IAMB",
             "InterIAMB",
             "MMPC",
+            "PCMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",
