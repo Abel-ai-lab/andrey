@@ -174,7 +174,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures`, `ldp`, `ld3` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `gin`, `anm`, `pnl`, `loci`, `icp`, `y_structures`, `covariate_rules`, `ldp`, `ld3` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb` |
 | `undirected` | `mmpc`, `hiton_pc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
@@ -201,6 +201,10 @@ those CPDAGs and `metadata["path_aggregated"]` whether each one's directions wer
 `y_structures` returns a `dag` with no edges: it claims that one variable is a causal ancestor of
 another, which is not an edge, so its claims are records in `metadata["effects"]`, and a pair
 without a record is not claimed either way.
+
+`covariate_rules` returns a `dag` with no edges: its rules decide whether the treatment affects the
+outcome, which is not an edge, so its answer, an effect with the adjustment sets found, no effect,
+or undecided, is a record in `metadata["effects"]`.
 
 `ldp` returns a `dag` with no edges: its labels say how each column relates to the pair, which is
 not an edge, so its answer, an adjustment set or none, is a record in `metadata["effects"]`. `ld3`

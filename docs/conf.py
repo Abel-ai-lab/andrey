@@ -505,6 +505,7 @@ PROSE_NAMES = {
     "mb_by_mb": "MB-by-MB",
     "mmb_by_mmb": "MMB-by-MMB",
     "y_structures": "Y-structures",
+    "covariate_rules": "covariate selection rules",
     "ldp": "LDP",
     "ld3": "LD3",
     "ges": "GES",

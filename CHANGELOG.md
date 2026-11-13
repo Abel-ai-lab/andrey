@@ -165,6 +165,16 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
+- `andrey.covariate_rules`, the covariate selection rules (Entner et al. 2013), experimental:
+  whether one `treatment` affects one `outcome`, and the covariate sets to adjust for, when every
+  other column is a covariate measured before the treatment, with hidden variables allowed. Rule R1
+  finds a covariate and a set of the others that show the treatment affects the outcome, the set
+  being a valid adjustment set; rule R2 finds the independences that show it does not. The answer is
+  an effect with every set R1 found when only R1 applies, no effect when only R2 applies, and
+  undecided otherwise, one record in `metadata["effects"]`; `metadata["rule_counts"]` counts each
+  rule, and the graph has no edges. It checks every set of covariates, so its tests double with each
+  covariate unless `max_depth` caps the sets, and it accepts missing values by test-wise deletion.
+  ([#PRB11])
 
 ### Changed
 
