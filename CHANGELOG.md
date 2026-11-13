@@ -194,7 +194,7 @@ names its pull request.
   of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
   them. It learns only the blankets the answer needs. `metadata["effects"]` holds one record per
   direction, the graph the edges at the two variables, and `metadata["blankets_learned"]` the
-  variables whose blanket it learned. ([#PR])
+  variables whose blanket it learned. ([#1003])
 
 ### Changed
 
@@ -2757,6 +2757,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
