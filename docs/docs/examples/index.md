@@ -92,7 +92,7 @@ quick_start
 
 PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, GS,
 Fast-IAMB, MMPC, HITON-PC, HITON-MB, and PCMB, which join each variable's local structure into a
-graph; CMB's edges at one variable; CD-NOD and FCI-JCI on data from several domains; and ICP's
+graph; CMB's edges at one variable and MMB-by-MMB's under hidden common causes; CD-NOD and FCI-JCI on data from several domains; and ICP's
 parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`

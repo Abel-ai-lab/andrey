@@ -30,6 +30,7 @@ _GRAPH = (
             "HITONMB",
             "MMMB",
             "CMB",
+            "MMBbyMMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",

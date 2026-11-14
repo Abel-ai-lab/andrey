@@ -4,7 +4,8 @@ FCI and RFCI.
 
 Runs the simulation of the MMB-by-MMB paper (Xie et al., 2024, Sect. 5.1) on published networks
 (:mod:`andrey_bench.latent_networks`): each network's DAG as a linear-Gaussian model with random
-nodes hidden, ``n`` rows, and the two nodes with the most neighbors as targets. Every solution
+nodes hidden, ``n`` rows, and the paper's targets (the two nodes with the most neighbors in a
+network outside its four, or ``--targets k`` of them in any network). Every solution
 answers at each target; a graph is scored on the edges at the target against the PAG of the
 observed nodes (the CPDAG with ``--hidden 0``), an edge counting only with both marks right
 (:func:`andrey_bench.local_lane.target_edge_scores`):
@@ -97,6 +98,14 @@ def _read(out: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
+def targets_for(network: networks.Network, count: int | None) -> tuple[str, ...]:
+    """The targets of ``network``: its ``count`` nodes with the most neighbors, else the paper's
+    targets in its four networks and the two with the most neighbors in any other."""
+    if count is None and network.name in latent_networks.PAPER_TARGETS:
+        return latent_networks.PAPER_TARGETS[network.name]
+    return latent_networks.default_targets(network, 2 if count is None else count)
+
+
 def hidden_for(network: str, override: int | None) -> int:
     """The hidden nodes of ``network``: ``override``, else the paper's count."""
     if override is not None:
@@ -140,7 +149,11 @@ def rescore(out: Path, meta: dict, hidden: dict[str, int]) -> list[dict]:
         if key not in truths:
             net = networks.load_network(record["network"])
             draw = latent_networks.sample(
-                net, n=2, seed=record["seed"], hidden=record["hidden"], n_targets=meta["targets"]
+                net,
+                n=2,
+                seed=record["seed"],
+                hidden=record["hidden"],
+                targets=meta["targets"][record["network"]],
             )
             truths[key] = (latent_networks.truth(draw), {t: draw.columns[t] for t in draw.targets})
         truth, targets = truths[key]
@@ -170,7 +183,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--seeds", type=int, default=20, help="datasets per network (default: 20)")
     p.add_argument("--first-seed", type=int, default=0, help="the first seed (default: 0)")
-    p.add_argument("--targets", type=int, default=2, help="targets per network (default: 2)")
+    p.add_argument(
+        "--targets",
+        type=int,
+        default=None,
+        help="the nodes with the most neighbors taken as targets (default: the paper's targets)",
+    )
     p.add_argument("--alpha", type=float, default=ALPHA, help="level of every test (default: 0.01)")
     p.add_argument("--part", type=int, default=0, help="run every --parts-th dataset from this one")
     p.add_argument("--parts", type=int, default=1, help="parts the datasets are split into")
@@ -252,7 +270,10 @@ def main(argv: list[str] | None = None) -> int:
         "weight_range": list(latent_networks.WEIGHT_RANGE),
         "networks": args.networks,
         "hidden": hidden,
-        "targets": args.targets,
+        "targets": {
+            name: list(targets_for(networks.load_network(name), args.targets))
+            for name in args.networks
+        },
         "rows": args.rows,
         "seeds": args.seeds,
         "first_seed": args.first_seed,
@@ -301,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
             walls: dict[str, list[float]] = {a.name: [] for a in field}
             for n in args.rows:
                 draw = latent_networks.sample(
-                    net, n=n, seed=seed, hidden=hidden[name], n_targets=args.targets
+                    net, n=n, seed=seed, hidden=hidden[name], targets=run_meta["targets"][name]
                 )
                 if truth is None:  # the model, so the truth, is the same for every n
                     truth = latent_networks.truth(draw)
