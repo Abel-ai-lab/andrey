@@ -175,6 +175,18 @@
         "asia_gauss": {"median_shd": 3.0, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 3, 0, 3, 0, 3, 3]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
+      "HITONMB": {
+        "linear_gauss_er_d20": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [2, 10, 7, 0, 0, 2, 6, 2, 10, 0]},
+        "linear_gauss_er_d50": {"median_shd": 11.0, "empty_median_shd": 50.0, "shd": [12, 12, 17, 9, 6, 11, 18, 11, 6, 8]},
+        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 2, 3, 0, 3, 3]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "MMMB": {
+        "linear_gauss_er_d20": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [2, 10, 7, 0, 0, 2, 6, 2, 11, 2]},
+        "linear_gauss_er_d50": {"median_shd": 10.5, "empty_median_shd": 50.0, "shd": [6, 14, 17, 9, 11, 11, 14, 10, 3, 6]},
+        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 2, 3, 0, 3, 3]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
       "MMHC": {
         "linear_gauss_er_d20": {"median_shd": 5.0, "empty_median_shd": 20.0, "shd": [0, 11, 9, 0, 3, 10, 2, 4, 15, 6]},
         "linear_gauss_er_d50": {"median_shd": 13.0, "empty_median_shd": 50.0, "shd": [12, 11, 18, 18, 17, 14, 10, 8, 8, 15]},
