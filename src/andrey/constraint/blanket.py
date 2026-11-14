@@ -309,10 +309,11 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     Grow: each pass visits every candidate outside the blanket in that order, tests it given the
     current blanket, and adds it at once when the p-value is at or below ``alpha``, so the next
     candidate of the pass is tested given the larger blanket; passes repeat until one adds nothing.
-    Shrink: each pass visits the members in the same order and drops each one the test finds
-    independent of ``target`` given the other current members; passes repeat until one drops
-    nothing. A test whose conditioning set has not changed since the candidate's last test is not
-    asked again, and while the blanket is still empty the grow test is the ordering test itself.
+    A candidate whose conditioning set has not changed since its last test is not asked again, and
+    while the blanket is still empty the grow test is the ordering test itself.
+    Shrink: the members are visited in the order they joined; a member the test finds independent
+    of ``target`` given the other current members is dropped at once, and the visit starts again
+    from the first member, until every member tests dependent.
 
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
     stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
@@ -357,23 +358,18 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 last[y] = len(blanket)
                 sepsets[y] = tuple(sorted(blanket))
         growing = growing and added
-    # The removals made when each member was last found dependent: the blanket only shrinks here.
-    kept: dict[int, int] = {}
-    removed = 0
-    while True:
-        before = removed
-        for x in [y for y in order if y in blanket]:
-            if kept.get(x) == removed:
+    removing = True
+    while removing:
+        removing = False
+        for x in blanket:
+            if x in required:
                 continue
             rest = [z for z in blanket if z != x]
             if search.scan(target, [x], rest)[1][0] > alpha:
                 blanket.remove(x)
-                removed += 1
                 sepsets[x] = tuple(sorted(rest))
-            else:
-                kept[x] = removed
-        if removed == before:
-            break
+                removing = True
+                break
     for x in blanket:
         sepsets.pop(x, None)
     if constraints is None:
