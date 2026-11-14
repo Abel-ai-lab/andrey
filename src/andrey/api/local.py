@@ -487,7 +487,10 @@ def mmb_by_mmb(
     its blanket with the search of :func:`~andrey.pc`: ``x`` and a member are adjacent unless some
     subset of the rest of the blanket separates them, every other pair is tested against the
     subsets of either end's neighbors, and a triple ``a - b - c`` with ``a`` and ``c`` separated
-    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. When the blanket and ``x`` lie
+    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. Since a member and ``x`` are
+    adjacent exactly when no subset of the rest of the member's own blanket separates them either
+    [1]_, the pair is tested on the smaller of the two blankets, as MBCS* limits the search [3]_;
+    the method learns the blanket of each member to compare them. When the blanket and ``x`` lie
     inside those of a variable done earlier, or every member of the blanket is done, the local
     structure is read from what is already learned instead [1]_. Only the edges at ``x`` and the
     v-structures that contain ``x`` join the growing graph, since the rest of the local structure
@@ -536,7 +539,9 @@ def mmb_by_mmb(
     graphs with hidden common causes, where the answer holds the PAG's edges with each mark the
     PAG's or a circle, the PAG's at 654 of 657 targets, and on simulated linear-Gaussian data with
     hidden nodes. The collider check learns the blanket and local structure of each variable it
-    reads, so a fit runs more tests than the paper's steps alone. ``"total_conditioning"`` tests
+    reads, so a fit runs more tests than the paper's steps alone. The tests of an adjacent pair
+    grow about twofold with each member of the smaller of its two blankets, so two adjacent
+    variables that both have wide blankets are slow. ``"total_conditioning"`` tests
     each variable given all the others, so it needs more rows than variables and continuous data
     with linear effects; on other data, choose another learner. Each local structure tests up to
     ``local_max_depth`` members per set, and a pair that only a larger set separates keeps its

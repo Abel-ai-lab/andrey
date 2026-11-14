@@ -298,6 +298,71 @@ def test_the_skeleton_rule_tests_far_fewer_sets_where_the_blanket_is_wide():
     assert counts["skeleton"] * 10 < counts["pc"]
 
 
+@pytest.mark.parametrize(("seed", "d", "hidden"), [(s, 10 + s % 5, s % 4) for s in range(12)])
+def test_the_smaller_blanket_keeps_the_answer_of_the_node_blanket_at_every_target(seed, d, hidden):
+    # Under exact tests a pair x - y is separated by a subset of MB(y) without x exactly when a
+    # subset of MB(x) without y separates it, with hidden variables too, so the answer is the same.
+    dag = _random_dag(seed, d, hidden, mediated=seed % 2 == 1)
+    truth = _pag(dag, d)
+    for target in range(d):
+        stars = [
+            sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules).network.star(target, d)
+            for rules in (MMB_BY_MMB, replace(MMB_BY_MMB, local="pc"))
+        ]
+        assert np.array_equal(*stars), target
+        want = _star(truth, target)
+        assert np.array_equal(stars[0] != NULL, want != NULL), target
+        assert np.all((stars[0] == want) | (stars[0] == CIRCLE)), target
+
+
+def test_the_smaller_blanket_tests_far_fewer_sets_at_a_hub():
+    # 0 has two children, each with six other parents: |MB(0)| is 14 and each child's blanket has
+    # 7 members. An adjacent pair at 0 passes every subset of 0's blanket, 2 ** 13 of them, and
+    # every subset of the child's, 2 ** 6.
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how in ("pc", "pc_smaller"):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            local = learn_local(search, 0, mb, how, of=lambda v: search.local("iamb", v)[1])
+            found[how] = _at(local, 0)
+        counts[how] = tests.n
+    assert found["pc_smaller"] == found["pc"]
+    assert counts["pc_smaller"] * 5 < counts["pc"]
+
+
+def test_the_collider_check_drops_a_v_structure_the_smaller_blanket_brings_in():
+    # 1's blanket {2, 6, 7, 10}: 2 <- 3 -> 7 -> 1 makes 2 - 7 an edge of L_1, and MB(2) = {1, 3,
+    # 10} separates 1 from 2 by {3}, a set without 7, so L_1 holds 1 *-> 7 <-* 2. 7's own step
+    # leaves 7 and 2 apart, and the check drops it.
+    edges = [(0, 4), (1, 6), (1, 10), (2, 10), (3, 2), (3, 7), (5, 0), (6, 8), (7, 1), (7, 5)]
+    dag = _dag(edges + [(7, 9), (9, 0), (10, 6), (10, 9)], 11)
+    search = _search(dag)
+    mb = search.local("iamb", 1)[1]
+    local = learn_local(search, 1, mb, "pc_smaller", of=lambda v: search.local("iamb", v)[1])
+    assert (1, 7, 2) in local.colliders
+    truth = _pag(dag, 11)
+    result = sequential(_search(dag), 1, "iamb", MMB_BY_MMB)
+    assert np.array_equal(result.network.star(1, 11), _star(truth, 1))
+
+
+def test_the_smaller_blanket_falls_back_to_the_node_blanket():
+    # A far blanket that does not hold x, as a learner can return on data, is not read.
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how, of in (("pc", None), ("pc_smaller", lambda v: [])):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            found[how] = learn_local(search, 0, mb, how, of=of)
+        counts[how] = tests.n
+    assert found["pc_smaller"] == found["pc"]
+    assert counts["pc_smaller"] == counts["pc"]
+
+
 def test_load_learns_its_local_structures_by_the_skeleton_rule():
     edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
     dag = _dag(edges, 15)
@@ -416,6 +481,8 @@ def test_rules_refuse_unknown_choices_and_a_learner_of_parents_and_children():
         Rules(colliders="never")
     with pytest.raises(ValueError, match="stop_after"):
         Rules(stop_after="degree")
+    with pytest.raises(ValueError, match="own_blanket"):
+        Rules(local="pc_smaller")
     with pytest.raises(ValueError, match="parents and children"):
         sequential(_search(_dag([(0, 1)], 2)), 0, "mmpc")
 
