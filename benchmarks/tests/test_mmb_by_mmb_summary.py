@@ -91,7 +91,12 @@ def test_the_summary_rows_carry_errors_the_parity_gate_judges(tmp_path):
         assert summary[f"andrey_{metric}_mean"] > summary[f"comparator_{metric}_mean"]
         assert summary["above_zero"] and summary["replication"]["above_zero"]
         assert summary["floor"]["applies"] and summary["floor"]["pass"]
-        entry = {"method": "MMB-by-MMB", "metric": metric, "comparator": "authors", "rows": [summary]}
+        entry = {
+            "method": "MMB-by-MMB",
+            "metric": metric,
+            "comparator": "authors",
+            "rows": [summary],
+        }
         data = {"parity_rule": "paired bootstrap", "methods": [entry]}
         [parsed] = reference_parity.paired_rows("test", data)
         assert parsed.failed
