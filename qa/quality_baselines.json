@@ -17,6 +17,7 @@
       "MMPC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "HITONPC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "PCMB": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "HITONMB": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "GES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
       "GIES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "GnIES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
@@ -178,12 +179,6 @@
       "HITONMB": {
         "linear_gauss_er_d20": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [2, 10, 7, 0, 0, 2, 6, 2, 10, 0]},
         "linear_gauss_er_d50": {"median_shd": 11.0, "empty_median_shd": 50.0, "shd": [12, 12, 17, 9, 6, 11, 18, 11, 6, 8]},
-        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 2, 3, 0, 3, 3]},
-        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
-      },
-      "MMMB": {
-        "linear_gauss_er_d20": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [2, 10, 7, 0, 0, 2, 6, 2, 11, 2]},
-        "linear_gauss_er_d50": {"median_shd": 10.5, "empty_median_shd": 50.0, "shd": [6, 14, 17, 9, 11, 11, 14, 10, 3, 6]},
         "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 2, 3, 0, 3, 3]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
