@@ -9457,7 +9457,7 @@
    "andrey_precision_mean": 0.9062,
    "andrey_recall_mean": 0.9518,
    "other_tests_per_target": 747.9,
-   "other_s": 3.8615,
+   "other_s": 3.6764,
    "other_errors_mean": 3.4246,
    "other_precision_mean": 0.512,
    "other_recall_mean": 0.9989,
@@ -9781,7 +9781,7 @@
    "andrey_precision_mean": 0.8079,
    "andrey_recall_mean": 0.4874,
    "other_tests_per_target": 462.2,
-   "other_s": 0.718,
+   "other_s": 0.6903,
    "other_errors_mean": 2.1037,
    "other_precision_mean": 0.8418,
    "other_recall_mean": 0.9215,
@@ -9943,7 +9943,7 @@
    "andrey_precision_mean": 0.7938,
    "andrey_recall_mean": 0.5348,
    "other_tests_per_target": 483.7,
-   "other_s": 1.3907,
+   "other_s": 1.3271,
    "other_errors_mean": 1.3772,
    "other_precision_mean": 0.8555,
    "other_recall_mean": 0.9804,
@@ -10105,7 +10105,7 @@
    "andrey_precision_mean": 0.9062,
    "andrey_recall_mean": 0.9518,
    "other_tests_per_target": 773.7,
-   "other_s": 3.815,
+   "other_s": 3.7623,
    "other_errors_mean": 3.4276,
    "other_precision_mean": 0.5118,
    "other_recall_mean": 0.9989,
@@ -10429,7 +10429,7 @@
    "andrey_precision_mean": 0.8079,
    "andrey_recall_mean": 0.4874,
    "other_tests_per_target": 520.7,
-   "other_s": 0.8737,
+   "other_s": 0.8312,
    "other_errors_mean": 2.0771,
    "other_precision_mean": 0.8464,
    "other_recall_mean": 0.9189,
@@ -10591,7 +10591,7 @@
    "andrey_precision_mean": 0.7938,
    "andrey_recall_mean": 0.5348,
    "other_tests_per_target": 549.9,
-   "other_s": 1.5061,
+   "other_s": 1.4545,
    "other_errors_mean": 1.3761,
    "other_precision_mean": 0.855,
    "other_recall_mean": 0.9807,
@@ -10701,25 +10701,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": -0.3565,
+     "mean_D": -0.3562,
      "bootstrap_95": [
-      -0.3745,
-      -0.3378
+      -0.3741,
+      -0.3376
      ],
      "verdict": "better",
      "andrey_mean": 0.1329,
-     "other_mean": 0.4894
+     "other_mean": 0.4891
     },
     "f1": {
      "paired": 20,
-     "mean_D": 0.2648,
+     "mean_D": 0.2645,
      "bootstrap_95": [
-      0.2506,
-      0.2781
+      0.2504,
+      0.2777
      ],
      "verdict": "better",
      "andrey_mean": 0.9117,
-     "other_mean": 0.6469
+     "other_mean": 0.6472
     },
     "same_sets": 0.0
    },
@@ -10736,10 +10736,10 @@
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -0.3868,
+     "mean": -0.3939,
      "bootstrap_95": [
-      -0.5473,
-      -0.2087
+      -0.5528,
+      -0.2196
      ],
      "pass": true
     }
@@ -10752,10 +10752,10 @@
    "andrey_errors_mean": 0.6933,
    "andrey_precision_mean": 0.9062,
    "andrey_recall_mean": 0.9518,
-   "other_tests_per_target": 296.2,
-   "other_s": 4.4573,
-   "other_errors_mean": 3.4957,
-   "other_precision_mean": 0.511,
+   "other_tests_per_target": 301.4,
+   "other_s": 4.432,
+   "other_errors_mean": 3.4886,
+   "other_precision_mean": 0.5113,
    "other_recall_mean": 0.999,
    "empty_errors_mean": 3.8825
   },
@@ -11025,25 +11025,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.3942,
+     "mean_D": 0.4008,
      "bootstrap_95": [
-      0.3528,
-      0.4336
+      0.3598,
+      0.4394
      ],
      "verdict": "worse",
      "andrey_mean": 0.5892,
-     "other_mean": 0.195
+     "other_mean": 0.1884
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.3179,
+     "mean_D": -0.3222,
      "bootstrap_95": [
-      -0.3504,
-      -0.284
+      -0.354,
+      -0.2885
      ],
      "verdict": "worse",
      "andrey_mean": 0.5567,
-     "other_mean": 0.8746
+     "other_mean": 0.8789
     },
     "same_sets": 0.0
    },
@@ -11060,10 +11060,10 @@
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -6.5934,
+     "mean": -6.6674,
      "bootstrap_95": [
-      -6.877,
-      -6.3209
+      -6.9327,
+      -6.4073
      ],
      "pass": true
     }
@@ -11076,11 +11076,11 @@
    "andrey_errors_mean": 6.0996,
    "andrey_precision_mean": 0.8079,
    "andrey_recall_mean": 0.4874,
-   "other_tests_per_target": 162.4,
-   "other_s": 0.9125,
-   "other_errors_mean": 1.9242,
-   "other_precision_mean": 0.8283,
-   "other_recall_mean": 0.9641,
+   "other_tests_per_target": 211.4,
+   "other_s": 1.0244,
+   "other_errors_mean": 1.8502,
+   "other_precision_mean": 0.8353,
+   "other_recall_mean": 0.9638,
    "empty_errors_mean": 8.5176
   },
   {
@@ -11187,25 +11187,25 @@
     "paired": 20,
     "distance": {
      "paired": 20,
-     "mean_D": 0.3827,
+     "mean_D": 0.3948,
      "bootstrap_95": [
-      0.3447,
-      0.4215
+      0.3544,
+      0.4356
      ],
      "verdict": "worse",
      "andrey_mean": 0.5514,
-     "other_mean": 0.1687
+     "other_mean": 0.1566
     },
     "f1": {
      "paired": 20,
-     "mean_D": -0.3038,
+     "mean_D": -0.3121,
      "bootstrap_95": [
-      -0.3359,
-      -0.2719
+      -0.3454,
+      -0.2789
      ],
      "verdict": "worse",
      "andrey_mean": 0.591,
-     "other_mean": 0.8948
+     "other_mean": 0.9031
     },
     "same_sets": 0.0
    },
@@ -11222,10 +11222,10 @@
     },
     "other_minus_empty": {
      "paired": 20,
-     "mean": -6.9245,
+     "mean": -7.065,
      "bootstrap_95": [
-      -7.1973,
-      -6.6707
+      -7.3386,
+      -6.81
      ],
      "pass": true
     }
@@ -11238,10 +11238,10 @@
    "andrey_errors_mean": 5.9563,
    "andrey_precision_mean": 0.7938,
    "andrey_recall_mean": 0.5348,
-   "other_tests_per_target": 156.5,
-   "other_s": 1.5121,
-   "other_errors_mean": 1.5931,
-   "other_precision_mean": 0.8377,
+   "other_tests_per_target": 230.3,
+   "other_s": 1.7199,
+   "other_errors_mean": 1.4526,
+   "other_precision_mean": 0.85,
    "other_recall_mean": 0.9899,
    "empty_errors_mean": 8.5176
   },
@@ -11401,7 +11401,7 @@
    "andrey_precision_mean": 0.9062,
    "andrey_recall_mean": 0.9518,
    "other_tests_per_target": 1793.7,
-   "other_s": 8.6913,
+   "other_s": 8.3787,
    "other_errors_mean": 0.7082,
    "other_precision_mean": 0.9078,
    "other_recall_mean": 0.9484,
@@ -11725,7 +11725,7 @@
    "andrey_precision_mean": 0.8079,
    "andrey_recall_mean": 0.4874,
    "other_tests_per_target": 3688.9,
-   "other_s": 6.4389,
+   "other_s": 5.8806,
    "other_errors_mean": 5.9367,
    "other_precision_mean": 0.8328,
    "other_recall_mean": 0.4838,
@@ -11887,7 +11887,7 @@
    "andrey_precision_mean": 0.7938,
    "andrey_recall_mean": 0.5348,
    "other_tests_per_target": 8272.2,
-   "other_s": 15.4636,
+   "other_s": 14.8949,
    "other_errors_mean": 5.5981,
    "other_precision_mean": 0.8316,
    "other_recall_mean": 0.538,
