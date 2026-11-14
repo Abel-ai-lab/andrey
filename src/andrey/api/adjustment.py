@@ -927,30 +927,29 @@ def local_optimal_adjustment(
     pair whose order you know and an adjustment set that need not be optimal, see
     :func:`~andrey.ldp`.
 
-    **How it works.** Algorithm 3 of [1]_ in four steps. Step 1 learns the edges at each of the
-    two variables with MB-by-MB [5]_ as [1]_ runs it: Grow-Shrink blankets, each local structure
-    learned by PC's search over a variable and its blanket, a pair at that variable tested against
-    the subsets of the rest of the blanket, Meek's rules, and every blanket, local structure, and
-    separating set kept for the later searches. A variable is an explicit ancestor of the other
-    when the other is its child, or, when the two are not adjacent, when the test finds them
-    dependent given the first one's parents and undirected neighbors; it is a possible ancestor
-    when the other is its child or undirected neighbor, or, when not adjacent, when they test
-    dependent given its parents alone [2]_. With no explicit ancestor, each direction gets the
-    parent sets of its treatment when the treatment is a possible ancestor, and a zero effect
-    otherwise. Step 2 learns the edges of each undirected neighbor of the treatment and keeps the
-    effect identifiable only when no such neighbor is adjacent to the outcome and each tests
-    independent of the outcome given its parents and the treatment (Lemma 4.3 of [1]_). Step 3
-    marks as possible descendants of the treatment its children and undirected neighbors and each
-    other variable that tests dependent on it given its parents. Step 4 runs MB-by-MB at the
-    outcome over the variables that are not possible descendants, with the treatment and the
-    outcome, and the outcome's parents there, the treatment left out, are the optimal set (Lemma
-    4.4 of [1]_). The parent sets of a treatment are its parents with each subset of its other
-    undirected neighbors whose members are adjacent to every other parent in the set, so that no
-    new v-structure forms [4]_. The variable whose rank, computed from the data, comes first is
-    searched first, ties between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the
-    neighbors of Step 2 go in rank order, so the answer does not depend on the column order unless
-    two columns are identical. An edge that two v-structures direct both ways, which exact tests
-    never give, is left undirected, so each end reads the other as an undirected neighbor.
+    **How it works.** Algorithm 3 of [1]_ in four steps. Step 1 learns the edges at each of the two
+    variables with MB-by-MB [5]_ as [1]_ runs it: Grow-Shrink blankets, each local structure learned
+    by the skeleton step of PC over a variable and its blanket, Meek's rules, and every blanket,
+    local structure, and separating set kept for the later searches. A variable is an explicit
+    ancestor of the other when the other is its child, or, when the two are not adjacent, when the
+    test finds them dependent given the first one's parents and undirected neighbors; it is a
+    possible ancestor when the other is its child or undirected neighbor, or, when not adjacent,
+    when they test dependent given its parents alone [2]_. With no explicit ancestor, each direction
+    gets the parent sets of its treatment when the treatment is a possible ancestor, and a zero
+    effect otherwise. Step 2 learns the edges of each undirected neighbor of the treatment and keeps
+    the effect identifiable only when no such neighbor is adjacent to the outcome and each tests
+    independent of the outcome given its parents and the treatment (Lemma 4.3 of [1]_). Step 3 marks
+    as possible descendants of the treatment its children and undirected neighbors and each other
+    variable that tests dependent on it given its parents. Step 4 runs MB-by-MB at the outcome over
+    the variables that are not possible descendants, with the treatment and the outcome, and the
+    outcome's parents there, the treatment left out, are the optimal set (Lemma 4.4 of [1]_). The
+    parent sets of a treatment are its parents with each subset of its other undirected neighbors
+    whose members are adjacent to every other parent in the set, so that no new v-structure forms
+    [4]_. The variable whose rank, computed from the data, comes first is searched first, ties
+    between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the neighbors of Step 2 go in
+    rank order, so the answer does not depend on the column order unless two columns are identical.
+    An edge that two v-structures direct both ways, which exact tests never give, is left
+    undirected, so each end reads the other as an undirected neighbor.
 
     **Zero effects.** A zero effect between two adjacent variables, the treatment a child of the
     outcome, is not identifiable here: the edge into the treatment is a back-door path that no set
@@ -969,8 +968,9 @@ def local_optimal_adjustment(
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs of up to
     20 variables, against the relation, the identifiability, and the optimal set of the true
-    graph, and on simulated linear-Gaussian data. Each local structure tests the pairs of a blanket
-    against subsets of the rest with no cap, so a variable with a large blanket costs many tests.
+    graph, and on simulated linear-Gaussian data. Each local structure tests a pair against the
+    subsets of the neighbors of its ends with no cap, so a variable with many neighbors costs many
+    tests, and the parent sets of a treatment grow with the subsets of its undirected neighbors.
     The numbers are a reference, not a hard limit: they change with the data generator, the
     density, the method's settings, and the machine.
 
