@@ -244,7 +244,7 @@ names its pull request.
   number of sets. `mmb_by_mmb` tests a pair against every subset of a blanket of up to 10 members,
   and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
   of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
-  unchanged. ([#PR1])
+  unchanged. ([#1019])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2786,7 +2786,7 @@ First alpha release.
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
-[#PR1]: https://github.com/Abel-ai-lab/Andrey/pull/PR1
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
