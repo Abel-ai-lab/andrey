@@ -181,7 +181,7 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
-- `andrey.cmb`, CMB (Gao and Ji 2015), experimental: the direct causes and direct effects of one
+- `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
   labels each neighbor from how its dependence on the others changes once the target is conditioned
@@ -190,7 +190,10 @@ names its pull request.
   acyclicity (Meek's rule R2). `alpha` defaults to 0.02, the level of the paper's runs. `metadata`
   lists the target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the
   `blankets_learned`, and `n_tests`. With exact tests every edge and direction it returns is the
-  CPDAG's, and some edges the CPDAG directs stay undirected. ([#995])
+  CPDAG's, and some edges the CPDAG directs stay undirected. It is supported: on samples of the
+  Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
+  PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
+  release card has the numbers. ([#995], [#1020])
 - `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
   directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
   blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
@@ -2783,6 +2786,7 @@ First alpha release.
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
+[#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#PR2]: https://github.com/Abel-ai-lab/Andrey/pull/PR2
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
