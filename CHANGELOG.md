@@ -189,7 +189,7 @@ names its pull request.
   CPDAG's, and some edges the CPDAG directs stay undirected. It is supported: on samples of the
   Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
   PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
-  release card has the numbers. ([#995], [#PRNUM])
+  release card has the numbers. ([#995], [#1020])
 - `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
   directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
   blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
@@ -2782,6 +2782,7 @@ First alpha release.
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
+[#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
