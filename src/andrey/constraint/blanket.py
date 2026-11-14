@@ -651,12 +651,11 @@ def _max_min(search: LocalSearch, target: int, sepsets: Sepsets | None) -> list[
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
         for size in range(1, top + 1):
-            separating = search.separating(target, x, rest, size, before)
-            if separating:
+            found = search.separating(target, x, rest, size, before)
+            if found is not None:
                 members.remove(x)
                 if sepsets is not None:
-                    pvalues = np.array([[p for _, p in separating]])
-                    [sepsets[x]] = search.largest_sets(pvalues, [s for s, _ in separating])
+                    sepsets[x] = found[0]
                 break
     return members
 
@@ -1373,23 +1372,42 @@ class LocalSearch:
         among: Sequence[int],
         size: int,
         skip_within: set[int] | None = None,
-    ) -> list[tuple[tuple[int, ...], float]]:
-        """The sets of ``size`` members of ``among`` that separate ``x`` from ``target`` (a p-value
-        above ``alpha``), each with its p-value, in the order of ``combinations``.
+    ) -> tuple[tuple[int, ...], float] | None:
+        """The set of ``size`` members of ``among`` that separates ``x`` from ``target`` (a p-value
+        above ``alpha``) with the largest p-value, as ``(set, p-value)``, or ``None`` when no set
+        does; of sets whose p-values agree, the one :meth:`largest_sets` picks.
 
         Every such set is tested, those lying inside ``skip_within`` excepted, in chunks of one
         call where the test has ``batched_call``
-        (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). ``among`` is ascending and
-        excludes ``target`` and ``x``. A test that stops its shuffles once the side of ``alpha`` is
-        certain may report a bound in place of a p-value above ``alpha``.
+        (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Only the number of sets
+        tested and the best separating set so far are kept, so the memory does not grow with the
+        number of sets. ``among`` is ascending and excludes ``target`` and ``x``. A test that stops
+        its shuffles once the side of ``alpha`` is certain may report a bound in place of a
+        p-value above ``alpha``.
         """
         start = perf_counter()
-        trace: list[dict] = []
+        tested = 0
+        kept: list[tuple[int, ...]] | None = [] if self.counts.queries is not None else None
+        best: list[tuple[tuple[int, ...], float]] = []
+
+        def visit(chunk: list[tuple[int, ...]], pvalues: Sequence[float]) -> None:
+            nonlocal tested
+            tested += len(chunk)
+            if kept is not None:
+                kept.extend(chunk)
+            p = np.asarray(pvalues, dtype=np.float64)
+            hits = [(chunk[j], float(p[j])) for j in np.flatnonzero(p > self.alpha).tolist()]
+            if hits:
+                found = best + hits
+                sets = [s for s, _ in found]
+                [pick] = self.largest_sets(np.array([[q for _, q in found]]), sets)
+                best[:] = [found[sets.index(pick)]]
+
         scan_conditioning_sets(
-            self.test, target, x, list(among), size, self.alpha, set(), skip_within, trace
+            self.test, target, x, list(among), size, self.alpha, set(), skip_within, visit=visit
         )
-        self._asked(start, target, [x], len(trace), lambda: (record["S"] for record in trace))
-        return [(record["S"], record["p"]) for record in trace if record["removed"]]
+        self._asked(start, target, [x], tested, lambda: kept or ())
+        return best[0] if best else None
 
     def reliable(
         self,

@@ -509,7 +509,9 @@ def learn_local(
                 if len(among) < size:
                     continue
                 tested = True
-                hits += search.separating(first, other, among, size, within)
+                found = search.separating(first, other, among, size, within)
+                if found is not None:
+                    hits.append(found)
                 within = set(among)
             if hits:
                 sets = [s for s, _ in hits]
