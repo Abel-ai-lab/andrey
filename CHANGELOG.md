@@ -109,8 +109,12 @@ names its pull request.
   beyond the paper, the method follows it, with two safeguards that make the answer correct where
   the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
   off the step confirm it from their own blankets, and the stop rules are read only once more
-  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
-  beside the authors' code. ([#966], [#980], [#994])
+  blankets have been learned than the target has neighbors. A pair at a step is tested against the
+  subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
+  does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
+  so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. ([#966],
+  [#980], [#994], [#PR2])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2780,6 +2784,7 @@ First alpha release.
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#PR2]: https://github.com/Abel-ai-lab/Andrey/pull/PR2
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
