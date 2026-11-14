@@ -90,7 +90,7 @@ names its pull request.
   they tie it on precision and average precision in all 12 settings, and the precision of their
   claims is above the share of ancestral pairs in each. Under selection the tests' errors make many
   claims wrong at 10,000 rows: on the random graphs with 16 variables, 35 of 65 claims were true,
-  and 133 of 475 with `extended=True`. ([#959], [#1016], [#1024])
+  and 133 of 475 with `extended=True`. ([#959], [#1016], [#1026])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
   its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
@@ -149,7 +149,7 @@ names its pull request.
   `--rule`: `authors`, the default, as the authors' simulation script draws them, the first among
   the colliders and their descendants and the others among all other nodes; `text`, the harder
   setting, as the paper's text describes them, among the leaves of the colliders' descendants.
-  `y_structures_summary.py` judges Andrey's claims against the authors' code per setting. ([#1024])
+  `y_structures_summary.py` judges Andrey's claims against the authors' code per setting. ([#1026])
 - Scores for the answers of local methods, which may leave a question open.
   `andrey.metrics.target_oracle` and `effect_oracle` give the answer a method's definition gives on
   the true graph: a target's Markov blanket, its parents and children, or its edges in the true
@@ -2815,7 +2815,7 @@ First alpha release.
 [#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
-[#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
+[#1026]: https://github.com/Abel-ai-lab/Andrey/pull/1026
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
