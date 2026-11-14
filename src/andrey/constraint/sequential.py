@@ -469,7 +469,8 @@ def learn_local(
     With ``how="ic"`` and ``how="pc"`` a pair at ``x`` is tested against the subsets of ``mb``
     without its other end; with ``how="pc_smaller"`` a pair ``x - y`` is tested against the subsets
     of ``of(y)``, ``y``'s blanket, without ``x`` instead when ``of`` is given and that blanket holds
-    ``x`` and has fewer members than ``mb``. With ``how="ic"`` every other pair is tested against
+    ``x`` and has fewer members than ``mb``; those blankets are asked first, in the order of
+    ``mb``. With ``how="ic"`` every other pair is tested against
     the subsets of the other members of ``MB+(x)``, and with ``how="pc"`` and ``"pc_smaller"``
     against the subsets of either end's adjacencies as they stand when the level begins. With
     ``how="skeleton"`` every pair, those at ``x`` included, is tested as ``"pc"`` tests the others.
@@ -489,6 +490,9 @@ def learn_local(
     adjacent = {p for p in combinations(nodes, 2) if support is None or support[p]}
     fixed = {p for p in adjacent if required is not None and required[p]}
     blanket = sorted(mb)
+    # The members' blankets in the blanket's joining order, so the order of the learned blankets,
+    # and the separating sets their learner records first, do not depend on the column order.
+    far = {y: of(y) for y in mb} if how == "pc_smaller" and of is not None else None
     sepsets: dict[Pair, tuple[int, ...]] = {}
     caps = [c for c in (search.max_depth, depth) if c is not None]
     cap = min(caps) if caps else None
@@ -500,7 +504,7 @@ def learn_local(
         for pair in sorted(adjacent - fixed):
             hits: list[tuple[tuple[int, ...], float]] = []
             within: set[int] | None = None
-            sides = _sides(search, x, pair, blanket, nodes, neighbors, how, of)
+            sides = _sides(search, x, pair, blanket, nodes, neighbors, how, far)
             for first, other, among in sides:
                 if len(among) < size:
                     continue
@@ -538,18 +542,19 @@ def _sides(
     nodes: tuple[int, ...],
     neighbors: Mapping[int, set[int]],
     how: str,
-    of: Callable[[int], Sequence[int]] | None = None,
+    far: Mapping[int, Sequence[int]] | None = None,
 ) -> list[tuple[int, int, list[int]]]:
     """The tests that decide ``pair`` in :func:`learn_local`: each as ``(first, other, among)``,
-    the pair's ends in the order the test takes them and the ascending variables to condition on.
+    the pair's ends in the order the test takes them and the ascending variables to condition on;
+    ``far`` holds the blankets of ``x``'s members for ``how="pc_smaller"``.
     """
     u, v = pair
     if x in pair and how != "skeleton":
         y = v if u == x else u
-        if how == "pc_smaller" and of is not None:
-            far = of(y)
-            if x in far and len(far) < len(blanket):
-                return [(y, x, sorted(z for z in far if z != x))]
+        if how == "pc_smaller" and far is not None:
+            other = far[y]
+            if x in other and len(other) < len(blanket):
+                return [(y, x, sorted(z for z in other if z != x))]
         return [(x, y, [z for z in blanket if z != y])]
     first = search.strongest({u: 0.0, v: 0.0})
     other = v if first == u else u
