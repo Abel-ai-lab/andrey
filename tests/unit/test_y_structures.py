@@ -177,3 +177,24 @@ def test_each_test_given_x_runs_once_for_a_pattern_it_can_serve():
     # dependent pairs of a variable with an independent partner, neither separated. Given 0 or 1
     # no pair is independent, so no pattern there can use a test.
     assert asked == 6 + 3 + 2
+
+
+class _Table:
+    """A CI test answering from a table of p-values: ``{(a, b, given): p}``, ``0`` otherwise."""
+
+    def __init__(self, table):
+        self.table = {(min(a, b), max(a, b), tuple(z)): p for (a, b, z), p in table.items()}
+
+    def __call__(self, x, y, condition_set=()):
+        return self.table.get((min(x, y), max(x, y), tuple(sorted(condition_set))), 0.0)
+
+
+@pytest.mark.parametrize("extended", [False, True])
+@pytest.mark.parametrize("p_xy", [0.0, 1.0])
+def test_a_pair_is_claimed_only_when_it_tests_dependent(extended, p_xy):
+    """v, w = 0, 1 around x = 2 and y = 3 make both patterns; x and y testing independent, which
+    no pattern allows, leaves the pair unclaimed."""
+    table = {(0, 1, ()): 1.0, (0, 3, (2,)): 1.0, (1, 3, (2,)): 1.0, (2, 3, ()): p_xy}
+    search = LocalSearch(_Table(table), [0, 1, 2, 3], 0.01)
+    claimed = {(c.cause, c.effect) for c in engine(search, range(4), extended=extended)}
+    assert ((2, 3) in claimed) == (p_xy == 0.0)
