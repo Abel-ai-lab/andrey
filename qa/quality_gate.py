@@ -755,6 +755,8 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: domain index orients the edges it reaches. ``clusters`` counts the latents missed
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
 #: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
+#: ``ancestors`` scores a set of claimed ancestral pairs against the truth's ancestral pairs, the
+#: false claims plus the true pairs not claimed (:func:`set_errors`).
 #: ``direct`` scores the directed edges against those between observed variables that no hidden
 #: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
 #: index by its endpoints against the one the draw records. A time-series estimate is scored in its
@@ -775,6 +777,7 @@ Target = Literal[
     "cross_links",
     "lagged_edges",
     "targets",
+    "ancestors",
 ]
 SERIES_TARGETS = ("lagged", "window", "window_edges", "cross_links", "lagged_edges")
 
@@ -807,6 +810,9 @@ def _sizes(regime: str) -> tuple[str, ...]:
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
+#: Y-structures claim ancestors from the patterns the data show, on linear-Gaussian data from a
+#: DAG without selection, which keeps its claims valid.
+ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
@@ -914,6 +920,12 @@ def ut_igsp_fit(x: np.ndarray) -> Any:
     return andrey.ut_igsp(samples, env, targets={0: [], **known})
 
 
+def y_structures_claims(x: np.ndarray) -> set[tuple[int, int]]:
+    """Return the ancestral pairs ``(cause, effect)`` ``andrey.y_structures`` claims on ``x``."""
+    effects = andrey.y_structures(x).metadata["effects"]
+    return {(e["treatment"], e["outcome"]) for e in effects}
+
+
 def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     """The targets :func:`ut_igsp_fit` returns for each setting, given and learned."""
     learned = ut_igsp_fit(x).metadata["targets"]
@@ -948,6 +960,7 @@ SUPPORTED: dict[str, Method] = {
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
+    "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
@@ -1108,12 +1121,19 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     if target == "parents":
         last = truth.n_nodes - 1
         return set_errors(parents_of(estimate, last), parents_of(truth, last))
+    if target == "ancestors":
+        return set_errors(estimate, ancestral_pairs(truth))
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
     return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
 
 
-def set_errors(estimate: set[int], truth: set[int]) -> int:
+def ancestral_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
+    """Return the pairs ``(i, j)`` for which ``i`` is a proper ancestor of ``j`` in ``truth``."""
+    return {(i, j) for j in range(truth.n_nodes) for i in truth.ancestors(j, index=True)}
+
+
+def set_errors(estimate: set, truth: set) -> int:
     """Return the members of ``estimate`` not in ``truth`` plus those of ``truth`` it misses.
 
     It scores a method that estimates a set of variables, such as one variable's parents, as SHD
@@ -1181,6 +1201,8 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
         return np.zeros_like(truth)
     if target == "essential":  # GIES's and GnIES's data hold the targets or environments too
         return empty_graph(truth.n_nodes, "cpdag")
+    if target == "ancestors":
+        return set()
     if target == "parents":  # the data hold each row's environment beside the variables
         return empty_graph(truth.n_nodes, "dag")
     if target == "clusters":

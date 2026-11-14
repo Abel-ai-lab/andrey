@@ -127,6 +127,7 @@ ALGORITHMS = {
     "MMPC": (_facade("mmpc", structure="cpdag"), "gauss_5v"),
     "HITONPC": (_facade("hiton_pc", structure="cpdag"), "gauss_5v"),
     "PCMB": (_facade("pcmb"), "gauss_5v"),
+    "YStructures": (_facade("y_structures"), "gauss_7v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),

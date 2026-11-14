@@ -24,6 +24,8 @@ from andrey.constraint.blanket import LocalSearch
 from andrey.constraint.ystructures import y_structures as engine
 from andrey.data.latent import DSepOracle
 from andrey.metrics import claim_scores
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.harness import assert_recorded_output
 
 BENCHMARKS = Path(__file__).resolve().parents[2] / "benchmarks"
 
@@ -194,3 +196,10 @@ def test_claims_beat_the_base_rate(setting, rows, extended):
         base.append(scores["base_rate"])
     assert true_claims > false_claims
     assert true_claims / (true_claims + false_claims) > np.mean(base)
+
+
+def test_y_structures_keeps_the_recorded_output():
+    """The collider case ``gauss_7v``: the claimed pairs, their order, and their scores."""
+    assert_recorded_output(
+        y_structures(datagen.generate("gauss_7v")), "YStructures", case="gauss_7v"
+    )

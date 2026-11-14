@@ -175,6 +175,11 @@
         "asia_gauss": {"median_shd": 3.0, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 3, 0, 3, 0, 3, 3]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
+      "Y-structures": {
+        "linear_gauss_er_d20": {"median_shd": 29.5, "empty_median_shd": 30.0, "shd": [28, 34, 28, 29, 41, 30, 27, 34, 45, 22]},
+        "linear_gauss_er_d50": {"median_shd": 88.5, "empty_median_shd": 96.5, "shd": [93, 75, 90, 86, 110, 102, 104, 82, 87, 84]},
+        "asia_gauss": {"median_shd": 17.0, "empty_median_shd": 18.0, "shd": [17, 17, 17, 17, 17, 17, 17, 17, 17, 18]}
+      },
       "MMHC": {
         "linear_gauss_er_d20": {"median_shd": 5.0, "empty_median_shd": 20.0, "shd": [0, 11, 9, 0, 3, 10, 2, 4, 15, 6]},
         "linear_gauss_er_d50": {"median_shd": 13.0, "empty_median_shd": 50.0, "shd": [12, 11, 18, 18, 17, 14, 10, 8, 8, 15]},
