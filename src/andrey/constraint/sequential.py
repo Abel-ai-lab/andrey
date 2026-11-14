@@ -12,15 +12,18 @@ growing graph (:func:`merge`), which holds no other edge of ``L_x``, orients tha
 at each step, and :data:`MB_BY_MB`, :data:`LOAD`, and :data:`MMB_BY_MMB` hold them.
 
 A node ``y`` of ``MB(x)`` is adjacent to ``x`` exactly when no subset of ``MB(x)`` without ``y``
-separates them ([1]_ Thm. 1, [2]_ Thm. 1, [3]_ Lemma A.2), so every pair at ``x`` is tested against
-the subsets of ``MB(x) \\ {y}``, never against ``x``'s shrinking adjacencies. The v-structures of
-``L_x`` that contain ``x`` are true ones ([1]_ Thm. 2, [2]_ Thm. 2); its other edges may come from
-variables outside ``MB+(x)`` and stay out of the growing graph. With PC's search, a v-structure at
-``x`` can rest on an edge away from ``x`` that only a larger subset of the blanket separates;
-MMB-by-MMB checks each from the far variables' own blankets (:func:`confirm_colliders`), as its
-authors' code does. A pair the growing graph leaves
-apart is known to be non-adjacent only when a test separated it; the orientation rules read a
-non-adjacency only then.
+separates them ([1]_ Thm. 1, [2]_ Thm. 1, [3]_ Lemma A.2), so MB-by-MB and MMB-by-MMB test every
+pair at ``x`` against the subsets of ``MB(x) \\ {y}``, never against ``x``'s shrinking adjacencies;
+the tests of an adjacent pair grow as ``2 ** (|MB(x)| - 1)``. LOAD runs the skeleton step of PC
+over ``MB+(x)`` as its Algorithm 11 states: a pair at ``x`` is tested like every other, against the
+subsets of the adjacencies of either end, so its tests grow with the neighborhoods of the skeleton.
+The v-structures of ``L_x`` that contain ``x`` are true ones ([1]_ Thm. 2, [2]_ Thm. 2); its other
+edges may come from variables outside ``MB+(x)`` and stay out of the growing graph. With PC's
+search, a v-structure at ``x`` can rest on an edge away from ``x`` that only a larger subset of the
+blanket separates; MMB-by-MMB checks each from the far variables' own blankets
+(:func:`confirm_colliders`), as its authors' code does. A pair the growing graph leaves apart is
+known to be non-adjacent only when a test separated it; the orientation rules read a non-adjacency
+only then.
 
 Every candidate order follows the blanket learner's joining order, and every choice between tied
 p-values the ranks of :func:`~andrey.core.ties.tie_ranks`, through
@@ -75,8 +78,11 @@ class Rules:
     ``local`` decides the pairs of ``L_x`` that do not hold ``x``: ``"ic"`` tests each against
     every subset of the other members of ``MB+(x)``, as the IC search of MB-by-MB [1]_; ``"pc"``
     tests each against the subsets of the current adjacencies of either end, level by level, as
-    the PC search of LOAD [3]_ and MMB-by-MMB [2]_. Either way a pair at ``x`` is tested against the
-    subsets of ``MB(x)`` without the other end. ``expand`` decides what joins the waitlist:
+    the PC search of MMB-by-MMB [2]_; ``"skeleton"`` does the same, as the skeleton step of PC that
+    LOAD runs over ``MB+(x)`` ([3]_ Alg. 11). With ``"ic"`` and ``"pc"`` a pair at ``x`` is tested
+    against the subsets of ``MB(x)`` without the other end; with ``"skeleton"`` it is tested like
+    every other pair, so the number of tests follows the neighborhoods of the skeleton, not
+    ``MB(x)``. ``expand`` decides what joins the waitlist:
     ``"blanket"`` the members of ``MB(x)``, as soon as it is learned [1]_; ``"adjacent"`` the
     variables adjacent to ``x``, after the merge [2]_. ``orient`` decides the orientation:
     ``"meek"`` Meek's rules R1-R3 on a CPDAG [1]_; ``"pag"`` the FCI rules without selection bias
@@ -104,7 +110,7 @@ class Rules:
     subset of ``MB(b)``.
     """
 
-    local: Literal["ic", "pc"] = "ic"
+    local: Literal["ic", "pc", "skeleton"] = "ic"
     expand: Literal["blanket", "adjacent"] = "blanket"
     orient: Literal["meek", "pag"] = "meek"
     stop: Literal["blocked", "r1_r3", "r1_r2"] = "blocked"
@@ -113,7 +119,7 @@ class Rules:
 
     def __post_init__(self) -> None:
         for name, value, choices in (
-            ("local", self.local, ("ic", "pc")),
+            ("local", self.local, ("ic", "pc", "skeleton")),
             ("expand", self.expand, ("blanket", "adjacent")),
             ("orient", self.orient, ("meek", "pag")),
             ("stop", self.stop, ("blocked", "r1_r3", "r1_r2")),
@@ -128,8 +134,8 @@ class Rules:
 
 #: MB-by-MB as Wang et al. state it [1]_.
 MB_BY_MB = Rules()
-#: MB-by-MB as LOAD runs it ([3]_ Alg. 11): PC's search in place of IC's.
-LOAD = Rules(local="pc")
+#: MB-by-MB as LOAD runs it ([3]_ Alg. 11): the skeleton step of PC in place of IC's search.
+LOAD = Rules(local="skeleton")
 #: MMB-by-MMB [2]_, with the collider check and the stop guard of its authors' code.
 MMB_BY_MMB = Rules(
     local="pc",
@@ -434,14 +440,15 @@ def learn_local(
 ) -> LocalGraph:
     """The local structure over ``MB+(x)``, ``x`` with its blanket ``mb``, learned from the data.
 
-    A pair at ``x`` is tested against the subsets of ``mb`` without its other end; with
-    ``how="ic"`` every other pair against the subsets of the other members of ``MB+(x)``, and with
-    ``how="pc"`` against the subsets of either end's adjacencies as they stand when the level
-    begins. Sizes grow from zero; at each size every subset is tested (in one call where the test
-    can), and a pair that some set of that size separates is removed after the level, with the set
-    of the largest p-value, ties to the set whose ranks come first
-    (:meth:`~andrey.constraint.blanket.LocalSearch.largest_sets`). No test conditions on more than
-    the search's ``max_depth`` variables, nor on more than ``depth``. With knowledge, a pair it
+    With ``how="ic"`` and ``how="pc"`` a pair at ``x`` is tested against the subsets of ``mb``
+    without its other end; with ``how="ic"`` every other pair against the subsets of the other
+    members of ``MB+(x)``, and with ``how="pc"`` against the subsets of either end's adjacencies as
+    they stand when the level begins. With ``how="skeleton"`` every pair, those at ``x`` included,
+    is tested as ``"pc"`` tests the others. Sizes grow from zero; at each size every subset is
+    tested (in one call where the test can), and a pair that some set of that size separates is
+    removed after the level, with the set of the largest p-value, ties to the set whose ranks come
+    first (:meth:`~andrey.constraint.blanket.LocalSearch.largest_sets`). No test conditions on more
+    than the search's ``max_depth`` variables, nor on more than ``depth``. With knowledge, a pair it
     makes non-adjacent is never adjacent and a required one is never tested. A triple
     ``a - b - c`` with ``a``, ``c`` separated is a collider when ``b`` is not in their set. Each set
     found goes into ``cache``.
@@ -506,7 +513,7 @@ def _sides(
     the pair's ends in the order the test takes them and the ascending variables to condition on.
     """
     u, v = pair
-    if x in pair:
+    if x in pair and how != "skeleton":
         y = v if u == x else u
         return [(x, y, [z for z in blanket if z != y])]
     first = search.strongest({u: 0.0, v: 0.0})
