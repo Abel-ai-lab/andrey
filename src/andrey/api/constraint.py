@@ -2614,10 +2614,9 @@ def y_structures(
     dependent is claimed. A claim's score is the largest, over its patterns, of the smaller of
     ``-log p`` for ``v`` and ``y`` and for ``w`` and ``y``, the p-values of their marginal tests
     ([3]_, eq. 9): the more clearly ``y`` depends on both, the higher. A p-value of ``0`` gives an
-    infinite score; ``"fisherz"`` returns ``0`` below about ``2e-16``, so the strongest claims share
-    an infinite score. Every test is marginal or conditions on ``x`` alone: each pair is tested
-    marginally once, and given ``x`` only when a pattern at ``x`` could use it, so the claims do
-    not depend on the column order.
+    infinite score, which ``"fisherz"`` reaches only below about ``1e-308``. Every test is marginal
+    or conditions on ``x`` alone: each pair is tested marginally once, and given ``x`` only when a
+    pattern at ``x`` could use it, so the claims do not depend on the column order.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [4]_ [5]_, so it keeps rows that
