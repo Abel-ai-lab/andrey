@@ -62,11 +62,10 @@ def test_a_setting_without_a_counterpart_is_refused():
         CausalExplorerBlanket("IAMB", indep_test="gsq")
 
 
-def test_the_answers_are_read_0_based_and_an_error_raises():
+def test_the_answers_are_read_0_based_and_a_failed_target_is_kept_apart():
     text = "matlab\t9.10\n1\tok\t0.1\t3 2\n2\tok\t0.0\t\n3\tok\t0.2\t1\n"
-    assert ce.parse_output(text, 3) == {0: [1, 2], 1: [], 2: [0]}
-    with pytest.raises(RuntimeError, match="failed at target 1: bad"):
-        ce.parse_output("2\terror\t0.0\tbad\n", 3)
+    assert ce.parse_output(text, 3) == ({0: [1, 2], 1: [], 2: [0]}, {})
+    assert ce.parse_output("1\tok\t0.0\t2\n2\terror\t0.0\tbad\n", 3) == ({0: [1]}, {1: "bad"})
     with pytest.raises(RuntimeError, match="gave target 0"):
         ce.parse_output("1\tok\t0.0\t1\n", 3)
 
@@ -74,6 +73,44 @@ def test_the_answers_are_read_0_based_and_an_error_raises():
 def test_the_and_rule_keeps_the_pairs_in_each_others_set():
     sets = {0: [1, 2], 1: [0], 2: [1], 3: []}
     assert ce.and_rule(sets, [0, 1, 2]) == {0: [1], 1: [0], 2: []}
+
+
+def _fake_matlab(monkeypatch, tmp_path, lines: str) -> None:
+    """Stand in for MATLAB: the runner's ``out.txt`` holds `lines`."""
+
+    def run(cmd, cwd, **kwargs):
+        (Path(cwd) / "out.txt").write_text("matlab\t9.10\n" + lines)
+        return type("Done", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(ce, "toolbox_dir", lambda: tmp_path)
+    monkeypatch.setattr(ce.shutil, "which", lambda name: "matlab")
+    monkeypatch.setattr(ce.subprocess, "run", run)
+
+
+def test_a_target_the_toolbox_fails_at_has_no_answer_and_the_others_are_kept(monkeypatch, tmp_path):
+    data = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 1], [1, 1, 0]], dtype=float)
+    _fake_matlab(monkeypatch, tmp_path, "1\tok\t0.1\t2\n2\terror\t0.1\tno set\n3\tok\t0.1\t\n")
+    native = CausalExplorerBlanket("MMMB", indep_test="gsq").fit(data, {"targets": [0, 1, 2]})
+    answer, counts, _ = lane.unpack_answer(native)
+    assert answer[0].tolist() == [0, 1, 0] and answer[2].tolist() == [0, 0, 0]
+    assert counts.tolist() == [lane.NO_COUNT, lane.NO_ANSWER, lane.NO_COUNT]
+    _fake_matlab(monkeypatch, tmp_path, "1\terror\t0.1\tno set\n")
+    with pytest.raises(RuntimeError, match="failed at every target"):
+        CausalExplorerBlanket("MMMB", indep_test="gsq").fit(data, {"targets": [0]})
+
+
+def test_the_lane_leaves_an_unanswered_target_out_of_the_scores():
+    truth = np.zeros((3, 3), dtype=np.int8)
+    truth[0, 1] = truth[2, 1] = 2  # 0 -> 1 <- 2 as endpoint marks: arrowhead 2, tail 1
+    truth[1, 0] = truth[1, 2] = 1
+    answer = np.zeros((3, 3), dtype=np.int8)
+    answer[0, 1] = 1
+    counts = np.array([lane.NO_COUNT, lane.NO_ANSWER, lane.NO_COUNT])
+    record = {"targets": [0, 1, 2], "structure": None, "kind": "mb"}
+    measure = {"status": "ok", "adj": lane.pack_answer(answer, counts)}
+    blanket_cpu.score(record, None, measure, truth)
+    assert record["unanswered"] == [1]
+    assert sorted(record["per_target"]) == ["0", "2"] and sorted(record["n_tests"]) == ["0", "2"]
 
 
 def test_hiton_pc_is_symmetric_unless_asked_for_the_toolboxs_sets():
