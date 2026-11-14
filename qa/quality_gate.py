@@ -1157,9 +1157,12 @@ def latents_missed(estimate: Any, truth: GraphStructure) -> int:
 
 
 def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
-    kind = {"projection": "pag", "index_pag": "pag", "target_cpdag": "cpdag", "target_pag": "pag"}.get(
-        target, target
-    )
+    kind = {
+        "projection": "pag",
+        "index_pag": "pag",
+        "target_cpdag": "cpdag",
+        "target_pag": "pag",
+    }.get(target, target)
     return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 

@@ -94,7 +94,7 @@ names its pull request.
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
   caps every test, as in the other learners, and sets no cap by default. ([#956])
-- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
+- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), supported: the direct causes and direct
   effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
   with their marks, learned one Markov blanket at a time outward from the target until its marks are
   decided or the paper's stop rules end the search. `metadata` lists the target's `parents`,
@@ -113,8 +113,11 @@ names its pull request.
   subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
   does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
   so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
-  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. ([#966],
-  [#980], [#994], [#1022])
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. It is
+  supported: on the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the paper's
+  targets, its edges and marks were better than those of the authors' code in five of eight
+  settings and no worse in the rest, and it made fewer errors than the empty answer in all eight;
+  the 0.18.0 release card has the numbers. ([#966], [#980], [#994], [#1022], [#PR])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2795,6 +2798,7 @@ First alpha release.
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
+[#PR]: https://github.com/Abel-ai-lab/Andrey/pull/PR
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994

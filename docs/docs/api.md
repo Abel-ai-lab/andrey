@@ -546,6 +546,13 @@ directs the target's edges from what their blankets show. No reference implement
 the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
 on its paper's Alarm setting.
 
+MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
+their marks when unmeasured common causes may exist, without the whole graph: it learns the
+target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
+marks at the target, and returns the edges the target has in the PAG. The authors' code is its
+reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
+four networks with hidden variables.
+
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
 variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
