@@ -42,20 +42,25 @@ names its pull request.
   graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
   empty set in every setting. ([#950], [#993])
 - `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
-  experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
   target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
   target and for each of its parents and children, then admits each child's other parent when a
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
-  ([#957])
+  It is supported: against the authors' HITON-MB on child, insurance, alarm, hailfinder, and pigs
+  at its paper's sizes, its sets were closer to the true ones in 11 of 13 settings and further in
+  2, at 5,000 rows on hailfinder and insurance, where its symmetry check drops members the authors'
+  code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
+  ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
   authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
   parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
   check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
   children, then admits a variable as a spouse when a test finds it dependent on the target given
   the set that separated the two and a parent or child of the target whose own set holds the
-  variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
-  ([#965])
+  variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
+  al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
+  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -114,8 +119,12 @@ names its pull request.
   beyond the paper, the method follows it, with two safeguards that make the answer correct where
   the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
   off the step confirm it from their own blankets, and the stop rules are read only once more
-  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
-  beside the authors' code. ([#966], [#980], [#994])
+  blankets have been learned than the target has neighbors. A pair at a step is tested against the
+  subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
+  does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
+  so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. ([#966],
+  [#980], [#994], [#1022])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2802,7 +2811,9 @@ First alpha release.
 [#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
 [#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

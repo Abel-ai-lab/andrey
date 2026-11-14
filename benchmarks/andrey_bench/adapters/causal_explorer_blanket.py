@@ -13,7 +13,11 @@ A fit writes the data and the settings to a new temporary directory, starts ``ma
 with one computational thread, and calls the toolbox's function for every target there (the runner
 is :data:`RUNNER`, written beside the data). It answers for targets only; the toolbox learns no
 whole graph from these functions. Its wall time includes MATLAB's start, so it is not a speed
-measure. The toolbox reports no test count.
+measure. The toolbox reports no test count. A target at which the function stops with an error
+(MMMB's and HITON-MB's "Deseparating set S is not found", for one) has no answer: the fit keeps the
+other targets' sets and marks it :data:`~andrey_bench.blanket_lane.NO_ANSWER`, so the lane leaves
+it out of the scores; under the AND rule so is a target whose set holds such a variable. A fit
+with no answered target fails.
 
 The settings the lane passes, and how each reaches the toolbox:
 
@@ -53,6 +57,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.blanket_lane import (
+    NO_ANSWER,
     NO_COUNT,
     STRUCTURE_PARAM,
     TARGETS_PARAM,
@@ -152,9 +157,11 @@ def encode(data: np.ndarray) -> tuple[np.ndarray, list[int]]:
     return codes, counts
 
 
-def parse_output(text: str, d: int) -> dict[int, list[int]]:
-    """Each target's set, 0-based, from the runner's ``out.txt``; an error line raises."""
+def parse_output(text: str, d: int) -> tuple[dict[int, list[int]], dict[int, str]]:
+    """Each answered target's set, 0-based, from the runner's ``out.txt``, and the message of each
+    target the function failed at; a set outside the variables raises."""
     sets: dict[int, list[int]] = {}
+    failed: dict[int, str] = {}
     for line in text.splitlines():
         fields = line.split("\t")
         if fields[0] == "matlab" or not line.strip():
@@ -162,12 +169,13 @@ def parse_output(text: str, d: int) -> dict[int, list[int]]:
         target, status = int(fields[0]) - 1, fields[1]
         rest = fields[3] if len(fields) > 3 else ""
         if status != "ok":
-            raise RuntimeError(f"Causal Explorer failed at target {target}: {rest}")
+            failed[target] = rest
+            continue
         members = sorted(int(v) - 1 for v in rest.split())
         if any(not 0 <= m < d or m == target for m in members):
             raise RuntimeError(f"Causal Explorer gave target {target} the set {members}")
         sets[target] = members
-    return sets
+    return sets, failed
 
 
 def and_rule(sets: Mapping[int, list[int]], targets: list[int]) -> dict[int, list[int]]:
@@ -283,13 +291,25 @@ class CausalExplorerBlanket:
             if done.returncode != 0 or not out.is_file():
                 tail = (done.stderr or done.stdout)[-2000:]
                 raise RuntimeError(f"matlab exited with {done.returncode}: {tail}")
-            sets = parse_output(out.read_text(), d)
+            sets, failed = parse_output(out.read_text(), d)
+        # Under the AND rule a target whose set holds a failed variable has no answer either.
+        unanswered = {
+            t
+            for t in targets
+            if t in failed or self.symmetry and set(sets.get(t, ())) & set(failed)
+        }
+        if len(unanswered) == len(targets):
+            t, message = next(iter(failed.items()))
+            raise RuntimeError(f"Causal Explorer failed at every target, at {t}: {message}")
+        answered = [t for t in targets if t not in unanswered]
         if self.symmetry:
-            sets = and_rule(sets, targets)
+            sets = and_rule(sets, answered)
         answer = np.zeros((d, d), dtype=np.int8)
-        for t in targets:
+        counts = np.full(d, NO_COUNT, dtype=np.int64)
+        for t in answered:
             answer[t, sets[t]] = 1
-        return pack_answer(answer, np.full(d, NO_COUNT, dtype=np.int64), None)
+        counts[sorted(unanswered)] = NO_ANSWER
+        return pack_answer(answer, counts, None)
 
     def to_structure(self, native: np.ndarray) -> Any:
         """The answer as a ``GraphStructure``; untimed. See ``answer_structure``."""

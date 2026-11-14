@@ -39,6 +39,8 @@ SPEC: dict[str, dict] = {
     "MMPC": GRAPH_ONLY,
     "HITONPC": GRAPH_ONLY,
     "PCMB": GRAPH_ONLY,
+    "HITONMB": GRAPH_ONLY,
+    "MMMB": GRAPH_ONLY,
     # Y-structures: the claimed pairs in their listed order, and the scores within rounding.
     "YStructures": {
         "structural": ["graph", "claims"],

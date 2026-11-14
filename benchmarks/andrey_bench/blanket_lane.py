@@ -37,6 +37,10 @@ STRUCTURES = ("moral", "skeleton", "cpdag")
 #: The test count of a target, or of a fit, that its solution does not report.
 NO_COUNT = -1
 
+#: The test count of a target its solution failed to answer: the lane leaves the target out of the
+#: fit's sets and scores, and lists it in the record's ``unanswered``.
+NO_ANSWER = -2
+
 # The arrowhead of Andrey's endpoint marks (mirrors contracts.py).
 _ARROW = 2
 

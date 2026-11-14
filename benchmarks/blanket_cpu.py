@@ -73,6 +73,7 @@ from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_blanket import BnlearnBlanket
 from andrey_bench.adapters.causal_explorer_blanket import CausalExplorerBlanket
 from andrey_bench.blanket_lane import (
+    NO_ANSWER,
     NO_COUNT,
     STRUCTURES,
     TARGETS_PARAM,
@@ -345,7 +346,8 @@ def score(record: dict, adapter: Any, measure: dict, truth: np.ndarray) -> None:
     native = np.asarray(measure["adj"])
     answer, counts, total = unpack_answer(native)
     if record["structure"] is None:
-        targets = record["targets"]
+        targets = [t for t in record["targets"] if counts[t] != NO_ANSWER]
+        record["unanswered"] = [t for t in record["targets"] if counts[t] == NO_ANSWER]
         record.update(score_sets(answer, truth, targets, record["kind"]))
         record["n_tests"] = {
             str(t): None if counts[t] == NO_COUNT else int(counts[t]) for t in targets

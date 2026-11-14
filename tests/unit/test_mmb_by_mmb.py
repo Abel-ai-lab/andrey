@@ -240,7 +240,8 @@ def test_the_collider_check_drops_an_edge_the_pc_step_keeps(dsep):
 
 def test_local_max_depth_caps_the_local_structures_alone(monkeypatch):
     # Six parents of t: total conditioning conditions on the five other variables, while the local
-    # structures test their pairs given at most local_max_depth members.
+    # structures test their pairs given at most local_max_depth members; a blanket learned during
+    # a local structure, to compare the two ends of a pair, counts as the blanket learner's.
     dag = _dag([(p, 6) for p in range(6)], 7)
     sizes: dict[str, list[int]] = {"blanket": [], "local": []}
     step = ["blanket"]
@@ -260,8 +261,17 @@ def test_local_max_depth_caps_the_local_structures_alone(monkeypatch):
         finally:
             step[0] = "blanket"
 
+    def learn_blanket(*args, **kwargs):
+        previous, step[0] = step[0], "blanket"
+        try:
+            return learn_mb(*args, **kwargs)
+        finally:
+            step[0] = previous
+
     learn = sequential_engine.learn_local
+    learn_mb = sequential_engine.learn_blanket
     monkeypatch.setattr(sequential_engine, "learn_local", learn_local)
+    monkeypatch.setattr(sequential_engine, "learn_blanket", learn_blanket)
     monkeypatch.setitem(ci._CI_REGISTRY, "recorded", Recorded)
     x = np.random.default_rng(0).standard_normal((40, 7))
     andrey.mmb_by_mmb(x, target=6, indep_test="recorded", local_max_depth=1)
