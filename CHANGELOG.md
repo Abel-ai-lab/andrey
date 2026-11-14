@@ -117,7 +117,7 @@ names its pull request.
   supported: on the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the paper's
   targets, its edges and marks were better than those of the authors' code in five of eight
   settings and no worse in the rest, and it made fewer errors than the empty answer in all eight;
-  the 0.18.0 release card has the numbers. ([#966], [#980], [#994], [#1022], [#PR])
+  the 0.18.0 release card has the numbers. ([#966], [#980], [#994], [#1022], [#1024])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2798,7 +2798,7 @@ First alpha release.
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
-[#PR]: https://github.com/Abel-ai-lab/Andrey/pull/PR
+[#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
