@@ -9,9 +9,10 @@ extended Y-structure needs a minimal independence and a minimal dependence, each
 - ``v`` and ``w`` are independent, and dependent given ``x``.
 
 The Y-structure also needs the first line with ``w`` in place of ``v``, so the two play the same
-role. Every test is marginal or conditions on ``x`` alone. The marginal tests run once for every
-pair; the tests given ``x`` run only for the pairs a pattern at ``x`` could use, each pair once,
-asked from its smaller column, so the claims do not depend on which tests run.
+role. Both claim only pairs ``x``, ``y`` that test dependent, which every pattern implies. Every
+test is marginal or conditions on ``x`` alone. The marginal tests run once for every pair; the
+tests given ``x`` run only for the pairs a pattern at ``x`` could use, each pair once, asked from
+its smaller column, so the claims do not depend on which tests run.
 """
 
 from __future__ import annotations
@@ -102,7 +103,8 @@ def _patterns(
     apart[x, :] = apart[:, x] = False
     # v needs a partner w independent of it; y is an effect of x in columns.
     capable = np.flatnonzero(apart.any(axis=1))
-    effects = [int(y) for y in columns if y != x]
+    # A pattern makes x and y dependent (from v _||_ y | x and v not_||_ y); claim only such y.
+    effects = [int(y) for y in columns if y != x and dependent[x, y]]
     pairs = {(min(v, y), max(v, y)) for y in effects for v in capable if v != y and dependent[v, y]}
     p_sep = _given(search, x, pairs)
     separated: dict[int, set[int]] = defaultdict(set)
