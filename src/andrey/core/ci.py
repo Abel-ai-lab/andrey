@@ -568,9 +568,10 @@ class FisherZ(PartialCorrelationTest):
     """Fisher-Z partial-correlation conditional-independence test.
 
     Applies Fisher's z-transform to the partial correlation ``r`` and reports
-    ``p = 2 * (1 - Phi(sqrt(n - |S| - 3) * |z|))`` with ``z = atanh(r)`` and ``Phi`` the
-    standard-normal CDF. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for
-    the partial correlation, the query paths, and their exact agreement.
+    ``p = 2 * Phi(-sqrt(n - |S| - 3) * |z|)`` with ``z = atanh(r)`` and ``Phi`` the standard-normal
+    CDF. The upper tail is computed directly, so a strong dependence keeps a positive p-value far
+    below ``1e-16``. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for the
+    partial correlation, the query paths, and their exact agreement.
     """
 
     def _degrees_of_freedom(self, size: int) -> int:
@@ -585,7 +586,7 @@ class FisherZ(PartialCorrelationTest):
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
-        return 2.0 * (1.0 - ndtr(np.sqrt(df) * np.abs(z)))
+        return 2.0 * ndtr(-np.sqrt(df) * np.abs(z))
 
 
 class StudentT(PartialCorrelationTest):

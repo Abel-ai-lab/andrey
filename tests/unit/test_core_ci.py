@@ -504,12 +504,12 @@ def test_guard_decides_by_eigenvalues_whatever_the_inversion_returns(monkeypatch
 
 def test_empty_condition_set_is_marginal_pearson(data):
     # With no conditioning the partial correlation reduces to the marginal Pearson r of columns
-    # x and y, so p = 2 * (1 - Phi(sqrt(n - 3) * |arctanh(r)|)). This closed form is computed
+    # x and y, so p = 2 * Phi(-sqrt(n - 3) * |arctanh(r)|). This closed form is computed
     # straight from np.corrcoef and np.arctanh, independent of the test's internal inversion path.
     n = data.shape[0]
     for x, y in [(0, 1), (2, 5), (3, 4)]:
         r = np.corrcoef(data[:, x], data[:, y])[0, 1]
-        expected = 2.0 * (1.0 - ndtr(np.sqrt(n - 3) * abs(np.arctanh(r))))
+        expected = 2.0 * ndtr(-np.sqrt(n - 3) * abs(np.arctanh(r)))
         assert FisherZ(data)(x, y) == pytest.approx(expected, abs=1e-12)
 
 
