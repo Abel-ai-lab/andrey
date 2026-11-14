@@ -252,6 +252,12 @@ names its pull request.
   change; and the claim scores of `y_structures` are finite where they were infinite, with the same
   claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
   `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+- The separating-set search of the local methods keeps a count of the conditioning sets it tests
+  and the best separating set, not a record of every set, so its memory no longer grows with the
+  number of sets. `mmb_by_mmb` tests a pair against every subset of a blanket of up to 10 members,
+  and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
+  of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
+  unchanged. ([#1019])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2796,6 +2802,7 @@ First alpha release.
 [#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
 [#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

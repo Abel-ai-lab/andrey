@@ -70,6 +70,7 @@ def scan_conditioning_sets(
     skip_within: set[int] | None = None,
     trace: list[dict] | None = None,
     largest: list[float] | None = None,
+    visit: Callable[[list[tuple[int, ...]], Sequence[float]], None] | None = None,
 ) -> bool:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
@@ -93,7 +94,9 @@ def scan_conditioning_sets(
     accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
-    runs once per chunk.
+    runs once per chunk. With ``visit`` given, it is called with each chunk of subsets and their
+    p-values, so a caller can count the tests or keep a few of them without storing a record per
+    test.
     """
     subsets = _subsets(candidates, size, skip_within)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
@@ -114,6 +117,8 @@ def scan_conditioning_sets(
         pvalues = batched(a, b, chunk)
         if trace is not None:
             record_tests(trace, size, a, b, chunk, pvalues, alpha)
+        if visit is not None:
+            visit(chunk, pvalues)
         for subset, p in zip(chunk, pvalues):
             if p > alpha:
                 found = True
