@@ -113,7 +113,9 @@ def rescore(out: Path, meta: dict) -> list[dict]:
             continue
         key = (record["setting"], record["seed"])
         if key not in truths:  # the model, so the truth, does not depend on n
-            truths[key] = selection_models.sample(key[0], n=2, seed=key[1]).ancestral
+            truths[key] = selection_models.sample(
+                key[0], n=2, seed=key[1], rule=meta["rule"]
+            ).ancestral
         score_record(record, truths[key], record["d"])
     (out / RECORDS).write_text("".join(json.dumps(r) + "\n" for r in records))
     return records
@@ -127,6 +129,13 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         default=list(selection_models.SETTINGS),
         help="the paper's settings (default: fixed small large)",
+    )
+    p.add_argument(
+        "--rule",
+        choices=selection_models.RULES,
+        default="authors",
+        help="how a random graph's selection variables are drawn (default: authors, the rule of "
+        "the authors' simulation script; text, the rule of the paper's text, is harder)",
     )
     p.add_argument("--rows", type=int, nargs="+", default=list(ROWS), help="sample sizes")
     p.add_argument("--seeds", type=int, default=20, help="models per setting (default: 20)")
@@ -208,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
             rsession.check_environment("pcalg") if any(a.package == "sbcd" for a in field) else {}
         ),
         "sampler": selection_models.SAMPLER,
+        "rule": args.rule,
         "weight_range": list(selection_models.WEIGHT_RANGE),
         "interval": list(selection_models.INTERVAL),
         "settings": args.settings,
@@ -248,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         for setting, seed in units:
             walls: dict[str, list[float]] = {a.name: [] for a in field}
             for n in args.rows:
-                draw = selection_models.sample(setting, n=n, seed=seed)
+                draw = selection_models.sample(setting, n=n, seed=seed, rule=args.rule)
                 d = draw.biased.shape[1]
                 for selection in SELECTIONS:
                     data = getattr(draw, selection)

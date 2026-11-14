@@ -29,24 +29,42 @@ def test_ancestry_is_the_transitive_closure_without_the_diagonal():
     assert int(anc.sum()) == 15
 
 
+@pytest.mark.parametrize("rule", S.RULES)
 @pytest.mark.parametrize("setting", ["small", "large"])
-def test_a_random_graph_follows_the_rule_of_the_papers_appendix(setting):
+def test_a_random_graph_follows_the_rule_of_the_papers_appendix(setting, rule):
     spec = S.SETTINGS[setting]
     for seed in range(25):
         rng = np.random.default_rng(seed)
-        g = S.random_graph(spec, rng)
+        g = S.random_graph(spec, rng, rule)
         a = g.adjacency.astype(bool)
         assert a.shape == (spec.system + 1,) * 2
         assert not S.ancestral_matrix(a).diagonal().any()  # acyclic
         context = g.context
         assert a[:, context].sum() == 0 and a[context].sum() >= 1  # a source with children
-        # At least the minimum number of colliders, nodes with two or more parents.
-        assert (a.sum(0) >= 2).sum() >= spec.min_colliders
-        assert len(g.selection) == spec.selection == len(set(g.selection))
         colliders = np.flatnonzero(a.sum(0) >= 2)
+        assert len(g.selection) == spec.selection == len(set(g.selection))
         below = S.ancestral_matrix(a)[colliders].any(0) | np.isin(np.arange(len(a)), colliders)
-        for node in g.selection:  # a leaf among the colliders' descendants
-            assert node != context and a[node].sum() == 0 and below[node]
+        if rule == "text":  # a leaf among the colliders' descendants, each selection variable
+            assert len(colliders) >= spec.min_colliders
+            for node in g.selection:
+                assert node != context and a[node].sum() == 0 and below[node]
+        else:  # more colliders than the minimum; the first selection variable is below a collider
+            assert len(colliders) > spec.min_colliders
+            assert any(below[node] for node in g.selection)
+
+
+def test_an_unknown_rule_is_an_error():
+    with pytest.raises(ValueError, match="rule"):
+        S.random_graph(S.SETTINGS["small"], np.random.default_rng(0), "paper")
+
+
+def test_the_rules_draw_different_selection_variables_from_one_stream():
+    spec = S.SETTINGS["large"]
+    drawn = {
+        rule: [S.random_graph(spec, np.random.default_rng(s), rule).selection for s in range(30)]
+        for rule in S.RULES
+    }
+    assert drawn["authors"] != drawn["text"]
 
 
 def test_the_edge_probability_is_the_settings():
