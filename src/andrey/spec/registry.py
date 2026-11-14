@@ -560,6 +560,13 @@ _OWN_DEGREES_OF_FREEDOM = {
         + " PCMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines do "
         "(Pena et al. 2007).",
     ),
+    "mmmb": concept_param(
+        "degrees_of_freedom",
+        default="nonempty",
+        doc=_DEGREES_OF_FREEDOM.doc
+        + " MMMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines "
+        "describe it (Tsamardinos, Aliferis & Statnikov 2003).",
+    ),
 }
 _OWN_ALPHA = {
     "pcmb": concept_param(
@@ -677,7 +684,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Aliferis et al. 2010", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "mmmb",

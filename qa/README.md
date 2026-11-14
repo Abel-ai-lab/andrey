@@ -156,8 +156,8 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
-PCMB, CMB, GES, GIES, GnIES, IGSP, ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM,
-NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
+HITON-MB, PCMB, CMB, GES, GIES, GnIES, IGSP, ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search,
+CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
 MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI,
 PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets
 whose assumptions each method needs, PC with each supported nonlinear conditional-independence test,
@@ -165,7 +165,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
-| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP; CMB at the last column |
+| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP; CMB at the last column |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
 | `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
@@ -196,9 +196,9 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
-| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; CMB and MMB-by-MMB at the last column |
+| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; CMB and MMB-by-MMB at the last column |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -332,14 +332,14 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   answer's.
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
-HITON-PC, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the
-truth's CPDAG, the LiNGAM methods, NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the DAG,
-MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint
-SHD against the PAG of the observed variables. CMB answers the last column, and counts the missing,
-extra, and mismarked edges there against the truth's CPDAG. MMB-by-MMB answers the last column
-too and counts the same edges there against the PAG: the true edges the answer lacks, the
-answer's edges the PAG lacks, and the edges in both with a mark that differs. The empty answer
-makes as many errors as the target has edges.
+HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP
+against the truth's CPDAG, the LiNGAM methods, NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the
+DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by
+endpoint SHD against the PAG of the observed variables. CMB answers the last column, and counts the
+missing, extra, and mismarked edges there against the truth's CPDAG.
+MMB-by-MMB answers the last column too and counts the same edges there against the PAG: the
+true edges the answer lacks, the answer's edges the PAG lacks, and the edges in both with a mark
+that differs. The empty answer makes as many errors as the target has edges.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.

@@ -27,6 +27,8 @@ _GRAPH = (
             "MMPC",
             "HITONPC",
             "PCMB",
+            "HITONMB",
+            "MMMB",
             "CMB",
             "MMBbyMMB",
             "ExactSearch",
