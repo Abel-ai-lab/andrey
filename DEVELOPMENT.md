@@ -195,7 +195,8 @@ defines it, the existing implementations, and the setting the paper claims.
    test can), `LocalSearch.scan_given_rest` (each candidate given all the other variables, from one
    inverse of the correlation matrix where the test can), `LocalSearch.weakest` (each candidate's
    weakest association over many sets), and
-   `LocalSearch.separating` (the sets of one size that separate a pair), and picks between
+   `LocalSearch.separating` (the set of one size that separates a pair with the largest p-value,
+   keeping only a count of the sets it tests), and picks between
    candidates with `LocalSearch.strongest`, which reads the tie-break ranks only when keys tie. It
    never reads a test's internals, such as its correlation matrix, and never indexes the ranks, so
    a faster scan or ranks computed on demand reach every local method at once.
