@@ -3,8 +3,9 @@
 
 Each run folder is named by its arm, ``ARM=FOLDER``: one arm is one set of lane settings (the
 bnlearn test, ``max_depth``), and a record is read as ``(arm, solution)``. :data:`COMPARISONS`
-lists what is compared with what; a comparison marked judged is the method against its bnlearn
-counterpart on the same data with the matching test, the others are context.
+lists what is compared with what; a comparison marked judged is the method against its reference
+on the same data with the matching test (bnlearn, or the authors' Causal Explorer), the others are
+context.
 
 Per dataset, over the targets whose true set is not empty (the same targets on both sides):
 
@@ -12,7 +13,12 @@ Per dataset, over the targets whose true set is not empty (the same targets on b
   empty answer has no wrong member, so it counts precision 1 and distance 1;
 - ``f1``: the mean of each target's F1, 2 tp / (found + true), 0 for an empty answer;
 - ``errors``: the mean of each target's missing plus extra members, the wrong answers of
-  :func:`andrey.metrics.target_answer_scores`; the empty set's is the true set's size.
+  :func:`andrey.metrics.target_answer_scores`; the empty set's is the true set's size;
+- ``precision`` and ``recall``: the means of each target's, reported beside the verdicts; an
+  empty answer counts precision 1.
+
+A target one side could not answer (``unanswered`` in its record, such as a target at which Causal
+Explorer stops with an error) is left out of both sides of that dataset.
 
 :func:`~andrey_bench.pairing.compare` gives the mean of the per-dataset difference, Andrey minus
 the other, with its percentile-bootstrap 95% interval; a verdict needs
@@ -104,6 +110,54 @@ COMPARISONS: tuple[Comparison, ...] = (
         ("norule", "andrey.hiton_pc"),
         ("pc-adf", "andrey.hiton_pc"),
     ),
+    Comparison(
+        "hiton_mb",
+        "Causal Explorer HITON_MB",
+        ("hmb", "andrey.hiton_mb"),
+        ("hmb", "causal-explorer.hiton-mb"),
+        True,
+    ),
+    Comparison("hiton_mb", "mmmb, max_depth 3", ("hmb", "andrey.hiton_mb"), ("hmb", "andrey.mmmb")),
+    *(
+        Comparison("hiton_mb", other, ("hmb", "andrey.hiton_mb"), ("ctx", f"andrey.{other}"))
+        for other in ("iamb", "inter_iamb", "gs", "pcmb")
+    ),
+    Comparison(
+        "mmmb", "Causal Explorer MMMB", ("mm", "andrey.mmmb"), ("mm", "causal-explorer.mmmb"), True
+    ),
+    Comparison(
+        "mmmb", "hiton_mb, max_depth None", ("mm", "andrey.mmmb"), ("mm", "andrey.hiton_mb")
+    ),
+    *(
+        Comparison("mmmb", other, ("mm", "andrey.mmmb"), ("ctx", f"andrey.{other}"))
+        for other in ("iamb", "inter_iamb", "gs", "pcmb")
+    ),
+    Comparison(
+        "hiton_mb, degrees_of_freedom nonempty",
+        "Causal Explorer HITON_MB",
+        ("hmbne", "andrey.hiton_mb"),
+        ("hmb", "causal-explorer.hiton-mb"),
+    ),
+    Comparison(
+        "hiton_mb, degrees_of_freedom nonempty",
+        "hiton_mb",
+        ("hmbne", "andrey.hiton_mb"),
+        ("hmb", "andrey.hiton_mb"),
+    ),
+    Comparison(
+        "mmmb, degrees_of_freedom mean",
+        "Causal Explorer MMMB",
+        ("mmmean", "andrey.mmmb"),
+        ("mm", "causal-explorer.mmmb"),
+    ),
+    Comparison(
+        "mmmb, degrees_of_freedom mean", "mmmb", ("mmmean", "andrey.mmmb"), ("mm", "andrey.mmmb")
+    ),
+    Comparison("hiton_mb", "mmmb, max_depth 3", ("gh", "andrey.hiton_mb"), ("gh", "andrey.mmmb")),
+    *(
+        Comparison("hiton_mb", other, ("gh", "andrey.hiton_mb"), ("gctx", f"andrey.{other}"))
+        for other in ("iamb", "inter_iamb", "gs", "pcmb")
+    ),
 )
 
 
@@ -130,6 +184,8 @@ def measures(record: dict) -> dict[str, float]:
     return {
         "distance": float(np.mean(dist)),
         "f1": float(np.mean([2 * s["tp"] / (s["est"] + s["true"]) for s in sets])),
+        "precision": float(np.mean([s["tp"] / s["est"] if s["est"] else 1.0 for s in sets])),
+        "recall": float(np.mean([s["tp"] / s["true"] for s in sets])),
         "errors": float(np.mean([s["fp"] + s["fn"] for s in sets])),
         "empty_errors": float(np.mean([s["true"] for s in sets])),
         "tests": float(
@@ -139,13 +195,21 @@ def measures(record: dict) -> dict[str, float]:
 
 
 def _pairs(a: dict, b: dict, seeds: range) -> list[tuple[int, dict, dict]]:
+    """The datasets both sides fitted, each record kept to the targets both answered."""
     out = []
     for (cell, seed), ra in sorted(a.items()):
         rb = b.get((cell, seed))
         if seed in seeds and rb and ra["status"] == "ok" and rb["status"] == "ok":
             assert ra["dataset"] == rb["dataset"] and ra["d"] == rb["d"], (cell, seed)
-            out.append((seed, ra, rb))
+            both = set(ra["per_target"]) & set(rb["per_target"])
+            out.append((seed, _only(ra, both), _only(rb, both)))
     return out
+
+
+def _only(record: dict, targets: set[str]) -> dict:
+    if set(record["per_target"]) == targets:
+        return record
+    return {**record, "per_target": {t: s for t, s in record["per_target"].items() if t in targets}}
 
 
 def judge(pairs: list[tuple[int, dict, dict]]) -> dict:
@@ -210,8 +274,18 @@ def cell(comp: Comparison, cell: str, a: dict, b: dict, first: range, fresh: ran
         "datasets": len(datasets),
         "andrey_short": len(ok_b - ok_a),
         "reference_short": len(ok_a - ok_b),
-        "andrey_status": dict(sorted(_count(r["status"] for (_, s), r in a.items() if s in first))),
-        "other_status": dict(sorted(_count(r["status"] for (_, s), r in b.items() if s in first))),
+        "andrey_status": dict(
+            sorted(_count(r["status"] for (_, s), r in a.items() if s in first).items())
+        ),
+        "unanswered_targets": sum(
+            len(r.get("unanswered", []))
+            for side in (a, b)
+            for (_, s), r in side.items()
+            if s in first
+        ),
+        "other_status": dict(
+            sorted(_count(r["status"] for (_, s), r in b.items() if s in first).items())
+        ),
     }
     row["first"] = judge(pairs)
     fresh_pairs = _pairs(a, b, fresh)
@@ -233,9 +307,10 @@ def cell(comp: Comparison, cell: str, a: dict, b: dict, first: range, fresh: ran
             round(float(np.nanmean([measures(r)["tests"] for r in fits])), 1) if fits else None
         )
         row[f"{side}_s"] = _median([r["wall_s"] for r in fits if r.get("wall_s") is not None])
-        row[f"{side}_errors_mean"] = (
-            round(float(np.mean([measures(r)["errors"] for r in fits])), 4) if fits else None
-        )
+        for name in ("errors", "precision", "recall"):
+            row[f"{side}_{name}_mean"] = (
+                round(float(np.mean([measures(r)[name] for r in fits])), 4) if fits else None
+            )
     row["empty_errors_mean"] = (
         round(float(np.mean([measures(ra)["empty_errors"] for _, ra, _ in pairs])), 4)
         if pairs

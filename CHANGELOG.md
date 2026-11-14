@@ -42,20 +42,25 @@ names its pull request.
   graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
   empty set in every setting. ([#950], [#993])
 - `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
-  experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
   target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
   target and for each of its parents and children, then admits each child's other parent when a
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
-  ([#957])
+  It is supported: against the authors' HITON-MB on child, insurance, alarm, hailfinder, and pigs
+  at its paper's sizes, its sets were closer to the true ones in 11 of 13 settings and further in
+  2, at 5,000 rows on hailfinder and insurance, where its symmetry check drops members the authors'
+  code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
+  ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
   authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
   parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
   check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
   children, then admits a variable as a spouse when a test finds it dependent on the target given
   the set that separated the two and a parent or child of the target whose own set holds the
-  variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
-  ([#965])
+  variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
+  al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
+  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -2796,6 +2801,7 @@ First alpha release.
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

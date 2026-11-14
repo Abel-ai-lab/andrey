@@ -307,6 +307,50 @@
       "cause": "correct-by-paper",
       "reason": "The difference is the candidates of each round. The paper's line 24 tests every variable outside the blanket given it, and Andrey's search does; bnlearn's fast.iamb drops from its pool every variable that was in the blanket at the end of a round, so a variable a later shrink removes is never tested again. A trace running one Fisher z test (bnlearn's zf agrees to 5e-7) under ports of both searches, with every rule switchable, reproduces Andrey's records on every target and bnlearn's on 1,976 to 1,998 of 2,000 per seed half. With bnlearn's pool rule in Andrey's search the difference is 0.0000 to -0.0002 on both seed halves at 1,000 and 5,000 rows, and with Andrey's rule in bnlearn's search the gap returns; the batch order, the shrink, and the stop move nothing. At all but one of the 333 targets where the two differ, the first difference is a variable that left the blanket in a shrink and tests dependent again given the current blanket; where it stays in Andrey's set it is outside the true blanket in 171 of 174 cases at 1,000 rows and 140 of 141 at 5,000. On the graphs with 50 variables and mean degree 4 at 1,000 rows the paper's rule gives the smaller distance, by 0.003.",
       "citation": "Yaramakala, S. and Margaritis, D. (2005). Speculative Markov blanket discovery for optimal feature selection. ICDM, Fig. 1, line 24: S <- {A | A in U - {T} - B(T) and A dependent on T given B(T)}. bnlearn 5.2.1 (GPL): R/fast-iamb.R, fast.ia.markov.blanket, nodes = nodes[nodes %!in% mb] at the end of each round."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "HITON-MB",
+      "comparator": "Causal Explorer 1.5 HITON_MB",
+      "row": {"metric": "set_distance", "d": 56, "n": 5000},
+      "andrey_errors": 0.5999,
+      "comparator_errors": 0.5173,
+      "cause": "trade-off",
+      "reason": "Andrey's hiton_mb runs the symmetry check of the paper's definition of semi-interleaved HITON-MB: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's HITON_MB keeps each run's set as it is, the form the paper's experiments evaluate. With the same G-square tests and the check left out, a trace gives the toolbox's distance and F1 within the interval in both settings (ties on seeds 0-19), and the check raises the precision (0.89 against 0.70 without it) at a larger cost in recall (0.44 against 0.65). On hailfinder, pairs of variables are copies of each other in the data, so a test given one of a pair finds the other independent of the pair's children, and the check then drops that variable from each child's set. Andrey's errors, missing plus extra members, stay below the toolbox's in both settings.",
+      "citation": "Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234: p. 198, Fig. 10 (semi-interleaved HITON-MB with symmetry correction), and p. 202 (the algorithms run without symmetry correction unless it is mentioned). Causal Explorer 1.5: HITON_MB, the target's set from its own runs."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "HITON-MB",
+      "comparator": "Causal Explorer 1.5 HITON_MB",
+      "row": {"metric": "set_distance", "d": 27, "n": 5000},
+      "andrey_errors": 0.3426,
+      "comparator_errors": 0.3268,
+      "cause": "trade-off",
+      "reason": "Andrey's hiton_mb runs the symmetry check of the paper's definition of semi-interleaved HITON-MB: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's HITON_MB keeps each run's set as it is, the form the paper's experiments evaluate. With the same G-square tests and the check left out, a trace gives the toolbox's distance and F1 within the interval in both settings (ties on seeds 0-19), and the check raises the precision (0.96 against 0.89 without it) at a larger cost in recall (0.68 against 0.76). On hailfinder, pairs of variables are copies of each other in the data, so a test given one of a pair finds the other independent of the pair's children, and the check then drops that variable from each child's set. Andrey's errors, missing plus extra members, stay below the toolbox's in both settings.",
+      "citation": "Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234: p. 198, Fig. 10 (semi-interleaved HITON-MB with symmetry correction), and p. 202 (the algorithms run without symmetry correction unless it is mentioned). Causal Explorer 1.5: HITON_MB, the target's set from its own runs."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "HITON-MB",
+      "comparator": "Causal Explorer 1.5 HITON_MB",
+      "row": {"metric": "set_f1_loss", "d": 56, "n": 5000},
+      "andrey_errors": 0.5038,
+      "comparator_errors": 0.4178,
+      "cause": "trade-off",
+      "reason": "Andrey's hiton_mb runs the symmetry check of the paper's definition of semi-interleaved HITON-MB: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's HITON_MB keeps each run's set as it is, the form the paper's experiments evaluate. With the same G-square tests and the check left out, a trace gives the toolbox's distance and F1 within the interval in both settings (ties on seeds 0-19), and the check raises the precision (0.89 against 0.70 without it) at a larger cost in recall (0.44 against 0.65). On hailfinder, pairs of variables are copies of each other in the data, so a test given one of a pair finds the other independent of the pair's children, and the check then drops that variable from each child's set. Andrey's errors, missing plus extra members, stay below the toolbox's in both settings.",
+      "citation": "Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234: p. 198, Fig. 10 (semi-interleaved HITON-MB with symmetry correction), and p. 202 (the algorithms run without symmetry correction unless it is mentioned). Causal Explorer 1.5: HITON_MB, the target's set from its own runs."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "HITON-MB",
+      "comparator": "Causal Explorer 1.5 HITON_MB",
+      "row": {"metric": "set_f1_loss", "d": 27, "n": 5000},
+      "andrey_errors": 0.2443,
+      "comparator_errors": 0.2204,
+      "cause": "trade-off",
+      "reason": "Andrey's hiton_mb runs the symmetry check of the paper's definition of semi-interleaved HITON-MB: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's HITON_MB keeps each run's set as it is, the form the paper's experiments evaluate. With the same G-square tests and the check left out, a trace gives the toolbox's distance and F1 within the interval in both settings (ties on seeds 0-19), and the check raises the precision (0.96 against 0.89 without it) at a larger cost in recall (0.68 against 0.76). On hailfinder, pairs of variables are copies of each other in the data, so a test given one of a pair finds the other independent of the pair's children, and the check then drops that variable from each child's set. Andrey's errors, missing plus extra members, stay below the toolbox's in both settings.",
+      "citation": "Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234: p. 198, Fig. 10 (semi-interleaved HITON-MB with symmetry correction), and p. 202 (the algorithms run without symmetry correction unless it is mentioned). Causal Explorer 1.5: HITON_MB, the target's set from its own runs."
     }
   ]
 }
