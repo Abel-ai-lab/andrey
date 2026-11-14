@@ -114,7 +114,7 @@ names its pull request.
   does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
   so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
   subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. ([#966],
-  [#980], [#994], [#PR2])
+  [#980], [#994], [#1022])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -2788,7 +2788,7 @@ First alpha release.
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
-[#PR2]: https://github.com/Abel-ai-lab/Andrey/pull/PR2
+[#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
