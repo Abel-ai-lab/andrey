@@ -475,8 +475,9 @@ def anderson_darling_uniform(p_values: npt.ArrayLike) -> tuple[float, float]:
     n = u.size
     i = np.arange(1, n + 1)
     a2 = float(-n - np.sum((2 * i - 1) * (np.log(u) + np.log1p(-u[::-1]))) / n)
-    if n == 1:  # A^2 = -1 - ln(u (1 - u)) >= ln 4 - 1, so P(A^2 >= a) = 1 - sqrt(1 - 4 e^(-1-a))
-        return a2, 1.0 - math.sqrt(max(0.0, 1.0 - 4.0 * math.exp(-1.0 - a2)))
+    if n == 1:  # A^2 = -1 - ln(u (1 - u)) >= ln 4 - 1, so P(A^2 >= a) = 1 - sqrt(1 - t), with
+        t = 4.0 * math.exp(-1.0 - a2)  # t = 4 e^(-1-a), which is t / (1 + sqrt(1 - t))
+        return a2, t / (1.0 + math.sqrt(max(0.0, 1.0 - t)))
     if a2 <= 0:
         return a2, 1.0
     x = _adinf(a2)

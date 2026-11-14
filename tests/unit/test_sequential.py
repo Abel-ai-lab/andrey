@@ -2,15 +2,18 @@
 
 Under a d-separation oracle, the CPDAG rules return at every target of random DAGs the target's
 edges and marks in the true CPDAG, and the PAG rules with R1 and R2 those in the true PAG over the
-observed variables, hidden variables included; the walks of the papers' examples are reproduced,
-an orientation that waits several steps away is found, and the stop rules end early with the
-answer still right. Each step is checked alone: the local structure decides a pair at the node
-by the node's blanket, the merge keeps the node's edges and the v-structures that contain it, the
-orientation reads a non-adjacency only where a test separated the pair, and the stop rules read
-the paths. On data the answer does not depend on the column order or the columns' units.
+observed variables, hidden variables included; the walks of the papers' examples are reproduced, an
+orientation that waits several steps away is found, and the stop rules end early with the answer
+still right. Each step is checked alone: the local structure decides a pair at the node by the
+node's blanket or, under the skeleton rule of LOAD, by the adjacencies of the pair's ends, the merge
+keeps the node's edges and the v-structures that contain it, the orientation reads a non-adjacency
+only where a test separated the pair, and the stop rules read the paths. On data the answer does not
+depend on the column order or the columns' units.
 """
 
 from __future__ import annotations
+
+from dataclasses import replace
 
 import networkx as nx
 import numpy as np
@@ -242,6 +245,69 @@ def test_a_pair_at_the_node_is_decided_by_subsets_of_its_blanket(how):
     local = learn_local(search, 0, mb, how)
     assert {p for p in local.adjacent if 0 in p} == {(0, 1), (0, 3)}
     assert {(0, 1, 2), (0, 3, 4)} <= local.colliders
+
+
+def _at(local: LocalGraph, x: int):
+    """The pairs that hold ``x`` and the v-structures that contain it."""
+    return (
+        {p for p in local.adjacent if x in p},
+        {c for c in local.colliders if x in c},
+    )
+
+
+@pytest.mark.parametrize(("seed", "d"), [(s, 10 + s % 5) for s in range(12)])
+def test_the_skeleton_rule_keeps_the_edges_and_v_structures_at_the_node_of_the_blanket_rule(
+    seed, d
+):
+    # Under exact tests, testing a pair at the node against the adjacencies of both ends keeps the
+    # node's edges and the v-structures that contain it, as testing it against its blanket does.
+    dag = _random_dag(seed, d)
+    search = _search(dag)
+    for x in range(d):
+        mb = search.local("iamb", x)[1]
+        assert _at(learn_local(search, x, mb, "skeleton"), x) == _at(
+            learn_local(search, x, mb, "pc"), x
+        )
+
+
+def test_the_skeleton_rule_separates_a_spouse_by_the_adjacencies_of_its_far_end():
+    # Schubert et al. (2026) Ex. A.1: 0 and its spouse 4 are separated by {1, 2} only; 2 is not
+    # adjacent to 0 but is to 4, so the far end's adjacencies hold the set.
+    dag = _dag([(0, 1), (0, 3), (1, 4), (2, 1), (2, 4), (4, 3)], 5)
+    search = _search(dag)
+    local = learn_local(search, 0, search.local("iamb", 0)[1], "skeleton")
+    assert {p for p in local.adjacent if 0 in p} == {(0, 1), (0, 3)}
+    assert {(0, 1, 2), (0, 3, 4)} <= local.colliders
+
+
+def test_the_skeleton_rule_tests_far_fewer_sets_where_the_blanket_is_wide():
+    # 0 has two children, each with six other parents: |MB(0)| is 14 and no variable has more than
+    # seven neighbors. An adjacent pair at 0 passes every subset of its blanket, 2 ** 13 of them,
+    # while the adjacencies of its ends hold at most 2 ** 6.
+    edges = [(0, c) for c in (1, 2)]
+    edges += [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how in ("pc", "skeleton"):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            found[how] = _at(learn_local(search, 0, mb, how), 0)
+        counts[how] = tests.n
+    assert found["skeleton"] == found["pc"]
+    assert counts["skeleton"] * 10 < counts["pc"]
+
+
+def test_load_learns_its_local_structures_by_the_skeleton_rule():
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, marks = {}, {}
+    for name, rules in (("load", LOAD), ("blanket", replace(LOAD, local="pc"))):
+        search = _search(dag)
+        result = sequential(search, 0, "gs", rules)
+        counts[name], marks[name] = result.n_tests, result.network.marks.copy()
+    assert np.array_equal(marks["load"], marks["blanket"])
+    assert counts["load"] * 10 < counts["blanket"]
 
 
 @pytest.mark.parametrize("how", ["ic", "pc"])

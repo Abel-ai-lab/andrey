@@ -76,11 +76,12 @@ the median over the datasets of the wall time of the search for every target.
 ## Results (0.18.0)
 
 Andrey is the 0.18.0 release branch with `gs`, `fast_iamb`, and `hiton_pc` merged; bnlearn is 5.2.1
-on R 4.6.1, and every fit ran on one core of an AMD EPYC 7713.
+on R 4.6.1, and every fit ran on one core of an AMD EPYC 7713. Andrey's `gs` fits ran after the
+others, in separate runs on shared nodes, so the times of GS are indicative.
 
 | Method | Better | Tie | Worse | Below the empty set's errors |
 |---|---:|---:|---:|---|
-| GS | 13 | 6 | 1 | every cell but hepar2 |
+| GS | 13 | 7 | 0 | every cell but hepar2 |
 | Fast-IAMB | 10 | 7 | 3 | every cell but hepar2 and Gaussian graphs with 100 variables |
 | HITON-PC | 13 | 7 | 0 | every cell |
 
@@ -90,9 +91,9 @@ in all 12 cells, `fast.iamb` on hepar2 and on child at 20,000 rows, and `si.hito
 add bnlearn's plain `mi`.
 
 On the discrete networks, Andrey's fits take longer than bnlearn's compiled searches: the median
-GS fit took 1.3 to 26 s against 0.12 to 5.2 s, 4.5 to 14 times as long, Fast-IAMB's 0.78 to 16 s
+GS fit took 1.0 to 28 s against 0.12 to 5.2 s, 3.5 to 16 times as long, Fast-IAMB's 0.78 to 16 s
 against 0.12 to 3.6 s, and HITON-PC's 1.7 to 18 s against 0.14 to 4.5 s. On the Gaussian graphs
-GS took 0.35 to 4.1 s and bnlearn 0.17 to 162 s; at 100 variables Andrey was 13 to 40 times faster.
+GS took 0.46 to 5.2 s and bnlearn 0.17 to 162 s; at 100 variables Andrey was 10 to 31 times faster.
 Fast-IAMB took 0.35 to 3.5 s against 0.08 to 4.1 s, and HITON-PC 0.42 to 4.3 s against 0.17 to
 97 s.
 
@@ -100,65 +101,73 @@ Fast-IAMB took 0.35 to 3.5 s against 0.08 to 4.1 s, and HITON-PC 0.42 to 4.3 s a
 
 | Data | Rows | Distance: Andrey | bnlearn | D [95%] | F1: Andrey | bnlearn | D [95%] | Seeds 20-39: D distance | D F1 | Verdict |
 |---|---:|---:|---:|---|---:|---:|---|---|---|---|
-| alarm | 1,000 | 0.395 | 0.943 | -0.548 [-0.587, -0.510] | 0.724 | 0.324 | +0.400 [+0.372, +0.428] | -0.509 [-0.546, -0.473] | +0.373 [+0.346, +0.400] | better |
-| alarm | 5,000 | 0.338 | 0.889 | -0.551 [-0.586, -0.514] | 0.766 | 0.364 | +0.402 [+0.375, +0.427] |  |  | better |
-| alarm | 20,000 | 0.260 | 0.884 | -0.624 [-0.662, -0.585] | 0.821 | 0.366 | +0.455 [+0.428, +0.482] |  |  | better |
+| alarm | 1,000 | 0.394 | 0.943 | -0.549 [-0.588, -0.511] | 0.725 | 0.324 | +0.401 [+0.373, +0.429] | -0.511 [-0.547, -0.476] | +0.374 [+0.349, +0.401] | better |
+| alarm | 5,000 | 0.335 | 0.889 | -0.554 [-0.589, -0.517] | 0.768 | 0.364 | +0.404 [+0.377, +0.429] |  |  | better |
+| alarm | 20,000 | 0.261 | 0.884 | -0.623 [-0.662, -0.585] | 0.820 | 0.366 | +0.455 [+0.428, +0.482] |  |  | better |
 | child | 1,000 | 0.263 | 0.825 | -0.562 [-0.605, -0.517] | 0.825 | 0.408 | +0.417 [+0.384, +0.448] |  |  | better |
 | child | 5,000 | 0.224 | 0.905 | -0.681 [-0.738, -0.622] | 0.849 | 0.346 | +0.503 [+0.461, +0.543] |  |  | better |
 | child | 20,000 | 0.164 | 0.928 | -0.764 [-0.808, -0.719] | 0.887 | 0.323 | +0.564 [+0.531, +0.596] |  |  | better |
-| insurance | 1,000 | 0.466 | 1.031 | -0.565 [-0.607, -0.523] | 0.675 | 0.247 | +0.428 [+0.397, +0.459] |  |  | better |
-| insurance | 5,000 | 0.368 | 1.038 | -0.670 [-0.712, -0.627] | 0.748 | 0.254 | +0.494 [+0.464, +0.523] |  |  | better |
-| insurance | 20,000 | 0.285 | 1.035 | -0.750 [-0.791, -0.706] | 0.807 | 0.259 | +0.548 [+0.518, +0.576] |  |  | better |
-| hepar2 | 1,000 | 0.828 | 1.103 | -0.275 [-0.304, -0.246] | 0.382 | 0.193 | +0.189 [+0.169, +0.209] |  |  | better |
-| hepar2 | 5,000 | 0.664 | 1.090 | -0.426 [-0.452, -0.400] | 0.497 | 0.199 | +0.298 [+0.280, +0.317] |  |  | better |
-| hepar2 | 20,000 | 0.594 | 1.096 | -0.502 [-0.539, -0.465] | 0.546 | 0.188 | +0.358 [+0.334, +0.382] |  |  | better |
-| Gaussian, d 20, degree 2 | 1,000 | 0.144 | 0.141 | +0.003 [-0.007, +0.014] | 0.907 | 0.909 | -0.002 [-0.009, +0.005] |  |  | tie |
-| Gaussian, d 20, degree 2 | 5,000 | 0.151 | 0.155 | -0.005 [-0.015, +0.005] | 0.903 | 0.898 | +0.005 [-0.002, +0.012] |  |  | tie |
-| Gaussian, d 50, degree 2 | 1,000 | 0.317 | 0.318 | -0.001 [-0.009, +0.007] | 0.788 | 0.786 | +0.002 [-0.004, +0.008] | -0.007 [-0.017, +0.003] | +0.006 [-0.001, +0.013] | tie |
-| Gaussian, d 50, degree 2 | 5,000 | 0.311 | 0.313 | -0.002 [-0.012, +0.007] | 0.792 | 0.787 | +0.005 [-0.002, +0.012] |  |  | tie |
-| Gaussian, d 100, degree 2 | 1,000 | 0.496 | 0.496 | +0.000 [-0.006, +0.008] | 0.641 | 0.639 | +0.002 [-0.004, +0.007] | -0.001 [-0.007, +0.006] | +0.002 [-0.004, +0.008] | tie |
-| Gaussian, d 100, degree 2 | 5,000 | 0.489 | 0.498 | -0.009 [-0.014, -0.005] | 0.647 | 0.638 | +0.009 [+0.005, +0.014] | -0.003 [-0.010, +0.003] | +0.005 [-0.000, +0.010] | better |
-| Gaussian, d 50, degree 4 | 1,000 | 0.195 | 0.173 | +0.022 [+0.011, +0.035] | 0.875 | 0.890 | -0.015 [-0.025, -0.006] | +0.007 [-0.009, +0.023] | -0.005 [-0.017, +0.007] | tie |
-| Gaussian, d 50, degree 4 | 5,000 | 0.169 | 0.156 | +0.013 [+0.002, +0.023] | 0.895 | 0.902 | -0.008 [-0.015, -0.001] | +0.011 [+0.001, +0.022] | -0.006 [-0.014, +0.002] | worse |
+| insurance | 1,000 | 0.466 | 1.031 | -0.565 [-0.607, -0.523] | 0.675 | 0.247 | +0.428 [+0.398, +0.459] |  |  | better |
+| insurance | 5,000 | 0.367 | 1.038 | -0.671 [-0.713, -0.628] | 0.748 | 0.254 | +0.494 [+0.464, +0.523] |  |  | better |
+| insurance | 20,000 | 0.285 | 1.035 | -0.750 [-0.791, -0.707] | 0.807 | 0.259 | +0.548 [+0.518, +0.576] |  |  | better |
+| hepar2 | 1,000 | 0.820 | 1.103 | -0.283 [-0.312, -0.256] | 0.388 | 0.193 | +0.195 [+0.175, +0.215] |  |  | better |
+| hepar2 | 5,000 | 0.662 | 1.090 | -0.428 [-0.453, -0.403] | 0.498 | 0.199 | +0.299 [+0.282, +0.316] |  |  | better |
+| hepar2 | 20,000 | 0.589 | 1.096 | -0.507 [-0.543, -0.471] | 0.550 | 0.188 | +0.362 [+0.339, +0.385] |  |  | better |
+| Gaussian, d 20, degree 2 | 1,000 | 0.145 | 0.141 | +0.004 [-0.006, +0.014] | 0.907 | 0.909 | -0.003 [-0.009, +0.004] |  |  | tie |
+| Gaussian, d 20, degree 2 | 5,000 | 0.150 | 0.155 | -0.005 [-0.015, +0.005] | 0.903 | 0.898 | +0.005 [-0.002, +0.012] |  |  | tie |
+| Gaussian, d 50, degree 2 | 1,000 | 0.316 | 0.318 | -0.001 [-0.009, +0.007] | 0.788 | 0.786 | +0.002 [-0.004, +0.008] | -0.007 [-0.017, +0.003] | +0.006 [-0.001, +0.013] | tie |
+| Gaussian, d 50, degree 2 | 5,000 | 0.311 | 0.313 | -0.002 [-0.012, +0.008] | 0.791 | 0.787 | +0.005 [-0.002, +0.012] |  |  | tie |
+| Gaussian, d 100, degree 2 | 1,000 | 0.495 | 0.496 | -0.001 [-0.007, +0.007] | 0.642 | 0.639 | +0.002 [-0.004, +0.008] | -0.001 [-0.007, +0.006] | +0.002 [-0.004, +0.007] | tie |
+| Gaussian, d 100, degree 2 | 5,000 | 0.489 | 0.498 | -0.009 [-0.014, -0.005] | 0.647 | 0.638 | +0.009 [+0.005, +0.013] | -0.004 [-0.010, +0.002] | +0.005 [-0.000, +0.010] | better |
+| Gaussian, d 50, degree 4 | 1,000 | 0.188 | 0.173 | +0.016 [+0.004, +0.029] | 0.879 | 0.890 | -0.011 [-0.021, -0.002] | +0.003 [-0.012, +0.017] | -0.003 [-0.013, +0.008] | tie |
+| Gaussian, d 50, degree 4 | 5,000 | 0.157 | 0.156 | +0.000 [-0.010, +0.011] | 0.903 | 0.902 | +0.001 [-0.006, +0.008] | -0.002 [-0.012, +0.009] | +0.003 [-0.005, +0.010] | tie |
 
 | Data | Rows | Errors: Andrey | bnlearn | Empty set | Andrey minus empty [95%] | Tests per target: Andrey | bnlearn | Fit, s: Andrey | bnlearn |
 |---|---:|---:|---:|---:|---|---:|---:|---:|---:|
-| alarm | 1,000 | 2.08 | 4.46 | 3.51 | -1.43 [-1.54, -1.32] | 94 | 60 | 2.35 | 0.19 |
-| alarm | 5,000 | 1.81 | 4.94 | 3.51 | -1.70 [-1.80, -1.60] | 96 | 68 | 3.85 | 0.49 |
-| alarm | 20,000 | 1.38 | 5.49 | 3.51 | -2.14 [-2.21, -2.06] | 98 | 72 | 7.85 | 1.60 |
-| child | 1,000 | 1.17 | 3.69 | 3.00 | -1.83 [-1.93, -1.74] | 45 | 31 | 1.29 | 0.12 |
-| child | 5,000 | 0.93 | 4.93 | 3.00 | -2.07 [-2.17, -1.97] | 47 | 32 | 1.89 | 0.24 |
-| child | 20,000 | 0.63 | 6.12 | 3.00 | -2.37 [-2.46, -2.27] | 49 | 32 | 3.22 | 0.71 |
-| insurance | 1,000 | 2.85 | 5.94 | 5.19 | -2.34 [-2.39, -2.28] | 66 | 39 | 1.46 | 0.13 |
-| insurance | 5,000 | 2.30 | 6.72 | 5.19 | -2.89 [-2.98, -2.78] | 70 | 41 | 2.87 | 0.34 |
-| insurance | 20,000 | 1.84 | 7.55 | 5.19 | -3.35 [-3.43, -3.27] | 72 | 42 | 5.10 | 0.94 |
-| hepar2 | 1,000 | 5.60 | 7.13 | 4.51 | +1.09 [+1.00, +1.17] | 206 | 144 | 7.81 | 0.57 |
-| hepar2 | 5,000 | 5.07 | 8.22 | 4.51 | +0.56 [+0.46, +0.67] | 221 | 145 | 12.7 | 1.51 |
-| hepar2 | 20,000 | 4.75 | 9.47 | 4.51 | +0.23 [+0.13, +0.35] | 234 | 143 | 26.1 | 5.20 |
-| Gaussian, d 20, degree 2 | 1,000 | 0.57 | 0.58 | 3.35 | -2.77 [-2.95, -2.61] | 49 | 54 | 0.35 | 0.17 |
-| Gaussian, d 20, degree 2 | 5,000 | 0.60 | 0.65 | 3.35 | -2.75 [-2.90, -2.61] | 49 | 55 | 0.45 | 0.57 |
-| Gaussian, d 50, degree 2 | 1,000 | 1.71 | 1.75 | 3.72 | -2.01 [-2.17, -1.86] | 134 | 209 | 0.68 | 2.52 |
-| Gaussian, d 50, degree 2 | 5,000 | 1.63 | 1.75 | 3.72 | -2.09 [-2.27, -1.89] | 133 | 218 | 1.21 | 12.7 |
-| Gaussian, d 100, degree 2 | 1,000 | 3.57 | 3.68 | 3.88 | -0.31 [-0.46, -0.17] | 295 | 596 | 2.04 | 27.5 |
-| Gaussian, d 100, degree 2 | 5,000 | 3.49 | 3.74 | 3.88 | -0.39 [-0.55, -0.21] | 287 | 618 | 4.08 | 161.9 |
-| Gaussian, d 50, degree 4 | 1,000 | 1.92 | 1.77 | 8.52 | -6.59 [-6.88, -6.32] | 162 | 268 | 0.81 | 9.81 |
-| Gaussian, d 50, degree 4 | 5,000 | 1.59 | 1.48 | 8.52 | -6.92 [-7.20, -6.67] | 156 | 262 | 1.33 | 46.3 |
+| alarm | 1,000 | 2.08 | 4.46 | 3.51 | -1.43 [-1.54, -1.32] | 94 | 60 | 2.42 | 0.19 |
+| alarm | 5,000 | 1.81 | 4.94 | 3.51 | -1.71 [-1.81, -1.61] | 98 | 68 | 3.80 | 0.49 |
+| alarm | 20,000 | 1.38 | 5.49 | 3.51 | -2.13 [-2.21, -2.06] | 100 | 72 | 7.99 | 1.60 |
+| child | 1,000 | 1.17 | 3.69 | 3.00 | -1.83 [-1.93, -1.74] | 45 | 31 | 1.04 | 0.12 |
+| child | 5,000 | 0.93 | 4.93 | 3.00 | -2.07 [-2.17, -1.97] | 48 | 32 | 1.46 | 0.24 |
+| child | 20,000 | 0.63 | 6.12 | 3.00 | -2.37 [-2.46, -2.27] | 49 | 32 | 2.50 | 0.71 |
+| insurance | 1,000 | 2.85 | 5.94 | 5.19 | -2.34 [-2.40, -2.28] | 67 | 39 | 1.44 | 0.13 |
+| insurance | 5,000 | 2.29 | 6.72 | 5.19 | -2.89 [-2.99, -2.79] | 71 | 41 | 2.41 | 0.34 |
+| insurance | 20,000 | 1.83 | 7.55 | 5.19 | -3.35 [-3.44, -3.27] | 74 | 42 | 4.67 | 0.94 |
+| hepar2 | 1,000 | 5.53 | 7.13 | 4.51 | +1.01 [+0.92, +1.11] | 208 | 144 | 9.03 | 0.57 |
+| hepar2 | 5,000 | 5.05 | 8.22 | 4.51 | +0.53 [+0.43, +0.64] | 222 | 145 | 14.0 | 1.51 |
+| hepar2 | 20,000 | 4.70 | 9.47 | 4.51 | +0.18 [+0.10, +0.28] | 237 | 143 | 28.0 | 5.20 |
+| Gaussian, d 20, degree 2 | 1,000 | 0.58 | 0.58 | 3.35 | -2.77 [-2.94, -2.60] | 51 | 54 | 0.46 | 0.17 |
+| Gaussian, d 20, degree 2 | 5,000 | 0.60 | 0.65 | 3.35 | -2.75 [-2.90, -2.61] | 51 | 55 | 0.57 | 0.57 |
+| Gaussian, d 50, degree 2 | 1,000 | 1.71 | 1.75 | 3.72 | -2.01 [-2.17, -1.86] | 139 | 209 | 0.86 | 2.52 |
+| Gaussian, d 50, degree 2 | 5,000 | 1.63 | 1.75 | 3.72 | -2.08 [-2.27, -1.88] | 140 | 218 | 1.57 | 12.7 |
+| Gaussian, d 100, degree 2 | 1,000 | 3.55 | 3.68 | 3.88 | -0.33 [-0.47, -0.18] | 305 | 596 | 2.72 | 27.5 |
+| Gaussian, d 100, degree 2 | 5,000 | 3.49 | 3.74 | 3.88 | -0.39 [-0.55, -0.22] | 301 | 618 | 5.22 | 161.9 |
+| Gaussian, d 50, degree 4 | 1,000 | 1.85 | 1.77 | 8.52 | -6.67 [-6.93, -6.41] | 211 | 268 | 1.20 | 9.81 |
+| Gaussian, d 50, degree 4 | 5,000 | 1.45 | 1.48 | 8.52 | -7.07 [-7.34, -6.81] | 230 | 262 | 1.99 | 46.3 |
 
 GS is better than bnlearn's `gs` in all 12 network cells, where bnlearn's answers make more errors
 than the empty set. Against bnlearn's plain `mi` it is better in 9 of 12 (see
-[bnlearn's plain test](#bnlearns-plain-test)). On the Gaussian graphs it ties in 6 cells and is
-better in one; the worse cell, 50 variables with mean degree 4 at 5,000 rows, has a distance D of
-+0.011 [+0.001, +0.022] on the rerun and a tie on F1, and at 1,000 rows the same graphs tie on the
-rerun. The worse cell comes from the shrink phase. The paper removes a member while one tests
-independent of the target given the others (Margaritis and Thrun 1999, Fig. 2), without saying
-which goes first; after a removal Andrey continues with the next member in its order, and
-bnlearn's `gs` starts again from the first member. A trace that runs one Fisher z test under both
-searches, with each rule switchable, reproduces both packages' records on every target. With
-bnlearn's restart in Andrey's search, D is +0.0004 [-0.0099, +0.0109] on seeds 0-19 and -0.0023
-[-0.0124, +0.0093] on seeds 20-39; the visit order alone changes nothing (+0.0149 and +0.0111).
-Over the 40 datasets the two rules end differently at 264 targets, and every member they keep
-differently is a wrong one: 451 kept by Andrey's rule only and 169 by the restart only. In the
-other seven Gaussian cells the restart moves D by at most 0.0066.
+[bnlearn's plain test](#bnlearns-plain-test)). On the Gaussian graphs it ties in 7 cells and is
+better in one. The cell with 50 variables and mean degree 4 at 1,000 rows is worse on seeds 0-19,
+with a distance D of +0.016 [+0.004, +0.029], and ties on the rerun, +0.003 [-0.012, +0.017].
+
+The shrink phase removes a member while one tests independent of the target given the others
+(Margaritis and Thrun 1999, Fig. 2), without saying which goes first. Andrey's `gs` visits the
+members in the order they joined and starts again from the first member after each removal, as
+bnlearn's `gs` does. The other reading, which goes on to the next member after a removal and
+repeats passes until none is removed, was worse than bnlearn's in the cell with 50 variables and
+mean degree 4 at 5,000 rows (D +0.013 [+0.002, +0.023] on seeds 0-19, +0.011 [+0.001, +0.022] on
+seeds 20-39, a tie on F1). A trace that runs one Fisher z test under both searches reproduces both
+packages' records on every target, and the visit order alone changes nothing. Over the 40 datasets
+of that cell the two readings end differently at 264 targets, and every member they keep
+differently is a wrong one: 451 kept by going on and 169 by starting again.
+
+Against going on, starting again is better in 5 of the 20 cells and ties in 15: on hepar2 at 1,000
+and 20,000 rows (D -0.008 [-0.014, -0.003] and -0.005 [-0.010, -0.000]), on the Gaussian graphs with
+mean degree 4 (-0.007 [-0.011, -0.003] at 1,000 rows and -0.012 [-0.016, -0.008] at 5,000), and at
+100 variables with 1,000 rows (-0.001 [-0.002, -0.000]). The fresh datasets of the two cells with
+mean degree 4 agree (-0.005 and -0.013). It runs more tests: 211 and 230 per target against 162 and
+157 at mean degree 4, and up to 5% more elsewhere.
 
 ### Fast-IAMB
 
@@ -324,32 +333,32 @@ comparisons are context: only the rows marked "worse" were rerun.
 
 ### GS beside IAMB
 
-GS ran 32% to 64% of IAMB's tests per target. It tied IAMB in 9 network cells and 6 Gaussian cells,
-was better in 2 Gaussian cells, and was worse on alarm at 1,000 rows (also on the rerun) and, on the
-first seeds only, alarm at 5,000 rows and child at 1,000 rows.
+GS ran 40% to 64% of IAMB's tests per target. It tied IAMB in 8 network cells and 6 Gaussian cells,
+was better in 2 Gaussian cells and on hepar2 at 1,000 and 20,000 rows, and was worse, on the first
+seeds only, on alarm at 5,000 rows and child at 1,000 rows.
 
 | Data | Rows | Tests per target: GS | IAMB | F1: GS | IAMB | D distance [95%] | D F1 [95%] | Result |
 |---|---:|---:|---:|---:|---:|---|---|---|
-| alarm | 1,000 | 94 | 164 | 0.724 | 0.740 | +0.018 [+0.006, +0.030] | -0.015 [-0.025, -0.006] | worse |
-| alarm | 5,000 | 96 | 187 | 0.766 | 0.779 | +0.014 [+0.003, +0.025] | -0.013 [-0.021, -0.004] | worse, seeds 0-19 only |
-| alarm | 20,000 | 98 | 212 | 0.821 | 0.825 | +0.004 [-0.014, +0.022] | -0.005 [-0.018, +0.008] | tie |
+| alarm | 1,000 | 94 | 164 | 0.725 | 0.740 | +0.017 [+0.004, +0.029] | -0.015 [-0.024, -0.006] | tie |
+| alarm | 5,000 | 98 | 187 | 0.768 | 0.779 | +0.012 [+0.001, +0.021] | -0.011 [-0.018, -0.003] | worse, seeds 0-19 only |
+| alarm | 20,000 | 100 | 212 | 0.820 | 0.825 | +0.005 [-0.012, +0.022] | -0.005 [-0.018, +0.007] | tie |
 | child | 1,000 | 45 | 70 | 0.825 | 0.831 | +0.009 [+0.000, +0.018] | -0.006 [-0.013, +0.001] | worse, seeds 0-19 only |
-| child | 5,000 | 47 | 81 | 0.849 | 0.853 | +0.005 [-0.008, +0.020] | -0.004 [-0.015, +0.005] | tie |
+| child | 5,000 | 48 | 81 | 0.849 | 0.853 | +0.005 [-0.008, +0.020] | -0.004 [-0.015, +0.005] | tie |
 | child | 20,000 | 49 | 91 | 0.887 | 0.876 | -0.013 [-0.030, +0.002] | +0.011 [-0.001, +0.023] | tie |
-| insurance | 1,000 | 66 | 119 | 0.675 | 0.679 | +0.005 [-0.007, +0.016] | -0.003 [-0.011, +0.005] | tie |
-| insurance | 5,000 | 70 | 143 | 0.748 | 0.753 | +0.006 [-0.007, +0.020] | -0.005 [-0.016, +0.004] | tie |
-| insurance | 20,000 | 72 | 164 | 0.807 | 0.816 | +0.012 [-0.002, +0.026] | -0.009 [-0.020, +0.001] | tie |
-| hepar2 | 1,000 | 206 | 426 | 0.382 | 0.382 | -0.002 [-0.009, +0.007] | +0.000 [-0.006, +0.006] | tie |
-| hepar2 | 5,000 | 221 | 494 | 0.497 | 0.495 | -0.003 [-0.013, +0.007] | +0.003 [-0.005, +0.009] | tie |
-| hepar2 | 20,000 | 234 | 552 | 0.546 | 0.541 | -0.008 [-0.018, +0.004] | +0.004 [-0.005, +0.013] | tie |
-| Gaussian, d 20, degree 2 | 1,000 | 49 | 80 | 0.907 | 0.903 | -0.007 [-0.012, -0.003] | +0.004 [+0.001, +0.007] | better |
-| Gaussian, d 20, degree 2 | 5,000 | 49 | 81 | 0.903 | 0.902 | -0.002 [-0.007, +0.002] | +0.001 [-0.002, +0.004] | tie |
-| Gaussian, d 50, degree 2 | 1,000 | 134 | 270 | 0.788 | 0.788 | -0.001 [-0.007, +0.005] | +0.000 [-0.004, +0.005] | tie |
-| Gaussian, d 50, degree 2 | 5,000 | 133 | 274 | 0.792 | 0.793 | +0.002 [-0.001, +0.005] | -0.002 [-0.004, +0.000] | tie |
-| Gaussian, d 100, degree 2 | 1,000 | 295 | 753 | 0.641 | 0.640 | -0.001 [-0.007, +0.005] | +0.001 [-0.004, +0.005] | tie |
-| Gaussian, d 100, degree 2 | 5,000 | 287 | 748 | 0.647 | 0.648 | +0.000 [-0.003, +0.004] | -0.001 [-0.004, +0.002] | tie |
-| Gaussian, d 50, degree 4 | 1,000 | 162 | 462 | 0.875 | 0.860 | -0.022 [-0.037, -0.007] | +0.015 [+0.004, +0.026] | better |
-| Gaussian, d 50, degree 4 | 5,000 | 156 | 484 | 0.895 | 0.902 | +0.010 [+0.000, +0.019] | -0.008 [-0.014, -0.001] | tie |
+| insurance | 1,000 | 67 | 119 | 0.675 | 0.679 | +0.005 [-0.007, +0.016] | -0.003 [-0.011, +0.005] | tie |
+| insurance | 5,000 | 71 | 143 | 0.748 | 0.753 | +0.006 [-0.008, +0.020] | -0.005 [-0.015, +0.005] | tie |
+| insurance | 20,000 | 74 | 164 | 0.807 | 0.816 | +0.012 [-0.003, +0.026] | -0.009 [-0.020, +0.002] | tie |
+| hepar2 | 1,000 | 208 | 426 | 0.388 | 0.382 | -0.009 [-0.019, -0.000] | +0.006 [-0.001, +0.012] | better |
+| hepar2 | 5,000 | 222 | 494 | 0.498 | 0.495 | -0.005 [-0.015, +0.006] | +0.003 [-0.004, +0.011] | tie |
+| hepar2 | 20,000 | 237 | 552 | 0.550 | 0.541 | -0.013 [-0.025, -0.000] | +0.009 [-0.001, +0.018] | better |
+| Gaussian, d 20, degree 2 | 1,000 | 51 | 80 | 0.907 | 0.903 | -0.006 [-0.011, -0.002] | +0.003 [+0.001, +0.006] | better |
+| Gaussian, d 20, degree 2 | 5,000 | 51 | 81 | 0.903 | 0.902 | -0.003 [-0.008, +0.003] | +0.001 [-0.002, +0.005] | tie |
+| Gaussian, d 50, degree 2 | 1,000 | 139 | 270 | 0.788 | 0.788 | -0.001 [-0.007, +0.005] | +0.000 [-0.004, +0.005] | tie |
+| Gaussian, d 50, degree 2 | 5,000 | 140 | 274 | 0.791 | 0.793 | +0.002 [-0.001, +0.006] | -0.002 [-0.004, +0.000] | tie |
+| Gaussian, d 100, degree 2 | 1,000 | 305 | 753 | 0.642 | 0.640 | -0.002 [-0.008, +0.004] | +0.002 [-0.003, +0.006] | tie |
+| Gaussian, d 100, degree 2 | 5,000 | 301 | 748 | 0.647 | 0.648 | +0.001 [-0.003, +0.004] | -0.001 [-0.004, +0.002] | tie |
+| Gaussian, d 50, degree 4 | 1,000 | 211 | 462 | 0.879 | 0.860 | -0.028 [-0.043, -0.015] | +0.019 [+0.009, +0.030] | better |
+| Gaussian, d 50, degree 4 | 5,000 | 230 | 484 | 0.903 | 0.902 | -0.002 [-0.012, +0.007] | +0.001 [-0.006, +0.007] | tie |
 
 ### HITON-PC at its default `max_depth=3`
 
@@ -416,18 +425,18 @@ context and were not rerun.
 
 | Data | Rows | GS: F1, Andrey | bnlearn `mi-adf` | bnlearn `mi` | Errors: Andrey | bnlearn `mi` | Against `mi` | Fast-IAMB: F1, Andrey | bnlearn `mi-adf` | bnlearn `mi` | Errors: Andrey | bnlearn `mi` | Against `mi` | Errors: empty set |
 |---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---|---:|
-| alarm | 1,000 | 0.724 | 0.324 | 0.509 | 2.08 | 3.00 | better | 0.675 | 0.694 | 0.650 | 2.20 | 2.27 | better | 3.51 |
-| alarm | 5,000 | 0.766 | 0.364 | 0.590 | 1.81 | 2.84 | better | 0.715 | 0.719 | 0.722 | 2.18 | 2.06 | tie | 3.51 |
-| alarm | 20,000 | 0.821 | 0.366 | 0.615 | 1.38 | 2.86 | better | 0.722 | 0.715 | 0.766 | 2.24 | 1.66 | worse, seeds 0-19 only | 3.51 |
+| alarm | 1,000 | 0.725 | 0.324 | 0.509 | 2.08 | 3.00 | better | 0.675 | 0.694 | 0.650 | 2.20 | 2.27 | better | 3.51 |
+| alarm | 5,000 | 0.768 | 0.364 | 0.590 | 1.81 | 2.84 | better | 0.715 | 0.719 | 0.722 | 2.18 | 2.06 | tie | 3.51 |
+| alarm | 20,000 | 0.820 | 0.366 | 0.615 | 1.38 | 2.86 | better | 0.722 | 0.715 | 0.766 | 2.24 | 1.66 | worse, seeds 0-19 only | 3.51 |
 | child | 1,000 | 0.825 | 0.408 | 0.641 | 1.17 | 2.26 | better | 0.764 | 0.712 | 0.736 | 1.52 | 1.61 | better | 3.00 |
 | child | 5,000 | 0.849 | 0.346 | 0.690 | 0.93 | 2.18 | better | 0.791 | 0.711 | 0.789 | 1.42 | 1.40 | tie | 3.00 |
 | child | 20,000 | 0.887 | 0.323 | 0.723 | 0.63 | 2.12 | better | 0.822 | 0.649 | 0.808 | 1.26 | 1.33 | tie | 3.00 |
 | insurance | 1,000 | 0.675 | 0.247 | 0.417 | 2.85 | 4.23 | better | 0.579 | 0.565 | 0.517 | 3.44 | 3.64 | better | 5.19 |
-| insurance | 5,000 | 0.748 | 0.254 | 0.479 | 2.30 | 4.11 | better | 0.648 | 0.631 | 0.643 | 3.26 | 3.07 | tie | 5.19 |
-| insurance | 20,000 | 0.807 | 0.259 | 0.520 | 1.84 | 4.04 | better | 0.722 | 0.670 | 0.722 | 2.86 | 2.63 | tie | 5.19 |
-| hepar2 | 1,000 | 0.382 | 0.193 | 0.376 | 5.60 | 4.78 | tie | 0.379 | 0.346 | 0.381 | 5.37 | 4.78 | tie | 4.51 |
-| hepar2 | 5,000 | 0.497 | 0.199 | 0.502 | 5.07 | 4.28 | tie | 0.495 | 0.421 | 0.492 | 4.93 | 4.33 | better | 4.51 |
-| hepar2 | 20,000 | 0.546 | 0.188 | 0.597 | 4.75 | 3.80 | worse, seeds 0-19 only | 0.549 | 0.405 | 0.532 | 4.70 | 4.17 | better | 4.51 |
+| insurance | 5,000 | 0.748 | 0.254 | 0.479 | 2.29 | 4.11 | better | 0.648 | 0.631 | 0.643 | 3.26 | 3.07 | tie | 5.19 |
+| insurance | 20,000 | 0.807 | 0.259 | 0.520 | 1.83 | 4.04 | better | 0.722 | 0.670 | 0.722 | 2.86 | 2.63 | tie | 5.19 |
+| hepar2 | 1,000 | 0.388 | 0.193 | 0.376 | 5.53 | 4.78 | tie | 0.379 | 0.346 | 0.381 | 5.37 | 4.78 | tie | 4.51 |
+| hepar2 | 5,000 | 0.498 | 0.199 | 0.502 | 5.05 | 4.28 | tie | 0.495 | 0.421 | 0.492 | 4.93 | 4.33 | better | 4.51 |
+| hepar2 | 20,000 | 0.550 | 0.188 | 0.597 | 4.70 | 3.80 | worse, seeds 0-19 only | 0.549 | 0.405 | 0.532 | 4.70 | 4.17 | better | 4.51 |
 
 | Data | Rows | HITON-PC: F1, Andrey | bnlearn `mi-adf` | bnlearn `mi` | Errors: Andrey | bnlearn `mi` | Against `mi` | Errors: empty set |
 |---|---:|---:|---:|---:|---:|---:|---|---:|
@@ -458,9 +467,9 @@ Mean errors per target on hepar2 at the GS and Fast-IAMB sizes:
 
 | Rows | Empty set | GS | Fast-IAMB | IAMB | Inter-IAMB | bnlearn `gs`, `mi-adf` | `mi` | bnlearn `fast.iamb`, `mi-adf` | `mi` |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 4.51 | 5.60 | 5.37 | 5.72 | 5.71 | 7.13 | 4.78 | 5.99 | 4.78 |
-| 5,000 | 4.51 | 5.07 | 4.93 | 5.16 | 5.11 | 8.22 | 4.28 | 6.18 | 4.33 |
-| 20,000 | 4.51 | 4.75 | 4.70 | 4.85 | 4.87 | 9.47 | 3.80 | 7.20 | 4.17 |
+| 1,000 | 4.51 | 5.53 | 5.37 | 5.72 | 5.71 | 7.13 | 4.78 | 5.99 | 4.78 |
+| 5,000 | 4.51 | 5.05 | 4.93 | 5.16 | 5.11 | 8.22 | 4.28 | 6.18 | 4.33 |
+| 20,000 | 4.51 | 4.70 | 4.70 | 4.85 | 4.87 | 9.47 | 3.80 | 7.20 | 4.17 |
 
 and at the HITON-PC sizes:
 

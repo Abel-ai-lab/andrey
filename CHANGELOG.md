@@ -21,10 +21,11 @@ names its pull request.
   one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
   arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
   first, and adds each at once when a test finds it dependent given the blanket so far, in passes
-  until none joins, then shrinks the blanket in passes until none leaves. It is supported: against
-  bnlearn's `gs` on four published networks and linear-Gaussian graphs, every variable a target, its
-  sets were better in 13 of 20 settings and worse in 1. On hepar2 they have more errors than the
-  empty set, as those of `iamb` do. ([#931], [#993])
+  until none joins, then shrinks the blanket, starting again from the first member after each
+  removal. It is supported: against bnlearn's `gs` on four published networks and linear-Gaussian
+  graphs, every variable a target, its sets were better in 13 of 20 settings and worse in none. On
+  hepar2 they have more errors than the empty set, as those of `iamb` do. ([#931], [#993],
+  [#1009])
 - `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005), with
   the arguments and metadata of `iamb`. Each round tests every variable outside the blanket and adds
   those that test dependent together, the most dependent first, while a categorical test's table
@@ -197,9 +198,11 @@ names its pull request.
   for two `variables` given in any order, finds whether one causes the other and the optimal
   adjustment set for the total effect when it is identifiable, else the locally valid parent sets
   of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
-  them. It learns only the blankets the answer needs. `metadata["effects"]` holds one record per
-  direction, the graph the edges at the two variables, and `metadata["blankets_learned"]` the
-  variables whose blanket it learned. ([#1003])
+  them but each by the skeleton step of PC over the blanket, so the tests are exponential in the
+  degrees of the skeleton and not in the size of the blanket. It learns only the blankets the
+  answer needs. `metadata["effects"]` holds one record per direction, the graph the edges at the
+  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned.
+  ([#1003], [#1011])
 
 ### Changed
 
@@ -225,6 +228,17 @@ names its pull request.
   asked, not the last record of the fit, and a record that says the effect is zero estimates 0
   instead of adjusting for the sets it lists. `--rescore` recomputes the errors of a stored run.
   ([#988])
+- `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
+  the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
+  one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
+  off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
+  is the same to rounding, and a strong dependence now keeps a positive p-value down to about
+  `1e-308`. On the recorded-output and recovery inputs, 60 of the 66 methods return the same output
+  bit for bit. The graph of `pcmb` changes in one fit, from a tie among p-values below `2e-16`;
+  the p-values and statistics in the metadata of `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`
+  change; and the claim scores of `y_structures` are finite where they were infinite, with the same
+  claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
+  `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2763,6 +2777,9 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
+[#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
+[#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
+[#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

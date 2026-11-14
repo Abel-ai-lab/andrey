@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.special import gammainc
+from scipy.special import gammaincc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -78,7 +78,7 @@ def _fisher_hsic_test(
         fisher_stat -= 2 * hsic_gamma_log_p(gram, residual_gram, n)
         if round(fisher_stat, KEY_DP) > bound:
             break
-    fisher_p = 1 - gammainc(len(predictor_grams), 0.5 * fisher_stat)
+    fisher_p = gammaincc(len(predictor_grams), 0.5 * fisher_stat)
     return float(fisher_p), float(fisher_stat)
 
 
