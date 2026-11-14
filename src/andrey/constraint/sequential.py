@@ -12,9 +12,12 @@ growing graph (:func:`merge`), which holds no other edge of ``L_x``, orients tha
 at each step, and :data:`MB_BY_MB`, :data:`LOAD`, and :data:`MMB_BY_MMB` hold them.
 
 A node ``y`` of ``MB(x)`` is adjacent to ``x`` exactly when no subset of ``MB(x)`` without ``y``
-separates them ([1]_ Thm. 1, [2]_ Thm. 1, [3]_ Lemma A.2), so MB-by-MB and MMB-by-MMB test every
-pair at ``x`` against the subsets of ``MB(x) \\ {y}``, never against ``x``'s shrinking adjacencies;
-the tests of an adjacent pair grow as ``2 ** (|MB(x)| - 1)``. LOAD runs the skeleton step of PC
+separates them ([1]_ Thm. 1, [2]_ Thm. 1, [3]_ Lemma A.2), so MB-by-MB tests every pair at ``x``
+against the subsets of ``MB(x) \\ {y}``, never against ``x``'s shrinking adjacencies; the tests
+of an adjacent pair grow as ``2 ** (|MB(x)| - 1)``. The same holds at ``y``, so MMB-by-MMB tests
+the pair against the subsets of the smaller of ``MB(x) \\ {y}`` and ``MB(y) \\ {x}``, as the
+Grow-Shrink search [4]_ and MBCS* [5]_ limit it, and the tests of an adjacent pair grow with the
+smaller blanket. LOAD runs the skeleton step of PC
 over ``MB+(x)`` as its Algorithm 11 states: a pair at ``x`` is tested like every other, against the
 subsets of the adjacencies of either end, so its tests grow with the neighborhoods of the skeleton.
 The v-structures of ``L_x`` that contain ``x`` are true ones ([1]_ Thm. 2, [2]_ Thm. 2); its other
@@ -42,6 +45,11 @@ References
 .. [3] Schubert, M., Claassen, T., and Magliacane, S. (2026). Local causal discovery for
    statistically efficient causal inference. Proceedings of the 29th International Conference
    on Artificial Intelligence and Statistics.
+.. [4] Margaritis, D., and Thrun, S. (1999). Bayesian network induction via local
+   neighborhoods. Advances in Neural Information Processing Systems 12, 505-511.
+.. [5] Pellet, J.-P., and Elisseeff, A. (2008). Finding latent causes in causal networks: an
+   efficient approach based on Markov blankets. Advances in Neural Information Processing
+   Systems 21, 1249-1256.
 """
 
 from __future__ import annotations
@@ -77,12 +85,14 @@ class Rules:
 
     ``local`` decides the pairs of ``L_x`` that do not hold ``x``: ``"ic"`` tests each against
     every subset of the other members of ``MB+(x)``, as the IC search of MB-by-MB [1]_; ``"pc"``
-    tests each against the subsets of the current adjacencies of either end, level by level, as
-    the PC search of MMB-by-MMB [2]_; ``"skeleton"`` does the same, as the skeleton step of PC that
-    LOAD runs over ``MB+(x)`` ([3]_ Alg. 11). With ``"ic"`` and ``"pc"`` a pair at ``x`` is tested
-    against the subsets of ``MB(x)`` without the other end; with ``"skeleton"`` it is tested like
-    every other pair, so the number of tests follows the neighborhoods of the skeleton, not
-    ``MB(x)``. ``expand`` decides what joins the waitlist:
+    and ``"pc_smaller"`` test each against the subsets of the current adjacencies of either end,
+    level by level, as the PC search of MMB-by-MMB [2]_; ``"skeleton"`` does the same, as the
+    skeleton step of PC that LOAD runs over ``MB+(x)`` ([3]_ Alg. 11). With ``"ic"`` and ``"pc"`` a
+    pair ``x - y`` is tested against the subsets of ``MB(x)`` without ``y``; with ``"pc_smaller"``
+    against those of ``MB(y)`` without ``x`` instead when that blanket holds ``x`` and has fewer
+    members, which learns ``MB(y)`` ([2]_ Thm. 1 at ``y``, [4]_, [5]_ Sect. 4.2); with
+    ``"skeleton"`` it is tested like every other pair, so the number of tests follows the
+    neighborhoods of the skeleton, not ``MB(x)``. ``expand`` decides what joins the waitlist:
     ``"blanket"`` the members of ``MB(x)``, as soon as it is learned [1]_; ``"adjacent"`` the
     variables adjacent to ``x``, after the merge [2]_. ``orient`` decides the orientation:
     ``"meek"`` Meek's rules R1-R3 on a CPDAG [1]_; ``"pag"`` the FCI rules without selection bias
@@ -107,10 +117,13 @@ class Rules:
     can keep an edge ``b - c`` away from ``x`` that only a larger subset of the blanket
     separates, and a v-structure ``x *-> b <-* c`` then brings in an edge the PAG lacks;
     ``colliders="own_blanket"`` drops it, since ``b``'s own step tests the pair against every
-    subset of ``MB(b)``.
+    subset of ``MB(b)``. With ``"pc_smaller"`` the separating set of a pair at ``x`` can hold
+    variables outside ``MB+(x)``, so a v-structure ``x *-> b <-* c`` over such an edge ``b - c`` can
+    come in even when ``b`` lies in every separating set inside the blanket; ``"pc_smaller"``
+    therefore needs ``colliders="own_blanket"``, which checks ``b - c`` against ``b``'s own step.
     """
 
-    local: Literal["ic", "pc", "skeleton"] = "ic"
+    local: Literal["ic", "pc", "pc_smaller", "skeleton"] = "ic"
     expand: Literal["blanket", "adjacent"] = "blanket"
     orient: Literal["meek", "pag"] = "meek"
     stop: Literal["blocked", "r1_r3", "r1_r2"] = "blocked"
@@ -119,7 +132,7 @@ class Rules:
 
     def __post_init__(self) -> None:
         for name, value, choices in (
-            ("local", self.local, ("ic", "pc", "skeleton")),
+            ("local", self.local, ("ic", "pc", "pc_smaller", "skeleton")),
             ("expand", self.expand, ("blanket", "adjacent")),
             ("orient", self.orient, ("meek", "pag")),
             ("stop", self.stop, ("blocked", "r1_r3", "r1_r2")),
@@ -130,15 +143,18 @@ class Rules:
                 raise ValueError(f"{name} must be one of {choices}, got {value!r}")
         if self.stop_after == "degree" and self.stop == "blocked":
             raise ValueError("stop_after='degree' needs stop='r1_r3' or 'r1_r2'")
+        if self.local == "pc_smaller" and self.colliders != "own_blanket":
+            raise ValueError("local='pc_smaller' needs colliders='own_blanket'")
 
 
 #: MB-by-MB as Wang et al. state it [1]_.
 MB_BY_MB = Rules()
 #: MB-by-MB as LOAD runs it ([3]_ Alg. 11): the skeleton step of PC in place of IC's search.
 LOAD = Rules(local="skeleton")
-#: MMB-by-MMB [2]_, with the collider check and the stop guard of its authors' code.
+#: MMB-by-MMB [2]_, with the collider check and the stop guard of its authors' code, each pair at
+#: ``x`` tested on the smaller of the two blankets.
 MMB_BY_MMB = Rules(
-    local="pc",
+    local="pc_smaller",
     expand="adjacent",
     orient="pag",
     stop="r1_r3",
@@ -340,8 +356,13 @@ def sequential(
     stopped = "empty"
     degree = 0
 
+    def blanket_of(v: int) -> list[int]:
+        return learn_blanket(search, blanket, v, cache, learned)
+
     def own(v: int) -> tuple[LocalGraph, dict[Pair, tuple[int, ...]]]:
-        return own_step(search, v, blanket, rules.local, cache, learned, depth=local_depth)
+        return own_step(
+            search, v, blanket, rules.local, cache, learned, depth=local_depth, of=blanket_of
+        )
 
     with counting_tests() as tests, search.pinned():
         while waitlist:
@@ -350,7 +371,9 @@ def sequential(
             if rules.expand == "blanket":
                 extend(waitlist, mb, done)
             done.append(x)
-            local = _local_structure(search, x, mb, rules.local, cache, network, done, local_depth)
+            local = _local_structure(
+                search, x, mb, rules.local, cache, network, done, local_depth, blanket_of
+            )
             if rules.colliders == "own_blanket":
                 local = confirm_colliders(local, x, search, own)
             merge(network, local, x)
@@ -410,8 +433,10 @@ def _local_structure(
     network: Network,
     done: list[int],
     depth: int | None = None,
+    of: Callable[[int], Sequence[int]] | None = None,
 ) -> LocalGraph:
-    """``L_x`` by the cases of :func:`sequential`, kept in ``cache``."""
+    """``L_x`` by the cases of :func:`sequential`, kept in ``cache``; ``of`` gives a variable's
+    blanket, as :func:`learn_local` reads it."""
     if x in cache.local:
         return cache.local[x]
     nodes = {x, *mb}
@@ -424,7 +449,7 @@ def _local_structure(
         if set(mb) <= set(done):
             local = network.local(sorted(nodes))
         else:
-            local = learn_local(search, x, mb, how, cache, depth=depth)
+            local = learn_local(search, x, mb, how, cache, depth=depth, of=of)
     cache.local[x] = local
     return local
 
@@ -437,21 +462,26 @@ def learn_local(
     cache: Cache | None = None,
     *,
     depth: int | None = None,
+    of: Callable[[int], Sequence[int]] | None = None,
 ) -> LocalGraph:
     """The local structure over ``MB+(x)``, ``x`` with its blanket ``mb``, learned from the data.
 
     With ``how="ic"`` and ``how="pc"`` a pair at ``x`` is tested against the subsets of ``mb``
-    without its other end; with ``how="ic"`` every other pair against the subsets of the other
-    members of ``MB+(x)``, and with ``how="pc"`` against the subsets of either end's adjacencies as
-    they stand when the level begins. With ``how="skeleton"`` every pair, those at ``x`` included,
-    is tested as ``"pc"`` tests the others. Sizes grow from zero; at each size every subset is
-    tested (in one call where the test can), and a pair that some set of that size separates is
-    removed after the level, with the set of the largest p-value, ties to the set whose ranks come
-    first (:meth:`~andrey.constraint.blanket.LocalSearch.largest_sets`). No test conditions on more
-    than the search's ``max_depth`` variables, nor on more than ``depth``. With knowledge, a pair it
-    makes non-adjacent is never adjacent and a required one is never tested. A triple
-    ``a - b - c`` with ``a``, ``c`` separated is a collider when ``b`` is not in their set. Each set
-    found goes into ``cache``.
+    without its other end; with ``how="pc_smaller"`` a pair ``x - y`` is tested against the subsets
+    of ``of(y)``, ``y``'s blanket, without ``x`` instead when ``of`` is given and that blanket holds
+    ``x`` and has fewer members than ``mb``; those blankets are asked first, in the order of
+    ``mb``. With ``how="ic"`` every other pair is tested against
+    the subsets of the other members of ``MB+(x)``, and with ``how="pc"`` and ``"pc_smaller"``
+    against the subsets of either end's adjacencies as they stand when the level begins. With
+    ``how="skeleton"`` every pair, those at ``x`` included, is tested as ``"pc"`` tests the others.
+    Sizes grow from zero; at each size every subset is tested (in one call where the test can), and
+    a pair that some set of that size separates is removed after the level, with the set of the
+    largest p-value, ties to the set whose ranks come first
+    (:meth:`~andrey.constraint.blanket.LocalSearch.largest_sets`). No test conditions on more than
+    the search's ``max_depth`` variables, nor on more than ``depth``. With knowledge, a pair it
+    makes non-adjacent is never adjacent and a required one is never tested. A triple ``a - b - c``
+    with ``a``, ``c`` separated is a collider when ``b`` is not in their set. Each set found goes
+    into ``cache``.
     """
     nodes = tuple(sorted({x, *mb}))
     constraints = search.constraints
@@ -460,6 +490,9 @@ def learn_local(
     adjacent = {p for p in combinations(nodes, 2) if support is None or support[p]}
     fixed = {p for p in adjacent if required is not None and required[p]}
     blanket = sorted(mb)
+    # The members' blankets in the blanket's joining order, so the order of the learned blankets,
+    # and the separating sets their learner records first, do not depend on the column order.
+    far = {y: of(y) for y in mb} if how == "pc_smaller" and of is not None else None
     sepsets: dict[Pair, tuple[int, ...]] = {}
     caps = [c for c in (search.max_depth, depth) if c is not None]
     cap = min(caps) if caps else None
@@ -471,7 +504,8 @@ def learn_local(
         for pair in sorted(adjacent - fixed):
             hits: list[tuple[tuple[int, ...], float]] = []
             within: set[int] | None = None
-            for first, other, among in _sides(search, x, pair, blanket, nodes, neighbors, how):
+            sides = _sides(search, x, pair, blanket, nodes, neighbors, how, far)
+            for first, other, among in sides:
                 if len(among) < size:
                     continue
                 tested = True
@@ -510,13 +544,19 @@ def _sides(
     nodes: tuple[int, ...],
     neighbors: Mapping[int, set[int]],
     how: str,
+    far: Mapping[int, Sequence[int]] | None = None,
 ) -> list[tuple[int, int, list[int]]]:
     """The tests that decide ``pair`` in :func:`learn_local`: each as ``(first, other, among)``,
-    the pair's ends in the order the test takes them and the ascending variables to condition on.
+    the pair's ends in the order the test takes them and the ascending variables to condition on;
+    ``far`` holds the blankets of ``x``'s members for ``how="pc_smaller"``.
     """
     u, v = pair
     if x in pair and how != "skeleton":
         y = v if u == x else u
+        if how == "pc_smaller" and far is not None:
+            other = far[y]
+            if x in other and len(other) < len(blanket):
+                return [(y, x, sorted(z for z in other if z != x))]
         return [(x, y, [z for z in blanket if z != y])]
     first = search.strongest({u: 0.0, v: 0.0})
     other = v if first == u else u
@@ -537,6 +577,7 @@ def own_step(
     learned: list[int],
     *,
     depth: int | None = None,
+    of: Callable[[int], Sequence[int]] | None = None,
 ) -> tuple[LocalGraph, dict[Pair, tuple[int, ...]]]:
     """``v``'s own local structure, learned from the data over ``MB+(v)`` (:func:`learn_local`),
     and the separating sets it found, kept in ``cache.own`` for :func:`confirm_colliders`.
@@ -549,7 +590,7 @@ def own_step(
     if v not in cache.own:
         mb = learn_blanket(search, blanket, v, cache, learned)
         found = Cache()
-        local = learn_local(search, v, mb, how, found, depth=depth)
+        local = learn_local(search, v, mb, how, found, depth=depth, of=of)
         cache.own[v] = (local, found.sepsets)
     return cache.own[v]
 
