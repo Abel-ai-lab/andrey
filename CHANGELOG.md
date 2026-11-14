@@ -114,8 +114,12 @@ names its pull request.
   beyond the paper, the method follows it, with two safeguards that make the answer correct where
   the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
   off the step confirm it from their own blankets, and the stop rules are read only once more
-  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
-  beside the authors' code. ([#966], [#980], [#994])
+  blankets have been learned than the target has neighbors. A pair at a step is tested against the
+  subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
+  does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
+  so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. ([#966],
+  [#980], [#994], [#1022])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -182,7 +186,7 @@ names its pull request.
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
   peels sink columns instead, for a target and children on no cycle. ([#986])
-- `andrey.cmb`, CMB (Gao and Ji 2015), experimental: the direct causes and direct effects of one
+- `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
   labels each neighbor from how its dependence on the others changes once the target is conditioned
@@ -191,7 +195,10 @@ names its pull request.
   acyclicity (Meek's rule R2). `alpha` defaults to 0.02, the level of the paper's runs. `metadata`
   lists the target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the
   `blankets_learned`, and `n_tests`. With exact tests every edge and direction it returns is the
-  CPDAG's, and some edges the CPDAG directs stay undirected. ([#995])
+  CPDAG's, and some edges the CPDAG directs stay undirected. It is supported: on samples of the
+  Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
+  PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
+  release card has the numbers. ([#995], [#1020])
 - `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
   directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
   blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
@@ -244,6 +251,12 @@ names its pull request.
   change; and the claim scores of `y_structures` are finite where they were infinite, with the same
   claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
   `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+- The separating-set search of the local methods keeps a count of the conditioning sets it tests
+  and the best separating set, not a record of every set, so its memory no longer grows with the
+  number of sets. `mmb_by_mmb` tests a pair against every subset of a blanket of up to 10 members,
+  and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
+  of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
+  unchanged. ([#1019])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2784,7 +2797,10 @@ First alpha release.
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
+[#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

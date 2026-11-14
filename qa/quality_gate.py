@@ -755,7 +755,9 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: domain index orients the edges it reaches. ``clusters`` counts the latents missed
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
 #: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
-#: ``direct`` scores the directed edges against those between observed variables that no hidden
+#: ``target_cpdag`` scores the edges at the last variable against the CPDAG's, as the missing,
+#: extra, and mismarked edges there (:func:`~andrey.metrics.target_edge_scores`). ``direct``
+#: scores the directed edges against those between observed variables that no hidden
 #: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
 #: index by its endpoints against the one the draw records. A time-series estimate is scored in its
 #: published summary's unit (:func:`series_error`).
@@ -767,6 +769,7 @@ Target = Literal[
     "essential",
     "clusters",
     "parents",
+    "target_cpdag",
     "direct",
     "index_pag",
     "lagged",
@@ -808,6 +811,9 @@ CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
+#: CMB answers one variable, the last column. Sachs has one draw, and at its last column, jnk, CMB
+#: finds at most one of the two edges, as PC does: its SHD there equals the empty answer's.
+TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
@@ -922,10 +928,11 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. A fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and
-#: GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through
-#: their benchmark adapters, which call the public functions with the published settings: the domain
-#: index of four equal blocks of rows, and three groups of columns.
+#: fits its IAMB restrict phase. CMB answers one variable, the last column. A fixed seed
+#: pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's
+#: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the
+#: public functions with the published settings: the domain index of four equal blocks of rows, and
+#: three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -949,6 +956,9 @@ SUPPORTED: dict[str, Method] = {
     "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
     "HITONMB": Method(lambda x: andrey.hiton_mb(x), "cpdag", CPDAG_DATA),
+    "CMB": Method(
+        lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
@@ -1083,9 +1093,9 @@ def direct(truth: GraphStructure) -> GraphStructure:
 def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
     """Return what an estimate scored as ``target`` is compared with, as in the published summary.
 
-    A CPDAG is scored against the truth's CPDAG, a DAG against the DAG, a PAG against the PAG of
-    the observed variables, a ``projection`` estimate against :func:`projection`, and a ``direct``
-    one against :func:`direct`.
+    A CPDAG, or the CPDAG's edges at one variable, is scored against the truth's CPDAG, a DAG
+    against the DAG, a PAG against the PAG of the observed variables, a ``projection`` estimate
+    against :func:`projection`, and a ``direct`` one against :func:`direct`.
     """
     if target == "direct":
         return direct(truth)
@@ -1093,15 +1103,16 @@ def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
         return marginal(truth, "pag", max_nodes=truth.n_nodes)
     if target == "projection":
         return projection(truth)
-    if target == "cpdag":
+    if target in ("cpdag", "target_cpdag"):
         return metrics.to_cpdag(truth)
     return truth
 
 
 def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     """Return the SHD of ``estimate`` against ``target_truth``; PAG-like targets count endpoints,
-    ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents, and
-    ``direct`` the directed edges in one graph and not the other, a reversed edge twice."""
+    ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents,
+    ``target_cpdag`` the missing, extra, and mismarked edges at the last variable, and ``direct``
+    the directed edges in one graph and not the other, a reversed edge twice."""
     if target == "direct":
         return len(directed(estimate) ^ directed(truth))
     if target == "clusters":
@@ -1109,6 +1120,8 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     if target == "parents":
         last = truth.n_nodes - 1
         return set_errors(parents_of(estimate, last), parents_of(truth, last))
+    if target == "target_cpdag":
+        return int(metrics.target_edge_scores(estimate, truth, truth.n_nodes - 1)["shd"])
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
     return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
@@ -1133,7 +1146,7 @@ def latents_missed(estimate: Any, truth: GraphStructure) -> int:
 
 
 def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
-    kind = "pag" if target in ("projection", "index_pag") else target
+    kind = {"projection": "pag", "index_pag": "pag", "target_cpdag": "cpdag"}.get(target, target)
     return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 

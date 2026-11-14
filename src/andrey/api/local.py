@@ -487,7 +487,10 @@ def mmb_by_mmb(
     its blanket with the search of :func:`~andrey.pc`: ``x`` and a member are adjacent unless some
     subset of the rest of the blanket separates them, every other pair is tested against the
     subsets of either end's neighbors, and a triple ``a - b - c`` with ``a`` and ``c`` separated
-    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. When the blanket and ``x`` lie
+    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. Since a member and ``x`` are
+    adjacent exactly when no subset of the rest of the member's own blanket separates them either
+    [1]_, the pair is tested on the smaller of the two blankets, as MBCS* limits the search [3]_;
+    the method learns the blanket of each member to compare them. When the blanket and ``x`` lie
     inside those of a variable done earlier, or every member of the blanket is done, the local
     structure is read from what is already learned instead [1]_. Only the edges at ``x`` and the
     v-structures that contain ``x`` join the growing graph, since the rest of the local structure
@@ -536,7 +539,9 @@ def mmb_by_mmb(
     graphs with hidden common causes, where the answer holds the PAG's edges with each mark the
     PAG's or a circle, the PAG's at 654 of 657 targets, and on simulated linear-Gaussian data with
     hidden nodes. The collider check learns the blanket and local structure of each variable it
-    reads, so a fit runs more tests than the paper's steps alone. ``"total_conditioning"`` tests
+    reads, so a fit runs more tests than the paper's steps alone. The tests of an adjacent pair
+    grow about twofold with each member of the smaller of its two blankets, so two adjacent
+    variables that both have wide blankets are slow. ``"total_conditioning"`` tests
     each variable given all the others, so it needs more rows than variables and continuous data
     with linear effects; on other data, choose another learner. Each local structure tests up to
     ``local_max_depth`` members per set, and a pair that only a larger set separates keeps its
@@ -727,9 +732,6 @@ def cmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -783,14 +785,17 @@ def cmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
-    With exact tests and exact blankets, every edge and every direction it returns is the true
-    CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows from
-    a separating set its steps never test, or from directions its visits do not find. Over every
-    target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets
-    at an average of 1.5, 2.5, and 4 neighbors per variable. Tested with exact d-separation on
-    those graphs and the paper's two examples, and on simulated linear-Gaussian data with 20
-    variables and categorical data with 10. The numbers are a reference, not a hard limit: they
+    **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
+    G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
+    target were nearer the true CPDAG's than those of :func:`~andrey.pc` on the same data and than
+    the empty answer, on 20 datasets and again on 20 fresh ones. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb>`_ has the
+    numbers. With exact tests and exact blankets, every edge and every direction it returns is the
+    true CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows
+    from a separating set its steps never test, or from directions its visits do not find. Over
+    every target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of
+    targets at an average of 1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per
+    target. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
 
     References

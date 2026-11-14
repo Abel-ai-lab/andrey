@@ -461,6 +461,7 @@ variable.
    hiton_pc
    hiton_mb
    pcmb
+   cmb
    icp
    ges
    gies
@@ -536,6 +537,14 @@ or a moral graph, as `iamb` does. On categorical data it counts degrees of freed
 Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation
 exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
 networks beside those of its paper.
+
+CMB, causal Markov blanket (Gao and Ji 2015), {py:func}`~andrey.cmb`, learns the edges at one
+variable and their directions without the whole graph: from the target's Markov blanket, learned
+with HITON-MB by default, it labels each neighbor a parent or a child by how its dependence on the
+others changes once the target is conditioned on, then visits the undecided neighbors in turn and
+directs the target's edges from what their blankets show. No reference implementation exists, so
+the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
+on its paper's Alarm setting.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -732,7 +741,6 @@ in a process.
    dagma
    mmmb
    mb_by_mb
-   cmb
    mmb_by_mmb
    y_structures
    ldp

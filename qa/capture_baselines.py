@@ -70,6 +70,18 @@ def _run_icp(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
 
 
+def _run_target(name: str):
+    def run(X: np.ndarray, algorithm: str) -> dict:
+        import andrey
+
+        # The column of x3, the variable with the most edges in the true graph: x1 -> x3 <- x2
+        # and x3 -> x4.
+        target = int(datagen.column_of("gauss_5v")[3])
+        return project_output(getattr(andrey, name)(X, target=target), algorithm)
+
+    return run
+
+
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -129,6 +141,7 @@ ALGORITHMS = {
     "PCMB": (_facade("pcmb"), "gauss_5v"),
     "HITONMB": (_facade("hiton_mb"), "gauss_5v"),
     "MMMB": (_facade("mmmb"), "gauss_5v"),
+    "CMB": (_run_target("cmb"), "gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),

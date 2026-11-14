@@ -29,6 +29,7 @@ _GRAPH = (
             "PCMB",
             "HITONMB",
             "MMMB",
+            "CMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",

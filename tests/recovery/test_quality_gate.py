@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure, data
-from andrey.core import LATENT
+from andrey.core import ARROW, LATENT, TAIL
 from andrey.data import real
 from andrey.data.sortability import causal_depth, index_correlation
 from qa import quality_gate as qg
@@ -81,6 +81,28 @@ def test_gate_rejects_a_broken_result(method: str) -> None:
     for dataset in qg.CHECKS[method].datasets:
         result = qg.evaluate(method, dataset, fit=lambda draw: shifted_truth(draw, target))
         assert not result.passed, f"{method} on {dataset} accepted SHD {result.shd}"
+
+
+def test_target_cpdag_counts_the_edges_at_the_last_variable_alone() -> None:
+    def graph(*edges: tuple[int, int, int, int], kind: str = "cpdag") -> GraphStructure:
+        """A graph over four variables; each edge is ``(i, j, mark at i, mark at j)``."""
+        marks = np.zeros((4, 4), dtype=np.int8)
+        for i, j, at_i, at_j in edges:
+            marks[i, j], marks[j, i] = at_i, at_j
+        return GraphStructure.from_numpy(marks, kind=kind)
+
+    # The DAG 0 -> 3 <- 1, 0 -> 2: its CPDAG keeps the collider at 3 and leaves 0 - 2 undirected.
+    dag = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, ARROW), (0, 2, TAIL, ARROW), kind="dag")
+    truth = qg.target_truth(dag, "target_cpdag")
+    right = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, ARROW))
+    # One edge at the last variable with a mark that differs and one the truth lacks; an edge the
+    # answer has between two other variables and the edge the truth has there count nothing.
+    wrong = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, TAIL), (2, 3, TAIL, ARROW), (1, 2, TAIL, TAIL))
+    missing = graph((0, 3, TAIL, ARROW))
+    assert qg.shd(truth, truth, "target_cpdag") == qg.shd(right, truth, "target_cpdag") == 0
+    assert qg.shd(wrong, truth, "target_cpdag") == 2
+    assert qg.shd(missing, truth, "target_cpdag") == 1
+    assert qg.shd(qg.empty_graph(4, "target_cpdag"), truth, "target_cpdag") == 2
 
 
 def test_tolerance_is_two_sided() -> None:

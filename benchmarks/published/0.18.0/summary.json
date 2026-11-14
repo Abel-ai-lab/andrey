@@ -1,14 +1,14 @@
 {
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
- "generated": "2026-11-13",
- "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty')",
- "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides",
- "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored",
- "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
- "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | HITON-MB: true when every row has at least 10 paired datasets (both fitted)",
- "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
+ "generated": "2026-11-14",
+ "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty')",
+ "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides",
+ "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
+ "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted)",
+ "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
  "regimes": {
   "network_tables": "net:<network>:<rows>: forward samples of the Alarm (37 variables) or Pigs (441) network's own tables, the columns in an order drawn from the seed, columns that hold one value left out of the fit",
   "discrete": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network",
@@ -23,12 +23,16 @@
    "bnlearn": "5.2.1",
    "R": "4.6.1"
   },
+  "CMB": {
+   "bnlearn": "5.2.1",
+   "R": "4.6.1"
+  },
   "HITON-MB": {
    "Causal Explorer": "1.5",
    "MATLAB": "R2026a"
   }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -6166,6 +6170,120 @@
      "andrey_s": 3.4571,
      "comparator_s": 97.4174,
      "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CMB",
+   "family": "local",
+   "solution": "andrey.cmb",
+   "setting": "alpha=0.02, the default; G-square; blanket='hiton_mb', the default; max_depth=None, the default",
+   "paper": "Gao and Ji (2015), Table 1, the CMB row on Alarm at 1,000 rows: the mean over its datasets of the extra, missing, and reversed edges at a target, every node a target, at significance level 0.02",
+   "lane": "cmb.paper",
+   "output": "edges and their directions at every target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun",
+   "regime": "network_tables",
+   "claim": "in",
+   "metric": "total",
+   "error_metric": "total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "n": 1000,
+     "alpha": 0.02,
+     "seeds": 20,
+     "andrey_extra_mean": 0.0189,
+     "andrey_missing_mean": 0.4027,
+     "andrey_reversed_mean": 0.3297,
+     "andrey_total_mean": 0.7514,
+     "andrey_lenient_mean": 0.4297,
+     "paper_extra_mean": 0.69,
+     "paper_missing_mean": 0.61,
+     "paper_reversed_mean": 0.51,
+     "paper_total_mean": 1.81,
+     "paper_total_sd": 0.11,
+     "against": {
+      "andrey.pc.gsq": {
+       "total_mean": 0.9973,
+       "lenient_mean": 0.6378,
+       "cmb_minus": {
+        "paired": 20,
+        "mean_D": -0.2459,
+        "bootstrap_95": [
+         -0.3676,
+         -0.1176
+        ]
+       },
+       "lenient_cmb_minus": {
+        "paired": 20,
+        "mean_D": -0.2081,
+        "bootstrap_95": [
+         -0.2486,
+         -0.1703
+        ]
+       },
+       "fresh_cmb_minus": {
+        "paired": 20,
+        "mean_D": -0.2649,
+        "bootstrap_95": [
+         -0.4,
+         -0.1324
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "total_mean": 1.8,
+       "lenient_mean": 1.3351,
+       "cmb_minus": {
+        "paired": 20,
+        "mean_D": -1.0486,
+        "bootstrap_95": [
+         -1.1365,
+         -0.9622
+        ]
+       },
+       "lenient_cmb_minus": {
+        "paired": 20,
+        "mean_D": -0.9054,
+        "bootstrap_95": [
+         -0.9649,
+         -0.8459
+        ]
+       },
+       "fresh_cmb_minus": {
+        "paired": 20,
+        "mean_D": -1.1324,
+        "bootstrap_95": [
+         -1.2149,
+         -1.0514
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_total_mean": 0.6892
+     },
+     "empty_total_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.7351,
+       "bootstrap_95": [
+        -1.8122,
+        -1.6527
+       ]
+      }
+     },
+     "andrey_s": 7.835
     }
    ]
   },

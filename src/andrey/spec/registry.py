@@ -827,7 +827,7 @@ _add(
             "metadata['blankets_learned'] the variables whose blanket the fit learned, in order",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
