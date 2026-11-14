@@ -931,9 +931,15 @@ def test_parity_judges_the_metric_an_entry_names():
 
 
 @pytest.mark.parametrize(
-    ("metric", "text"), [("set_distance", "set distance"), ("set_f1_loss", "set F1 loss")]
+    ("metric", "text"),
+    [
+        ("set_distance", "set distance"),
+        ("set_f1_loss", "set F1 loss"),
+        ("claim_error", "claim errors"),
+        ("claim_ap_loss", "claim AP loss"),
+    ],
 )
-def test_parity_judges_a_set_learned_at_every_target(metric, text):
+def test_parity_judges_a_set_or_claims_per_dataset(metric, text):
     from qa import reference_parity
 
     row = {
