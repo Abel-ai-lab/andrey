@@ -200,8 +200,8 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
-experimental in `gs`, `fast_iamb`, `hiton_pc`, and `pcmb`, which that measurement did not cover,
-and in an experimental method, such as `hiton_mb` or `mmmb`. An experimental part warns with
+experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, and `pcmb`, which that measurement
+did not cover, and in an experimental method, such as `mmmb`. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
@@ -459,6 +459,7 @@ variable.
    fast_iamb
    mmpc
    hiton_pc
+   hiton_mb
    pcmb
    icp
    ges
@@ -729,7 +730,6 @@ in a process.
    :nosignatures:
 
    dagma
-   hiton_mb
    mmmb
    mb_by_mb
    cmb

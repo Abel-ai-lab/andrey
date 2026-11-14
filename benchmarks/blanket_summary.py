@@ -145,13 +145,13 @@ COMPARISONS: tuple[Comparison, ...] = (
         ("hmb", "andrey.hiton_mb"),
     ),
     Comparison(
-        "mmmb, degrees_of_freedom nonempty",
+        "mmmb, degrees_of_freedom mean",
         "Causal Explorer MMMB",
-        ("mmne", "andrey.mmmb"),
+        ("mmmean", "andrey.mmmb"),
         ("mm", "causal-explorer.mmmb"),
     ),
     Comparison(
-        "mmmb, degrees_of_freedom nonempty", "mmmb", ("mmne", "andrey.mmmb"), ("mm", "andrey.mmmb")
+        "mmmb, degrees_of_freedom mean", "mmmb", ("mmmean", "andrey.mmmb"), ("mm", "andrey.mmmb")
     ),
     Comparison("hiton_mb", "mmmb, max_depth 3", ("gh", "andrey.hiton_mb"), ("gh", "andrey.mmmb")),
     *(
