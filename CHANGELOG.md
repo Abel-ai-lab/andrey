@@ -237,7 +237,8 @@ names its pull request.
   bit for bit. The graph of `pcmb` changes in one fit, from a tie among p-values below `2e-16`;
   the p-values and statistics in the metadata of `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`
   change; and the claim scores of `y_structures` are finite where they were infinite, with the same
-  claims. ([#1017])
+  claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
+  `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
 
 ## [0.17.1] - 2026-11-12
 
