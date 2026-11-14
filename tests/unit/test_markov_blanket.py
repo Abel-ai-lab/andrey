@@ -154,9 +154,32 @@ def test_gs_admits_on_a_later_pass_a_spouse_an_earlier_member_hid():
 
 def test_gs_shrinks_a_member_its_order_admitted_early():
     """0 -> 1 -> 2 with 2 ranked first: both depend on 0, so 2 is visited first and joins, 1 joins
-    given {2}, and the shrink, in the same order, drops 2 given {1}."""
+    given {2}, and the shrink, in the order they joined, drops 2 given {1}."""
     oracle = DSepOracle(nx.DiGraph([(0, 1), (1, 2)]))
     assert LocalSearch(oracle, [0, 2, 1], 0.5).run("gs", 0) == ([1], {2: (1,)})
+
+
+class _Independent:
+    """A test that finds ``x`` independent of the target given exactly the sets listed for ``x`` and
+    dependent given any other, and logs each query in the order asked."""
+
+    def __init__(self, independent: dict[int, list[set[int]]]) -> None:
+        self.independent = independent
+        self.log: list[tuple[int, int, tuple[int, ...]]] = []
+
+    def __call__(self, x, y, cond=()):
+        self.log.append((x, y, tuple(cond)))
+        return 1.0 if set(cond) in self.independent.get(y, []) else 0.0
+
+
+def test_gs_retests_a_member_a_later_removal_made_removable():
+    """1, 2, and 3 depend on 0 and join in that order. Given the others, 2 tests independent and
+    1 and 3 dependent, so 2 goes. Without 2, 1 tests independent given {3} and 3 given {1}, but
+    each depends on 0 alone: the shrink starts again from 1, drops it, and keeps 3. A shrink that
+    went on to 3 after dropping 2 would drop 3 given {1} and keep 1."""
+    test = _Independent({2: [{1, 3}], 1: [{3}], 3: [{1}]})
+    assert LocalSearch(test, [0, 1, 2, 3], 0.5).run("gs", 0) == ([3], {2: (1, 3), 1: (3,)})
+    assert test.log[-4:] == [(0, 1, (2, 3)), (0, 2, (1, 3)), (0, 1, (3,)), (0, 3, ())]
 
 
 @pytest.mark.parametrize("seed", range(4))

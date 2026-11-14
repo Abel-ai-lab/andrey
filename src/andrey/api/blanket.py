@@ -818,12 +818,16 @@ def gs(
     the papers leave the order open and suggest visiting the most associated variables first [2]_.
     The grow phase visits the variables outside the blanket in that order, tests each given the
     current blanket, and adds it at once when its p-value is at or below ``alpha``, so the next one
-    is tested given the larger blanket; it passes over them again until a pass adds none. With
-    exact tests, the first pass adds at least the parents and children and the second the
-    children's other parents [2]_. The shrink phase visits the members in the same order and drops
-    each one the test finds independent of the target given the other current members, again until
-    a pass drops none. A test whose conditioning set is unchanged since the variable's last test is
-    not run again. With exact tests, the result is the true Markov blanket [1]_ [2]_.
+    is tested given the larger blanket; it passes over them again until a pass adds none, and does
+    not test a variable again given the blanket of its last test. With exact tests, the first pass
+    adds at least the parents and children and the second the children's other parents [2]_. The
+    shrink phase visits the members in the order they joined; a member the test finds independent
+    of the target given the other current members is dropped, and the visit starts again from the
+    first member, until every member tests dependent. The papers state the shrink as removing a
+    member while one tests independent and leave open which goes first [1]_ [2]_; starting again
+    tests the earlier members at once, given the smaller blanket, and on Gaussian graphs with mean
+    degree 4 it kept fewer wrong members than going on to the next member, at 30% to 47% more tests.
+    With exact tests, the result is the true Markov blanket [1]_ [2]_.
 
     The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
     to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
@@ -870,10 +874,10 @@ def gs(
     <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#gs>`_ shows; the benchmark scores the set at
     each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
     members, than the empty set in every measured setting except hepar2, where they have more at
-    every size, 5.6, 5.1, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
-    hepar2, with 70 variables, 2.8 to 3.4 members per target are extra, close to ``alpha`` times the
+    every size, 5.5, 5.0, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
+    hepar2, with 70 variables, 2.7 to 3.4 members per target are extra, close to ``alpha`` times the
     variables outside the blanket, while 1.3 to 2.8 of its 4.5 members are missed. The median fit
-    for every target took 1.3 to 26 s on the networks and 0.35 to 4.1 s on the Gaussian graphs.
+    for every target took 1.0 to 28 s on the networks and 0.46 to 5.2 s on the Gaussian graphs.
     Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
     run them on up to 20 variables with up to a fifth of the values missing completely at random. At
     a fixed ``alpha``, the grow phase tests every variable outside the blanket, so the false members

@@ -1,9 +1,9 @@
 {
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
- "generated": "2026-11-12",
+ "generated": "2026-11-13",
  "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal",
  "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun",
  "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored",
  "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size",
@@ -24,7 +24,7 @@
    "R": "4.6.1"
   }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -523,9 +523,9 @@
    "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
    "lane": "blanket",
    "output": "Markov blanket at every target",
-   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so the times are indicative",
    "cores": 1,
-   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "build": "Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged, with gs's shrink starting again from the first member after each removal)",
    "regime": "discrete",
    "claim": "in",
    "metric": "set_distance",
@@ -538,12 +538,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.3948,
+     "andrey_set_distance_mean": 0.3938,
      "comparator_set_distance_mean": 0.9428,
-     "mean_D": -0.548,
+     "mean_D": -0.5491,
      "bootstrap_95": [
-      -0.5871,
-      -0.5096
+      -0.5881,
+      -0.5109
      ],
      "above_zero": false,
      "verdict": "better",
@@ -557,10 +557,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -1.4311,
+       "mean": -1.4338,
        "bootstrap_95": [
-        -1.5365,
-        -1.3203
+        -1.5405,
+        -1.3216
        ]
       },
       "reference_minus_empty": {
@@ -572,7 +572,7 @@
        ]
       }
      },
-     "andrey_s": 2.3485,
+     "andrey_s": 2.4163,
      "comparator_s": 0.191,
      "result": "better"
     },
@@ -582,12 +582,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.3379,
+     "andrey_set_distance_mean": 0.3352,
      "comparator_set_distance_mean": 0.8889,
-     "mean_D": -0.5509,
+     "mean_D": -0.5536,
      "bootstrap_95": [
-      -0.5861,
-      -0.5142
+      -0.5888,
+      -0.5166
      ],
      "above_zero": false,
      "verdict": "better",
@@ -601,10 +601,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -1.7,
+       "mean": -1.7081,
        "bootstrap_95": [
-        -1.8041,
-        -1.5986
+        -1.8095,
+        -1.6068
        ]
       },
       "reference_minus_empty": {
@@ -616,7 +616,7 @@
        ]
       }
      },
-     "andrey_s": 3.847,
+     "andrey_s": 3.7987,
      "comparator_s": 0.4886,
      "result": "better"
     },
@@ -626,12 +626,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.2602,
+     "andrey_set_distance_mean": 0.2606,
      "comparator_set_distance_mean": 0.8838,
-     "mean_D": -0.6236,
+     "mean_D": -0.6232,
      "bootstrap_95": [
-      -0.6621,
-      -0.5853
+      -0.6617,
+      -0.5852
      ],
      "above_zero": false,
      "verdict": "better",
@@ -645,10 +645,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.1365,
+       "mean": -2.1311,
        "bootstrap_95": [
-        -2.2135,
-        -2.0649
+        -2.2081,
+        -2.0581
        ]
       },
       "reference_minus_empty": {
@@ -660,7 +660,7 @@
        ]
       }
      },
-     "andrey_s": 7.8518,
+     "andrey_s": 7.9938,
      "comparator_s": 1.5951,
      "result": "better"
     },
@@ -704,7 +704,7 @@
        ]
       }
      },
-     "andrey_s": 1.2933,
+     "andrey_s": 1.0413,
      "comparator_s": 0.1154,
      "result": "better"
     },
@@ -748,7 +748,7 @@
        ]
       }
      },
-     "andrey_s": 1.891,
+     "andrey_s": 1.4557,
      "comparator_s": 0.2435,
      "result": "better"
     },
@@ -792,7 +792,7 @@
        ]
       }
      },
-     "andrey_s": 3.2186,
+     "andrey_s": 2.4987,
      "comparator_s": 0.7085,
      "result": "better"
     },
@@ -802,12 +802,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.8283,
+     "andrey_set_distance_mean": 0.8202,
      "comparator_set_distance_mean": 1.1035,
-     "mean_D": -0.2752,
+     "mean_D": -0.2833,
      "bootstrap_95": [
-      -0.3045,
-      -0.2462
+      -0.3122,
+      -0.2557
      ],
      "above_zero": false,
      "verdict": "better",
@@ -821,10 +821,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 1.0886,
+       "mean": 1.0129,
        "bootstrap_95": [
-        1.0029,
-        1.1736
+        0.9171,
+        1.1071
        ]
       },
       "reference_minus_empty": {
@@ -836,7 +836,7 @@
        ]
       }
      },
-     "andrey_s": 7.808,
+     "andrey_s": 9.0325,
      "comparator_s": 0.5737,
      "result": "better"
     },
@@ -846,12 +846,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.6643,
+     "andrey_set_distance_mean": 0.6624,
      "comparator_set_distance_mean": 1.0901,
-     "mean_D": -0.4257,
+     "mean_D": -0.4277,
      "bootstrap_95": [
-      -0.4519,
-      -0.4
+      -0.4527,
+      -0.4029
      ],
      "above_zero": false,
      "verdict": "better",
@@ -865,10 +865,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 0.5579,
+       "mean": 0.5314,
        "bootstrap_95": [
-        0.4564,
-        0.6664
+        0.4293,
+        0.6357
        ]
       },
       "reference_minus_empty": {
@@ -880,7 +880,7 @@
        ]
       }
      },
-     "andrey_s": 12.6935,
+     "andrey_s": 14.0091,
      "comparator_s": 1.5142,
      "result": "better"
     },
@@ -890,12 +890,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.5939,
+     "andrey_set_distance_mean": 0.589,
      "comparator_set_distance_mean": 1.0956,
-     "mean_D": -0.5018,
+     "mean_D": -0.5066,
      "bootstrap_95": [
-      -0.5388,
-      -0.465
+      -0.5426,
+      -0.4712
      ],
      "above_zero": false,
      "verdict": "better",
@@ -909,10 +909,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 0.2336,
+       "mean": 0.1829,
        "bootstrap_95": [
-        0.1264,
-        0.3522
+        0.0979,
+        0.275
        ]
       },
       "reference_minus_empty": {
@@ -924,7 +924,7 @@
        ]
       }
      },
-     "andrey_s": 26.1234,
+     "andrey_s": 27.9912,
      "comparator_s": 5.1968,
      "result": "better"
     },
@@ -934,12 +934,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.4661,
+     "andrey_set_distance_mean": 0.4662,
      "comparator_set_distance_mean": 1.0313,
-     "mean_D": -0.5652,
+     "mean_D": -0.5651,
      "bootstrap_95": [
-      -0.6071,
-      -0.5231
+      -0.6069,
+      -0.5233
      ],
      "above_zero": false,
      "verdict": "better",
@@ -953,9 +953,9 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.337,
+       "mean": -2.3389,
        "bootstrap_95": [
-        -2.3944,
+        -2.3981,
         -2.2778
        ]
       },
@@ -968,7 +968,7 @@
        ]
       }
      },
-     "andrey_s": 1.4596,
+     "andrey_s": 1.4356,
      "comparator_s": 0.1277,
      "result": "better"
     },
@@ -978,12 +978,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.3679,
+     "andrey_set_distance_mean": 0.3674,
      "comparator_set_distance_mean": 1.0381,
-     "mean_D": -0.6703,
+     "mean_D": -0.6707,
      "bootstrap_95": [
-      -0.7121,
-      -0.6274
+      -0.7125,
+      -0.6278
      ],
      "above_zero": false,
      "verdict": "better",
@@ -997,10 +997,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.8852,
+       "mean": -2.8907,
        "bootstrap_95": [
-        -2.9833,
-        -2.7833
+        -2.9907,
+        -2.787
        ]
       },
       "reference_minus_empty": {
@@ -1012,7 +1012,7 @@
        ]
       }
      },
-     "andrey_s": 2.8746,
+     "andrey_s": 2.4117,
      "comparator_s": 0.3403,
      "result": "better"
     },
@@ -1022,12 +1022,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.2853,
+     "andrey_set_distance_mean": 0.285,
      "comparator_set_distance_mean": 1.0352,
-     "mean_D": -0.7499,
+     "mean_D": -0.7502,
      "bootstrap_95": [
       -0.7907,
-      -0.7063
+      -0.707
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1041,9 +1041,9 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -3.35,
+       "mean": -3.3519,
        "bootstrap_95": [
-        -3.4333,
+        -3.4352,
         -3.2704
        ]
       },
@@ -1056,7 +1056,7 @@
        ]
       }
      },
-     "andrey_s": 5.0972,
+     "andrey_s": 4.6743,
      "comparator_s": 0.9353,
      "result": "better"
     }
@@ -1072,9 +1072,9 @@
    "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
    "lane": "blanket",
    "output": "Markov blanket at every target",
-   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so the times are indicative",
    "cores": 1,
-   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "build": "Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged, with gs's shrink starting again from the first member after each removal)",
    "regime": "discrete",
    "claim": "in",
    "metric": "set_f1_loss",
@@ -1087,12 +1087,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.2758,
+     "andrey_set_f1_loss_mean": 0.2752,
      "comparator_set_f1_loss_mean": 0.6758,
-     "mean_D": -0.4,
+     "mean_D": -0.4006,
      "bootstrap_95": [
-      -0.4284,
-      -0.3717
+      -0.4288,
+      -0.3728
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1106,10 +1106,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -1.4311,
+       "mean": -1.4338,
        "bootstrap_95": [
-        -1.5365,
-        -1.3203
+        -1.5405,
+        -1.3216
        ]
       },
       "reference_minus_empty": {
@@ -1121,7 +1121,7 @@
        ]
       }
      },
-     "andrey_s": 2.3485,
+     "andrey_s": 2.4163,
      "comparator_s": 0.191,
      "result": "better"
     },
@@ -1131,12 +1131,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.234,
+     "andrey_set_f1_loss_mean": 0.2321,
      "comparator_set_f1_loss_mean": 0.6356,
-     "mean_D": -0.4017,
+     "mean_D": -0.4035,
      "bootstrap_95": [
-      -0.4274,
-      -0.3748
+      -0.429,
+      -0.3767
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1150,10 +1150,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -1.7,
+       "mean": -1.7081,
        "bootstrap_95": [
-        -1.8041,
-        -1.5986
+        -1.8095,
+        -1.6068
        ]
       },
       "reference_minus_empty": {
@@ -1165,7 +1165,7 @@
        ]
       }
      },
-     "andrey_s": 3.847,
+     "andrey_s": 3.7987,
      "comparator_s": 0.4886,
      "result": "better"
     },
@@ -1175,12 +1175,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.1793,
+     "andrey_set_f1_loss_mean": 0.1797,
      "comparator_set_f1_loss_mean": 0.6343,
-     "mean_D": -0.455,
+     "mean_D": -0.4546,
      "bootstrap_95": [
-      -0.4822,
-      -0.4281
+      -0.4817,
+      -0.4278
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1194,10 +1194,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.1365,
+       "mean": -2.1311,
        "bootstrap_95": [
-        -2.2135,
-        -2.0649
+        -2.2081,
+        -2.0581
        ]
       },
       "reference_minus_empty": {
@@ -1209,7 +1209,7 @@
        ]
       }
      },
-     "andrey_s": 7.8518,
+     "andrey_s": 7.9938,
      "comparator_s": 1.5951,
      "result": "better"
     },
@@ -1253,7 +1253,7 @@
        ]
       }
      },
-     "andrey_s": 1.2933,
+     "andrey_s": 1.0413,
      "comparator_s": 0.1154,
      "result": "better"
     },
@@ -1297,7 +1297,7 @@
        ]
       }
      },
-     "andrey_s": 1.891,
+     "andrey_s": 1.4557,
      "comparator_s": 0.2435,
      "result": "better"
     },
@@ -1341,7 +1341,7 @@
        ]
       }
      },
-     "andrey_s": 3.2186,
+     "andrey_s": 2.4987,
      "comparator_s": 0.7085,
      "result": "better"
     },
@@ -1351,12 +1351,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.6179,
+     "andrey_set_f1_loss_mean": 0.6122,
      "comparator_set_f1_loss_mean": 0.8069,
-     "mean_D": -0.189,
+     "mean_D": -0.1947,
      "bootstrap_95": [
-      -0.2095,
-      -0.1688
+      -0.2152,
+      -0.1751
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1370,10 +1370,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 1.0886,
+       "mean": 1.0129,
        "bootstrap_95": [
-        1.0029,
-        1.1736
+        0.9171,
+        1.1071
        ]
       },
       "reference_minus_empty": {
@@ -1385,7 +1385,7 @@
        ]
       }
      },
-     "andrey_s": 7.808,
+     "andrey_s": 9.0325,
      "comparator_s": 0.5737,
      "result": "better"
     },
@@ -1395,12 +1395,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.5026,
+     "andrey_set_f1_loss_mean": 0.5017,
      "comparator_set_f1_loss_mean": 0.8008,
-     "mean_D": -0.2982,
+     "mean_D": -0.299,
      "bootstrap_95": [
-      -0.3166,
-      -0.28
+      -0.3163,
+      -0.2817
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1414,10 +1414,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 0.5579,
+       "mean": 0.5314,
        "bootstrap_95": [
-        0.4564,
-        0.6664
+        0.4293,
+        0.6357
        ]
       },
       "reference_minus_empty": {
@@ -1429,7 +1429,7 @@
        ]
       }
      },
-     "andrey_s": 12.6935,
+     "andrey_s": 14.0091,
      "comparator_s": 1.5142,
      "result": "better"
     },
@@ -1439,12 +1439,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.4544,
+     "andrey_set_f1_loss_mean": 0.45,
      "comparator_set_f1_loss_mean": 0.8121,
-     "mean_D": -0.3577,
+     "mean_D": -0.3621,
      "bootstrap_95": [
-      -0.3816,
-      -0.3341
+      -0.3851,
+      -0.3393
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1458,10 +1458,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": 0.2336,
+       "mean": 0.1829,
        "bootstrap_95": [
-        0.1264,
-        0.3522
+        0.0979,
+        0.275
        ]
       },
       "reference_minus_empty": {
@@ -1473,7 +1473,7 @@
        ]
       }
      },
-     "andrey_s": 26.1234,
+     "andrey_s": 27.9912,
      "comparator_s": 5.1968,
      "result": "better"
     },
@@ -1487,8 +1487,8 @@
      "comparator_set_f1_loss_mean": 0.753,
      "mean_D": -0.4285,
      "bootstrap_95": [
-      -0.4586,
-      -0.3974
+      -0.4585,
+      -0.3975
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1502,9 +1502,9 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.337,
+       "mean": -2.3389,
        "bootstrap_95": [
-        -2.3944,
+        -2.3981,
         -2.2778
        ]
       },
@@ -1517,7 +1517,7 @@
        ]
       }
      },
-     "andrey_s": 1.4596,
+     "andrey_s": 1.4356,
      "comparator_s": 0.1277,
      "result": "better"
     },
@@ -1527,12 +1527,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.252,
+     "andrey_set_f1_loss_mean": 0.2516,
      "comparator_set_f1_loss_mean": 0.7456,
-     "mean_D": -0.4936,
+     "mean_D": -0.494,
      "bootstrap_95": [
-      -0.5228,
-      -0.4638
+      -0.5232,
+      -0.4642
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1546,10 +1546,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.8852,
+       "mean": -2.8907,
        "bootstrap_95": [
-        -2.9833,
-        -2.7833
+        -2.9907,
+        -2.787
        ]
       },
       "reference_minus_empty": {
@@ -1561,7 +1561,7 @@
        ]
       }
      },
-     "andrey_s": 2.8746,
+     "andrey_s": 2.4117,
      "comparator_s": 0.3403,
      "result": "better"
     },
@@ -1571,12 +1571,12 @@
      "n": 20000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.193,
+     "andrey_set_f1_loss_mean": 0.1929,
      "comparator_set_f1_loss_mean": 0.7407,
-     "mean_D": -0.5476,
+     "mean_D": -0.5477,
      "bootstrap_95": [
-      -0.5757,
-      -0.5181
+      -0.5758,
+      -0.5182
      ],
      "above_zero": false,
      "verdict": "better",
@@ -1590,9 +1590,9 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -3.35,
+       "mean": -3.3519,
        "bootstrap_95": [
-        -3.4333,
+        -3.4352,
         -3.2704
        ]
       },
@@ -1605,7 +1605,7 @@
        ]
       }
      },
-     "andrey_s": 5.0972,
+     "andrey_s": 4.6743,
      "comparator_s": 0.9353,
      "result": "better"
     }
@@ -1621,9 +1621,9 @@
    "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
    "lane": "blanket",
    "output": "Markov blanket at every target",
-   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so the times are indicative",
    "cores": 1,
-   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "build": "Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged, with gs's shrink starting again from the first member after each removal)",
    "regime": "gaussian",
    "claim": "in",
    "metric": "set_distance",
@@ -1636,12 +1636,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.4964,
+     "andrey_set_distance_mean": 0.4955,
      "comparator_set_distance_mean": 0.4962,
-     "mean_D": 0.0002,
+     "mean_D": -0.0007,
      "bootstrap_95": [
-      -0.0064,
-      0.0077
+      -0.0075,
+      0.0069
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -1655,10 +1655,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -0.3147,
+       "mean": -0.328,
        "bootstrap_95": [
-        -0.457,
-        -0.1733
+        -0.4734,
+        -0.1849
        ]
       },
       "reference_minus_empty": {
@@ -1670,7 +1670,7 @@
        ]
       }
      },
-     "andrey_s": 2.0442,
+     "andrey_s": 2.7204,
      "comparator_s": 27.4768,
      "result": "tie"
     },
@@ -1680,11 +1680,11 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.4889,
+     "andrey_set_distance_mean": 0.4891,
      "comparator_set_distance_mean": 0.4982,
-     "mean_D": -0.0093,
+     "mean_D": -0.0092,
      "bootstrap_95": [
-      -0.0143,
+      -0.0139,
       -0.0049
      ],
      "above_zero": false,
@@ -1699,10 +1699,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -0.3921,
+       "mean": -0.3939,
        "bootstrap_95": [
-        -0.5532,
-        -0.215
+        -0.5528,
+        -0.2196
        ]
       },
       "reference_minus_empty": {
@@ -1714,7 +1714,7 @@
        ]
       }
      },
-     "andrey_s": 4.0809,
+     "andrey_s": 5.2215,
      "comparator_s": 161.944,
      "result": "better"
     },
@@ -1724,12 +1724,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.1445,
+     "andrey_set_distance_mean": 0.1455,
      "comparator_set_distance_mean": 0.1414,
-     "mean_D": 0.0032,
+     "mean_D": 0.0041,
      "bootstrap_95": [
-      -0.0072,
-      0.0136
+      -0.0061,
+      0.0143
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -1743,10 +1743,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.775,
+       "mean": -2.7722,
        "bootstrap_95": [
-        -2.9482,
-        -2.6056
+        -2.9444,
+        -2.6041
        ]
       },
       "reference_minus_empty": {
@@ -1758,7 +1758,7 @@
        ]
       }
      },
-     "andrey_s": 0.3522,
+     "andrey_s": 0.4618,
      "comparator_s": 0.17,
      "result": "tie"
     },
@@ -1768,12 +1768,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.1506,
+     "andrey_set_distance_mean": 0.1505,
      "comparator_set_distance_mean": 0.1555,
-     "mean_D": -0.0049,
+     "mean_D": -0.005,
      "bootstrap_95": [
       -0.0146,
-      0.005
+      0.0048
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -1787,10 +1787,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.7514,
+       "mean": -2.7512,
        "bootstrap_95": [
-        -2.8984,
-        -2.6106
+        -2.9,
+        -2.6104
        ]
       },
       "reference_minus_empty": {
@@ -1802,7 +1802,7 @@
        ]
       }
      },
-     "andrey_s": 0.4533,
+     "andrey_s": 0.5685,
      "comparator_s": 0.5732,
      "result": "tie"
     },
@@ -1812,11 +1812,11 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.3165,
+     "andrey_set_distance_mean": 0.3164,
      "comparator_set_distance_mean": 0.3176,
-     "mean_D": -0.0011,
+     "mean_D": -0.0012,
      "bootstrap_95": [
-      -0.0093,
+      -0.0094,
       0.0072
      ],
      "above_zero": false,
@@ -1831,10 +1831,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.0097,
+       "mean": -2.0109,
        "bootstrap_95": [
-        -2.1653,
-        -1.8567
+        -2.1708,
+        -1.8565
        ]
       },
       "reference_minus_empty": {
@@ -1846,7 +1846,7 @@
        ]
       }
      },
-     "andrey_s": 0.682,
+     "andrey_s": 0.8618,
      "comparator_s": 2.5212,
      "result": "tie"
     },
@@ -1856,12 +1856,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.195,
+     "andrey_set_distance_mean": 0.1884,
      "comparator_set_distance_mean": 0.1727,
-     "mean_D": 0.0223,
+     "mean_D": 0.0157,
      "bootstrap_95": [
-      0.0109,
-      0.0349
+      0.0035,
+      0.0286
      ],
      "above_zero": true,
      "verdict": "worse",
@@ -1875,10 +1875,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -6.5934,
+       "mean": -6.6674,
        "bootstrap_95": [
-        -6.877,
-        -6.3209
+        -6.9327,
+        -6.4073
        ]
       },
       "reference_minus_empty": {
@@ -1890,18 +1890,18 @@
        ]
       }
      },
-     "andrey_s": 0.8079,
+     "andrey_s": 1.1996,
      "comparator_s": 9.8147,
      "result": "tie",
      "replication": {
       "seeds": "20-39",
       "paired": 20,
-      "andrey_set_distance_mean": 0.1908,
+      "andrey_set_distance_mean": 0.1861,
       "comparator_set_distance_mean": 0.1834,
-      "mean_D": 0.0074,
+      "mean_D": 0.0027,
       "bootstrap_95": [
-       -0.0088,
-       0.023
+       -0.0117,
+       0.0165
       ],
       "above_zero": false
      }
@@ -1914,10 +1914,10 @@
      "paired": 20,
      "andrey_set_distance_mean": 0.3113,
      "comparator_set_distance_mean": 0.313,
-     "mean_D": -0.0018,
+     "mean_D": -0.0017,
      "bootstrap_95": [
       -0.0117,
-      0.0075
+      0.0077
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -1931,10 +1931,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.0859,
+       "mean": -2.0827,
        "bootstrap_95": [
-        -2.2729,
-        -1.889
+        -2.2736,
+        -1.8829
        ]
       },
       "reference_minus_empty": {
@@ -1946,7 +1946,7 @@
        ]
       }
      },
-     "andrey_s": 1.2076,
+     "andrey_s": 1.5657,
      "comparator_s": 12.7487,
      "result": "tie"
     },
@@ -1956,15 +1956,15 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_distance_mean": 0.1687,
+     "andrey_set_distance_mean": 0.1566,
      "comparator_set_distance_mean": 0.1561,
-     "mean_D": 0.0126,
+     "mean_D": 0.0004,
      "bootstrap_95": [
-      0.0023,
-      0.0228
+      -0.0099,
+      0.0109
      ],
-     "above_zero": true,
-     "verdict": "worse",
+     "above_zero": false,
+     "verdict": "tie",
      "coverage": {
       "datasets": 20,
       "andrey_short": 0,
@@ -1975,10 +1975,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -6.9245,
+       "mean": -7.065,
        "bootstrap_95": [
-        -7.1973,
-        -6.6707
+        -7.3386,
+        -6.81
        ]
       },
       "reference_minus_empty": {
@@ -1990,21 +1990,9 @@
        ]
       }
      },
-     "andrey_s": 1.3279,
+     "andrey_s": 1.9908,
      "comparator_s": 46.3015,
-     "result": "worse",
-     "replication": {
-      "seeds": "20-39",
-      "paired": 20,
-      "andrey_set_distance_mean": 0.1699,
-      "comparator_set_distance_mean": 0.1588,
-      "mean_D": 0.0111,
-      "bootstrap_95": [
-       0.0006,
-       0.0221
-      ],
-      "above_zero": true
-     }
+     "result": "tie"
     }
    ]
   },
@@ -2018,9 +2006,9 @@
    "comparator_setting": "learn.mb(method = 'gs') per target, alpha 0.05, max.sx = Inf; test mi-adf on categorical data (degrees of freedom counted from the configurations that occur, as Andrey's G-square, with bnlearn's rule that a table under 5 rows per cell is independent) and zf on continuous data",
    "lane": "blanket",
    "output": "Markov blanket at every target",
-   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so the times are indicative",
    "cores": 1,
-   "build": "Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with gs, fast_iamb, and hiton_pc as merged)",
+   "build": "Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged, with gs's shrink starting again from the first member after each removal)",
    "regime": "gaussian",
    "claim": "in",
    "metric": "set_f1_loss",
@@ -2033,12 +2021,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.3588,
+     "andrey_set_f1_loss_mean": 0.3582,
      "comparator_set_f1_loss_mean": 0.3605,
-     "mean_D": -0.0017,
+     "mean_D": -0.0024,
      "bootstrap_95": [
-      -0.0072,
-      0.0044
+      -0.008,
+      0.0039
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -2052,10 +2040,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -0.3147,
+       "mean": -0.328,
        "bootstrap_95": [
-        -0.457,
-        -0.1733
+        -0.4734,
+        -0.1849
        ]
       },
       "reference_minus_empty": {
@@ -2067,7 +2055,7 @@
        ]
       }
      },
-     "andrey_s": 2.0442,
+     "andrey_s": 2.7204,
      "comparator_s": 27.4768,
      "result": "tie"
     },
@@ -2079,10 +2067,10 @@
      "paired": 20,
      "andrey_set_f1_loss_mean": 0.3528,
      "comparator_set_f1_loss_mean": 0.3622,
-     "mean_D": -0.0094,
+     "mean_D": -0.0093,
      "bootstrap_95": [
-      -0.0138,
-      -0.0053
+      -0.0134,
+      -0.0054
      ],
      "above_zero": false,
      "verdict": "better",
@@ -2096,10 +2084,10 @@
       "pass": null,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -0.3921,
+       "mean": -0.3939,
        "bootstrap_95": [
-        -0.5532,
-        -0.215
+        -0.5528,
+        -0.2196
        ]
       },
       "reference_minus_empty": {
@@ -2111,7 +2099,7 @@
        ]
       }
      },
-     "andrey_s": 4.0809,
+     "andrey_s": 5.2215,
      "comparator_s": 161.944,
      "result": "better"
     },
@@ -2121,12 +2109,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.0928,
+     "andrey_set_f1_loss_mean": 0.0933,
      "comparator_set_f1_loss_mean": 0.0906,
-     "mean_D": 0.0022,
+     "mean_D": 0.0027,
      "bootstrap_95": [
-      -0.0048,
-      0.0091
+      -0.004,
+      0.0094
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -2140,10 +2128,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.775,
+       "mean": -2.7722,
        "bootstrap_95": [
-        -2.9482,
-        -2.6056
+        -2.9444,
+        -2.6041
        ]
       },
       "reference_minus_empty": {
@@ -2155,7 +2143,7 @@
        ]
       }
      },
-     "andrey_s": 0.3522,
+     "andrey_s": 0.4618,
      "comparator_s": 0.17,
      "result": "tie"
     },
@@ -2165,12 +2153,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.0968,
+     "andrey_set_f1_loss_mean": 0.0967,
      "comparator_set_f1_loss_mean": 0.1015,
-     "mean_D": -0.0047,
+     "mean_D": -0.0048,
      "bootstrap_95": [
       -0.0116,
-      0.0024
+      0.0023
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -2184,10 +2172,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.7514,
+       "mean": -2.7512,
        "bootstrap_95": [
-        -2.8984,
-        -2.6106
+        -2.9,
+        -2.6104
        ]
       },
       "reference_minus_empty": {
@@ -2199,7 +2187,7 @@
        ]
       }
      },
-     "andrey_s": 0.4533,
+     "andrey_s": 0.5685,
      "comparator_s": 0.5732,
      "result": "tie"
     },
@@ -2228,10 +2216,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.0097,
+       "mean": -2.0109,
        "bootstrap_95": [
-        -2.1653,
-        -1.8567
+        -2.1708,
+        -1.8565
        ]
       },
       "reference_minus_empty": {
@@ -2243,7 +2231,7 @@
        ]
       }
      },
-     "andrey_s": 0.682,
+     "andrey_s": 0.8618,
      "comparator_s": 2.5212,
      "result": "tie"
     },
@@ -2253,12 +2241,12 @@
      "n": 1000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.1254,
+     "andrey_set_f1_loss_mean": 0.1211,
      "comparator_set_f1_loss_mean": 0.11,
-     "mean_D": 0.0154,
+     "mean_D": 0.0111,
      "bootstrap_95": [
-      0.0065,
-      0.0252
+      0.0018,
+      0.021
      ],
      "above_zero": true,
      "verdict": "worse",
@@ -2272,10 +2260,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -6.5934,
+       "mean": -6.6674,
        "bootstrap_95": [
-        -6.877,
-        -6.3209
+        -6.9327,
+        -6.4073
        ]
       },
       "reference_minus_empty": {
@@ -2287,18 +2275,18 @@
        ]
       }
      },
-     "andrey_s": 0.8079,
+     "andrey_s": 1.1996,
      "comparator_s": 9.8147,
      "result": "tie",
      "replication": {
       "seeds": "20-39",
       "paired": 20,
-      "andrey_set_f1_loss_mean": 0.1231,
+      "andrey_set_f1_loss_mean": 0.1203,
       "comparator_set_f1_loss_mean": 0.1178,
-      "mean_D": 0.0052,
+      "mean_D": 0.0025,
       "bootstrap_95": [
-       -0.0067,
-       0.0167
+       -0.0083,
+       0.0126
       ],
       "above_zero": false
      }
@@ -2309,12 +2297,12 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.2083,
+     "andrey_set_f1_loss_mean": 0.2085,
      "comparator_set_f1_loss_mean": 0.2133,
-     "mean_D": -0.005,
+     "mean_D": -0.0047,
      "bootstrap_95": [
-      -0.012,
-      0.0015
+      -0.0116,
+      0.0018
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -2328,10 +2316,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -2.0859,
+       "mean": -2.0827,
        "bootstrap_95": [
-        -2.2729,
-        -1.889
+        -2.2736,
+        -1.8829
        ]
       },
       "reference_minus_empty": {
@@ -2343,7 +2331,7 @@
        ]
       }
      },
-     "andrey_s": 1.2076,
+     "andrey_s": 1.5657,
      "comparator_s": 12.7487,
      "result": "tie"
     },
@@ -2353,15 +2341,15 @@
      "n": 5000,
      "seeds": 20,
      "paired": 20,
-     "andrey_set_f1_loss_mean": 0.1052,
+     "andrey_set_f1_loss_mean": 0.0969,
      "comparator_set_f1_loss_mean": 0.0976,
-     "mean_D": 0.0076,
+     "mean_D": -0.0007,
      "bootstrap_95": [
-      0.0005,
-      0.0148
+      -0.0076,
+      0.0064
      ],
-     "above_zero": true,
-     "verdict": "worse",
+     "above_zero": false,
+     "verdict": "tie",
      "coverage": {
       "datasets": 20,
       "andrey_short": 0,
@@ -2372,10 +2360,10 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
-       "mean": -6.9245,
+       "mean": -7.065,
        "bootstrap_95": [
-        -7.1973,
-        -6.6707
+        -7.3386,
+        -6.81
        ]
       },
       "reference_minus_empty": {
@@ -2387,21 +2375,9 @@
        ]
       }
      },
-     "andrey_s": 1.3279,
+     "andrey_s": 1.9908,
      "comparator_s": 46.3015,
-     "result": "tie",
-     "replication": {
-      "seeds": "20-39",
-      "paired": 20,
-      "andrey_set_f1_loss_mean": 0.1061,
-      "comparator_set_f1_loss_mean": 0.1005,
-      "mean_D": 0.0056,
-      "bootstrap_95": [
-       -0.0018,
-       0.0136
-      ],
-      "above_zero": false
-     }
+     "result": "tie"
     }
    ]
   },
