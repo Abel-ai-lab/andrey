@@ -32,7 +32,7 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
     measurement model moves its indicators and keeps its latents last; learned targets move to
-    the next variable."""
+    the next variable; claimed ancestral pairs are the shifted graph's."""
     if target == "targets":
         p = draw.truth.n_nodes
         return [sorted((v + 1) % p for v in t) for t in draw.targets]
@@ -44,7 +44,10 @@ def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     types = None if target != "clusters" else np.asarray(truth.node_types)
     observed = shift if types is None else np.flatnonzero(types != LATENT)
     shift[observed] = np.roll(observed, 1)
-    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types)
+    shifted = GraphStructure.from_numpy(
+        marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types
+    )
+    return qg.ancestral_pairs(shifted) if target == "ancestors" else shifted
 
 
 def shifted_series_truth(truth: object, target: qg.Target) -> object:
