@@ -727,9 +727,6 @@ def cmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -783,14 +780,17 @@ def cmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
-    With exact tests and exact blankets, every edge and every direction it returns is the true
-    CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows from
-    a separating set its steps never test, or from directions its visits do not find. Over every
-    target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets
-    at an average of 1.5, 2.5, and 4 neighbors per variable. Tested with exact d-separation on
-    those graphs and the paper's two examples, and on simulated linear-Gaussian data with 20
-    variables and categorical data with 10. The numbers are a reference, not a hard limit: they
+    **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
+    G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
+    target were nearer the true CPDAG's than those of :func:`~andrey.pc` on the same data and than
+    the empty answer, on 20 datasets and again on 20 fresh ones. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb>`_ has the
+    numbers. With exact tests and exact blankets, every edge and every direction it returns is the
+    true CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows
+    from a separating set its steps never test, or from directions its visits do not find. Over
+    every target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of
+    targets at an average of 1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per
+    target. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
 
     References
