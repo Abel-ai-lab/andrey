@@ -77,9 +77,9 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, and J-PCMCI+, whose draws a
-    column order does not apply to: each row's environment is a column of the draw, ICP's target is
-    the last variable, and J-PCMCI+'s contexts follow the system variables.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, and CMB, whose draws
+    a column order does not apply to: each row's environment is a column of the draw, the target of
+    ICP and CMB is the last variable, and J-PCMCI+'s contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -115,6 +115,11 @@ def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
 def _fci_jci(x: np.ndarray) -> StructureOutput:
     """FCI-JCI with the draw's last column as the environment, as the gate fits it."""
     return andrey.fci_jci(x[:, :-1], x[:, -1], alpha=ALPHA)
+
+
+def _last_column(name: str) -> Callable[[np.ndarray], StructureOutput]:
+    """A target-centered method at the draw's last column, as the gate fits it."""
+    return lambda x: getattr(andrey, name)(x, target=x.shape[1] - 1, alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -179,6 +184,7 @@ FITS: dict[str, Fit] = {
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
     "HITONPC": Fit(functools.partial(andrey.hiton_pc, alpha=ALPHA), alpha=ALPHA),
     "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
+    "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -295,6 +301,7 @@ LARGER: dict[str, str] = {
             "MMPC",
             "HITONPC",
             "PCMB",
+            "CMB",
             "MMHC",
             "RSMAX2",
             "BOSS",

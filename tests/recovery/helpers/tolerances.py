@@ -39,6 +39,7 @@ SPEC: dict[str, dict] = {
     "MMPC": GRAPH_ONLY,
     "HITONPC": GRAPH_ONLY,
     "PCMB": GRAPH_ONLY,
+    "CMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,
