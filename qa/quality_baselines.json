@@ -8,6 +8,7 @@
       "GFCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison or independence decision to differ on another host."},
       "BOSS-FCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison or independence decision to differ on another host."},
       "GRaSP-FCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison or independence decision to differ on another host."},
+      "MMB-by-MMB": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "CDNOD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "FCI-JCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence test to differ on another host."},
       "IAMB": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
@@ -259,6 +260,11 @@
         "latent_gauss_er_d50": {"median_shd": 19.0, "empty_median_shd": 105.0, "shd": [14, 13, 20, 18, 25, 21, 22, 23, 17, 12]},
         "asia_gauss": {"median_shd": 3.5, "empty_median_shd": 16.0, "shd": [0, 0, 5, 5, 2, 0, 7, 0, 7, 9]},
         "sachs": {"median_shd": 20.0, "empty_median_shd": 34.0, "shd": [20]}
+      },
+      "MMB-by-MMB": {
+        "latent_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 1.5, "shd": [1, 0, 2, 0, 0, 0, 0, 0, 1, 2]},
+        "latent_gauss_er_d50": {"median_shd": 0.0, "empty_median_shd": 1.5, "shd": [1, 0, 0, 0, 0, 0, 1, 0, 0, 0]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 2.0, "shd": [0, 0, 1, 0, 0, 1, 1, 0, 0, 0]}
       },
       "UT-IGSP": {
         "unknown_target_shift_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 15.0, "shd": [4, 0, 0, 0, 0, 0, 0, 0, 0, 0]},

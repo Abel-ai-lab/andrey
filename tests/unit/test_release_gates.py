@@ -935,11 +935,13 @@ def test_parity_judges_the_metric_an_entry_names():
     [
         ("set_distance", "set distance"),
         ("set_f1_loss", "set F1 loss"),
+        ("edge_distance", "edge distance"),
+        ("edge_f1_loss", "edge F1 loss"),
         ("claim_error", "claim errors"),
         ("claim_ap_loss", "claim AP loss"),
     ],
 )
-def test_parity_judges_a_set_or_claims_per_dataset(metric, text):
+def test_parity_judges_an_answer_at_every_target(metric, text):
     from qa import reference_parity
 
     row = {

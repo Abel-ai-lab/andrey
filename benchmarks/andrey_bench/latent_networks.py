@@ -10,9 +10,9 @@ so a hidden leaf simply disappears here. With ``hidden = 0`` the model is the pl
 replay of the network that the methods for causally sufficient data use, and :func:`truth` is the
 CPDAG.
 
-Targets are the nodes with the most neighbors in the network, the paper's "nodes with more adjacent
-nodes", ties in file order (:func:`default_targets`); they depend on the network alone, so every
-seed of a network has the same targets, and a target is never hidden. The observed columns are in
+Targets are named, such as the paper's own (:data:`PAPER_TARGETS`), or else the nodes with the most
+neighbors in the network, ties in file order (:func:`default_targets`); they depend on the network
+alone, so every seed of a network has the same targets, and a target is never hidden. The observed columns are in
 an order drawn from the seed, with the hidden nodes last in the truth, as every latent dataset of
 the harness is. The model (weights, hidden nodes, column order) is a function of the network and
 the seed; the rows are a function of the model and ``n``, so ``n = 1000`` and ``n = 5000`` of one
@@ -37,6 +37,17 @@ WEIGHT_RANGE = (0.5, 1.0)
 
 #: Hidden nodes per network in the paper's four: MILDEW, ALARM, WIN95PTS, and ANDES.
 PAPER_HIDDEN = {"mildew": 4, "alarm": 4, "win95pts": 6, "andes": 10}
+
+#: The paper's targets in its four networks, by the networks' node names, in the order of its
+#: Tables 7-10 (App. E; Tables 1-4 show two of each). The paper writes ``dm_1`` as "dm-1",
+#: ``SNode_27`` as "SNode-27", ``RApp3`` as "RApp3(V5)", and ``PrtData`` as "PrData", a name no
+#: node has (``PrtData`` is one letter away).
+PAPER_TARGETS = {
+    "mildew": ("dm_2", "dm_1", "foto_4", "dm_4"),
+    "alarm": ("LVEDVOLUME", "VENTTUBE", "CATECHOL", "STROKEVOLUME"),
+    "win95pts": ("Problem5", "HrglssDrtnAftrPrnt", "Problem1", "GDIOUT", "PrtData"),
+    "andes": ("RApp3", "SNode_27", "SNode_21", "RApp4", "SNode_4", "SNode_47", "SNode_24"),
+}
 
 #: The generator a run's records come from; a run recorded with another cannot be rescored.
 SAMPLER = "latent_networks.sample, numpy.random.SeedSequence([crc32(network), seed, n])"

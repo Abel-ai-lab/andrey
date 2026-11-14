@@ -2,17 +2,18 @@
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-14",
- "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged)",
- "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0",
- "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script",
- "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair",
- "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted)",
- "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
+ "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; MMB-by-MMB against the authors' code on the paper's networks with hidden nodes; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | MMB-by-MMB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged)",
+ "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | MMB-by-MMB: per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0",
+ "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | MMB-by-MMB: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | MMB-by-MMB: edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair",
+ "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | MMB-by-MMB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted)",
+ "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | MMB-by-MMB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
  "regimes": {
   "network_tables": "net:<network>:<rows>: forward samples of the Alarm (37 variables) or Pigs (441) network's own tables, the columns in an order drawn from the seed, columns that hold one value left out of the fit",
   "discrete": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network",
   "gaussian": "gauss:<d>:<rows>[:<mean degree>]: linear-Gaussian Erdos-Renyi graph, standardized, mean degree 2 unless given",
+  "latent_networks": "the paper's four networks (MILDEW, ALARM, WIN95PTS, ANDES) as linear-Gaussian models, weights +-U(0.5, 1), N(0, 1) noise, 4/4/6/10 random non-target nodes hidden, columns shuffled; the truth is the PAG of the observed variables, read at each target",
   "selection": "setting:<fixed|small|large>: linear-Gaussian models of the authors' simulation script, 10,000 rows kept when the sum of the selection variables lies in [2, 2.5], the system columns in an order drawn from the seed and the context last",
   "unselected": "the same models with 10,000 rows drawn without selection"
  },
@@ -33,13 +34,16 @@
    "Causal Explorer": "1.5",
    "MATLAB": "R2026a"
   },
+  "MMB-by-MMB": {
+   "mmb-by-mmb (authors' code)": "2c63c89"
+  },
   "Y-structures": {
    "sbcd": "4bae8af",
    "pcalg": "2.7-12",
    "R": "4.6.1"
   }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | MMB-by-MMB: AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -7525,6 +7529,808 @@
      "andrey_s": 90.6629,
      "comparator_s": 146.6712,
      "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "MMB-by-MMB",
+   "family": "local",
+   "solution": "andrey.mmb_by_mmb",
+   "setting": "alpha=0.01, Fisher's z, blanket='total_conditioning', local_max_depth=10, the defaults; one fit per target",
+   "comparator": "the authors' MMB-by-MMB code, commit 2c63c89, unmodified",
+   "comparator_solution": "mmb-by-mmb.authors",
+   "comparator_setting": "MMB_by_MMB with Fisher's z, alpha 0.01, maxK 10 (the authors' example), one run per target",
+   "lane": "mmb-by-mmb",
+   "output": "the edges and marks at the target, its PAG's",
+   "hardware": "AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits",
+   "regime": "latent_networks",
+   "claim": "in",
+   "metric": "edge_distance",
+   "error_metric": "edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree",
+   "complete": true,
+   "rows": [
+    {
+     "network": "mildew",
+     "d": 31,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.0477,
+     "comparator_edge_distance_mean": 0.0882,
+     "mean_D": -0.0404,
+     "bootstrap_95": [
+      -0.0766,
+      -0.0069
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.95,
+       "bootstrap_95": [
+        -3.075,
+        -2.8375
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.825,
+       "bootstrap_95": [
+        -2.975,
+        -2.675
+       ]
+      }
+     },
+     "andrey_s": 0.435,
+     "comparator_s": 0.0672,
+     "andrey_tests_per_fit": 2013.5,
+     "comparator_tests_per_fit": 560.9,
+     "result": "better"
+    },
+    {
+     "network": "mildew",
+     "d": 31,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.0272,
+     "comparator_edge_distance_mean": 0.073,
+     "mean_D": -0.0458,
+     "bootstrap_95": [
+      -0.0805,
+      -0.0175
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.025,
+       "bootstrap_95": [
+        -3.15,
+        -2.9125
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.9,
+       "bootstrap_95": [
+        -3.0625,
+        -2.725
+       ]
+      }
+     },
+     "andrey_s": 0.4815,
+     "comparator_s": 0.2679,
+     "andrey_tests_per_fit": 5571.7,
+     "comparator_tests_per_fit": 910.8,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 33,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.1949,
+     "comparator_edge_distance_mean": 0.3234,
+     "mean_D": -0.1285,
+     "bootstrap_95": [
+      -0.1865,
+      -0.0793
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.525,
+       "bootstrap_95": [
+        -3.8,
+        -3.225
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.05,
+       "bootstrap_95": [
+        -3.3125,
+        -2.775
+       ]
+      }
+     },
+     "andrey_s": 0.3333,
+     "comparator_s": 0.0983,
+     "andrey_tests_per_fit": 1664.0,
+     "comparator_tests_per_fit": 521.6,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 33,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.1526,
+     "comparator_edge_distance_mean": 0.2221,
+     "mean_D": -0.0695,
+     "bootstrap_95": [
+      -0.1193,
+      -0.0255
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.7,
+       "bootstrap_95": [
+        -4.0,
+        -3.375
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.425,
+       "bootstrap_95": [
+        -3.7625,
+        -3.1
+       ]
+      }
+     },
+     "andrey_s": 0.3534,
+     "comparator_s": 0.5203,
+     "andrey_tests_per_fit": 2629.0,
+     "comparator_tests_per_fit": 660.6,
+     "result": "better"
+    },
+    {
+     "network": "win95pts",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.1605,
+     "comparator_edge_distance_mean": 0.2193,
+     "mean_D": -0.0587,
+     "bootstrap_95": [
+      -0.0862,
+      -0.0332
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.18,
+       "bootstrap_95": [
+        -3.33,
+        -3.04
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.75,
+       "bootstrap_95": [
+        -2.92,
+        -2.57
+       ]
+      }
+     },
+     "andrey_s": 0.5141,
+     "comparator_s": 1.0734,
+     "andrey_tests_per_fit": 19145.6,
+     "comparator_tests_per_fit": 3050.7,
+     "result": "better"
+    },
+    {
+     "network": "win95pts",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.0681,
+     "comparator_edge_distance_mean": 0.0841,
+     "mean_D": -0.016,
+     "bootstrap_95": [
+      -0.0515,
+      0.014
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.56,
+       "bootstrap_95": [
+        -3.68,
+        -3.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.44,
+       "bootstrap_95": [
+        -3.62,
+        -3.27
+       ]
+      }
+     },
+     "andrey_s": 0.6352,
+     "comparator_s": 4.9759,
+     "andrey_tests_per_fit": 125085.9,
+     "comparator_tests_per_fit": 6078.6,
+     "result": "tie"
+    },
+    {
+     "network": "andes",
+     "d": 213,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.2561,
+     "comparator_edge_distance_mean": 0.2212,
+     "mean_D": 0.0349,
+     "bootstrap_95": [
+      0.007,
+      0.0683
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.4786,
+       "bootstrap_95": [
+        -2.5929,
+        -2.3429
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.5429,
+       "bootstrap_95": [
+        -2.6288,
+        -2.4357
+       ]
+      }
+     },
+     "andrey_s": 0.5244,
+     "comparator_s": 17.9063,
+     "andrey_tests_per_fit": 7341.2,
+     "comparator_tests_per_fit": 3678.6,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_edge_distance_mean": 0.2172,
+      "comparator_edge_distance_mean": 0.2216,
+      "mean_D": -0.0044,
+      "bootstrap_95": [
+       -0.0279,
+       0.0192
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "network": "andes",
+     "d": 213,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_distance_mean": 0.158,
+     "comparator_edge_distance_mean": 0.1559,
+     "mean_D": 0.0021,
+     "bootstrap_95": [
+      -0.0187,
+      0.0219
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6857,
+       "bootstrap_95": [
+        -2.7571,
+        -2.5929
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.6786,
+       "bootstrap_95": [
+        -2.7571,
+        -2.5929
+       ]
+      }
+     },
+     "andrey_s": 0.4428,
+     "comparator_s": 73.9861,
+     "andrey_tests_per_fit": 18112.0,
+     "comparator_tests_per_fit": 4740.5,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "MMB-by-MMB",
+   "family": "local",
+   "solution": "andrey.mmb_by_mmb",
+   "setting": "alpha=0.01, Fisher's z, blanket='total_conditioning', local_max_depth=10, the defaults; one fit per target",
+   "comparator": "the authors' MMB-by-MMB code, commit 2c63c89, unmodified",
+   "comparator_solution": "mmb-by-mmb.authors",
+   "comparator_setting": "MMB_by_MMB with Fisher's z, alpha 0.01, maxK 10 (the authors' example), one run per target",
+   "lane": "mmb-by-mmb",
+   "output": "the edges and marks at the target, its PAG's",
+   "hardware": "AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits",
+   "regime": "latent_networks",
+   "claim": "in",
+   "metric": "edge_f1_loss",
+   "error_metric": "edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree",
+   "complete": true,
+   "rows": [
+    {
+     "network": "mildew",
+     "d": 31,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.0325,
+     "comparator_edge_f1_loss_mean": 0.061,
+     "mean_D": -0.0284,
+     "bootstrap_95": [
+      -0.0534,
+      -0.0052
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.95,
+       "bootstrap_95": [
+        -3.075,
+        -2.8375
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.825,
+       "bootstrap_95": [
+        -2.975,
+        -2.675
+       ]
+      }
+     },
+     "andrey_s": 0.435,
+     "comparator_s": 0.0672,
+     "andrey_tests_per_fit": 2013.5,
+     "comparator_tests_per_fit": 560.9,
+     "result": "better"
+    },
+    {
+     "network": "mildew",
+     "d": 31,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.0182,
+     "comparator_edge_f1_loss_mean": 0.0511,
+     "mean_D": -0.0329,
+     "bootstrap_95": [
+      -0.0584,
+      -0.0124
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.025,
+       "bootstrap_95": [
+        -3.15,
+        -2.9125
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.9,
+       "bootstrap_95": [
+        -3.0625,
+        -2.725
+       ]
+      }
+     },
+     "andrey_s": 0.4815,
+     "comparator_s": 0.2679,
+     "andrey_tests_per_fit": 5571.7,
+     "comparator_tests_per_fit": 910.8,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 33,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.1331,
+     "comparator_edge_f1_loss_mean": 0.2256,
+     "mean_D": -0.0924,
+     "bootstrap_95": [
+      -0.1334,
+      -0.0575
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.525,
+       "bootstrap_95": [
+        -3.8,
+        -3.225
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.05,
+       "bootstrap_95": [
+        -3.3125,
+        -2.775
+       ]
+      }
+     },
+     "andrey_s": 0.3333,
+     "comparator_s": 0.0983,
+     "andrey_tests_per_fit": 1664.0,
+     "comparator_tests_per_fit": 521.6,
+     "result": "better"
+    },
+    {
+     "network": "alarm",
+     "d": 33,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.1064,
+     "comparator_edge_f1_loss_mean": 0.1563,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.0854,
+      -0.0187
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.7,
+       "bootstrap_95": [
+        -4.0,
+        -3.375
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.425,
+       "bootstrap_95": [
+        -3.7625,
+        -3.1
+       ]
+      }
+     },
+     "andrey_s": 0.3534,
+     "comparator_s": 0.5203,
+     "andrey_tests_per_fit": 2629.0,
+     "comparator_tests_per_fit": 660.6,
+     "result": "better"
+    },
+    {
+     "network": "win95pts",
+     "d": 70,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.1111,
+     "comparator_edge_f1_loss_mean": 0.1566,
+     "mean_D": -0.0456,
+     "bootstrap_95": [
+      -0.065,
+      -0.0273
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.18,
+       "bootstrap_95": [
+        -3.33,
+        -3.04
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.75,
+       "bootstrap_95": [
+        -2.92,
+        -2.57
+       ]
+      }
+     },
+     "andrey_s": 0.5141,
+     "comparator_s": 1.0734,
+     "andrey_tests_per_fit": 19145.6,
+     "comparator_tests_per_fit": 3050.7,
+     "result": "better"
+    },
+    {
+     "network": "win95pts",
+     "d": 70,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.0473,
+     "comparator_edge_f1_loss_mean": 0.0593,
+     "mean_D": -0.0121,
+     "bootstrap_95": [
+      -0.0373,
+      0.0093
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.56,
+       "bootstrap_95": [
+        -3.68,
+        -3.47
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.44,
+       "bootstrap_95": [
+        -3.62,
+        -3.27
+       ]
+      }
+     },
+     "andrey_s": 0.6352,
+     "comparator_s": 4.9759,
+     "andrey_tests_per_fit": 125085.9,
+     "comparator_tests_per_fit": 6078.6,
+     "result": "tie"
+    },
+    {
+     "network": "andes",
+     "d": 213,
+     "n": 1000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.181,
+     "comparator_edge_f1_loss_mean": 0.1565,
+     "mean_D": 0.0245,
+     "bootstrap_95": [
+      0.005,
+      0.048
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.4786,
+       "bootstrap_95": [
+        -2.5929,
+        -2.3429
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.5429,
+       "bootstrap_95": [
+        -2.6288,
+        -2.4357
+       ]
+      }
+     },
+     "andrey_s": 0.5244,
+     "comparator_s": 17.9063,
+     "andrey_tests_per_fit": 7341.2,
+     "comparator_tests_per_fit": 3678.6,
+     "result": "tie",
+     "replication": {
+      "seeds": "20-39",
+      "paired": 20,
+      "andrey_edge_f1_loss_mean": 0.153,
+      "comparator_edge_f1_loss_mean": 0.1563,
+      "mean_D": -0.0033,
+      "bootstrap_95": [
+       -0.0199,
+       0.0133
+      ],
+      "above_zero": false
+     }
+    },
+    {
+     "network": "andes",
+     "d": 213,
+     "n": 5000,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_edge_f1_loss_mean": 0.1116,
+     "comparator_edge_f1_loss_mean": 0.1104,
+     "mean_D": 0.0012,
+     "bootstrap_95": [
+      -0.0137,
+      0.0152
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.6857,
+       "bootstrap_95": [
+        -2.7571,
+        -2.5929
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -2.6786,
+       "bootstrap_95": [
+        -2.7571,
+        -2.5929
+       ]
+      }
+     },
+     "andrey_s": 0.4428,
+     "comparator_s": 73.9861,
+     "andrey_tests_per_fit": 18112.0,
+     "comparator_tests_per_fit": 4740.5,
+     "result": "tie"
     }
    ]
   },

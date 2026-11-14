@@ -459,9 +459,6 @@ def mmb_by_mmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -476,9 +473,9 @@ def mmb_by_mmb(
     reads such data; the other tests read categorical or mixed data or detect nonlinear effects,
     as :func:`~andrey.pc` describes, with a blanket learner whose tests condition on fewer
     variables, such as ``"iamb"``. It is designed for large graphs in which each variable has a
-    small Markov blanket: it learns only the blankets the answer needs [1]_. It returns the edges
-    at the target with the marks the PAG gives them; for the whole PAG, use :func:`~andrey.fci`,
-    and with no unmeasured common causes, :func:`~andrey.mb_by_mb`.
+    small Markov blanket: it learns the blankets near the target, not the whole graph [1]_. It
+    returns the edges at the target with the marks the PAG gives them; for the whole PAG, use
+    :func:`~andrey.fci`, and with no unmeasured common causes, :func:`~andrey.mb_by_mb`.
 
     **How it works.** A waitlist starts with the target [1]_. Each step takes the waitlist's head
     ``x`` and learns its Markov blanket ``MB(x)`` with the ``blanket`` learner: with hidden
@@ -535,18 +532,15 @@ def mmb_by_mmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on every target of random
-    graphs with hidden common causes, where the answer holds the PAG's edges with each mark the
-    PAG's or a circle, the PAG's at 654 of 657 targets, and on simulated linear-Gaussian data with
-    hidden nodes. The collider check learns the blanket and local structure of each variable it
-    reads, so a fit runs more tests than the paper's steps alone. The tests of an adjacent pair
-    grow about twofold with each member of the smaller of its two blankets, so two adjacent
-    variables that both have wide blankets are slow. ``"total_conditioning"`` tests
-    each variable given all the others, so it needs more rows than variables and continuous data
-    with linear effects; on other data, choose another learner. Each local structure tests up to
-    ``local_max_depth`` members per set, and a pair that only a larger set separates keeps its
-    edge. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
+    paper's targets, its edges and marks were better than those of the authors' code in five of
+    eight settings and no worse in the rest, and its errors at the target were below the empty
+    answer's in all eight; the
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
+    numbers. Two adjacent variables that both have very wide blankets can still take long.
+    ``"total_conditioning"`` needs more rows than variables and continuous data with linear
+    effects; on other data, choose another learner. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

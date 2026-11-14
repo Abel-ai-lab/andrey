@@ -47,6 +47,7 @@ SPEC: dict[str, dict] = {
         "numeric": {"scores": {"atol": 1e-6, "rtol": 1e-6}},
     },
     "CMB": GRAPH_ONLY,
+    "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,

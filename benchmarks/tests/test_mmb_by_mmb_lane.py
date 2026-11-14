@@ -216,6 +216,29 @@ def test_the_papers_four_networks_and_their_hidden_counts():
     ]
 
 
+def test_the_papers_networks_take_its_named_targets_and_others_the_most_connected():
+    assert set(latent_networks.PAPER_TARGETS) == set(mmb_by_mmb_cpu.NETWORKS)
+    assert [len(t) for t in latent_networks.PAPER_TARGETS.values()] == [4, 4, 5, 7]
+    named = latent_networks.PAPER_TARGETS["alarm"]
+    others = ("HUB", "A", "B", "C")
+    arcs = tuple(("HUB", v) for v in (*named, "A", "B")) + (("A", "B"),)
+    alarm = networks.Network("alarm", (*named, *others), arcs)
+    assert mmb_by_mmb_cpu.targets_for(alarm, None) == named
+    assert mmb_by_mmb_cpu.targets_for(alarm, 2) == ("HUB", "A")
+    elsewhere = networks.Network("elsewhere", alarm.nodes, arcs)
+    assert mmb_by_mmb_cpu.targets_for(elsewhere, None) == ("HUB", "A")
+
+
+def test_the_run_records_its_targets_by_name(lane):
+    out, flags, _ = lane
+    mmb_by_mmb_cpu.main(flags)
+    meta = json.loads((out / "run_meta.json").read_text())
+    asia = networks.load_network("asia")
+    assert meta["targets"] == {"asia": list(latent_networks.default_targets(asia, 2))}
+    for r in _records(out):
+        assert set(r["target_names"].values()) == set(meta["targets"]["asia"])
+
+
 @pytest.mark.parametrize("blanket", ["total_conditioning", "iamb"])
 def test_andreys_adapter_answers_a_target_of_a_hidden_variable_network_as_the_truth_does(blanket):
     """The fork with a hidden root of the authors' test: Andrey's answer at z is the truth's."""

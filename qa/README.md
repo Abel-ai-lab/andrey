@@ -47,9 +47,9 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, J-PCMCI+, and CMB are not refit: their data hold each row's environment in one
-  column, the target of ICP and CMB is the last variable, and J-PCMCI+'s contexts follow the
-  system variables.
+  IGSP, FCI-JCI, J-PCMCI+, CMB, and MMB-by-MMB are not refit: their data hold each row's
+  environment in one column, the target of ICP, CMB, and MMB-by-MMB is the last variable, and
+  J-PCMCI+'s contexts follow the system variables.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -157,8 +157,8 @@ fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
 HITON-MB, PCMB, Y-structures, CMB, GES, GIES, GnIES, IGSP, ICP, XGES, AGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, UT-IGSP, DirectLiNGAM,
-ICA-LiNGAM,
+RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, MMB-by-MMB, UT-IGSP,
+DirectLiNGAM, ICA-LiNGAM,
 MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI,
 PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets
 whose assumptions each method needs, PC with each supported nonlinear conditional-independence test,
@@ -170,7 +170,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
 | `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
-| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
+| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI, MMB-by-MMB |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
@@ -197,7 +197,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
-| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; Y-structures; CMB at the last column |
+| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; Y-structures; CMB and MMB-by-MMB at the last column |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
 | Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
@@ -314,6 +314,13 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   every variable but the target, which identifies the target's parents (Peters, Buhlmann and
   Meinshausen 2016, Theorem 2), so the check has power. Each seed draws its target among the
   variables with parents, and ICP runs at its defaults.
+- **One variable's edges.** MMB-by-MMB answers the edges at one variable, so the gate fits it at the
+  last column of each draw and scores the edges at that column alone. It runs on the draws of FCI's
+  `latent_gauss_er` cells and on ASIA's. Sachs is left out: its one draw has two edges at its last
+  column, jnk, and the fit finds one of them with a wrong mark, as FCI does, so it makes as many
+  errors as the empty answer. The empty answer's median errors are the last column's median
+  number of edges in the PAG, 1.5 on the `latent_gauss_er` cells and 2 on ASIA. Identity fits the
+  same column, so it skips the column-order refits, as it does for ICP.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -330,9 +337,12 @@ HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM,
 against the truth's CPDAG, the LiNGAM methods, NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the
 DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by
 endpoint SHD against the PAG of the observed variables. CMB answers the last column, and counts the
-missing, extra, and mismarked edges there against the truth's CPDAG. Y-structures claim ancestral
-pairs, so their errors are the false claims plus the true ancestral pairs not claimed, against the
-empty answer's, the number of true pairs.
+missing, extra, and mismarked edges there against the truth's CPDAG.
+MMB-by-MMB answers the last column too and counts the same edges there against the PAG: the
+true edges the answer lacks, the answer's edges the PAG lacks, and the edges in both with a mark
+that differs. The empty answer makes as many errors as the target has edges.
+Y-structures claim ancestral pairs, so their errors are the false claims plus the true ancestral
+pairs not claimed, against the empty answer's, the number of true pairs.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.

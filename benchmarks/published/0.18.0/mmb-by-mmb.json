@@ -1,0 +1,2666 @@
+{
+ "release": "0.18.0",
+ "generated": "2026-11-14",
+ "lane": "mmb-by-mmb",
+ "about": "MMB-by-MMB against the authors' code on the paper's four networks with hidden nodes, at the paper's named targets; FCI and RFCI read at each target and the IAMB blanket arm are context. The release summary's MMB-by-MMB entries are built from it",
+ "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits",
+ "hardware": "AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative",
+ "packages": {
+  "mmb-by-mmb (authors' code)": "2c63c89",
+  "pcalg": "2.7-12",
+  "R": "4.6.1",
+  "rpy2": "3.6.9"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree",
+ "error_metric": "edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
+ "cells_note": "the paper's four networks (MILDEW, ALARM, WIN95PTS, ANDES) as linear-Gaussian models, weights +-U(0.5, 1), N(0, 1) noise, 4/4/6/10 random non-target nodes hidden, columns shuffled; the truth is the PAG of the observed variables, read at each target",
+ "bootstrap": {
+  "resamples": 10000,
+  "interval": "percentile 95%",
+  "rng": "default_rng(0)"
+ },
+ "comparisons_note": "judged: Andrey against the authors' code; context, reported and never judged: Andrey's FCI and pcalg's RFCI read at each target, and mmb_by_mmb with blanket='iamb' (MILDEW and ALARM)",
+ "tallies": {
+  "better": 5,
+  "tie": 3,
+  "worse": 0,
+  "floor_fail": []
+ },
+ "rows": [
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 1000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2673,
+     "bootstrap_95": [
+      -0.3501,
+      -0.1884
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0477,
+     "other_mean": 0.3151
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1891,
+     "bootstrap_95": [
+      0.1329,
+      0.2485
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9675,
+     "other_mean": 0.7784
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.95,
+     "bootstrap_95": [
+      -3.075,
+      -2.8375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.225,
+     "bootstrap_95": [
+      -2.475,
+      -1.9625
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 2013.5,
+   "andrey_s": 0.435,
+   "andrey_errors_mean": 0.1875,
+   "other_tests_per_fit": null,
+   "other_s": 0.2871,
+   "other_errors_mean": 0.9125,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 1000,
+   "against": "andrey.mmb_by_mmb.iamb",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0356,
+     "bootstrap_95": [
+      -0.0683,
+      -0.0034
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0477,
+     "other_mean": 0.0834
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0228,
+     "bootstrap_95": [
+      0.0006,
+      0.0455
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9675,
+     "other_mean": 0.9447
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.95,
+     "bootstrap_95": [
+      -3.075,
+      -2.8375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.8375,
+     "bootstrap_95": [
+      -2.9875,
+      -2.6875
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 2013.5,
+   "andrey_s": 0.435,
+   "andrey_errors_mean": 0.1875,
+   "other_tests_per_fit": 9353.0,
+   "other_s": 0.3158,
+   "other_errors_mean": 0.3,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 1000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0404,
+     "bootstrap_95": [
+      -0.0766,
+      -0.0069
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0477,
+     "other_mean": 0.0882,
+     "D_by_seed": {
+      "0": -0.1676,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": -0.1386,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0,
+      "8": -0.0884,
+      "9": 0.0,
+      "10": 0.0,
+      "11": 0.1179,
+      "12": -0.1179,
+      "13": 0.0,
+      "14": -0.2393,
+      "15": 0.0,
+      "16": 0.0,
+      "17": -0.0571,
+      "18": 0.0,
+      "19": -0.1179
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0284,
+     "bootstrap_95": [
+      0.0052,
+      0.0534
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9675,
+     "other_mean": 0.939,
+     "D_by_seed": {
+      "0": 0.1152,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.1056,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0,
+      "8": 0.0625,
+      "9": 0.0,
+      "10": 0.0,
+      "11": -0.0833,
+      "12": 0.0833,
+      "13": 0.0,
+      "14": 0.1607,
+      "15": 0.0,
+      "16": 0.0,
+      "17": 0.0417,
+      "18": 0.0,
+      "19": 0.0833
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.95,
+     "bootstrap_95": [
+      -3.075,
+      -2.8375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.825,
+     "bootstrap_95": [
+      -2.975,
+      -2.675
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 2013.5,
+   "andrey_s": 0.435,
+   "andrey_errors_mean": 0.1875,
+   "other_tests_per_fit": 560.9,
+   "other_s": 0.0672,
+   "other_errors_mean": 0.3125,
+   "empty_errors_mean": 3.1375,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 2382,
+      "floor": 1898.0,
+      "queries": 2400,
+      "pass": true
+     },
+     "marks": {
+      "net": 474,
+      "floor": 47.0,
+      "queries": 502,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 2372,
+      "floor": 1898.0,
+      "queries": 2400,
+      "pass": true
+     },
+     "marks": {
+      "net": 456,
+      "floor": 47.0,
+      "queries": 502,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 1000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.5143,
+     "bootstrap_95": [
+      -0.6343,
+      -0.3993
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0477,
+     "other_mean": 0.5621
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.365,
+     "bootstrap_95": [
+      0.2838,
+      0.4495
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9675,
+     "other_mean": 0.6025
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.95,
+     "bootstrap_95": [
+      -3.075,
+      -2.8375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -1.725,
+     "bootstrap_95": [
+      -1.9625,
+      -1.4875
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 2013.5,
+   "andrey_s": 0.435,
+   "andrey_errors_mean": 0.1875,
+   "other_tests_per_fit": 4922.6,
+   "other_s": 0.1326,
+   "other_errors_mean": 1.4125,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 5000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.1514,
+     "bootstrap_95": [
+      -0.2071,
+      -0.1029
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0272,
+     "other_mean": 0.1785
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1071,
+     "bootstrap_95": [
+      0.0724,
+      0.1469
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9818,
+     "other_mean": 0.8746
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.025,
+     "bootstrap_95": [
+      -3.15,
+      -2.9125
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.6125,
+     "bootstrap_95": [
+      -2.7625,
+      -2.45
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 5571.7,
+   "andrey_s": 0.4815,
+   "andrey_errors_mean": 0.1125,
+   "other_tests_per_fit": null,
+   "other_s": 0.2963,
+   "other_errors_mean": 0.525,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 5000,
+   "against": "andrey.mmb_by_mmb.iamb",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0273,
+     "bootstrap_95": [
+      -0.0576,
+      -0.0019
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0272,
+     "other_mean": 0.0545
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0173,
+     "bootstrap_95": [
+      -0.0004,
+      0.0387
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.9818,
+     "other_mean": 0.9645
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.025,
+     "bootstrap_95": [
+      -3.15,
+      -2.9125
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.95,
+     "bootstrap_95": [
+      -3.1,
+      -2.8
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "tie",
+   "result": "better",
+   "andrey_tests_per_fit": 5571.7,
+   "andrey_s": 0.4815,
+   "andrey_errors_mean": 0.1125,
+   "other_tests_per_fit": 52030.1,
+   "other_s": 0.3508,
+   "other_errors_mean": 0.1875,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 5000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0458,
+     "bootstrap_95": [
+      -0.0805,
+      -0.0175
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0272,
+     "other_mean": 0.073,
+     "D_by_seed": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": -0.2702,
+      "8": -0.0884,
+      "9": 0.0,
+      "10": 0.0,
+      "11": 0.0,
+      "12": -0.1179,
+      "13": -0.0884,
+      "14": 0.0,
+      "15": 0.0,
+      "16": -0.1179,
+      "17": -0.1162,
+      "18": 0.0,
+      "19": -0.1179
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0329,
+     "bootstrap_95": [
+      0.0124,
+      0.0584
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9818,
+     "other_mean": 0.9489,
+     "D_by_seed": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.2,
+      "8": 0.0625,
+      "9": 0.0,
+      "10": 0.0,
+      "11": 0.0,
+      "12": 0.0833,
+      "13": 0.0625,
+      "14": 0.0,
+      "15": 0.0,
+      "16": 0.0833,
+      "17": 0.0824,
+      "18": 0.0,
+      "19": 0.0833
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.025,
+     "bootstrap_95": [
+      -3.15,
+      -2.9125
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.9,
+     "bootstrap_95": [
+      -3.0625,
+      -2.725
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 5571.7,
+   "andrey_s": 0.4815,
+   "andrey_errors_mean": 0.1125,
+   "other_tests_per_fit": 910.8,
+   "other_s": 0.2679,
+   "other_errors_mean": 0.2375,
+   "empty_errors_mean": 3.1375,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 2388,
+      "floor": 1898.0,
+      "queries": 2400,
+      "pass": true
+     },
+     "marks": {
+      "net": 485,
+      "floor": 47.0,
+      "queries": 502,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 2388,
+      "floor": 1898.0,
+      "queries": 2400,
+      "pass": true
+     },
+     "marks": {
+      "net": 468,
+      "floor": 47.0,
+      "queries": 502,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "mildew",
+   "d": 31,
+   "n": 5000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2654,
+     "bootstrap_95": [
+      -0.3726,
+      -0.1705
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0272,
+     "other_mean": 0.2926
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1885,
+     "bootstrap_95": [
+      0.1217,
+      0.2643
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9818,
+     "other_mean": 0.7933
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.025,
+     "bootstrap_95": [
+      -3.15,
+      -2.9125
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.4,
+     "bootstrap_95": [
+      -2.6,
+      -2.2
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 5571.7,
+   "andrey_s": 0.4815,
+   "andrey_errors_mean": 0.1125,
+   "other_tests_per_fit": 8751.8,
+   "other_s": 0.2445,
+   "other_errors_mean": 0.7375,
+   "empty_errors_mean": 3.1375
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 1000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.1843,
+     "bootstrap_95": [
+      -0.3043,
+      -0.0735
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1949,
+     "other_mean": 0.3792
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1333,
+     "bootstrap_95": [
+      0.0549,
+      0.2172
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8669,
+     "other_mean": 0.7336
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.525,
+     "bootstrap_95": [
+      -3.8,
+      -3.225
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.875,
+     "bootstrap_95": [
+      -3.2628,
+      -2.475
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 1664.0,
+   "andrey_s": 0.3333,
+   "andrey_errors_mean": 0.7625,
+   "other_tests_per_fit": null,
+   "other_s": 0.2311,
+   "other_errors_mean": 1.4125,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 1000,
+   "against": "andrey.mmb_by_mmb.iamb",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0218,
+     "bootstrap_95": [
+      -0.0552,
+      0.0107
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.1949,
+     "other_mean": 0.2166
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0163,
+     "bootstrap_95": [
+      -0.0049,
+      0.0388
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8669,
+     "other_mean": 0.8506
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.525,
+     "bootstrap_95": [
+      -3.8,
+      -3.225
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.4375,
+     "bootstrap_95": [
+      -3.725,
+      -3.1375
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 1664.0,
+   "andrey_s": 0.3333,
+   "andrey_errors_mean": 0.7625,
+   "other_tests_per_fit": 5488.6,
+   "other_s": 0.258,
+   "other_errors_mean": 0.85,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 1000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.1285,
+     "bootstrap_95": [
+      -0.1865,
+      -0.0793
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1949,
+     "other_mean": 0.3234,
+     "D_by_seed": {
+      "0": -0.0554,
+      "1": -0.05,
+      "2": -0.0472,
+      "3": -0.4715,
+      "4": -0.05,
+      "5": -0.0679,
+      "6": -0.0884,
+      "7": -0.197,
+      "8": 0.0,
+      "9": -0.2475,
+      "10": -0.0707,
+      "11": -0.3536,
+      "12": -0.1768,
+      "13": 0.0,
+      "14": -0.2339,
+      "15": -0.0884,
+      "16": -0.0555,
+      "17": -0.2147,
+      "18": -0.0679,
+      "19": -0.0343
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0924,
+     "bootstrap_95": [
+      0.0575,
+      0.1334
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8669,
+     "other_mean": 0.7744,
+     "D_by_seed": {
+      "0": 0.0476,
+      "1": 0.0278,
+      "2": 0.0333,
+      "3": 0.3346,
+      "4": 0.0278,
+      "5": 0.0556,
+      "6": 0.0625,
+      "7": 0.15,
+      "8": 0.0,
+      "9": 0.175,
+      "10": 0.05,
+      "11": 0.25,
+      "12": 0.125,
+      "13": 0.0,
+      "14": 0.1655,
+      "15": 0.0625,
+      "16": 0.0455,
+      "17": 0.1521,
+      "18": 0.0556,
+      "19": 0.0286
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.525,
+     "bootstrap_95": [
+      -3.8,
+      -3.225
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.05,
+     "bootstrap_95": [
+      -3.3125,
+      -2.775
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 1664.0,
+   "andrey_s": 0.3333,
+   "andrey_errors_mean": 0.7625,
+   "other_tests_per_fit": 521.6,
+   "other_s": 0.0983,
+   "other_errors_mean": 1.2375,
+   "empty_errors_mean": 4.2875,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 2508,
+      "floor": 1874.0,
+      "queries": 2560,
+      "pass": true
+     },
+     "marks": {
+      "net": 572,
+      "floor": 192.0,
+      "queries": 686,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 2502,
+      "floor": 1874.0,
+      "queries": 2560,
+      "pass": true
+     },
+     "marks": {
+      "net": 492,
+      "floor": 192.0,
+      "queries": 686,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 1000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.3243,
+     "bootstrap_95": [
+      -0.4588,
+      -0.1912
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1949,
+     "other_mean": 0.5192
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.2325,
+     "bootstrap_95": [
+      0.1369,
+      0.3281
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8669,
+     "other_mean": 0.6344
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.525,
+     "bootstrap_95": [
+      -3.8,
+      -3.225
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.475,
+     "bootstrap_95": [
+      -2.8,
+      -2.1375
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 1664.0,
+   "andrey_s": 0.3333,
+   "andrey_errors_mean": 0.7625,
+   "other_tests_per_fit": 3769.6,
+   "other_s": 0.139,
+   "other_errors_mean": 1.8125,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 5000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0854,
+     "bootstrap_95": [
+      -0.1858,
+      0.0298
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.1526,
+     "other_mean": 0.238
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0603,
+     "bootstrap_95": [
+      -0.0211,
+      0.1315
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8936,
+     "other_mean": 0.8333
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.7,
+     "bootstrap_95": [
+      -4.0,
+      -3.375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.3375,
+     "bootstrap_95": [
+      -3.675,
+      -3.025
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 2629.0,
+   "andrey_s": 0.3534,
+   "andrey_errors_mean": 0.5875,
+   "other_tests_per_fit": null,
+   "other_s": 0.2465,
+   "other_errors_mean": 0.95,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 5000,
+   "against": "andrey.mmb_by_mmb.iamb",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0148,
+     "bootstrap_95": [
+      -0.0687,
+      0.0372
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.1526,
+     "other_mean": 0.1673
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0117,
+     "bootstrap_95": [
+      -0.0252,
+      0.05
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8936,
+     "other_mean": 0.882
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.7,
+     "bootstrap_95": [
+      -4.0,
+      -3.375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.65,
+     "bootstrap_95": [
+      -3.9375,
+      -3.375
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 2629.0,
+   "andrey_s": 0.3534,
+   "andrey_errors_mean": 0.5875,
+   "other_tests_per_fit": 9714.0,
+   "other_s": 0.2849,
+   "other_errors_mean": 0.6375,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 5000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0695,
+     "bootstrap_95": [
+      -0.1193,
+      -0.0255
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1526,
+     "other_mean": 0.2221,
+     "D_by_seed": {
+      "0": -0.2652,
+      "1": -0.3536,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": -0.0884,
+      "7": -0.197,
+      "8": 0.0,
+      "9": -0.1886,
+      "10": -0.0707,
+      "11": 0.0,
+      "12": 0.1139,
+      "13": -0.1179,
+      "14": 0.0312,
+      "15": -0.0884,
+      "16": 0.0,
+      "17": -0.1179,
+      "18": 0.0,
+      "19": -0.0484
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0187,
+      0.0854
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8936,
+     "other_mean": 0.8437,
+     "D_by_seed": {
+      "0": 0.1875,
+      "1": 0.25,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0625,
+      "7": 0.15,
+      "8": 0.0,
+      "9": 0.1333,
+      "10": 0.05,
+      "11": 0.0,
+      "12": -0.0795,
+      "13": 0.0833,
+      "14": -0.0167,
+      "15": 0.0625,
+      "16": 0.0,
+      "17": 0.0833,
+      "18": 0.0,
+      "19": 0.0333
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.7,
+     "bootstrap_95": [
+      -4.0,
+      -3.375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.425,
+     "bootstrap_95": [
+      -3.7625,
+      -3.1
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 2629.0,
+   "andrey_s": 0.3534,
+   "andrey_errors_mean": 0.5875,
+   "other_tests_per_fit": 660.6,
+   "other_s": 0.5203,
+   "other_errors_mean": 0.8625,
+   "empty_errors_mean": 4.2875,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 2530,
+      "floor": 1874.0,
+      "queries": 2560,
+      "pass": true
+     },
+     "marks": {
+      "net": 597,
+      "floor": 192.0,
+      "queries": 686,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 2530,
+      "floor": 1874.0,
+      "queries": 2560,
+      "pass": true
+     },
+     "marks": {
+      "net": 553,
+      "floor": 192.0,
+      "queries": 686,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "alarm",
+   "d": 33,
+   "n": 5000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.1095,
+     "bootstrap_95": [
+      -0.2153,
+      0.0099
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.1526,
+     "other_mean": 0.262
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0776,
+     "bootstrap_95": [
+      -0.0068,
+      0.1528
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8936,
+     "other_mean": 0.8161
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.7,
+     "bootstrap_95": [
+      -4.0,
+      -3.375
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.225,
+     "bootstrap_95": [
+      -3.5625,
+      -2.9
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 2629.0,
+   "andrey_s": 0.3534,
+   "andrey_errors_mean": 0.5875,
+   "other_tests_per_fit": 5134.7,
+   "other_s": 0.1971,
+   "other_errors_mean": 1.0625,
+   "empty_errors_mean": 4.2875
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 1000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2298,
+     "bootstrap_95": [
+      -0.3217,
+      -0.1319
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1605,
+     "other_mean": 0.3903
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1661,
+     "bootstrap_95": [
+      0.0957,
+      0.2312
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8889,
+     "other_mean": 0.7229
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.18,
+     "bootstrap_95": [
+      -3.33,
+      -3.04
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.41,
+     "bootstrap_95": [
+      -2.6,
+      -2.22
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 19145.6,
+   "andrey_s": 0.5141,
+   "andrey_errors_mean": 0.72,
+   "other_tests_per_fit": null,
+   "other_s": 0.2894,
+   "other_errors_mean": 1.49,
+   "empty_errors_mean": 3.9
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 1000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0587,
+     "bootstrap_95": [
+      -0.0862,
+      -0.0332
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1605,
+     "other_mean": 0.2193,
+     "D_by_seed": {
+      "0": -0.0434,
+      "1": 0.0213,
+      "2": -0.1389,
+      "3": -0.1369,
+      "4": -0.0751,
+      "5": -0.0577,
+      "6": 0.0,
+      "7": -0.0723,
+      "8": -0.075,
+      "9": 0.0299,
+      "10": -0.2109,
+      "11": 0.0,
+      "12": -0.0606,
+      "13": 0.0035,
+      "14": -0.0998,
+      "15": -0.1061,
+      "16": -0.0566,
+      "17": -0.1066,
+      "18": 0.0104,
+      "19": 0.0
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0456,
+     "bootstrap_95": [
+      0.0273,
+      0.065
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8889,
+     "other_mean": 0.8434,
+     "D_by_seed": {
+      "0": 0.0514,
+      "1": 0.0088,
+      "2": 0.1044,
+      "3": 0.1068,
+      "4": 0.0545,
+      "5": 0.0484,
+      "6": 0.0,
+      "7": 0.0519,
+      "8": 0.0623,
+      "9": -0.0273,
+      "10": 0.1491,
+      "11": 0.0,
+      "12": 0.0465,
+      "13": 0.0067,
+      "14": 0.0721,
+      "15": 0.075,
+      "16": 0.04,
+      "17": 0.0728,
+      "18": -0.0117,
+      "19": 0.0
+     }
+    }
+   },
+   "fresh": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0487,
+     "bootstrap_95": [
+      -0.0767,
+      -0.0217
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.2148,
+     "other_mean": 0.2635,
+     "D_by_seed": {
+      "20": 0.0,
+      "21": -0.05,
+      "22": -0.025,
+      "23": 0.0,
+      "24": 0.0838,
+      "25": -0.025,
+      "26": -0.1353,
+      "27": -0.1288,
+      "28": -0.1368,
+      "29": -0.0576,
+      "30": 0.0,
+      "31": 0.0432,
+      "32": -0.1906,
+      "33": -0.075,
+      "34": -0.0101,
+      "35": -0.0467,
+      "36": -0.0632,
+      "37": -0.05,
+      "38": -0.0205,
+      "39": -0.0857
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0364,
+     "bootstrap_95": [
+      0.0171,
+      0.0567
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8511,
+     "other_mean": 0.8147,
+     "D_by_seed": {
+      "20": -0.0027,
+      "21": 0.0448,
+      "22": 0.0205,
+      "23": 0.0,
+      "24": -0.06,
+      "25": 0.0133,
+      "26": 0.0867,
+      "27": 0.1023,
+      "28": 0.0996,
+      "29": 0.04,
+      "30": 0.0,
+      "31": -0.0242,
+      "32": 0.135,
+      "33": 0.0623,
+      "34": 0.0101,
+      "35": 0.0321,
+      "36": 0.0505,
+      "37": 0.0328,
+      "38": 0.02,
+      "39": 0.0646
+     }
+    }
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.18,
+     "bootstrap_95": [
+      -3.33,
+      -3.04
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.75,
+     "bootstrap_95": [
+      -2.92,
+      -2.57
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 19145.6,
+   "andrey_s": 0.5141,
+   "andrey_errors_mean": 0.72,
+   "other_tests_per_fit": 3050.7,
+   "other_s": 1.0734,
+   "other_errors_mean": 1.15,
+   "empty_errors_mean": 3.9,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 6820,
+      "floor": 6120.0,
+      "queries": 6900,
+      "pass": true
+     },
+     "marks": {
+      "net": 635,
+      "floor": 263.0,
+      "queries": 780,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 6750,
+      "floor": 6120.0,
+      "queries": 6900,
+      "pass": true
+     },
+     "marks": {
+      "net": 546,
+      "floor": 263.0,
+      "queries": 780,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 1000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2852,
+     "bootstrap_95": [
+      -0.3792,
+      -0.1887
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.1605,
+     "other_mean": 0.4457
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.2069,
+     "bootstrap_95": [
+      0.138,
+      0.2742
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8889,
+     "other_mean": 0.6821
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.18,
+     "bootstrap_95": [
+      -3.33,
+      -3.04
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.14,
+     "bootstrap_95": [
+      -2.32,
+      -1.95
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 19145.6,
+   "andrey_s": 0.5141,
+   "andrey_errors_mean": 0.72,
+   "other_tests_per_fit": 12691.2,
+   "other_s": 0.5282,
+   "other_errors_mean": 1.76,
+   "empty_errors_mean": 3.9
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 5000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.1999,
+     "bootstrap_95": [
+      -0.2708,
+      -0.1259
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0681,
+     "other_mean": 0.268
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1409,
+     "bootstrap_95": [
+      0.0885,
+      0.1913
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9527,
+     "other_mean": 0.8118
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.56,
+     "bootstrap_95": [
+      -3.68,
+      -3.47
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.07,
+     "bootstrap_95": [
+      -3.22,
+      -2.92
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 125085.9,
+   "andrey_s": 0.6352,
+   "andrey_errors_mean": 0.34,
+   "other_tests_per_fit": null,
+   "other_s": 0.5463,
+   "other_errors_mean": 0.83,
+   "empty_errors_mean": 3.9
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 5000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.016,
+     "bootstrap_95": [
+      -0.0515,
+      0.014
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.0681,
+     "other_mean": 0.0841,
+     "D_by_seed": {
+      "0": 0.024,
+      "1": -0.0865,
+      "2": 0.0566,
+      "3": 0.0566,
+      "4": 0.0367,
+      "5": -0.0354,
+      "6": 0.0354,
+      "7": 0.0,
+      "8": -0.025,
+      "9": -0.2616,
+      "10": -0.0444,
+      "11": 0.0,
+      "12": -0.0725,
+      "13": 0.0778,
+      "14": 0.0957,
+      "15": -0.0707,
+      "16": -0.0354,
+      "17": 0.0,
+      "18": -0.0354,
+      "19": -0.0354
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0121,
+     "bootstrap_95": [
+      -0.0093,
+      0.0373
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.9527,
+     "other_mean": 0.9407,
+     "D_by_seed": {
+      "0": -0.0133,
+      "1": 0.064,
+      "2": -0.04,
+      "3": -0.04,
+      "4": -0.0267,
+      "5": 0.025,
+      "6": -0.025,
+      "7": 0.0,
+      "8": 0.0133,
+      "9": 0.185,
+      "10": 0.0364,
+      "11": 0.0,
+      "12": 0.0571,
+      "13": -0.055,
+      "14": -0.0646,
+      "15": 0.05,
+      "16": 0.025,
+      "17": 0.0,
+      "18": 0.025,
+      "19": 0.025
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.56,
+     "bootstrap_95": [
+      -3.68,
+      -3.47
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -3.44,
+     "bootstrap_95": [
+      -3.62,
+      -3.27
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 125085.9,
+   "andrey_s": 0.6352,
+   "andrey_errors_mean": 0.34,
+   "other_tests_per_fit": 6078.6,
+   "other_s": 4.9759,
+   "other_errors_mean": 0.46,
+   "empty_errors_mean": 3.9,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 6868,
+      "floor": 6120.0,
+      "queries": 6900,
+      "pass": true
+     },
+     "marks": {
+      "net": 715,
+      "floor": 263.0,
+      "queries": 780,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 6866,
+      "floor": 6120.0,
+      "queries": 6900,
+      "pass": true
+     },
+     "marks": {
+      "net": 687,
+      "floor": 263.0,
+      "queries": 780,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "win95pts",
+   "d": 70,
+   "n": 5000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2478,
+     "bootstrap_95": [
+      -0.3221,
+      -0.1719
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.0681,
+     "other_mean": 0.3159
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1752,
+     "bootstrap_95": [
+      0.1212,
+      0.228
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.9527,
+     "other_mean": 0.7776
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -3.56,
+     "bootstrap_95": [
+      -3.68,
+      -3.47
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.92,
+     "bootstrap_95": [
+      -3.07,
+      -2.77
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 125085.9,
+   "andrey_s": 0.6352,
+   "andrey_errors_mean": 0.34,
+   "other_tests_per_fit": 21722.8,
+   "other_s": 1.0711,
+   "other_errors_mean": 0.98,
+   "empty_errors_mean": 3.9
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 1000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2205,
+     "bootstrap_95": [
+      -0.2664,
+      -0.1793
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.2561,
+     "other_mean": 0.4766
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1559,
+     "bootstrap_95": [
+      0.127,
+      0.1883
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.819,
+     "other_mean": 0.6631
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.4786,
+     "bootstrap_95": [
+      -2.5929,
+      -2.3429
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -1.9714,
+     "bootstrap_95": [
+      -2.1,
+      -1.8429
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 7341.2,
+   "andrey_s": 0.5244,
+   "andrey_errors_mean": 0.5571,
+   "other_tests_per_fit": null,
+   "other_s": 0.7745,
+   "other_errors_mean": 1.0643,
+   "empty_errors_mean": 3.0357
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 1000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": 0.0349,
+     "bootstrap_95": [
+      0.007,
+      0.0683
+     ],
+     "verdict": "worse",
+     "andrey_mean": 0.2561,
+     "other_mean": 0.2212,
+     "D_by_seed": {
+      "0": 0.0101,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.083,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0673,
+      "7": 0.0,
+      "8": 0.0,
+      "9": 0.2694,
+      "10": -0.083,
+      "11": 0.0,
+      "12": 0.0,
+      "13": 0.0673,
+      "14": 0.0505,
+      "15": 0.0156,
+      "16": 0.083,
+      "17": 0.1347,
+      "18": 0.0,
+      "19": 0.0
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": -0.0245,
+     "bootstrap_95": [
+      -0.048,
+      -0.005
+     ],
+     "verdict": "worse",
+     "andrey_mean": 0.819,
+     "other_mean": 0.8435,
+     "D_by_seed": {
+      "0": -0.0071,
+      "1": 0.0,
+      "2": 0.0,
+      "3": -0.0571,
+      "4": 0.0,
+      "5": 0.0,
+      "6": -0.0476,
+      "7": 0.0,
+      "8": 0.0,
+      "9": -0.1905,
+      "10": 0.0571,
+      "11": 0.0,
+      "12": 0.0,
+      "13": -0.0476,
+      "14": -0.0357,
+      "15": -0.0095,
+      "16": -0.0571,
+      "17": -0.0952,
+      "18": 0.0,
+      "19": 0.0
+     }
+    }
+   },
+   "fresh": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.0044,
+     "bootstrap_95": [
+      -0.0279,
+      0.0192
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.2172,
+     "other_mean": 0.2216,
+     "D_by_seed": {
+      "20": 0.0,
+      "21": 0.0673,
+      "22": 0.101,
+      "23": 0.0673,
+      "24": 0.0,
+      "25": -0.0673,
+      "26": -0.0517,
+      "27": 0.0,
+      "28": 0.0,
+      "29": 0.0,
+      "30": -0.0505,
+      "31": -0.0673,
+      "32": 0.0156,
+      "33": -0.0673,
+      "34": 0.0673,
+      "35": 0.0,
+      "36": -0.1179,
+      "37": 0.0156,
+      "38": 0.0,
+      "39": 0.0
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.0033,
+     "bootstrap_95": [
+      -0.0133,
+      0.0199
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.847,
+     "other_mean": 0.8437,
+     "D_by_seed": {
+      "20": 0.0,
+      "21": -0.0476,
+      "22": -0.0714,
+      "23": -0.0476,
+      "24": 0.0,
+      "25": 0.0476,
+      "26": 0.0381,
+      "27": 0.0,
+      "28": 0.0,
+      "29": 0.0,
+      "30": 0.0357,
+      "31": 0.0476,
+      "32": -0.0095,
+      "33": 0.0476,
+      "34": -0.0476,
+      "35": 0.0,
+      "36": 0.0833,
+      "37": -0.0095,
+      "38": 0.0,
+      "39": 0.0
+     }
+    }
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.4786,
+     "bootstrap_95": [
+      -2.5929,
+      -2.3429
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.5429,
+     "bootstrap_95": [
+      -2.6288,
+      -2.4357
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 7341.2,
+   "andrey_s": 0.5244,
+   "andrey_errors_mean": 0.5571,
+   "other_tests_per_fit": 3678.6,
+   "other_s": 17.9063,
+   "other_errors_mean": 0.4929,
+   "empty_errors_mean": 3.0357,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 29640,
+      "floor": 28830.0,
+      "queries": 29680,
+      "pass": true
+     },
+     "marks": {
+      "net": 738,
+      "floor": 169.0,
+      "queries": 850,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 29646,
+      "floor": 28830.0,
+      "queries": 29680,
+      "pass": true
+     },
+     "marks": {
+      "net": 758,
+      "floor": 169.0,
+      "queries": 850,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 1000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2595,
+     "bootstrap_95": [
+      -0.3068,
+      -0.2154
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.2561,
+     "other_mean": 0.5156
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1834,
+     "bootstrap_95": [
+      0.1524,
+      0.2167
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.819,
+     "other_mean": 0.6355
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.4786,
+     "bootstrap_95": [
+      -2.5929,
+      -2.3429
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -1.8857,
+     "bootstrap_95": [
+      -2.0,
+      -1.7714
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 7341.2,
+   "andrey_s": 0.5244,
+   "andrey_errors_mean": 0.5571,
+   "other_tests_per_fit": 162615.0,
+   "other_s": 6.0996,
+   "other_errors_mean": 1.15,
+   "empty_errors_mean": 3.0357
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 5000,
+   "against": "andrey.fci.numpy",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2327,
+     "bootstrap_95": [
+      -0.2724,
+      -0.1932
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.158,
+     "other_mean": 0.3908
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1648,
+     "bootstrap_95": [
+      0.1368,
+      0.1928
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8884,
+     "other_mean": 0.7236
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.6857,
+     "bootstrap_95": [
+      -2.7571,
+      -2.5929
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.15,
+     "bootstrap_95": [
+      -2.25,
+      -2.0429
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 18112.0,
+   "andrey_s": 0.4428,
+   "andrey_errors_mean": 0.35,
+   "other_tests_per_fit": null,
+   "other_s": 1.2758,
+   "other_errors_mean": 0.8857,
+   "empty_errors_mean": 3.0357
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 5000,
+   "against": "mmb-by-mmb.authors",
+   "judged": true,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": 0.0021,
+     "bootstrap_95": [
+      -0.0187,
+      0.0219
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.158,
+     "other_mean": 0.1559,
+     "D_by_seed": {
+      "0": 0.0423,
+      "1": 0.0673,
+      "2": -0.076,
+      "3": 0.083,
+      "4": 0.0,
+      "5": -0.0673,
+      "6": 0.0,
+      "7": -0.0388,
+      "8": 0.0,
+      "9": 0.0,
+      "10": 0.0673,
+      "11": -0.101,
+      "12": 0.0,
+      "13": 0.0,
+      "14": 0.0505,
+      "15": 0.0156,
+      "16": 0.0,
+      "17": 0.0,
+      "18": 0.0,
+      "19": 0.0
+     }
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": -0.0012,
+     "bootstrap_95": [
+      -0.0152,
+      0.0137
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8884,
+     "other_mean": 0.8896,
+     "D_by_seed": {
+      "0": -0.0306,
+      "1": -0.0476,
+      "2": 0.0544,
+      "3": -0.0571,
+      "4": 0.0,
+      "5": 0.0476,
+      "6": 0.0,
+      "7": 0.0317,
+      "8": 0.0,
+      "9": 0.0,
+      "10": -0.0476,
+      "11": 0.0714,
+      "12": 0.0,
+      "13": 0.0,
+      "14": -0.0357,
+      "15": -0.0095,
+      "16": 0.0,
+      "17": 0.0,
+      "18": 0.0,
+      "19": 0.0
+     }
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.6857,
+     "bootstrap_95": [
+      -2.7571,
+      -2.5929
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.6786,
+     "bootstrap_95": [
+      -2.7571,
+      -2.5929
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "tie",
+   "f1_result": "tie",
+   "result": "tie",
+   "andrey_tests_per_fit": 18112.0,
+   "andrey_s": 0.4428,
+   "andrey_errors_mean": 0.35,
+   "other_tests_per_fit": 4740.5,
+   "other_s": 73.9861,
+   "other_errors_mean": 0.3571,
+   "empty_errors_mean": 3.0357,
+   "answers": {
+    "andrey": {
+     "adjacency": {
+      "net": 29666,
+      "floor": 28830.0,
+      "queries": 29680,
+      "pass": true
+     },
+     "marks": {
+      "net": 790,
+      "floor": 169.0,
+      "queries": 850,
+      "pass": true
+     }
+    },
+    "reference": {
+     "adjacency": {
+      "net": 29668,
+      "floor": 28830.0,
+      "queries": 29680,
+      "pass": true
+     },
+     "marks": {
+      "net": 785,
+      "floor": 169.0,
+      "queries": 850,
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "network": "andes",
+   "d": 213,
+   "n": 5000,
+   "against": "pcalg.rfci",
+   "judged": false,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "distance": {
+     "paired": 20,
+     "mean_D": -0.2568,
+     "bootstrap_95": [
+      -0.2934,
+      -0.2211
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.158,
+     "other_mean": 0.4149
+    },
+    "f1": {
+     "paired": 20,
+     "mean_D": 0.1819,
+     "bootstrap_95": [
+      0.1567,
+      0.2077
+     ],
+     "verdict": "better",
+     "andrey_mean": 0.8884,
+     "other_mean": 0.7065
+    }
+   },
+   "fresh": null,
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.6857,
+     "bootstrap_95": [
+      -2.7571,
+      -2.5929
+     ],
+     "pass": true
+    },
+    "other_minus_empty": {
+     "paired": 20,
+     "mean": -2.0714,
+     "bootstrap_95": [
+      -2.15,
+      -1.9857
+     ],
+     "pass": true
+    }
+   },
+   "distance_result": "better",
+   "f1_result": "better",
+   "result": "better",
+   "andrey_tests_per_fit": 18112.0,
+   "andrey_s": 0.4428,
+   "andrey_errors_mean": 0.35,
+   "other_tests_per_fit": 328354.5,
+   "other_s": 13.6786,
+   "other_errors_mean": 0.9643,
+   "empty_errors_mean": 3.0357
+  }
+ ]
+}

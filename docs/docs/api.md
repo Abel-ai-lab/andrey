@@ -463,6 +463,7 @@ variable.
    pcmb
    y_structures
    cmb
+   mmb_by_mmb
    icp
    ges
    gies
@@ -546,6 +547,13 @@ others changes once the target is conditioned on, then visits the undecided neig
 directs the target's edges from what their blankets show. No reference implementation exists, so
 the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
 on its paper's Alarm setting.
+
+MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
+their marks when unmeasured common causes may exist, without the whole graph: it learns the
+target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
+marks at the target, and returns the edges the target has in the PAG. The authors' code is its
+reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
+four networks with hidden variables.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -751,7 +759,6 @@ in a process.
    dagma
    mmmb
    mb_by_mb
-   mmb_by_mmb
    ldp
    ld3
    ldecc
