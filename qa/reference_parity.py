@@ -26,12 +26,14 @@ summary's ``parity_rule`` sets how its rows are judged:
   variables that no unobserved causal or backdoor path joins), ``"set_distance"`` (a set learned
   at every target, such as a Markov blanket: the mean over the targets of the distance of the
   set's precision and recall from (1, 1)), ``"set_f1_loss"`` (1 minus the mean over the
-  targets of the set's F1, so that fewer is better as for the others), or ``"edge_distance"`` and
+  targets of the set's F1, so that fewer is better as for the others), ``"edge_distance"`` and
   ``"edge_f1_loss"`` (the same two over the edges a method answers at a target, an edge right
-  only with both endpoint marks right). A row's means are
-  ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
-  then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
-  and a row's key names the ``metric``.
+  only with both endpoint marks right), ``"claim_error"`` (claims of ancestral pairs: the mean
+  over the datasets of the false claims plus the true pairs not claimed), or ``"claim_ap_loss"``
+  (1 minus the mean over the datasets of the average precision of the claims' scores). A row's
+  means are ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean``
+  fields, which then hold that error's means. A method with a gated metric beside SHD has one
+  entry per metric, and a row's key names the ``metric``.
 - ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
   judged by, such as another method on the same data. Its rows are reported with their numbers.
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
@@ -117,6 +119,8 @@ METRICS: dict[str, str] = {
     "set_f1_loss": "set F1 loss",
     "edge_distance": "edge distance",
     "edge_f1_loss": "edge F1 loss",
+    "claim_error": "claim errors",
+    "claim_ap_loss": "claim AP loss",
 }
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset(

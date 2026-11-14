@@ -13,14 +13,17 @@ variables, falls in :data:`INTERVAL`, drawn in chunks until ``n`` are kept.
 
 :data:`SETTINGS` holds the paper's three: ``fixed``, the 7-node graph of its Figure 5(a) (the edges
 of the authors' ``simulate.R``), and ``small`` and ``large``, random graphs with ``p = 8`` and
-``p = 16`` system variables (:func:`random_graph`). A random graph follows Appendix D: every
-ordered pair of the ``p + 1`` nodes has an edge with a fixed probability, in a causal order that
-makes it acyclic; a graph with fewer than ``min_colliders`` colliders (nodes with two or more
-parents) is discarded, to raise the share of spurious correlations selection creates; the selection
-variables are drawn uniformly among the leaves of the colliders' descendants (the paper's rule; the
-authors' code draws the first among the descendants and the rest among all variables); and the
-context is a source with children, drawn uniformly. The system columns are then listed in an order
-drawn from the seed, with the truth permuted the same way, and the context stays last.
+``p = 16`` system variables (:func:`random_graph`). A random graph follows Appendix D: every ordered pair of the ``p + 1`` nodes has an edge with a
+fixed probability, in a causal order that makes it acyclic; a graph with too few colliders (nodes
+with two or more parents) is discarded, to raise the share of spurious correlations selection
+creates; the context is a source with children, drawn uniformly; and the selection variables come
+by one of two rules, :data:`RULES`. ``authors``, the default, is the rule of the authors'
+``simulate.R``: the first selection variable is drawn among the colliders and their descendants,
+the others among all other nodes, the context included, and a graph needs more than
+``min_colliders`` colliders. ``text`` is the rule the paper's text describes: every selection
+variable is drawn among the leaves of the colliders' descendants, and a graph needs at least
+``min_colliders`` colliders; it is the harder setting. The system columns are then listed in an
+order drawn from the seed, with the truth permuted the same way, and the context stays last.
 
 A model is a function of the setting and the seed; the rows are a function of the model and ``n``.
 :attr:`SelectionSample.ancestral` is the truth a claim is scored against: ``ancestral[i, j]`` when
@@ -40,8 +43,14 @@ WEIGHT_RANGE = (0.5, 1.5)
 #: The sum of the selection variables a row must fall in (open), the paper's ``[2, 2.5]``.
 INTERVAL = (2.0, 2.5)
 
+#: The rules that draw a random graph's selection variables (:func:`random_graph`).
+RULES = ("authors", "text")
+
 #: The generator a run's records come from; a run recorded with another cannot be rescored.
-SAMPLER = "selection_models.sample, numpy.random.SeedSequence([crc32(setting), seed, n])"
+SAMPLER = (
+    "selection_models.sample(rule), numpy.random.SeedSequence([crc32(setting), seed, n]), "
+    "selection variables by the rule"
+)
 
 #: Draws of a random graph before giving up, as the authors' code does, and the biased draw's
 #: chunks: ``CHUNK_FACTOR * n`` rows each, at most ``MAX_CHUNKS`` of them.
@@ -122,32 +131,49 @@ def fixed_graph() -> SelectionGraph:
     return SelectionGraph(adjacency, FIXED_SELECTION)
 
 
-def random_graph(setting: Setting, rng: np.random.Generator) -> SelectionGraph:
-    """A random graph of ``setting`` by the rule of the paper's Appendix D.
+def random_graph(
+    setting: Setting, rng: np.random.Generator, rule: str = "authors"
+) -> SelectionGraph:
+    """A random graph of ``setting``, its selection variables drawn by ``rule`` (:data:`RULES`).
 
     Raises ``RuntimeError`` when :data:`MAX_GRAPHS` draws hold no graph of the setting.
     """
+    if rule not in RULES:
+        raise ValueError(f"rule must be one of {RULES}, not {rule!r}")
     nodes = setting.system + 1
     upper = np.triu(np.ones((nodes, nodes), dtype=bool), 1)
     for _ in range(MAX_GRAPHS):
         adjacency = (rng.random((nodes, nodes)) < setting.edge_prob) & upper
         colliders = np.flatnonzero(adjacency.sum(0) >= 2)
         sources = np.flatnonzero((adjacency.sum(0) == 0) & (adjacency.sum(1) > 0))
-        if len(colliders) < setting.min_colliders or not len(sources):
+        enough = (
+            len(colliders) > setting.min_colliders
+            if rule == "authors"
+            else (len(colliders) >= setting.min_colliders)
+        )
+        if not enough or not len(sources):
             continue
-        below = ancestral_matrix(adjacency)[colliders].any(0) | np.isin(np.arange(nodes), colliders)
-        leaves = np.flatnonzero(below & (adjacency.sum(1) == 0))
-        if len(leaves) < setting.selection:
-            continue
+        if rule == "text":
+            below = ancestral_matrix(adjacency)[colliders].any(0) | np.isin(
+                np.arange(nodes), colliders
+            )
+            leaves = np.flatnonzero(below & (adjacency.sum(1) == 0))
+            if len(leaves) < setting.selection:
+                continue
         context = int(rng.choice(sources))
-        selection = np.sort(rng.choice(leaves, size=setting.selection, replace=False))
         # The context moves to the last column; the other nodes keep their order.
         order = np.r_[[i for i in range(nodes) if i != context], context]
         position = {int(old): new for new, old in enumerate(order)}
-        return SelectionGraph(
-            adjacency[np.ix_(order, order)].astype(np.int8),
-            tuple(position[int(i)] for i in selection),
-        )
+        moved = adjacency[np.ix_(order, order)].astype(np.int8)
+        if rule == "text":
+            selection = np.sort(rng.choice(leaves, size=setting.selection, replace=False))
+            return SelectionGraph(moved, tuple(position[int(i)] for i in selection))
+        colliders = np.flatnonzero(moved.sum(0) >= 2)
+        below = ancestral_matrix(moved)[colliders].any(0) | np.isin(np.arange(nodes), colliders)
+        first = int(rng.choice(np.flatnonzero(below)))
+        rest = [i for i in range(nodes) if i != first]
+        chosen = rng.choice(rest, size=setting.selection - 1, replace=False)
+        return SelectionGraph(moved, tuple(sorted([first, *(int(i) for i in chosen)])))
     raise RuntimeError(f"no graph of {setting} in {MAX_GRAPHS} draws")
 
 
@@ -161,15 +187,18 @@ def _streams(name: str, seed: int, n: int) -> tuple[np.random.Generator, ...]:
     )
 
 
-def sample(setting: str, *, n: int, seed: int, shuffle: bool = True) -> SelectionSample:
-    """Draw one model of ``setting`` and its biased and unbiased datasets of ``n`` rows.
+def sample(
+    setting: str, *, n: int, seed: int, shuffle: bool = True, rule: str = "authors"
+) -> SelectionSample:
+    """Draw one model of ``setting`` and its biased and unbiased datasets of ``n`` rows, a random
+    graph's selection variables by ``rule`` (:data:`RULES`).
 
     Raises ``RuntimeError`` when :data:`MAX_CHUNKS` chunks of the biased draw keep fewer than ``n``
     rows: a selection interval the model rarely reaches.
     """
     spec = SETTINGS[setting]
     model, biased_rows, unbiased_rows = _streams(setting, seed, n)
-    graph = fixed_graph() if spec.edge_prob is None else random_graph(spec, model)
+    graph = fixed_graph() if spec.edge_prob is None else random_graph(spec, model, rule)
     p = graph.adjacency.shape[0]
     system = p - 1
 

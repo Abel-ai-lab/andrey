@@ -942,7 +942,7 @@ _add(
             "treatment, by descending score, each with its score and patterns",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note="The listing order of claims with equal scores and of a claim's patterns "
         "follows the column order.",

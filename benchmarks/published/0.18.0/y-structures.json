@@ -1,0 +1,2972 @@
+{
+ "release": "0.18.0",
+ "generated": "2026-11-14",
+ "lane": "y_structures",
+ "about": "Andrey's Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection; the release summary's Y-structures entries are built from it",
+ "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged)",
+ "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative",
+ "packages": {
+  "sbcd": "4bae8af",
+  "pcalg": "2.7-12",
+  "R": "4.6.1",
+  "rpy2": "3.6.9"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0",
+ "error_metric": "claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
+ "cells_note": "setting x dataset kind x form: fixed is the 7-node graph of the paper's Figure 5(a); small and large are random graphs with 8 and 16 system variables and a context variable (d counts the context); biased datasets keep the rows whose selection sum lies in [2, 2.5], unbiased datasets keep every row",
+ "bootstrap": {
+  "resamples": 10000,
+  "interval": "percentile 95%",
+  "rng": "default_rng(0)"
+ },
+ "comparisons_note": "judged: rule authors, the selection variables drawn as the authors' simulation script draws them; the rule text, the selection variables among the leaves below the colliders as the paper's text describes them, is a harder setting reported as context and never judged",
+ "tallies": {
+  "Y-structures": {
+   "better": 0,
+   "tie": 6,
+   "worse": 0,
+   "floor_fail": [],
+   "precision_floor_fail": []
+  },
+  "Y-structures extended": {
+   "better": 0,
+   "tie": 6,
+   "worse": 0,
+   "floor_fail": [],
+   "precision_floor_fail": []
+  }
+ },
+ "rows": [
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "fixed",
+   "selection": "biased",
+   "form": "yst",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.6608,
+     "reference_mean": 0.6608
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0059,
+    "tests": 91.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0151,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "fixed",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.15,
+     "reference_mean": 3.15
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0061,
+    "tests": 100.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0152,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "fixed",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.6608,
+     "reference_mean": 0.6608
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 19,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 19,
+    "claim_error": 3.05,
+    "average_precision": 0.3392,
+    "wall_s": 0.0051,
+    "tests": 46.0
+   },
+   "reference": {
+    "tp": 19,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 19,
+    "claim_error": 3.05,
+    "average_precision": 0.3392,
+    "wall_s": 0.012,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "fixed",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.9524,
+    "base_rate": 0.1333,
+    "mean": 0.819,
+    "bootstrap_95": [
+     0.7362,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 1,
+    "precision": 0.9524,
+    "answered": 20,
+    "claim_error": 3.05,
+    "average_precision": 0.35,
+    "wall_s": 0.0055,
+    "tests": 61.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 1,
+    "precision": 0.9524,
+    "answered": 20,
+    "claim_error": 3.05,
+    "average_precision": 0.35,
+    "wall_s": 0.0118,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "small",
+   "selection": "biased",
+   "form": "yst",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 10.8,
+     "reference_mean": 10.8
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7769,
+     "reference_mean": 0.7769
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 11.9,
+     "reference_mean": 11.9
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7473,
+     "reference_mean": 0.7473
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -0.7,
+      -0.1
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -0.7,
+      -0.1
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1991,
+    "mean": 0.8009,
+    "bootstrap_95": [
+     0.7723,
+     0.8268
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 7,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 5,
+    "claim_error": 10.8,
+    "average_precision": 0.2231,
+    "wall_s": 0.0063,
+    "tests": 138.0
+   },
+   "reference": {
+    "tp": 7,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 5,
+    "claim_error": 10.8,
+    "average_precision": 0.2231,
+    "wall_s": 0.0145,
+    "tests": null
+   },
+   "base_rate": 0.1991,
+   "empty_error": 11.15,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "small",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 10.65,
+     "reference_mean": 10.65
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7165,
+     "reference_mean": 0.7165
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 13.05,
+     "reference_mean": 13.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7277,
+     "reference_mean": 0.7277
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -1.2,
+      0.1
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -1.2,
+      0.1
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.5926,
+    "base_rate": 0.1991,
+    "mean": 0.3935,
+    "bootstrap_95": [
+     0.2821,
+     0.5312
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 32,
+    "fp": 22,
+    "precision": 0.5926,
+    "answered": 15,
+    "claim_error": 10.65,
+    "average_precision": 0.2835,
+    "wall_s": 0.0071,
+    "tests": 165.0
+   },
+   "reference": {
+    "tp": 32,
+    "fp": 22,
+    "precision": 0.5926,
+    "answered": 15,
+    "claim_error": 10.65,
+    "average_precision": 0.2835,
+    "wall_s": 0.0151,
+    "tests": null
+   },
+   "base_rate": 0.1991,
+   "empty_error": 11.15,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "small",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 10.55,
+     "reference_mean": 10.55
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7598,
+     "reference_mean": 0.7598
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 11.8,
+     "reference_mean": 11.8
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7437,
+     "reference_mean": 0.7437
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.6,
+     "bootstrap_95": [
+      -1.15,
+      -0.15
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.6,
+     "bootstrap_95": [
+      -1.15,
+      -0.15
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.875,
+    "base_rate": 0.1991,
+    "mean": 0.6759,
+    "bootstrap_95": [
+     0.4533,
+     0.8161
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 14,
+    "fp": 2,
+    "precision": 0.875,
+    "answered": 9,
+    "claim_error": 10.55,
+    "average_precision": 0.2402,
+    "wall_s": 0.0065,
+    "tests": 146.5
+   },
+   "reference": {
+    "tp": 14,
+    "fp": 2,
+    "precision": 0.875,
+    "answered": 9,
+    "claim_error": 10.55,
+    "average_precision": 0.2402,
+    "wall_s": 0.0152,
+    "tests": null
+   },
+   "base_rate": 0.1991,
+   "empty_error": 11.15,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "small",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 10.8,
+     "reference_mean": 10.8
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7377,
+     "reference_mean": 0.7377
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 12.2,
+     "reference_mean": 12.2
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7292,
+     "reference_mean": 0.7292
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -1.15,
+      0.45
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.35,
+     "bootstrap_95": [
+      -1.15,
+      0.45
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.5814,
+    "base_rate": 0.1991,
+    "mean": 0.3823,
+    "bootstrap_95": [
+     0.1948,
+     0.5818
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 25,
+    "fp": 18,
+    "precision": 0.5814,
+    "answered": 15,
+    "claim_error": 10.8,
+    "average_precision": 0.2623,
+    "wall_s": 0.0074,
+    "tests": 171.0
+   },
+   "reference": {
+    "tp": 25,
+    "fp": 18,
+    "precision": 0.5814,
+    "answered": 15,
+    "claim_error": 10.8,
+    "average_precision": 0.2623,
+    "wall_s": 0.0152,
+    "tests": null
+   },
+   "base_rate": 0.1991,
+   "empty_error": 11.15,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "large",
+   "selection": "biased",
+   "form": "yst",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 28.3,
+     "reference_mean": 28.3
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.834,
+     "reference_mean": 0.834
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 29.7,
+     "reference_mean": 29.7
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8222,
+     "reference_mean": 0.8222
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.25,
+     "bootstrap_95": [
+      -1.1,
+      0.8
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.25,
+     "bootstrap_95": [
+      -1.1,
+      0.8
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.5385,
+    "base_rate": 0.119,
+    "mean": 0.4195,
+    "bootstrap_95": [
+     0.2891,
+     0.5913
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 35,
+    "fp": 30,
+    "precision": 0.5385,
+    "answered": 18,
+    "claim_error": 28.3,
+    "average_precision": 0.166,
+    "wall_s": 0.0165,
+    "tests": 992.5
+   },
+   "reference": {
+    "tp": 35,
+    "fp": 30,
+    "precision": 0.5385,
+    "answered": 18,
+    "claim_error": 28.3,
+    "average_precision": 0.166,
+    "wall_s": 0.0647,
+    "tests": null
+   },
+   "base_rate": 0.119,
+   "empty_error": 28.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "large",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 39.0,
+     "reference_mean": 39.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7912,
+     "reference_mean": 0.7912
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 43.0,
+     "reference_mean": 43.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7655,
+     "reference_mean": 0.7655
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 10.45,
+     "bootstrap_95": [
+      6.65,
+      14.75
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 10.45,
+     "bootstrap_95": [
+      6.65,
+      14.75
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.28,
+    "base_rate": 0.119,
+    "mean": 0.161,
+    "bootstrap_95": [
+     0.1161,
+     0.2137
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 133,
+    "fp": 342,
+    "precision": 0.28,
+    "answered": 20,
+    "claim_error": 39.0,
+    "average_precision": 0.2088,
+    "wall_s": 0.0206,
+    "tests": 1305.0
+   },
+   "reference": {
+    "tp": 133,
+    "fp": 342,
+    "precision": 0.28,
+    "answered": 20,
+    "claim_error": 39.0,
+    "average_precision": 0.2088,
+    "wall_s": 0.0642,
+    "tests": null
+   },
+   "base_rate": 0.119,
+   "empty_error": 28.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "large",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 25.7,
+     "reference_mean": 25.7
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7928,
+     "reference_mean": 0.7928
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 26.4,
+     "reference_mean": 26.4
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7854,
+     "reference_mean": 0.7854
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -2.85,
+     "bootstrap_95": [
+      -4.05,
+      -1.75
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -2.85,
+     "bootstrap_95": [
+      -4.05,
+      -1.75
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.9254,
+    "base_rate": 0.119,
+    "mean": 0.8064,
+    "bootstrap_95": [
+     0.7166,
+     0.8825
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 62,
+    "fp": 5,
+    "precision": 0.9254,
+    "answered": 18,
+    "claim_error": 25.7,
+    "average_precision": 0.2072,
+    "wall_s": 0.0128,
+    "tests": 639.0
+   },
+   "reference": {
+    "tp": 62,
+    "fp": 5,
+    "precision": 0.9254,
+    "answered": 18,
+    "claim_error": 25.7,
+    "average_precision": 0.2072,
+    "wall_s": 0.0445,
+    "tests": null
+   },
+   "base_rate": 0.119,
+   "empty_error": 28.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "authors",
+   "judged": true,
+   "setting": "large",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 28.65,
+     "reference_mean": 28.65
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7326,
+     "reference_mean": 0.7326
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 28.0,
+     "reference_mean": 28.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7022,
+     "reference_mean": 0.7022
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 0.1,
+     "bootstrap_95": [
+      -1.5,
+      2.0
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 0.1,
+     "bootstrap_95": [
+      -1.5,
+      2.0
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.4964,
+    "base_rate": 0.119,
+    "mean": 0.3774,
+    "bootstrap_95": [
+     0.3104,
+     0.446
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 137,
+    "fp": 139,
+    "precision": 0.4964,
+    "answered": 20,
+    "claim_error": 28.65,
+    "average_precision": 0.2674,
+    "wall_s": 0.0163,
+    "tests": 949.5
+   },
+   "reference": {
+    "tp": 137,
+    "fp": 139,
+    "precision": 0.4964,
+    "answered": 20,
+    "claim_error": 28.65,
+    "average_precision": 0.2674,
+    "wall_s": 0.0457,
+    "tests": null
+   },
+   "base_rate": 0.119,
+   "empty_error": 28.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "fixed",
+   "selection": "biased",
+   "form": "yst",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.6608,
+     "reference_mean": 0.6608
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0057,
+    "tests": 91.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0146,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "fixed",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.15,
+     "reference_mean": 3.15
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -1.0,
+     "bootstrap_95": [
+      -1.0,
+      -1.0
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.006,
+    "tests": 100.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 20,
+    "claim_error": 3.0,
+    "average_precision": 0.35,
+    "wall_s": 0.0138,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "fixed",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.6608,
+     "reference_mean": 0.6608
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1333,
+    "mean": 0.8667,
+    "bootstrap_95": [
+     0.8667,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 19,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 19,
+    "claim_error": 3.05,
+    "average_precision": 0.3392,
+    "wall_s": 0.0049,
+    "tests": 46.0
+   },
+   "reference": {
+    "tp": 19,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 19,
+    "claim_error": 3.05,
+    "average_precision": 0.3392,
+    "wall_s": 0.0114,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "fixed",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 7,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.05,
+     "reference_mean": 3.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 3.0,
+     "reference_mean": 3.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.65,
+     "reference_mean": 0.65
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.95,
+     "bootstrap_95": [
+      -1.0,
+      -0.85
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.9524,
+    "base_rate": 0.1333,
+    "mean": 0.819,
+    "bootstrap_95": [
+     0.7362,
+     0.8667
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 20,
+    "fp": 1,
+    "precision": 0.9524,
+    "answered": 20,
+    "claim_error": 3.05,
+    "average_precision": 0.35,
+    "wall_s": 0.0053,
+    "tests": 61.0
+   },
+   "reference": {
+    "tp": 20,
+    "fp": 1,
+    "precision": 0.9524,
+    "answered": 20,
+    "claim_error": 3.05,
+    "average_precision": 0.35,
+    "wall_s": 0.0118,
+    "tests": null
+   },
+   "base_rate": 0.1333,
+   "empty_error": 4.0,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "small",
+   "selection": "biased",
+   "form": "yst",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 9.45,
+     "reference_mean": 9.45
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.81,
+     "reference_mean": 0.81
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 9.7,
+     "reference_mean": 9.7
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7957,
+     "reference_mean": 0.7957
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 0.0,
+     "bootstrap_95": [
+      -0.5,
+      0.5
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 0.0,
+     "bootstrap_95": [
+      -0.5,
+      0.5
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.5,
+    "base_rate": 0.1688,
+    "mean": 0.3312,
+    "bootstrap_95": [
+     -0.0585,
+     0.8339
+    ],
+    "pass": false
+   },
+   "andrey": {
+    "tp": 6,
+    "fp": 6,
+    "precision": 0.5,
+    "answered": 7,
+    "claim_error": 9.45,
+    "average_precision": 0.19,
+    "wall_s": 0.0069,
+    "tests": 135.5
+   },
+   "reference": {
+    "tp": 6,
+    "fp": 6,
+    "precision": 0.5,
+    "answered": 7,
+    "claim_error": 9.45,
+    "average_precision": 0.19,
+    "wall_s": 0.0156,
+    "tests": null
+   },
+   "base_rate": 0.1688,
+   "empty_error": 9.45,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "small",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 10.05,
+     "reference_mean": 10.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8087,
+     "reference_mean": 0.8087
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 9.8,
+     "reference_mean": 9.8
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7667,
+     "reference_mean": 0.7667
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 0.6,
+     "bootstrap_95": [
+      0.05,
+      1.2
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 0.6,
+     "bootstrap_95": [
+      0.05,
+      1.2
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.3421,
+    "base_rate": 0.1688,
+    "mean": 0.1734,
+    "bootstrap_95": [
+     0.067,
+     0.3179
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 13,
+    "fp": 25,
+    "precision": 0.3421,
+    "answered": 14,
+    "claim_error": 10.05,
+    "average_precision": 0.1913,
+    "wall_s": 0.0077,
+    "tests": 172.0
+   },
+   "reference": {
+    "tp": 13,
+    "fp": 25,
+    "precision": 0.3421,
+    "answered": 14,
+    "claim_error": 10.05,
+    "average_precision": 0.1913,
+    "wall_s": 0.0158,
+    "tests": null
+   },
+   "base_rate": 0.1688,
+   "empty_error": 9.45,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "small",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 8.8,
+     "reference_mean": 8.8
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7943,
+     "reference_mean": 0.7943
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 9.05,
+     "reference_mean": 9.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7681,
+     "reference_mean": 0.7681
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.65,
+     "bootstrap_95": [
+      -1.2,
+      -0.2
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.65,
+     "bootstrap_95": [
+      -1.2,
+      -0.2
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 1.0,
+    "base_rate": 0.1688,
+    "mean": 0.8313,
+    "bootstrap_95": [
+     0.8036,
+     0.8562
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 13,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 6,
+    "claim_error": 8.8,
+    "average_precision": 0.2057,
+    "wall_s": 0.0067,
+    "tests": 118.0
+   },
+   "reference": {
+    "tp": 13,
+    "fp": 0,
+    "precision": 1.0,
+    "answered": 6,
+    "claim_error": 8.8,
+    "average_precision": 0.2057,
+    "wall_s": 0.016,
+    "tests": null
+   },
+   "base_rate": 0.1688,
+   "empty_error": 9.45,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "small",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 9,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 8.95,
+     "reference_mean": 8.95
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7924,
+     "reference_mean": 0.7924
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 9.25,
+     "reference_mean": 9.25
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7513,
+     "reference_mean": 0.7513
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -1.2,
+      0.15
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -0.5,
+     "bootstrap_95": [
+      -1.2,
+      0.15
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.7778,
+    "base_rate": 0.1688,
+    "mean": 0.609,
+    "bootstrap_95": [
+     0.2433,
+     0.8438
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 14,
+    "fp": 4,
+    "precision": 0.7778,
+    "answered": 8,
+    "claim_error": 8.95,
+    "average_precision": 0.2076,
+    "wall_s": 0.0073,
+    "tests": 141.0
+   },
+   "reference": {
+    "tp": 14,
+    "fp": 4,
+    "precision": 0.7778,
+    "answered": 8,
+    "claim_error": 8.95,
+    "average_precision": 0.2076,
+    "wall_s": 0.0158,
+    "tests": null
+   },
+   "base_rate": 0.1688,
+   "empty_error": 9.45,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "large",
+   "selection": "biased",
+   "form": "yst",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 27.55,
+     "reference_mean": 27.55
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8696,
+     "reference_mean": 0.8696
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 24.45,
+     "reference_mean": 24.45
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8681,
+     "reference_mean": 0.8681
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 3.0,
+     "bootstrap_95": [
+      1.6,
+      4.4
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 3.0,
+     "bootstrap_95": [
+      1.6,
+      4.4
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.2321,
+    "base_rate": 0.1023,
+    "mean": 0.1299,
+    "bootstrap_95": [
+     0.0574,
+     0.2216
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 26,
+    "fp": 86,
+    "precision": 0.2321,
+    "answered": 20,
+    "claim_error": 27.55,
+    "average_precision": 0.1304,
+    "wall_s": 0.0166,
+    "tests": 992.0
+   },
+   "reference": {
+    "tp": 26,
+    "fp": 86,
+    "precision": 0.2321,
+    "answered": 20,
+    "claim_error": 27.55,
+    "average_precision": 0.1304,
+    "wall_s": 0.066,
+    "tests": null
+   },
+   "base_rate": 0.1023,
+   "empty_error": 24.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "large",
+   "selection": "biased",
+   "form": "yst_ext",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 42.0,
+     "reference_mean": 42.0
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8282,
+     "reference_mean": 0.8282
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 41.05,
+     "reference_mean": 41.05
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.843,
+     "reference_mean": 0.843
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 17.45,
+     "bootstrap_95": [
+      12.6,
+      22.95
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 17.45,
+     "bootstrap_95": [
+      12.6,
+      22.95
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.1878,
+    "base_rate": 0.1023,
+    "mean": 0.0855,
+    "bootstrap_95": [
+     0.0469,
+     0.1276
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 105,
+    "fp": 454,
+    "precision": 0.1878,
+    "answered": 20,
+    "claim_error": 42.0,
+    "average_precision": 0.1718,
+    "wall_s": 0.0211,
+    "tests": 1286.0
+   },
+   "reference": {
+    "tp": 105,
+    "fp": 454,
+    "precision": 0.1878,
+    "answered": 20,
+    "claim_error": 42.0,
+    "average_precision": 0.1718,
+    "wall_s": 0.0673,
+    "tests": null
+   },
+   "base_rate": 0.1023,
+   "empty_error": 24.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "large",
+   "selection": "unbiased",
+   "form": "yst",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 22.75,
+     "reference_mean": 22.75
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8397,
+     "reference_mean": 0.8397
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 20.55,
+     "reference_mean": 20.55
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.8445,
+     "reference_mean": 0.8445
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": -1.8,
+     "bootstrap_95": [
+      -2.7,
+      -0.95
+     ],
+     "pass": true
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": -1.8,
+     "bootstrap_95": [
+      -2.7,
+      -0.95
+     ],
+     "pass": true
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.9737,
+    "base_rate": 0.1023,
+    "mean": 0.8714,
+    "bootstrap_95": [
+     0.7977,
+     0.9069
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 37,
+    "fp": 1,
+    "precision": 0.9737,
+    "answered": 14,
+    "claim_error": 22.75,
+    "average_precision": 0.1603,
+    "wall_s": 0.0112,
+    "tests": 494.5
+   },
+   "reference": {
+    "tp": 37,
+    "fp": 1,
+    "precision": 0.9737,
+    "answered": 14,
+    "claim_error": 22.75,
+    "average_precision": 0.1603,
+    "wall_s": 0.0384,
+    "tests": null
+   },
+   "base_rate": 0.1023,
+   "empty_error": 24.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  },
+  {
+   "rule": "text",
+   "judged": false,
+   "setting": "large",
+   "selection": "unbiased",
+   "form": "yst_ext",
+   "d": 17,
+   "n": 10000,
+   "coverage": {
+    "datasets": 20,
+    "andrey_short": 0,
+    "reference_short": 0
+   },
+   "first": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 24.75,
+     "reference_mean": 24.75
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7862,
+     "reference_mean": 0.7862
+    },
+    "same_claims": 20
+   },
+   "fresh": {
+    "paired": 20,
+    "claim_error": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 21.15,
+     "reference_mean": 21.15
+    },
+    "claim_ap_loss": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie",
+     "andrey_mean": 0.7737,
+     "reference_mean": 0.7737
+    },
+    "same_claims": 20
+   },
+   "floor": {
+    "andrey_minus_empty": {
+     "paired": 20,
+     "mean": 0.2,
+     "bootstrap_95": [
+      -1.95,
+      3.25
+     ],
+     "pass": false
+    },
+    "reference_minus_empty": {
+     "paired": 20,
+     "mean": 0.2,
+     "bootstrap_95": [
+      -1.95,
+      3.25
+     ],
+     "pass": false
+    }
+   },
+   "precision_floor": {
+    "paired": 20,
+    "precision": 0.4875,
+    "base_rate": 0.1023,
+    "mean": 0.3852,
+    "bootstrap_95": [
+     0.2376,
+     0.5459
+    ],
+    "pass": true
+   },
+   "andrey": {
+    "tp": 78,
+    "fp": 82,
+    "precision": 0.4875,
+    "answered": 18,
+    "claim_error": 24.75,
+    "average_precision": 0.2138,
+    "wall_s": 0.0148,
+    "tests": 735.5
+   },
+   "reference": {
+    "tp": 78,
+    "fp": 82,
+    "precision": 0.4875,
+    "answered": 18,
+    "claim_error": 24.75,
+    "average_precision": 0.2138,
+    "wall_s": 0.0414,
+    "tests": null
+   },
+   "base_rate": 0.1023,
+   "empty_error": 24.55,
+   "claim_error_result": "tie",
+   "claim_ap_loss_result": "tie",
+   "result": "tie"
+  }
+ ]
+}

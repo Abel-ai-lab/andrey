@@ -77,6 +77,11 @@ _WEIGHTED_DAG = frozenset({"NOTEARS"})
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
 
 
+# Y-structures: candidate = the edgeless graph, the claimed ``[treatment, outcome]`` pairs by
+# descending score, and their scores.
+_CLAIMS = frozenset({"YStructures"})
+
+
 def found_dag(out: Any) -> GraphStructure:
     """The DAG an exact search found, which ``metadata["dag"]`` lists as ``[i, j]`` for ``i -> j``;
     the output's own structure is the DAG's CPDAG."""
@@ -128,6 +133,13 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
+    if algorithm in _CLAIMS:
+        claims = out.metadata["effects"]
+        return {
+            "graph": out.structure.to_numpy(),
+            "claims": [[c["treatment"], c["outcome"]] for c in claims],
+            "scores": [c["score"] for c in claims],
+        }
     if algorithm in _INVARIANT:
         return {
             "graph": out.structure.to_numpy(),

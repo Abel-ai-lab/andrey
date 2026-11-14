@@ -150,6 +150,7 @@ ALGORITHMS = {
     "PCMB": (_facade("pcmb"), "gauss_5v"),
     "HITONMB": (_facade("hiton_mb"), "gauss_5v"),
     "MMMB": (_facade("mmmb"), "gauss_5v"),
+    "YStructures": (_facade("y_structures"), "gauss_7v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),

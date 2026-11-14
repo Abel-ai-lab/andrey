@@ -80,12 +80,17 @@ names its pull request.
   columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
   Passing it with another test raises `ValueError`. ([#981])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
-  experimental: claims that one variable is a causal ancestor of another from a pattern of four
+  supported: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
   common causes allowed. Each claim is a record in `metadata["effects"]` with the paper's score and
   its patterns, and the graph has no edges; `extended=True` tests the extended Y-structure, and
   `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
-  runs it beside the authors' code. ([#959])
+  runs it beside the authors' code. On the datasets of the authors' simulation script, with and
+  without selection, both forms make the same claims as the authors' code on every dataset, so
+  they tie it on precision and average precision in all 12 settings, and the precision of their
+  claims is above the share of ancestral pairs in each. Under selection the tests' errors make many
+  claims wrong at 10,000 rows: on the random graphs with 16 variables, 35 of 65 claims were true,
+  and 133 of 475 with `extended=True`. ([#959], [#1016], [#1024])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
   its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
@@ -140,6 +145,11 @@ names its pull request.
   FCI on published networks as linear-Gaussian models with hidden nodes, and `y_structures_cpu.py`
   runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
   scores, and the contract that the adapter of an Andrey method fills. ([#912])
+- The Y-structures benchmark lane draws the selection variables of a random graph by a rule,
+  `--rule`: `authors`, the default, as the authors' simulation script draws them, the first among
+  the colliders and their descendants and the others among all other nodes; `text`, the harder
+  setting, as the paper's text describes them, among the leaves of the colliders' descendants.
+  `y_structures_summary.py` judges Andrey's claims against the authors' code per setting. ([#1024])
 - Scores for the answers of local methods, which may leave a question open.
   `andrey.metrics.target_oracle` and `effect_oracle` give the answer a method's definition gives on
   the true graph: a target's Markov blanket, its parents and children, or its edges in the true
@@ -2801,6 +2811,8 @@ First alpha release.
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
+[#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
+[#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
