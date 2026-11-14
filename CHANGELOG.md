@@ -51,7 +51,7 @@ names its pull request.
   at its paper's sizes, its sets were closer to the true ones in 11 of 13 settings and further in
   2, at 5,000 rows on hailfinder and insurance, where its symmetry check drops members the authors'
   code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
-  ([#957], [#PR])
+  ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
   authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
   parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
@@ -60,7 +60,7 @@ names its pull request.
   the set that separated the two and a parent or child of the target whose own set holds the
   variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
   al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
-  benchmark lane runs it beside the authors' MMMB. ([#965], [#PR])
+  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -2801,6 +2801,7 @@ First alpha release.
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
