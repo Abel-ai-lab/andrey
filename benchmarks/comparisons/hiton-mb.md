@@ -258,7 +258,7 @@ $ANDREY_BENCH_PYTHON benchmarks/blanket_summary.py 'hmb=out/hmb*' 'gh=out/gh*' -
 ```
 
 The driver's defaults supply the rest: `--indep-test gsq`, `--alpha 0.05`, and `--cap-wall-s` of
-1800 (3,600 on pigs). A rerun is the same command with `--first-seed 20` on the cells to rerun,
-into a folder its arm's pattern matches; the context arms are `'ctx=out/ctx*'` and `'gctx=out/gctx*'` with `--max-depth none` and the solutions
-`andrey.iamb,andrey.inter_iamb,andrey.gs,andrey.pcmb`. Times will differ with the hardware; the
-sets should match closely.
+1800 (3,600 on pigs). A rerun is the same command with `--first-seed 20` on the cells to rerun, into
+a folder its arm's pattern matches; the context arms are `'ctx=out/ctx*'` and `'gctx=out/gctx*'`
+with `--max-depth none` and the solutions `andrey.iamb,andrey.inter_iamb,andrey.gs,andrey.pcmb`.
+Times will differ with the hardware; the sets should match closely.

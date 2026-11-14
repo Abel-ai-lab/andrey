@@ -326,10 +326,10 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
 HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP
-against the truth's CPDAG, the LiNGAM methods, NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the DAG,
-MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint
-SHD against the PAG of the observed variables. CMB answers the last column, and counts the missing,
-extra, and mismarked edges there against the truth's CPDAG.
+against the truth's CPDAG, the LiNGAM methods, NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the
+DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by
+endpoint SHD against the PAG of the observed variables. CMB answers the last column, and counts the
+missing, extra, and mismarked edges there against the truth's CPDAG.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
