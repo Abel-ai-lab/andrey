@@ -161,8 +161,8 @@ reports only p-values is ordered by its p-value, smallest first.
 `"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
 of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
 values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
-Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
-paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
+Scheines 1993). The two differ only on sparse tables. `pcmb` and `mmmb` default to `"nonempty"`,
+the test their papers run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
 raises a `ValueError`.
 
 % concept: knowledge

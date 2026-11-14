@@ -458,6 +458,15 @@ _CONCEPTS = (
                 reason="Its paper runs G-square as Spirtes, Glymour and Scheines do (Pena et al. "
                 "2007, Section 3), whose degrees of freedom drop the cells with no expected count.",
             ),
+            Deviation(
+                method="mmmb",
+                name="degrees_of_freedom",
+                default="nonempty",
+                choices=DEGREES_OF_FREEDOM,
+                reason="Its paper runs G-square as Spirtes, Glymour and Scheines describe it "
+                "(Tsamardinos, Aliferis and Statnikov 2003, Section 2), whose degrees of freedom "
+                "drop the cells with no expected count.",
+            ),
         ),
     ),
     Concept(

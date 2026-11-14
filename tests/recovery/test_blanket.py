@@ -461,15 +461,16 @@ def test_a_mmmb_fit_repeats(kind):
 
 @pytest.mark.parametrize("kind", ["gaussian", "categorical"])
 def test_mmmb_parents_and_children_are_mmpcs(kind):
-    """MMMB's parents and children are MMPC's at the same settings and open its blanket, and its
-    skeleton is MMPC's."""
+    """MMMB's parents and children are MMPC's at the same settings and degrees of freedom and open
+    its blanket, and its skeleton is MMPC's."""
     sample, settings = _sample_of(kind)
+    same = settings | ({"degrees_of_freedom": "nonempty"} if kind == "categorical" else {})
     for v in range(sample.data.shape[1]):
         got = andrey.mmmb(sample.data, target=v, **settings).metadata
-        pc = andrey.mmpc(sample.data, target=v, **settings).metadata["parents_and_children"]
+        pc = andrey.mmpc(sample.data, target=v, **same).metadata["parents_and_children"]
         assert got["parents_and_children"] == pc == got["markov_blanket"][: len(pc)], v
     skeleton = andrey.mmmb(sample.data, structure="skeleton", **settings)
-    assert _named_edges(skeleton) == _named_edges(andrey.mmpc(sample.data, **settings))
+    assert _named_edges(skeleton) == _named_edges(andrey.mmpc(sample.data, **same))
 
 
 def test_mmmb_finds_the_blanket_on_the_graph_the_2003_form_gets_wrong():

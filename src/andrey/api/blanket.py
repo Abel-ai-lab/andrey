@@ -2054,7 +2054,7 @@ def mmmb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
-    degrees_of_freedom: str = "mean",
+    degrees_of_freedom: str = "nonempty",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -2099,13 +2099,14 @@ def mmmb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+    degrees_of_freedom : {"mean", "nonempty"}, default="nonempty"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        ``ValueError``. MMMB defaults to ``"nonempty"``, the degrees of freedom of the G-square
+        test its paper runs, after Spirtes, Glymour and Scheines [1]_ [10]_.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -2296,6 +2297,8 @@ def mmmb(
     .. [9] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
        discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
        1762-1770.
+    .. [10] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd edition. MIT Press.
 
     Examples
     --------
