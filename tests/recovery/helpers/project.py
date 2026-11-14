@@ -28,6 +28,7 @@ _GRAPH = (
             "HITONPC",
             "PCMB",
             "CMB",
+            "MMBbyMMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",

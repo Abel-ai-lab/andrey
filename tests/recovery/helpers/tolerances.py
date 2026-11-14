@@ -40,6 +40,7 @@ SPEC: dict[str, dict] = {
     "HITONPC": GRAPH_ONLY,
     "PCMB": GRAPH_ONLY,
     "CMB": GRAPH_ONLY,
+    "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,

@@ -1,0 +1,60 @@
+{
+  "algorithm": "MMBbyMMB",
+  "case": "confounded_gauss_5v",
+  "input": {
+    "case": "confounded_gauss_5v",
+    "column_order": [
+      0,
+      3,
+      2,
+      4,
+      1
+    ],
+    "seed": 20261013,
+    "sha256": "a47e9bccfc1d9b572abffae721e73bd882f48b917505755ece0886a7af0d3044",
+    "shape": [
+      2000,
+      5
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        3,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        1,
+        2
+      ],
+      [
+        0,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        0,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

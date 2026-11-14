@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure, data
-from andrey.core import ARROW, LATENT, TAIL
+from andrey.core import ARROW, CIRCLE, LATENT, TAIL
 from andrey.data import real
 from andrey.data.sortability import causal_depth, index_correlation
 from qa import quality_gate as qg
@@ -103,6 +103,28 @@ def test_target_cpdag_counts_the_edges_at_the_last_variable_alone() -> None:
     assert qg.shd(wrong, truth, "target_cpdag") == 2
     assert qg.shd(missing, truth, "target_cpdag") == 1
     assert qg.shd(qg.empty_graph(4, "target_cpdag"), truth, "target_cpdag") == 2
+
+
+def test_target_pag_counts_the_edges_at_the_last_variable_alone() -> None:
+    def pag(*edges: tuple[int, int, int, int]) -> GraphStructure:
+        """A PAG over four variables; each edge is ``(i, j, mark at i, mark at j)``."""
+        marks = np.zeros((4, 4), dtype=np.int8)
+        for i, j, at_i, at_j in edges:
+            marks[i, j], marks[j, i] = at_i, at_j
+        return GraphStructure.from_numpy(marks, kind="pag")
+
+    truth = pag((0, 3, TAIL, ARROW), (1, 3, CIRCLE, ARROW), (0, 1, TAIL, ARROW))
+    right = pag((0, 3, TAIL, ARROW), (1, 3, CIRCLE, ARROW))
+    # One edge at the last variable with a mark that differs and one the truth lacks; an edge the
+    # answer has between two other variables and the edge the truth has there count nothing.
+    wrong = pag(
+        (0, 3, TAIL, ARROW), (1, 3, CIRCLE, CIRCLE), (2, 3, TAIL, ARROW), (1, 2, ARROW, ARROW)
+    )
+    missing = pag((0, 3, TAIL, ARROW))
+    assert qg.shd(truth, truth, "target_pag") == qg.shd(right, truth, "target_pag") == 0
+    assert qg.shd(wrong, truth, "target_pag") == 2
+    assert qg.shd(missing, truth, "target_pag") == 1
+    assert qg.shd(qg.empty_graph(4, "target_pag"), truth, "target_pag") == 2
 
 
 def test_tolerance_is_two_sided() -> None:

@@ -82,6 +82,15 @@ def _run_target(name: str):
     return run
 
 
+def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The column of c, which has one edge of each kind the answer holds in this case's PAG,
+    # c -> e, b <-> c, and d o-> c; every other variable has one or two.
+    target = int(datagen.column_of("confounded_gauss_5v")[2])
+    return project_output(andrey.mmb_by_mmb(X, target=target), algorithm)
+
+
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -140,6 +149,7 @@ ALGORITHMS = {
     "HITONPC": (_facade("hiton_pc", structure="cpdag"), "gauss_5v"),
     "PCMB": (_facade("pcmb"), "gauss_5v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
+    "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),
